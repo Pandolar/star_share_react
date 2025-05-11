@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
+    "build:static": "next build",
+    "pack:deploy": "next build && tar -czvf dist.tar.gz dist",
     "start": "next start",
     "lint": "next lint"
   },
@@ -19,11 +21,13 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "embla-carousel-react": "^8.6.0",
+    "framer-motion": "^12.10.5",
     "lucide-react": "^0.503.0",
     "next": "15.3.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.56.1",
+    "react-markdown": "^10.1.0",
     "tailwind-merge": "^3.2.0",
     "zod": "^3.24.3"
   },

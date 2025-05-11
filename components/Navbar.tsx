@@ -8,13 +8,6 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
 
-  // 处理登录/注册按钮点击事件
-  const handleAuthClick = () => {
-    // 使用自定义事件通知其他组件显示登录框
-    const showLoginEvent = new CustomEvent('showLogin');
-    window.dispatchEvent(showLoginEvent);
-  }
-
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white shadow-sm">
       <div className="mx-auto w-full max-w-[1400px] px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between">
@@ -71,19 +64,21 @@ export function Navbar() {
             常见问题
           </Link>
           <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
-              className="border-navy-blue text-navy-blue hover:bg-navy-blue hover:text-white"
-              onClick={handleAuthClick}
-            >
-              登录
-            </Button>
-            <Button 
-              className="bg-navy-blue hover:bg-dark-blue"
-              onClick={handleAuthClick}
-            >
-              注册
-            </Button>
+            <Link href="/#auth-section">
+              <Button 
+                variant="outline" 
+                className="border-navy-blue text-navy-blue hover:bg-navy-blue hover:text-white"
+              >
+                登录
+              </Button>
+            </Link>
+            <Link href="/#auth-section">
+              <Button 
+                className="bg-navy-blue hover:bg-dark-blue"
+              >
+                注册
+              </Button>
+            </Link>
           </div>
         </nav>
         
@@ -140,25 +135,21 @@ export function Navbar() {
               >
                 常见问题
               </Link>
-              <Button 
-                variant="outline" 
-                className="border-navy-blue text-navy-blue hover:bg-navy-blue hover:text-white" 
-                onClick={() => {
-                  setIsOpen(false);
-                  handleAuthClick();
-                }}
-              >
-                登录
-              </Button>
-              <Button 
-                className="bg-navy-blue hover:bg-dark-blue" 
-                onClick={() => {
-                  setIsOpen(false);
-                  handleAuthClick();
-                }}
-              >
-                注册
-              </Button>
+              <Link href="/#auth-section" onClick={() => setIsOpen(false)}>
+                <Button 
+                  variant="outline" 
+                  className="w-full border-navy-blue text-navy-blue hover:bg-navy-blue hover:text-white"
+                >
+                  登录
+                </Button>
+              </Link>
+              <Link href="/#auth-section" onClick={() => setIsOpen(false)}>
+                <Button 
+                  className="w-full bg-navy-blue hover:bg-dark-blue"
+                >
+                  注册
+                </Button>
+              </Link>
             </nav>
           </SheetContent>
         </Sheet>

@@ -2,7 +2,7 @@ import './globals.css'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { Navbar } from '@/components/Navbar'
-// LoginBox is rendered conditionally in HeroSection, no need to add it here
+import { AnnouncementProvider } from '@/components/AnnouncementProvider'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -19,9 +19,10 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body className={inter.className}>
-        <Navbar />
-        <main>{children}</main>
-        {/* LoginBox moved to HeroSection with event-based rendering */}
+        <AnnouncementProvider>
+          <Navbar />
+          <main>{children}</main>
+        </AnnouncementProvider>
       </body>
     </html>
   )
