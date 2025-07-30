@@ -1,7 +1,0 @@
-# Netlify redirects file for SPA routing
-# API routes should not be affected
-/star/* /star/:splat 200
-/u/* /u/:splat 200
-
-# All other routes should serve index.html for client-side routing
-/* /index.html 200
