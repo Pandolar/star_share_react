@@ -1,0 +1,28 @@
+/* SubscriptionTab.module.css */
+
+/* Resetting global styles within the subscription tab container */
+#subscription-tab-container *,
+#subscription-tab-container *::before,
+#subscription-tab-container *::after {
+  box-sizing: border-box;
+}
+
+/* Ensure HeroUI components render correctly */
+#subscription-tab-container .heroui-button {
+  /* Restore any button styles that were being overridden */
+  border: 1px solid transparent;
+}
+
+#subscription-tab-container .heroui-card {
+  /* Ensure cards have consistent styling */
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+/* Add any other specific overrides needed to fix the layout */
+#subscription-tab-container .grid {
+  display: grid;
+}
+
+#subscription-tab-container .gap-6 {
+  gap: 1.5rem;
+} 

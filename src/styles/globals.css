@@ -1,0 +1,335 @@
+/* 全局样式文件 - 统一设计系统 */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* CSS变量定义 - 设计令牌 */
+:root {
+  /* 颜色系统 */
+  --color-primary: #006fee;
+  --color-primary-50: #e6f1fe;
+  --color-primary-100: #cce3fd;
+  --color-primary-500: #006fee;
+  --color-primary-600: #005bc4;
+  --color-primary-700: #004493;
+  
+  --color-success: #17c964;
+  --color-success-50: #e8faf0;
+  --color-success-100: #d1f4e0;
+  
+  --color-warning: #f5a524;
+  --color-warning-50: #fefce8;
+  --color-warning-100: #fef9c3;
+  
+  --color-danger: #f31260;
+  --color-danger-50: #fee7ef;
+  --color-danger-100: #fdd0df;
+  
+  /* 灰度系统 */
+  --color-default-50: #fafafa;
+  --color-default-100: #f4f4f5;
+  --color-default-200: #e4e4e7;
+  --color-default-300: #d4d4d8;
+  --color-default-400: #a1a1aa;
+  --color-default-500: #71717a;
+  --color-default-600: #52525b;
+  --color-default-700: #3f3f46;
+  --color-default-800: #27272a;
+  --color-default-900: #18181b;
+
+  /* 间距系统 */
+  --spacing-unit: 4px;
+  --spacing-1: calc(var(--spacing-unit) * 1); /* 4px */
+  --spacing-2: calc(var(--spacing-unit) * 2); /* 8px */
+  --spacing-3: calc(var(--spacing-unit) * 3); /* 12px */
+  --spacing-4: calc(var(--spacing-unit) * 4); /* 16px */
+  --spacing-5: calc(var(--spacing-unit) * 5); /* 20px */
+  --spacing-6: calc(var(--spacing-unit) * 6); /* 24px */
+  --spacing-8: calc(var(--spacing-unit) * 8); /* 32px */
+  
+  /* 圆角系统 */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  
+  /* 阴影系统 */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  
+  /* 动画参数 */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow: 350ms ease;
+}
+
+/* 基础重置 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-default-50);
+  color: var(--color-default-900);
+  line-height: 1.6;
+}
+
+/* 链接样式重置 */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: none;
+}
+
+/* 按钮重置 */
+button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* 输入框重置 */
+input, textarea, select {
+  font-family: inherit;
+}
+
+/* 工具类 */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--spacing-4);
+}
+
+@media (min-width: 640px) {
+  .container {
+    padding: 0 var(--spacing-6);
+  }
+}
+
+@media (min-width: 1024px) {
+  .container {
+    padding: 0 var(--spacing-8);
+  }
+}
+
+/* 文本工具类 */
+.text-primary {
+  color: var(--color-primary);
+}
+
+.text-success {
+  color: var(--color-success);
+}
+
+.text-warning {
+  color: var(--color-warning);
+}
+
+.text-danger {
+  color: var(--color-danger);
+}
+
+/* 背景工具类 */
+.bg-primary-50 {
+  background-color: var(--color-primary-50);
+}
+
+.bg-success-50 {
+  background-color: var(--color-success-50);
+}
+
+.bg-warning-50 {
+  background-color: var(--color-warning-50);
+}
+
+.bg-danger-50 {
+  background-color: var(--color-danger-50);
+}
+
+/* 动画工具类 */
+.transition-fast {
+  transition: all var(--transition-fast);
+}
+
+.transition-normal {
+  transition: all var(--transition-normal);
+}
+
+.transition-slow {
+  transition: all var(--transition-slow);
+}
+
+/* 布局工具类 */
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.flex-start {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+/* 响应式隐藏工具类 */
+.hidden-mobile {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .hidden-mobile {
+    display: block;
+  }
+  
+  .hidden-desktop {
+    display: none;
+  }
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-default-100);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-default-300);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-default-400);
+}
+
+/* Focus样式重置 - 完全去除聚焦边框 */
+*:focus,
+*:focus-visible,
+input:focus,
+textarea:focus,
+select:focus,
+button:focus,
+[data-focus="true"],
+[data-focused="true"],
+[data-focus-visible="true"] {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: inherit !important;
+}
+
+/* HeroUI 组件聚焦样式完全重置 */
+.heroui-input,
+.heroui-input input,
+.heroui-textarea,
+.heroui-textarea textarea,
+.heroui-select,
+.heroui-select select,
+.heroui-button,
+.heroui-button:focus,
+[class*="heroui-"]:focus,
+[class*="heroui-"] *:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: inherit !important;
+}
+
+.focus-visible:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* 页面过渡动画 */
+.page-enter {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity var(--transition-normal), transform var(--transition-normal);
+}
+
+.page-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.page-exit-active {
+  opacity: 0;
+  transform: translateY(-20px);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+/* 卡片样式统一 */
+.card-hover {
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* 状态颜色映射 */
+.status-active {
+  color: var(--color-success);
+  background-color: var(--color-success-50);
+}
+
+.status-inactive {
+  color: var(--color-default-500);
+  background-color: var(--color-default-100);
+}
+
+.status-pending {
+  color: var(--color-warning);
+  background-color: var(--color-warning-50);
+}
+
+.status-error {
+  color: var(--color-danger);
+  background-color: var(--color-danger-50);
+}
+
+/* 骨架屏动画 */
+@keyframes skeleton-loading {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--color-default-200) 25%, var(--color-default-100) 50%, var(--color-default-200) 75%);
+  background-size: 200px 100%;
+  animation: skeleton-loading 1.5s infinite;
+}

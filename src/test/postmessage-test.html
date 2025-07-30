@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PostMessage 退出登录测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        button {
+            padding: 12px 24px;
+            margin: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .primary:hover {
+            background: #0056b3;
+        }
+
+        .danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .danger:hover {
+            background: #c82333;
+        }
+
+        .success {
+            background: #28a745;
+            color: white;
+        }
+
+        .success:hover {
+            background: #1e7e34;
+        }
+
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 20px;
+            font-family: monospace;
+            font-size: 14px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+
+        .status.listening {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🧪 PostMessage 退出登录测试</h1>
+
+        <div id="status" class="status">准备中...</div>
+
+        <h2>测试按钮</h2>
+        <button class="primary" onclick="testNavigate()">测试普通导航</button>
+        <button class="primary" onclick="testNavigateNewWindow()">测试新窗口导航</button>
+        <button class="danger" onclick="testLogoutDefault()">测试退出登录（自动获取地址）</button>
+        <button class="danger" onclick="testLogoutCustom()">测试退出登录（自定义URL）</button>
+        <button class="success" onclick="clearLog()">清空日志</button>
+
+        <h2>📋 消息日志</h2>
+        <div id="log" class="log">等待消息...</div>
+    </div>
+
+    <script>
+        // 日志功能
+        const log = document.getElementById('log');
+        const status = document.getElementById('status');
+
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#007bff';
+            log.innerHTML += `<div style="color: ${color};">[${timestamp}] ${message}</div>`;
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function clearLog() {
+            log.innerHTML = '日志已清空...<br>';
+        }
+
+        // 设置消息监听（模拟您的主页面逻辑）
+        function setupMessageListener() {
+            addLog('✅ 消息监听已启动（不校验来源）', 'success');
+            status.className = 'status listening';
+            status.textContent = '✅ 正在监听消息...';
+
+            window.addEventListener('message', function (event) {
+                const data = event.data;
+
+                addLog(`📨 收到消息: ${JSON.stringify(data)}`);
+
+                // 仅检查必要字段（您的监听逻辑）
+                if (data && data.action === 'navigate' && typeof data.url === 'string') {
+                    addLog(`🎯 匹配导航消息，准备跳转到: ${data.url}`, 'success');
+
+                    if (data.newWindow === true) {
+                        addLog(`🔗 在新窗口打开: ${data.url}`, 'success');
+                        // window.open(data.url, '_blank'); // 实际测试时取消注释
+                        addLog(`⚠️ 新窗口打开已禁用（测试模式）`, 'info');
+                    } else {
+                        addLog(`➡️ 当前窗口跳转到: ${data.url}`, 'success');
+                        // window.location.href = data.url; // 实际测试时取消注释
+                        addLog(`⚠️ 页面跳转已禁用（测试模式）`, 'info');
+                    }
+                } else {
+                    addLog(`❌ 未知消息，已忽略`, 'error');
+                }
+            });
+        }
+
+        // 测试函数
+        function testNavigate() {
+            const message = {
+                action: 'navigate',
+                url: '/dashboard',
+                newWindow: false
+            };
+            addLog(`📤 发送消息: ${JSON.stringify(message)}`);
+            window.postMessage(message, '*');
+        }
+
+        function testNavigateNewWindow() {
+            const message = {
+                action: 'navigate',
+                url: 'https://example.com',
+                newWindow: true
+            };
+            addLog(`📤 发送消息: ${JSON.stringify(message)}`);
+            window.postMessage(message, '*');
+        }
+
+        function testLogoutDefault() {
+            // 模拟自动获取当前地址的逻辑
+            const currentOrigin = window.location.origin;
+            const currentPath = window.location.pathname;
+            let targetUrl;
+
+            if (currentPath.includes('/user-center')) {
+                targetUrl = currentOrigin + '/';
+            } else {
+                targetUrl = window.location.href;
+            }
+
+            const message = {
+                action: 'navigate',
+                url: targetUrl,
+                newWindow: false
+            };
+            addLog(`📤 发送退出登录消息（自动获取地址）: ${JSON.stringify(message)}`);
+            addLog(`🔍 当前地址: ${window.location.href}, 目标地址: ${targetUrl}`);
+            window.postMessage(message, '*');
+        }
+
+        function testLogoutCustom() {
+            const message = {
+                action: 'navigate',
+                url: '/login',
+                newWindow: false
+            };
+            addLog(`📤 发送退出登录消息（自定义登录页）: ${JSON.stringify(message)}`);
+            window.postMessage(message, '*');
+        }
+
+        // 初始化
+        setupMessageListener();
+        addLog('🚀 测试页面已加载', 'success');
+    </script>
+</body>
+
+</html>
