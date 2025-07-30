@@ -20,4 +20,3 @@ venv
 __pycache__
 .git
 data/
-build/
