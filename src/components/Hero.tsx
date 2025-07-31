@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useReducer, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Play, ArrowRight } from 'lucide-react';
-import config from '../config';
+import { useHomeInfo } from '../contexts/HomeInfoContext';
+import { HeroSlide } from '../types/homeInfo';
 
 // 轮播状态类型定义
 interface CarouselState {
@@ -244,45 +245,11 @@ const ANIMATION_CONFIG = {
 
 // Hero轮播组件 - 重构版本
 const Hero: React.FC = () => {
-  // 轮播数据
-  const slides: SlideData[] = useMemo(() => [
-    {
-      id: 1,
-      title: '国内直连镜像服务',
-      subtitle: '畅通无阻',
-      description: '国内任意网络，无需魔法畅通无阻，全球各大AI模型，为您服务',
-      image: 'https://niceaigc-cos.niceaigc.com/casdoor/resource/built-in/admin/Snipaste_2025-07-08_22-57-31.png',
-      gradient: 'from-purple-25 to-pink-25',
-      ctaText: '立即体验',
-      ctaUrl: config.links.chatService,
-      learnMoreText: '了解更多',
-      learnMoreUrl: config.links.chatService
-    },
-    {
-      id: 2,
-      title: 'Plus会员直充服务',
-      subtitle: '直充个人号',
-      description: '无需海外卡，无需繁琐步骤，国内微信/支付宝，1分钟直充自己账号，安全可靠',
-      image: 'https://niceaigc-cos.niceaigc.com/casdoor/resource/built-in/admin/kgWeN216754042602034_l.jpg',
-      gradient: 'from-blue-25 to-cyan-25',
-      ctaText: '立即充值',
-      ctaUrl: config.links.plusService,
-      learnMoreText: '产品详情',
-      learnMoreUrl: config.links.plusService
-    },
-    {
-      id: 3,
-      title: '全网聚合AI模型API服务',
-      subtitle: 'API',
-      description: '稳定AI模型API服务，支持多种模型，多种API，多种语言，多种场景',
-      image: 'https://niceaigc-cos.niceaigc.com/casdoor/resource/built-in/admin/Snipaste_2025-07-08_23-02-23.png',
-      gradient: 'from-green-25 to-emerald-25',
-      ctaText: '立刻接入',
-      ctaUrl: config.links.openPlatform,
-      learnMoreText: '',
-      learnMoreUrl: config.links.openPlatform
-    }
-  ], []);
+  const { homeInfo, loading } = useHomeInfo();
+
+  // 从homeInfo获取轮播数据
+  const slides: HeroSlide[] = useMemo(() => homeInfo.hero.slides, [homeInfo.hero.slides]);
+  const carouselInterval = useMemo(() => homeInfo.hero.autoPlayInterval, [homeInfo.hero.autoPlayInterval]);
 
   // 状态管理
   const [state, dispatch] = useReducer(carouselReducer, {
@@ -300,7 +267,7 @@ const Hero: React.FC = () => {
     dispatch,
     isAutoPlaying,
     slides.length,
-    config.business.carouselInterval
+    carouselInterval
   );
 
   useKeyboardNavigation(dispatch, slides.length);
@@ -325,7 +292,34 @@ const Hero: React.FC = () => {
     dispatch({ type: 'PREV_SLIDE', totalSlides: slides.length, isManual: true });
   }, [slides.length]);
 
-
+  // 如果正在加载，显示加载状态
+  if (loading || !currentSlideData) {
+    return (
+      <div className="w-full pt-20 pb-8 px-4 sm:px-6 lg:px-8">
+        <section className="relative group min-h-[600px] lg:h-[600px] max-w-7xl mx-auto overflow-hidden rounded-3xl shadow-2xl border border-gray-100 bg-gray-100 animate-pulse">
+          <div className="absolute inset-0 bg-white"></div>
+          <div className="relative z-10 h-full flex items-center py-8 lg:py-0">
+            <div className="w-full px-8 sm:px-12 lg:px-16">
+              <div className="grid grid-cols-1 lg:grid-cols-7 gap-6 lg:items-center">
+                <div className="text-gray-900 lg:col-span-3 order-2 lg:order-1 text-left">
+                  <div className="w-20 h-8 bg-gray-200 rounded-full mb-6 animate-pulse"></div>
+                  <div className="w-3/4 h-12 bg-gray-200 rounded mb-4 animate-pulse"></div>
+                  <div className="w-full h-6 bg-gray-200 rounded mb-6 animate-pulse"></div>
+                  <div className="flex space-x-4">
+                    <div className="w-32 h-12 bg-gray-200 rounded animate-pulse"></div>
+                    <div className="w-32 h-12 bg-gray-200 rounded animate-pulse"></div>
+                  </div>
+                </div>
+                <div className="lg:col-span-4 lg:pl-8 order-1 lg:order-2">
+                  <div className="aspect-[4/3] w-full max-w-sm sm:max-w-md lg:max-w-lg bg-gray-200 rounded-xl animate-pulse mx-auto lg:mx-0"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full pt-20 pb-8 px-4 sm:px-6 lg:px-8">
@@ -510,11 +504,10 @@ const Hero: React.FC = () => {
               key={index}
               onClick={() => goToSlide(index)}
               aria-label={`转到第 ${index + 1} 张幻灯片`}
-              className={`rounded-full transition-all duration-400 ease-out ${
-                index === currentSlide 
-                  ? 'w-6 h-2 bg-gray-900 shadow-lg' 
+              className={`rounded-full transition-all duration-400 ease-out ${index === currentSlide
+                  ? 'w-6 h-2 bg-gray-900 shadow-lg'
                   : 'w-2 h-2 bg-gray-600/60 hover:bg-gray-700/80'
-              }`}
+                }`}
             />
           ))}
         </div>

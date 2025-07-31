@@ -1,56 +1,12 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
-import config from '../config';
-
-// 按钮类型定义
-type ButtonType = 'text' | 'outline' | 'solid';
-type TargetType = '_blank' | '_self';
-
-interface NavAction {
-  name: string;
-  type: ButtonType;
-  url: string;
-  target: TargetType;
-}
-
-// 参数化配置
-const navActions: NavAction[] = [
-  {
-    name: '研究',
-    type: 'text',
-    url: '#research',
-    target: '_self',
-  },
-  {
-    name: '产品',
-    type: 'text',
-    url: '#products',
-    target: '_self',
-  },
-  {
-    name: '关于我们',
-    type: 'text',
-    url: '#about',
-    target: '_self',
-  },
-  {
-    name: '开放平台',
-    type: 'outline',
-    url: config.links.openPlatform,
-    target: '_blank',
-  },
-  {
-    name: '开始对话',
-    type: 'solid',
-    url: config.links.chatService,
-    target: '_blank',
-  },
-];
+import { useHomeInfo } from '../contexts/HomeInfoContext';
+import { NavAction as NavActionType, ButtonType, TargetType } from '../types/homeInfo';
 
 // 按钮渲染函数
 const renderNavAction = (
-  action: NavAction,
+  action: NavActionType,
   key: string | number,
   isMobile: boolean = false,
   onClick?: () => void
@@ -103,6 +59,27 @@ const renderNavAction = (
 // Header组件
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { homeInfo, loading } = useHomeInfo();
+
+  // 如果还在加载中，显示默认的导航
+  if (loading) {
+    return (
+      <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Loading skeleton */}
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-gray-200 rounded animate-pulse"></div>
+              <div className="w-24 h-6 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+          </div>
+        </div>
+      </header>
+    );
+  }
+
+  const { siteInfo, navigation } = homeInfo;
+  const navActions = navigation.navActions;
 
   // 拆分导航项和右侧按钮
   const navItems = navActions.filter((item) => item.type === 'text');
@@ -118,13 +95,13 @@ const Header: React.FC = () => {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            <img 
-              src="https://niceaigc-cos.niceaigc.com/casdoor/resource/built-in/admin/oai.svg" 
-              alt="Logo" 
+            <img
+              src={siteInfo.logoUrl}
+              alt="Logo"
               className="w-8 h-8"
             />
             <div className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              NiceAIGC
+              {siteInfo.siteName}
             </div>
           </motion.div>
 

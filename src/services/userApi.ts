@@ -139,6 +139,16 @@ export const announcementApi = {
             method: 'GET',
         });
     },
+    
+    // 获取公告信息和Home页面配置信息
+    getPublicAndHomeInfo: async (): Promise<ApiResponse<{ 
+        notice: string; 
+        home_info: import('../types/homeInfo').HomeInfo;
+    }>> => {
+        return createUserRequest(getUserApiUrl('/u/get_public_info'), {
+            method: 'GET',
+        });
+    },
 };
 
 // 用户信息API

@@ -14,94 +14,97 @@ import ProtectedRoute from './components/ProtectedRoute';
 import { ToastContainer } from './components/Toast';
 import { RedirectPage } from './pages/other';
 import { HeroUIProvider } from '@heroui/react';
+import { HomeInfoProvider } from './contexts/HomeInfoContext';
 
 const App: React.FC = () => {
   return (
     <HeroUIProvider>
-      <Router>
-        <div className="App">
-          {/* 全局Toast通知容器 */}
-          <ToastContainer />
-          <Routes>
-            {/* 主页路由 */}
-            <Route path="/" element={<HomePage />} />
+      <HomeInfoProvider>
+        <Router>
+          <div className="App">
+            {/* 全局Toast通知容器 */}
+            <ToastContainer />
+            <Routes>
+              {/* 主页路由 */}
+              <Route path="/" element={<HomePage />} />
 
-            {/* 用户中心路由 */}
-            <Route path="/user-center" element={<UserCenter />} />
+              {/* 用户中心路由 */}
+              <Route path="/user-center" element={<UserCenter />} />
 
-            {/* 其他功能路由 */}
-            <Route path="/handle_callback" element={<RedirectPage />} />
+              {/* 其他功能路由 */}
+              <Route path="/handle_callback" element={<RedirectPage />} />
 
-            {/* 管理员登录路由 */}
-            <Route path="/admin/login" element={<AdminLogin />} />
+              {/* 管理员登录路由 */}
+              <Route path="/admin/login" element={<AdminLogin />} />
 
-            {/* 管理员路由重定向 */}
-            <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+              {/* 管理员路由重定向 */}
+              <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
 
-            {/* 管理员路由 - 需要认证 */}
-            <Route
-              path="/admin/dashboard"
-              element={
-                <ProtectedRoute>
-                  <AdminLayout>
-                    <AdminDashboard />
-                  </AdminLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/packages"
-              element={
-                <ProtectedRoute>
-                  <AdminLayout>
-                    <AdminPackages />
-                  </AdminLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/users"
-              element={
-                <ProtectedRoute>
-                  <AdminLayout>
-                    <AdminUsers />
-                  </AdminLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/user-packages"
-              element={
-                <ProtectedRoute>
-                  <AdminLayout>
-                    <AdminUserPackages />
-                  </AdminLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/cdk"
-              element={
-                <ProtectedRoute>
-                  <AdminLayout>
-                    <AdminCDK />
-                  </AdminLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/config"
-              element={
-                <ProtectedRoute>
-                  <AdminLayout>
-                    <AdminConfig />
-                  </AdminLayout>
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
-        </div>
-      </Router>
+              {/* 管理员路由 - 需要认证 */}
+              <Route
+                path="/admin/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <AdminLayout>
+                      <AdminDashboard />
+                    </AdminLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/packages"
+                element={
+                  <ProtectedRoute>
+                    <AdminLayout>
+                      <AdminPackages />
+                    </AdminLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/users"
+                element={
+                  <ProtectedRoute>
+                    <AdminLayout>
+                      <AdminUsers />
+                    </AdminLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/user-packages"
+                element={
+                  <ProtectedRoute>
+                    <AdminLayout>
+                      <AdminUserPackages />
+                    </AdminLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/cdk"
+                element={
+                  <ProtectedRoute>
+                    <AdminLayout>
+                      <AdminCDK />
+                    </AdminLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/config"
+                element={
+                  <ProtectedRoute>
+                    <AdminLayout>
+                      <AdminConfig />
+                    </AdminLayout>
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </div>
+        </Router>
+      </HomeInfoProvider>
     </HeroUIProvider>
   );
 };
