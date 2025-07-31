@@ -276,10 +276,10 @@ const UserCenter: React.FC = () => {
                   {tabConfigs.map(tab => renderTabItem(tab, true))}
 
                   {/* 分隔线 */}
-                  <div className="my-6 border-t border-gray-200"></div>
+                  {/* <div className="my-6 border-t border-gray-200"></div> */}
 
                   {/* 退出登录按钮 */}
-                  <motion.button
+                  {/* <motion.button
                     onClick={() => {
                       setLogoutModalOpen(true);
                       setMobileMenuOpen(false);
@@ -292,7 +292,7 @@ const UserCenter: React.FC = () => {
                       <LogOut size={20} />
                     </span>
                     <span className="flex-1 font-medium">退出登录</span>
-                  </motion.button>
+                  </motion.button> */}
                 </nav>
               </motion.aside>
             )}
