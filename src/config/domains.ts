@@ -36,26 +36,26 @@ export interface DomainConfig {
  */
 export const domainConfig: DomainConfig = {
     // 主域名
-    mainDomain: 'niceaigc.com',
+    mainDomain: '183ai.com',
 
     // Cookie 作用域域名
-    cookieDomain: '.niceaigc.com',
+    cookieDomain: '.183ai.com',
 
     // API 基础URL
-    apiBaseUrl: 'https://niceaigc.com',
+    apiBaseUrl: 'https://183ai.com',
 
     // 登录API URL
-    loginApiUrl: 'https://niceaigc.com/u/login',
+    loginApiUrl: 'https://183ai.com/u/login',
 
     // 用户信息API URL
-    userInfoApiUrl: 'https://niceaigc.com/u/get_user_info',
+    userInfoApiUrl: 'https://183ai.com/u/get_user_info',
 
     // 静态资源域名
-    staticDomain: 'https://niceaigc.com',
+    staticDomain: 'https://183ai.com',
 
     // 跳转目标域名配置
     redirectTargets: {
-        'share': 'https://share.niceaigc.com/',
+        'share': 'https://share.183ai.com/',
         'zz': 'aa',
         // 在这里添加更多跳转目标
         // 'admin': 'https://admin.niceaigc.com/',

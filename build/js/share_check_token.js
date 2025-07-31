@@ -30,10 +30,10 @@ function clearCookies() {
 
 // 跳转到登录页面
 function redirectToLogin() {
-    const fromUrl = "https://static.niceaigc.com/handle_callback.html";
+    const fromUrl = "https://183ai.com/handle_callback";
     const domain = "share";
     
-    fetch(`https://niceaigc.com/u/login?from_url=${encodeURIComponent(fromUrl)}&domain=${encodeURIComponent(domain)}`)
+    fetch(`https://183ai.com/u/login?from_url=${encodeURIComponent(fromUrl)}&domain=${encodeURIComponent(domain)}`)
         .then(response => response.json())
         .then(data => {
             if (data.code === 20000) {
@@ -67,7 +67,7 @@ function checkCookiesAndRedirect() {
         setCookie("lastCheckTime", currentTime, 1);
 
         // 请求获取用户信息
-        fetch("http://niceaigc.com/u/get_user_info", {
+        fetch("http://183ai.com/u/get_user_info", {
             method: "GET",
             headers: {
                 "xuserid": xUserId,
@@ -94,7 +94,7 @@ function checkCookiesAndRedirect() {
         const allCookies = getAllCookies();
 
         // 发起带所有cookie的请求
-        fetch("https://share.niceaigc.com/client-api/info", {
+        fetch("https://share.183ai.com/client-api/info", {
             method: "GET",
             headers: {
                 "cache-control": "max-age=0",
@@ -106,7 +106,7 @@ function checkCookiesAndRedirect() {
         .then(data => {
             if (!data.user || !data.user.username) {
                 // 修改这里的跳转逻辑
-                window.location.href = `https://share.niceaigc.com/client-api/login?code=${xyUuidToken}&redirect=true`;
+                window.location.href = `https://share.183ai.com/client-api/login?code=${xyUuidToken}&redirect=true`;
             }
         })
         .catch(error => {
