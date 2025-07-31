@@ -12,6 +12,7 @@ import AdminCDK from './pages/admin/AdminCDK';
 import AdminConfig from './pages/admin/AdminConfig';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ToastContainer } from './components/Toast';
+import { RedirectPage } from './pages/other';
 import { HeroUIProvider } from '@heroui/react';
 
 const App: React.FC = () => {
@@ -27,6 +28,9 @@ const App: React.FC = () => {
 
             {/* 用户中心路由 */}
             <Route path="/user-center" element={<UserCenter />} />
+
+            {/* 其他功能路由 */}
+            <Route path="/handle_callback" element={<RedirectPage />} />
 
             {/* 管理员登录路由 */}
             <Route path="/admin/login" element={<AdminLogin />} />

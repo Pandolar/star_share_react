@@ -2,6 +2,8 @@
  * Cookie管理工具函数
  */
 
+import { domainConfig, getCasdoorLogoutUrl } from '../config/domains';
+
 // 获取当前域名信息
 const getCurrentDomain = (): { currentDomain: string; mainDomain: string } => {
   const hostname = window.location.hostname;
@@ -90,10 +92,10 @@ const clearAllRelatedCookies = (currentDomain: string, mainDomain: string): void
         document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
 
         // 2. 删除主域名的cookie
-        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=niceaigc.com`;
+        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${domainConfig.mainDomain}`;
 
         // 3. 删除.主域名的cookie (这个是关键！)
-        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=.niceaigc.com`;
+        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${domainConfig.cookieDomain}`;
 
         // 4. 删除当前完整域名
         document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${window.location.hostname}`;
@@ -103,15 +105,15 @@ const clearAllRelatedCookies = (currentDomain: string, mainDomain: string): void
 
         // 6. 带secure属性的删除
         document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; secure`;
-        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=niceaigc.com; secure`;
-        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=.niceaigc.com; secure`;
+        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${domainConfig.mainDomain}; secure`;
+        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${domainConfig.cookieDomain}; secure`;
 
         // 7. 不同路径的删除
         const paths = ['/', '', window.location.pathname];
         paths.forEach(path => {
           document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=${path}`;
-          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=${path}; domain=niceaigc.com`;
-          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=${path}; domain=.niceaigc.com`;
+          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=${path}; domain=${domainConfig.mainDomain}`;
+          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=${path}; domain=${domainConfig.cookieDomain}`;
         });
       }
     });
@@ -130,8 +132,8 @@ const clearAllRelatedCookies = (currentDomain: string, mainDomain: string): void
     criticalCookies.forEach(cookieName => {
       // 多种删除方式确保清除
       document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
-      document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=niceaigc.com`;
-      document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=.niceaigc.com`;
+      document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${domainConfig.mainDomain}`;
+      document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${domainConfig.cookieDomain}`;
       document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${window.location.hostname}`;
       document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=.${window.location.hostname}`;
     });
@@ -151,14 +153,14 @@ const clearAllRelatedCookies = (currentDomain: string, mainDomain: string): void
         if (cookieName) {
           // 超级暴力删除
           document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
-          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=.niceaigc.com`;
-          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=niceaigc.com`;
-          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=; domain=.niceaigc.com`;
-          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; domain=.niceaigc.com`;
+          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${domainConfig.cookieDomain}`;
+          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${domainConfig.mainDomain}`;
+          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=; domain=${domainConfig.cookieDomain}`;
+          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; domain=${domainConfig.cookieDomain}`;
 
           // 尝试空值设置
-          document.cookie = `${cookieName}=; max-age=0; path=/; domain=.niceaigc.com`;
-          document.cookie = `${cookieName}=; max-age=0; path=/; domain=niceaigc.com`;
+          document.cookie = `${cookieName}=; max-age=0; path=/; domain=${domainConfig.cookieDomain}`;
+          document.cookie = `${cookieName}=; max-age=0; path=/; domain=${domainConfig.mainDomain}`;
         }
       });
     }
@@ -174,7 +176,7 @@ const clearAllRelatedCookies = (currentDomain: string, mainDomain: string): void
         const cookieName = cookie.split('=')[0].trim();
         if (cookieName) {
           document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
-          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=.niceaigc.com`;
+          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${domainConfig.cookieDomain}`;
         }
       });
     } catch (basicError) {
@@ -198,7 +200,7 @@ const notifyParentToDeleteCookies = (): void => {
     if (window.parent && window.parent !== window) {
       window.parent.postMessage({
         action: 'deleteCookies',
-        domain: '.niceaigc.com',
+        domain: domainConfig.cookieDomain,
         cookies: document.cookie.split(';').map(c => c.split('=')[0].trim()).filter(name => name)
       }, '*');
       console.log('📤 已通知父页面删除cookies');
@@ -288,12 +290,7 @@ export const logout = async (): Promise<void> => {
     console.log('🔗 重定向URI:', redirectUri);
 
     // 构造Casdoor logout URL
-    let casdoorLogoutUrl = `https://casdoor.niceaigc.com/api/logout?post_logout_redirect_uri=${encodeURIComponent(redirectUri)}`;
-
-    // 如果有cas_access_token，添加id_token_hint参数
-    if (casAccessToken) {
-      casdoorLogoutUrl += `&id_token_hint=${encodeURIComponent(casAccessToken)}`;
-    }
+    const casdoorLogoutUrl = getCasdoorLogoutUrl(redirectUri, casAccessToken || undefined);
 
     console.log('🎯 最终跳转URL:', casdoorLogoutUrl);
 
@@ -338,16 +335,16 @@ export const logout = async (): Promise<void> => {
         const cookieName = cookie.split('=')[0].trim();
         if (cookieName) {
           document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
-          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=.niceaigc.com`;
+          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${domainConfig.cookieDomain}`;
         }
       });
 
       console.log('🛡️ 应急清理完成，强制跳转到主页');
       // 应急跳转
       if (inIframe) {
-        window.parent.postMessage({ action: 'logout_redirect', url: 'https://niceaigc.com/' }, '*');
+        window.parent.postMessage({ action: 'logout_redirect', url: `https://${domainConfig.mainDomain}/` }, '*');
       }
-      window.location.href = 'https://niceaigc.com/';
+      window.location.href = `https://${domainConfig.mainDomain}/`;
     } catch (emergencyError) {
       console.error('❌ 应急清理也失败了:', emergencyError);
       // 最后的手段
