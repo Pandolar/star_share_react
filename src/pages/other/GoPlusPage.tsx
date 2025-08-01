@@ -168,6 +168,10 @@ const GoPlusPage: React.FC = () => {
         {
             question: '会封号吗？会降智吗',
             answer: '我们只是提供一个充值渠道，不会对您的账号进行任何操作。\n我们建议您使用固定的欧美的ip进行使用，且尽量不要和他人共享账号。'
+        },
+        {
+            question: '没到期可以续费吗？',
+            answer: '可以不到期续费，但是不能叠加，比如您原有的plus到8月15日过期，今天是7月25，您再使用自助激活的话，只能将会员续费到8月25日而不是叠加，所以建议过期后或过期前一天再进行续费。'
         }
     ];
 
@@ -537,7 +541,7 @@ const GoPlusPage: React.FC = () => {
                         <CardBody className="p-6">
                             <div className="flex items-center space-x-3 mb-4">
                                 <Zap className="w-8 h-8 text-primary" />
-                                <h2 className="text-2xl font-semibold text-gray-900">极简步骤</h2>
+                                <h2 className="text-2xl font-semibold text-gray-900">极简步骤，一分钟搞定！</h2>
                             </div>
                             <div className="text-lg text-gray-700 space-y-2">
                                 <p><span className="font-semibold text-primary">第一步.</span> 登录ChatGPT官网后，复制JSON到本页面</p>
