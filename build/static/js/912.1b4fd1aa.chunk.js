@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunkstar_share_web=self.webpackChunkstar_share_web||[]).push([[912],{5912:(e,s,a)=>{a.r(s),a.d(s,{default:()=>r});var r=a(1).l}}]);
+//# sourceMappingURL=912.1b4fd1aa.chunk.js.map

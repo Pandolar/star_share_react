@@ -13,7 +13,7 @@ import AdminCDK from './pages/admin/AdminCDK';
 import AdminConfig from './pages/admin/AdminConfig';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ToastContainer } from './components/Toast';
-import { RedirectPage } from './pages/other';
+import { RedirectPage, GoPlusPage } from './pages/other';
 import { HeroUIProvider } from '@heroui/react';
 import { HomeInfoProvider } from './contexts/HomeInfoContext';
 
@@ -35,6 +35,7 @@ const App: React.FC = () => {
 
                 {/* 其他功能路由 */}
                 <Route path="/handle_callback" element={<RedirectPage />} />
+                <Route path="/goplus" element={<GoPlusPage />} />
 
                 {/* 管理员登录路由 */}
                 <Route path="/admin/login" element={<AdminLogin />} />
