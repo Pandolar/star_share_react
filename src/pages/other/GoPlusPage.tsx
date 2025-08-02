@@ -28,12 +28,14 @@ import {
 import QRCodeGenerator from 'qrcode-generator';
 import { showMessage } from '../../utils/toast';
 
+
 // 导航链接接口
 interface NavLink {
     label: string;
     href: string;
     external?: boolean;
 }
+
 
 // 页面配置接口
 interface PageConfig {
@@ -45,6 +47,7 @@ interface PageConfig {
     videoTutorialUrl: string;
     supportContact: string;
 }
+
 
 // 默认配置
 const defaultConfig: PageConfig = {
@@ -60,8 +63,10 @@ const defaultConfig: PageConfig = {
     supportContact: 'https://example.com/support'
 };
 
+
 // 充值步骤类型
 type RechargeStepType = 'json_input' | 'json_verify' | 'payment' | 'processing' | 'success';
+
 
 // 充值步骤常量
 const RechargeStep = {
@@ -71,6 +76,7 @@ const RechargeStep = {
     PROCESSING: 'processing' as const,
     SUCCESS: 'success' as const
 };
+
 
 // 订单信息接口
 interface OrderInfo {
@@ -84,12 +90,14 @@ interface OrderInfo {
     package_name: string;
 }
 
+
 // 订单状态接口
 interface OrderStatus {
     status: string;
     order_id: string;
     message: string;
 }
+
 
 // JSON验证状态接口
 interface JsonValidationState {
@@ -98,9 +106,11 @@ interface JsonValidationState {
     errorMessage?: string;     // 错误信息
 }
 
+
 const GoPlusPage: React.FC = () => {
     // 配置状态
     const [config] = useState<PageConfig>(defaultConfig);
+
 
     // 充值相关状态
     const [currentStep, setCurrentStep] = useState<RechargeStepType>(RechargeStep.JSON_INPUT);
@@ -121,8 +131,16 @@ const GoPlusPage: React.FC = () => {
         hasAllFields: false
     });
 
+
     // Modal控制
     const { isOpen: isPaymentModalOpen, onOpen: openPaymentModal, onOpenChange: onPaymentModalChange } = useDisclosure();
+
+    // **新增：充值等待/结果弹窗控制**
+    const { isOpen: isRechargeModalOpen, onOpen: openRechargeModal, onOpenChange: onRechargeModalChange } = useDisclosure();
+    const [rechargeStatus, setRechargeStatus] = useState<'idle' | 'waiting' | 'success' | 'error'>('idle');
+    const [rechargeMessage, setRechargeMessage] = useState<string>('');
+    const [rechargeRaw, setRechargeRaw] = useState<any>(null);
+
 
     // 特点数据
     const features = [
@@ -147,6 +165,7 @@ const GoPlusPage: React.FC = () => {
             description: '采用高级加密，保护您的隐私'
         }
     ];
+
 
     // FAQ数据
     const faqData = [
@@ -186,6 +205,7 @@ const GoPlusPage: React.FC = () => {
         }
     ];
 
+
     // 清理定时器
     useEffect(() => {
         return () => {
@@ -195,6 +215,7 @@ const GoPlusPage: React.FC = () => {
         };
     }, [paymentTimer]);
 
+
     // 实时验证JSON - 先验证格式，再验证字段
     useEffect(() => {
         // 延迟验证，避免输入过程中频繁验证
@@ -202,8 +223,10 @@ const GoPlusPage: React.FC = () => {
             validateJsonInput(jsonInput);
         }, 500);
 
+
         return () => clearTimeout(delayDebounceFn);
     }, [jsonInput]);
+
 
     // 二维码过期计时器
     useEffect(() => {
@@ -237,6 +260,7 @@ const GoPlusPage: React.FC = () => {
         };
     }, [qrCodeExpiryTime, isQrCodeExpired, paymentTimer]);
 
+
     // 生成二维码
     const generateQRCode = (text: string): string => {
         const qr = QRCodeGenerator(0, 'M');
@@ -244,6 +268,7 @@ const GoPlusPage: React.FC = () => {
         qr.make();
         return qr.createDataURL(8, 4);
     };
+
 
     // 验证JSON输入（先验证格式，再验证字段）
     const validateJsonInput = (input: string) => {
@@ -258,6 +283,7 @@ const GoPlusPage: React.FC = () => {
             return;
         }
 
+
         // 第一步：验证JSON格式
         try {
             const parsed = JSON.parse(input);
@@ -270,17 +296,19 @@ const GoPlusPage: React.FC = () => {
             const requiredFields = ['user.id', 'user.email', 'account.id', 'accessToken'];
             const missingFields: string[] = [];
 
+
             requiredFields.forEach(field => {
                 const keys = field.split('.');
                 let current = parsed;
                 for (let key of keys) {
-                    if (!current || !current.hasOwnProperty(key)) {
+                    if (!current || !Object.prototype.hasOwnProperty.call(current, key)) {
                         missingFields.push(field);
                         break;
                     }
                     current = current[key];
                 }
             });
+
 
             if (missingFields.length > 0) {
                 setValidationState({
@@ -306,6 +334,7 @@ const GoPlusPage: React.FC = () => {
         }
     };
 
+
     // 验证并进入下一步
     const validateAndProceed = () => {
         // 先检查JSON格式是否有效
@@ -325,6 +354,7 @@ const GoPlusPage: React.FC = () => {
         showMessage.success('JSON验证通过，包含所有必要字段');
     };
 
+
     // 创建订单
     const createOrder = async () => {
         setIsLoading(true);
@@ -337,7 +367,9 @@ const GoPlusPage: React.FC = () => {
                 body: JSON.stringify({})
             });
 
+
             const result = await response.json();
+
 
             if (result.code === 20000 && result.data.success) {
                 setOrderInfo(result.data);
@@ -361,6 +393,7 @@ const GoPlusPage: React.FC = () => {
         }
     };
 
+
     // 开始支付状态检查
     const startPaymentCheck = (orderId: string) => {
         const checkPayment = async () => {
@@ -371,16 +404,19 @@ const GoPlusPage: React.FC = () => {
                 const response = await fetch(`/u/go_plus_order?order_id=${orderId}`);
                 const result = await response.json();
 
+
                 if (result.code === 20000) {
                     const status: OrderStatus = result.data;
 
+
                     if (status.status === 'success') {
-                        // 支付成功，进行实际充值
+                        // 支付成功 -> 关闭支付弹窗 -> 进入充值等待弹窗并调用充值
                         setCurrentStep(RechargeStep.PROCESSING);
-                        onPaymentModalChange();
-                        performRecharge(orderId);
+                        onPaymentModalChange(); // 关闭支付弹窗
+                        performRecharge(orderId); // 进入充值流程（内部会打开等待弹窗）
                         return;
                     }
+
 
                     if (status.status === 'failed') {
                         // 继续检查
@@ -396,13 +432,21 @@ const GoPlusPage: React.FC = () => {
             }
         };
 
+
         // 开始第一次检查
         const timer = setTimeout(checkPayment, 2000);
         setPaymentTimer(timer);
     };
 
-    // 执行充值
+
+    // 执行充值（显示等待弹窗；成功或失败在该弹窗内提示）
     const performRecharge = async (orderId: string) => {
+        // 打开“正在充值”弹窗
+        setRechargeStatus('waiting');
+        setRechargeMessage('正在充值... 请稍等10~60秒');
+        setRechargeRaw(null);
+        openRechargeModal();
+
         try {
             const response = await fetch('/u/go_plus', {
                 method: 'POST',
@@ -415,18 +459,31 @@ const GoPlusPage: React.FC = () => {
                 })
             });
 
+            // 这里接口可能耗时较长
             const result = await response.json();
+            setRechargeRaw(result);
 
             if (result.code === 20000 && result.msg === 'ok') {
+                setRechargeStatus('success');
+                setRechargeMessage('充值成功！请返回ChatGPT官网刷新！如有任何问题请联系客服~');
                 setCurrentStep(RechargeStep.SUCCESS);
-                showMessage.success('充值成功！请返回ChatGPT官网查看');
+                showMessage.success('充值成功！');
             } else {
-                showMessage.error('充值失败，请联系客服');
+                setRechargeStatus('error');
+                setRechargeMessage('充值失败：请截图下方返回信息并联系在线客服处理');
+                showMessage.error('充值失败，请查看弹窗信息并联系售后');
             }
-        } catch (error) {
+        } catch (error: any) {
+            setRechargeStatus('error');
+            setRechargeMessage('充值失败：网络错误。请截图下方信息并联系在线客服处理');
+            setRechargeRaw({
+                error: 'network_error',
+                message: error?.message || '未知错误'
+            });
             showMessage.error('执行充值失败: 网络错误，请联系客服');
         }
     };
+
 
     // 重置流程
     const resetProcess = () => {
@@ -437,6 +494,9 @@ const GoPlusPage: React.FC = () => {
         setQrCodeExpiryTime(null);
         setIsQrCodeExpired(false);
         setRemainingTime(300);
+        setRechargeStatus('idle');
+        setRechargeMessage('');
+        setRechargeRaw(null);
         
         if (paymentTimer) {
             clearTimeout(paymentTimer);
@@ -444,12 +504,14 @@ const GoPlusPage: React.FC = () => {
         }
     };
 
+
     // 格式化剩余时间为分:秒格式
     const formatRemainingTime = (seconds: number): string => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
+
 
     // 复制示例JSON
     const copyExampleJson = () => {
@@ -480,9 +542,11 @@ const GoPlusPage: React.FC = () => {
             }
         }, null, 2);
 
+
         navigator.clipboard.writeText(exampleJson);
         showMessage.success('示例JSON已复制到剪贴板');
     };
+
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -517,6 +581,7 @@ const GoPlusPage: React.FC = () => {
                             </div>
                         </div>
 
+
                         {/* 导航链接 */}
                         <div className="hidden md:flex items-center space-x-6">
                             {config.navLinks.map((link, index) => (
@@ -534,6 +599,7 @@ const GoPlusPage: React.FC = () => {
                             ))}
                         </div>
 
+
                         {/* 移动端菜单按钮 */}
                         <div className="md:hidden">
                             <Button
@@ -549,6 +615,7 @@ const GoPlusPage: React.FC = () => {
                 </div>
             </nav>
 
+
             <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 {/* 标题区域 */}
                 <motion.div
@@ -563,6 +630,7 @@ const GoPlusPage: React.FC = () => {
                         安全快速，专业可靠的ChatGPT Plus充值服务
                     </p>
                 </motion.div>
+
 
                 {/* 特点栏 */}
                 <motion.div
@@ -594,6 +662,7 @@ const GoPlusPage: React.FC = () => {
                     </div>
                 </motion.div>
 
+
                 {/* 教程栏 */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
@@ -615,6 +684,7 @@ const GoPlusPage: React.FC = () => {
                     </Card>
                 </motion.div>
 
+
                 {/* 充值栏 */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
@@ -625,6 +695,7 @@ const GoPlusPage: React.FC = () => {
                     <Card className="shadow-lg">
                         <CardBody className="p-8">
                             <h2 className="text-2xl font-semibold text-gray-900 mb-6">开始充值</h2>
+
 
                             <AnimatePresence mode="wait">
                                 {currentStep === RechargeStep.JSON_INPUT && (
@@ -667,6 +738,7 @@ const GoPlusPage: React.FC = () => {
                                                 </div>
                                             </div>
                                         </div>
+
 
                                         <div className="space-y-4">
                                             {/* JSON输入框 */}
@@ -726,7 +798,9 @@ const GoPlusPage: React.FC = () => {
                                             </div>
                                         </div>
 
+
                                         {/* 示例JSON手风琴 */}
+
 
                                             <CardBody className="p-6">
                                                 <Accordion variant="splitted">
@@ -778,8 +852,10 @@ const GoPlusPage: React.FC = () => {
                                                 </Accordion>
                                             </CardBody>
 
+
                                     </motion.div>
                                 )}
+
 
                                 {currentStep === RechargeStep.JSON_VERIFY && (
                                     <motion.div
@@ -795,6 +871,7 @@ const GoPlusPage: React.FC = () => {
                                                 <span className="text-green-800 font-medium">确认邮箱无误后请点击下一步！</span>
                                             </div>
                                         </div>
+
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                             {/* <div>
@@ -820,6 +897,7 @@ const GoPlusPage: React.FC = () => {
                                             </div> */}
                                         </div>
 
+
                                         <div className="flex flex-col sm:flex-row gap-4">
                                             <Button
                                                 color="primary"
@@ -839,6 +917,7 @@ const GoPlusPage: React.FC = () => {
                                     </motion.div>
                                 )}
 
+
                                 {currentStep === RechargeStep.PROCESSING && (
                                     <motion.div
                                         key="processing"
@@ -854,6 +933,7 @@ const GoPlusPage: React.FC = () => {
                                         </div>
                                     </motion.div>
                                 )}
+
 
                                 {currentStep === RechargeStep.SUCCESS && (
                                     <motion.div
@@ -897,6 +977,7 @@ const GoPlusPage: React.FC = () => {
                     </Card>
                 </motion.div>
 
+
                 {/* 帮助中心 - 手风琴样式 */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
@@ -939,6 +1020,7 @@ const GoPlusPage: React.FC = () => {
                             </CardBody>
                         </Card> */}
 
+
                         {/* 常见问题 */}
                         <Card>
                             <CardBody className="p-6">
@@ -958,6 +1040,7 @@ const GoPlusPage: React.FC = () => {
                                 </Accordion>
                             </CardBody>
                         </Card>
+
 
                         {/* 联系客服 */}
                         <Card>
@@ -994,6 +1077,7 @@ const GoPlusPage: React.FC = () => {
                     </div>
                 </motion.div>
             </div>
+
 
             {/* 支付Modal */}
             <Modal
@@ -1043,6 +1127,7 @@ const GoPlusPage: React.FC = () => {
                                                 </div>
                                             )}
                                         </div>
+
 
                                         {/* 现代化订单信息卡片 */}
                                         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -1133,8 +1218,116 @@ const GoPlusPage: React.FC = () => {
                     )}
                 </ModalContent>
             </Modal>
+
+            {/* **新增：充值等待/结果 Modal** */}
+            <Modal
+                isOpen={isRechargeModalOpen}
+                onOpenChange={onRechargeModalChange}
+                size="md"
+                hideCloseButton
+                isDismissable={false}
+            >
+                <ModalContent>
+                    {(onClose) => (
+                        <>
+                            <ModalHeader className="flex items-center gap-2">
+                                {rechargeStatus === 'waiting' && '正在充值'}
+                                {rechargeStatus === 'success' && '充值成功'}
+                                {rechargeStatus === 'error' && '充值失败'}
+                            </ModalHeader>
+                            <ModalBody>
+                                {rechargeStatus === 'waiting' && (
+                                    <div className="text-center space-y-4">
+                                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                                        <p className="text-gray-800 font-medium">{rechargeMessage}</p>
+                                        <p className="text-gray-500 text-sm">通常耗时约 10 ~ 60 秒，请耐心等待...</p>
+                                    </div>
+                                )}
+
+                                {rechargeStatus === 'success' && (
+                                    <div className="text-center space-y-4">
+                                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                                            <CheckCircle className="w-8 h-8 text-green-600" />
+                                        </div>
+                                        <p className="text-gray-800 font-medium">{rechargeMessage}</p>
+                                    </div>
+                                )}
+
+                                {rechargeStatus === 'error' && (
+                                    <div className="space-y-4">
+                                        <div className="text-center">
+                                            <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-2" />
+                                            <p className="text-red-700 font-semibold">{rechargeMessage}</p>
+                                            <p className="text-gray-500 text-sm">请截图下方返回信息并发送给客服协助处理。</p>
+                                        </div>
+                                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-72 overflow-auto">
+                                            <pre className="text-xs text-gray-800 break-all whitespace-pre-wrap">
+{JSON.stringify(rechargeRaw, null, 2)}
+                                            </pre>
+                                        </div>
+                                    </div>
+                                )}
+                            </ModalBody>
+                            <ModalFooter>
+                                {rechargeStatus === 'success' && (
+                                    <>
+                                        <Button
+                                            color="primary"
+                                            as="a"
+                                            href="https://chatgpt.com/"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            startContent={<ExternalLink className="w-4 h-4" />}
+                                        >
+                                            返回ChatGPT官网
+                                        </Button>
+                                        <Button
+                                            variant="bordered"
+                                            onPress={() => {
+                                                onClose();
+                                            }}
+                                        >
+                                            关闭
+                                        </Button>
+                                    </>
+                                )}
+
+                                {rechargeStatus === 'waiting' && (
+                                    <Button variant="bordered" isDisabled>
+                                        正在充值...
+                                    </Button>
+                                )}
+
+                                {rechargeStatus === 'error' && (
+                                    <>
+                                        <Button
+                                            variant="flat"
+                                            as="a"
+                                            href={config.supportContact}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            startContent={<MessageCircle className="w-4 h-4" />}
+                                        >
+                                            联系客服
+                                        </Button>
+                                        <Button
+                                            color="primary"
+                                            onPress={() => {
+                                                onClose();
+                                            }}
+                                        >
+                                            我已截图，关闭
+                                        </Button>
+                                    </>
+                                )}
+                            </ModalFooter>
+                        </>
+                    )}
+                </ModalContent>
+            </Modal>
         </div>
     );
 };
+
 
 export default GoPlusPage;
