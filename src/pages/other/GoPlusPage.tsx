@@ -1035,9 +1035,11 @@ const GoPlusPage: React.FC = () => {
                                             
                                             {/* 倒计时提示 */}
                                             {!isQrCodeExpired && (
-                                                <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 bg-red-500 text-white text-xs px-3 py-1 rounded-full flex items-center">
-                                                    <Clock8 className="w-3 h-3 mr-1" />
-                                                    剩余时间: {formatRemainingTime(remainingTime)}
+                                                <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-yellow-900 text-xs px-4 py-1.5 rounded-full flex items-center shadow-lg border border-yellow-300 font-semibold transition-all duration-300">
+                                                    <Clock8 className="w-4 h-4 mr-2 text-yellow-700" />
+                                                    <span>
+                                                        剩余时间：<span className="font-bold">{formatRemainingTime(remainingTime)}</span>
+                                                    </span>
                                                 </div>
                                             )}
                                         </div>
@@ -1050,7 +1052,14 @@ const GoPlusPage: React.FC = () => {
                                                         <Tag className="w-4 h-4 mr-2 text-primary" />
                                                         <span>订单信息</span>
                                                     </div>
-                                                    <span className="text-xs font-medium px-2 py-1 bg-blue-50 text-blue-600 rounded-full">
+                                                    <span
+                                                        className={`text-base font-semibold px-4 py-2 rounded-full
+                                                            ${orderInfo.pay_type === 'wxpay'
+                                                                ? 'bg-green-100 text-green-700'
+                                                                : 'bg-blue-100 text-blue-700'
+                                                            }`
+                                                        }
+                                                    >
                                                         {orderInfo.pay_type === 'wxpay' ? '微信支付' : '支付宝'}
                                                     </span>
                                                 </div>
