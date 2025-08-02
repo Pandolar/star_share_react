@@ -70,12 +70,12 @@ const tabConfigs: TabConfig[] = [
   //   icon: <Book size={20} />,
   //   component: TutorialTab
   // },
-  {
-    key: 'contact',
-    label: '联系我们',
-    icon: <MessageCircle size={20} />,
-    component: ContactTab
-  }
+  // {
+  //   key: 'contact',
+  //   label: '联系我们',
+  //   icon: <MessageCircle size={20} />,
+  //   component: ContactTab
+  // }
 ];
 
 const UserCenter: React.FC = () => {

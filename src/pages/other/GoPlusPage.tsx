@@ -132,8 +132,12 @@ const GoPlusPage: React.FC = () => {
     });
 
 
-    // Modal控制
-    const { isOpen: isPaymentModalOpen, onOpen: openPaymentModal, onOpenChange: onPaymentModalChange } = useDisclosure();
+    const {
+        isOpen: isPaymentModalOpen,
+        onOpen: openPaymentModal,
+        onClose: closePaymentModal, 
+        onOpenChange: onPaymentModalChange
+      } = useDisclosure();
 
     // **新增：充值等待/结果弹窗控制**
     const { isOpen: isRechargeModalOpen, onOpen: openRechargeModal, onOpenChange: onRechargeModalChange } = useDisclosure();
@@ -204,7 +208,39 @@ const GoPlusPage: React.FC = () => {
             answer: '可以不到期续费，但是不能叠加，比如您原有的plus到8月15日过期，今天是7月25，您再使用自助激活的话，只能将会员续费到8月25日而不是叠加，所以建议过期后或过期前一天再进行续费。'
         }
     ];
-
+    
+    const compareRows = [
+        {
+          label: '充值渠道',
+          ours: '✅官方 IOS 渠道 (海外地区 / 正规扣款)',
+          card: '❌第三方虚拟信用卡（来源不明）'
+        },
+        {
+          label: '到手价格',
+          ours: '✅$18 ~ $20 / 月（0 手续费）',
+          card: '❌≥ $20 + 平台手续费，折合更贵'
+        },
+        {
+          label: '是否预充',
+          ours: '✅无需预充；按需直购',
+          card: '❌必须先充额；有跑路风险'
+        },
+        {
+          label: '操作复杂度',
+          ours: '✅极简 2 步完成，小白1分钟搞定',
+          card: '❌步骤繁琐，对小白不友好'
+        },
+        {
+          label: '隐私安全',
+          ours: '✅无需实名；全程数据加密',
+          card: '❌需要实名；卡信息易泄露'
+        },
+        {
+          label: '平台盈利模式',
+          ours: '✅仅赚汇率差，流程透明',
+          card: '❌未知；部分依靠手续费或跑路'
+        }
+      ];
 
     // 清理定时器
     useEffect(() => {
@@ -412,8 +448,8 @@ const GoPlusPage: React.FC = () => {
                     if (status.status === 'success') {
                         // 支付成功 -> 关闭支付弹窗 -> 进入充值等待弹窗并调用充值
                         setCurrentStep(RechargeStep.PROCESSING);
-                        onPaymentModalChange(); // 关闭支付弹窗
-                        performRecharge(orderId); // 进入充值流程（内部会打开等待弹窗）
+                        closePaymentModal();
+                        performRecharge(orderId);   // 进入充值流程（内部会打开等待弹窗）
                         return;
                     }
 
@@ -977,6 +1013,53 @@ const GoPlusPage: React.FC = () => {
                     </Card>
                 </motion.div>
 
+                {/* 充值方式对比表格 */}
+            <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.75 }}
+            className="mb-12"
+            >
+            <h2 className="text-2xl font-semibold text-gray-900 text-center mb-8">
+                充值方式对比
+            </h2>
+
+            <Card shadow="sm">
+                <CardBody className="overflow-x-auto p-0">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-50">
+                    <tr>
+                        <th className="px-6 py-4 font-semibold text-left text-gray-700 w-40">
+                        {/* 对比维度 */}
+                        </th>
+                        <th className="px-6 py-4 font-semibold text-center text-primary">
+                        本站自助充值
+                        </th>
+                        <th className="px-6 py-4 font-semibold text-center text-gray-600">
+                        虚拟卡充值
+                        </th>
+                    </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 bg-white">
+                    {compareRows.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-800">
+                            {row.label}
+                        </td>
+                        <td className="px-6 py-4 text-gray-900">
+                            {row.ours}
+                        </td>
+                        <td className="px-6 py-4 text-gray-700">
+                            {row.card}
+                        </td>
+                        </tr>
+                    ))}
+                    </tbody>
+                </table>
+                </CardBody>
+            </Card>
+            </motion.div>
+
 
                 {/* 帮助中心 - 手风琴样式 */}
                 <motion.div
@@ -1190,7 +1273,7 @@ const GoPlusPage: React.FC = () => {
                                             clearTimeout(paymentTimer);
                                         }
                                         resetProcess();
-                                        onClose();
+                                        closePaymentModal();
                                     }}
                                 >
                                     取消支付
