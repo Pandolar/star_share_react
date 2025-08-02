@@ -19,7 +19,11 @@ import {
     HelpCircle,
     Menu,
     MessageCircle,
-    Mail
+    Mail,
+    Clock8,
+    Tag,
+    Box,
+    SmartphoneNfc
 } from 'lucide-react';
 import QRCodeGenerator from 'qrcode-generator';
 import { showMessage } from '../../utils/toast';
@@ -76,6 +80,8 @@ interface OrderInfo {
     qr_code: string;
     channel: string;
     pay_type: string;
+    price: number;
+    package_name: string;
 }
 
 // 订单状态接口
@@ -103,6 +109,11 @@ const GoPlusPage: React.FC = () => {
     const [orderInfo, setOrderInfo] = useState<OrderInfo | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [paymentTimer, setPaymentTimer] = useState<NodeJS.Timeout | null>(null);
+    
+    // 二维码过期相关状态
+    const [qrCodeExpiryTime, setQrCodeExpiryTime] = useState<number | null>(null);
+    const [remainingTime, setRemainingTime] = useState<number>(300); // 5分钟，单位：秒
+    const [isQrCodeExpired, setIsQrCodeExpired] = useState<boolean>(false);
     
     // JSON验证状态 - 明确区分格式验证和字段验证
     const [validationState, setValidationState] = useState<JsonValidationState>({
@@ -193,6 +204,38 @@ const GoPlusPage: React.FC = () => {
 
         return () => clearTimeout(delayDebounceFn);
     }, [jsonInput]);
+
+    // 二维码过期计时器
+    useEffect(() => {
+        let timer: NodeJS.Timeout;
+        
+        if (qrCodeExpiryTime && !isQrCodeExpired) {
+            timer = setInterval(() => {
+                const now = Date.now();
+                const remaining = Math.ceil((qrCodeExpiryTime - now) / 1000);
+                
+                if (remaining <= 0) {
+                    // 二维码已过期
+                    setIsQrCodeExpired(true);
+                    setRemainingTime(0);
+                    
+                    // 停止订单检查
+                    if (paymentTimer) {
+                        clearTimeout(paymentTimer);
+                        setPaymentTimer(null);
+                    }
+                    
+                    clearInterval(timer);
+                } else {
+                    setRemainingTime(remaining);
+                }
+            }, 1000);
+        }
+        
+        return () => {
+            if (timer) clearInterval(timer);
+        };
+    }, [qrCodeExpiryTime, isQrCodeExpired, paymentTimer]);
 
     // 生成二维码
     const generateQRCode = (text: string): string => {
@@ -300,6 +343,13 @@ const GoPlusPage: React.FC = () => {
                 setOrderInfo(result.data);
                 setCurrentStep(RechargeStep.PAYMENT);
                 openPaymentModal();
+                
+                // 设置二维码过期时间为5分钟后
+                const expiryTime = Date.now() + 5 * 60 * 1000; // 5分钟
+                setQrCodeExpiryTime(expiryTime);
+                setIsQrCodeExpired(false);
+                setRemainingTime(300); // 5分钟 = 300秒
+                
                 startPaymentCheck(result.data.order_id);
             } else {
                 showMessage.error('创建订单失败，请重试');
@@ -314,6 +364,9 @@ const GoPlusPage: React.FC = () => {
     // 开始支付状态检查
     const startPaymentCheck = (orderId: string) => {
         const checkPayment = async () => {
+            // 如果二维码已过期，停止检查
+            if (isQrCodeExpired) return;
+            
             try {
                 const response = await fetch(`/u/go_plus_order?order_id=${orderId}`);
                 const result = await response.json();
@@ -381,10 +434,21 @@ const GoPlusPage: React.FC = () => {
         setJsonInput('');
         setValidatedData(null);
         setOrderInfo(null);
+        setQrCodeExpiryTime(null);
+        setIsQrCodeExpired(false);
+        setRemainingTime(300);
+        
         if (paymentTimer) {
             clearTimeout(paymentTimer);
             setPaymentTimer(null);
         }
+    };
+
+    // 格式化剩余时间为分:秒格式
+    const formatRemainingTime = (seconds: number): string => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
 
     // 复制示例JSON
@@ -948,24 +1012,77 @@ const GoPlusPage: React.FC = () => {
                             <ModalBody className="text-center">
                                 {orderInfo && (
                                     <div className="space-y-6">
-                                        <div className="bg-gray-50 p-6 rounded-lg">
+                                        {/* 二维码区域 - 带过期覆盖层 */}
+                                        <div className="relative bg-gray-50 p-6 rounded-lg inline-block mx-auto">
                                             <img
                                                 src={generateQRCode(orderInfo.qr_code)}
                                                 alt="支付二维码"
-                                                className="w-48 h-48 mx-auto"
+                                                className={`w-48 h-48 mx-auto transition-opacity duration-300 ${
+                                                    isQrCodeExpired ? 'opacity-50' : 'opacity-100'
+                                                }`}
                                             />
+                                            
+                                            {/* 过期覆盖层 */}
+                                            {isQrCodeExpired && (
+                                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white bg-opacity-80 rounded-lg">
+                                                    <div className="text-center p-4">
+                                                        <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-2" />
+                                                        <h3 className="text-lg font-semibold text-red-700 mb-1">二维码已过期</h3>
+                                                        <p className="text-sm text-gray-600">请刷新页面重新获取</p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            
+                                            {/* 倒计时提示 */}
+                                            {!isQrCodeExpired && (
+                                                <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 bg-red-500 text-white text-xs px-3 py-1 rounded-full flex items-center">
+                                                    <Clock8 className="w-3 h-3 mr-1" />
+                                                    剩余时间: {formatRemainingTime(remainingTime)}
+                                                </div>
+                                            )}
                                         </div>
 
-                                        <div className="space-y-2 text-sm text-gray-600">
-                                            <p>订单号: {orderInfo.order_id}</p>
-                                            <p>支付方式: {orderInfo.pay_type === 'wxpay' ? '微信支付' : '支付宝'}</p>
-                                            <p className="text-primary font-medium">请使用{orderInfo.pay_type === 'wxpay' ? '微信' : '支付宝'}扫码支付</p>
-                                        </div>
-
-                                        <div className="bg-blue-50 p-4 rounded-lg">
-                                            <p className="text-sm text-blue-800">
-                                                支付完成后会自动跳转，请勿关闭此页面
-                                            </p>
+                                        {/* 现代化订单信息卡片 */}
+                                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                                            <div className="p-5 space-y-4">
+                                                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                                                    <div className="flex items-center text-gray-700">
+                                                        <Tag className="w-4 h-4 mr-2 text-primary" />
+                                                        <span>订单信息</span>
+                                                    </div>
+                                                    <span className="text-xs font-medium px-2 py-1 bg-blue-50 text-blue-600 rounded-full">
+                                                        {orderInfo.pay_type === 'wxpay' ? '微信支付' : '支付宝'}
+                                                    </span>
+                                                </div>
+                                                
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="flex flex-col items-start">
+                                                        <span className="text-xs text-gray-500 mb-1">订单号</span>
+                                                        <span className="text-sm font-medium text-gray-900 truncate max-w-[150px]">
+                                                            {orderInfo.order_id}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex flex-col items-start">
+                                                        <span className="text-xs text-gray-500 mb-1">套餐名称</span>
+                                                        <span className="text-sm font-medium text-gray-900">{orderInfo.package_name}</span>
+                                                    </div>
+                                                    <div className="flex flex-col items-start col-span-2 pt-2">
+                                                        <span className="text-xs text-gray-500 mb-1">订单金额</span>
+                                                        <span className="text-xl font-bold text-gray-900">{orderInfo.price}元</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className={`p-3 rounded-lg text-sm ${
+                                                    isQrCodeExpired 
+                                                        ? 'bg-red-50 text-red-600' 
+                                                        : 'bg-blue-50 text-blue-800'
+                                                }`}>
+                                                    {isQrCodeExpired 
+                                                        ? '二维码已过期，请刷新页面重新创建订单' 
+                                                        : `请使用${orderInfo.pay_type === 'wxpay' ? '微信' : '支付宝'}扫码支付，支付完成后会自动跳转`
+                                                    }
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -984,6 +1101,24 @@ const GoPlusPage: React.FC = () => {
                                 >
                                     取消支付
                                 </Button>
+                                
+                                {/* 二维码过期时显示刷新按钮 */}
+                                {isQrCodeExpired && (
+                                    <Button
+                                        color="primary"
+                                        onPress={() => {
+                                            if (paymentTimer) {
+                                                clearTimeout(paymentTimer);
+                                            }
+                                            resetProcess();
+                                            onClose();
+                                            // 可以在这里添加刷新当前页面的逻辑
+                                            window.location.reload();
+                                        }}
+                                    >
+                                        刷新页面
+                                    </Button>
+                                )}
                             </ModalFooter>
                         </>
                     )}
