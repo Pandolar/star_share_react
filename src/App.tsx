@@ -31,11 +31,11 @@ const App: React.FC = () => {
               <ToastContainer />
               <Routes>
                 {/* 主页路由 */}
-                // 修改路由配置
+                // 修改主页路由配置
                 <Route 
                   path="/" 
                   element={
-                    <ErrorBoundary>
+                    <ErrorBoundary autoReload={true} reloadDelay={1500}>
                       <HomePage />
                     </ErrorBoundary>
                   } 
