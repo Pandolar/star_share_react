@@ -27,7 +27,7 @@ const HomePage: React.FC = () => {
         {/* 新闻更新 */}
         {/* <NewsUpdates /> */}
       </main>
-      
+
       {/* 页脚 */}
       <Footer />
     </div>
