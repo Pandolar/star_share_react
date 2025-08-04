@@ -23,7 +23,7 @@ function getAllCookies() {
 
 // 清除指定cookie
 function clearCookies() {
-    ["xuserid", "xtoken", "xy_uuid_token"].forEach(cookie => {
+    ["xuserid", "xtoken", "xy_uuid_token", "lastCheckTime"].forEach(cookie => {
         document.cookie = `${cookie}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC`;
     });
 }
@@ -64,26 +64,40 @@ function checkCookiesAndRedirect() {
 
     // 如果已经过了30分钟，则进行请求验证
     if (!lastCheckTime || timeElapsed > 30 * 60 * 1000) {
-        setCookie("lastCheckTime", currentTime, 1);
+        // 先保存当前时间，但只有验证成功后才真正生效
+        const newCheckTime = currentTime;
 
-        // 请求获取用户信息
-        fetch("http://183ai.com/u/get_user_info", {
+        // 修复协议不一致问题，使用https
+        fetch("https://183ai.com/u/get_user_info", {
             method: "GET",
             headers: {
                 "xuserid": xUserId,
-                "xtoken": xToken
-            }
+                "xtoken": xToken,
+                "Content-Type": "application/json"
+            },
+            credentials: "include" // 确保跨域请求携带cookie
         })
-        .then(response => response.json())
+        .then(response => {
+            // 先检查HTTP响应状态
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
-            if (data.code !== 20000) {
+            if (data.code === 20000) {
+                // 只有验证成功才更新检查时间
+                setCookie("lastCheckTime", newCheckTime, 1);
+            } else {
+                console.error("用户信息验证失败", data.msg);
                 clearCookies();
                 redirectToLogin();
             }
         })
         .catch(error => {
-            console.error("请求失败", error);
-            redirectToLogin();
+            console.error("用户信息请求失败", error);
+            // 只在确定认证失败时才跳转，网络错误暂时不跳转
+            // 可以增加重试逻辑或其他处理
         });
     }
 
@@ -98,23 +112,27 @@ function checkCookiesAndRedirect() {
             method: "GET",
             headers: {
                 "cache-control": "max-age=0",
-                "cookie": allCookies,
                 "priority": "u=0, i"
-            }
+            },
+            credentials: "include" // 携带cookie
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (!data.user || !data.user.username) {
-                // 修改这里的跳转逻辑
                 window.location.href = `https://share.183ai.com/client-api/login?code=${xyUuidToken}&redirect=true`;
             }
         })
         .catch(error => {
             console.error("请求失败", error);
-            redirectToLogin();
+            // 同样，网络错误不直接跳转
         });
     }
 }
 
 // 执行检测
-checkCookiesAndRedirect(); 
+checkCookiesAndRedirect();
