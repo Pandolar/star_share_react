@@ -17,6 +17,9 @@ import { RedirectPage, GoPlusPage } from './pages/other';
 import { HeroUIProvider } from '@heroui/react';
 import { HomeInfoProvider } from './contexts/HomeInfoContext';
 
+// 添加导入
+import ErrorBoundary from './components/ErrorBoundary';
+
 const App: React.FC = () => {
   return (
     <HelmetProvider>
@@ -28,7 +31,15 @@ const App: React.FC = () => {
               <ToastContainer />
               <Routes>
                 {/* 主页路由 */}
-                <Route path="/" element={<HomePage />} />
+                // 修改路由配置
+                <Route 
+                  path="/" 
+                  element={
+                    <ErrorBoundary>
+                      <HomePage />
+                    </ErrorBoundary>
+                  } 
+                />
 
                 {/* 用户中心路由 */}
                 <Route path="/user-center" element={<UserCenter />} />

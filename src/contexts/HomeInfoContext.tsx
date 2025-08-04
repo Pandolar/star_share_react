@@ -218,6 +218,11 @@ interface HomeInfoProviderProps {
     children: ReactNode;
 }
 
+// 添加缓存机制
+let cachedData: HomeInfo | null = null;
+let cacheTimestamp = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5分钟缓存
+
 export const HomeInfoProvider: React.FC<HomeInfoProviderProps> = ({ children }) => {
     const [homeInfo, setHomeInfo] = useState<HomeInfo>(defaultHomeInfo);
     const [loading, setLoading] = useState(true);
@@ -225,28 +230,36 @@ export const HomeInfoProvider: React.FC<HomeInfoProviderProps> = ({ children }) 
 
     const fetchHomeInfo = async () => {
         try {
+            // 检查缓存
+            const now = Date.now();
+            if (cachedData && (now - cacheTimestamp) < CACHE_DURATION) {
+                setHomeInfo(cachedData);
+                setLoading(false);
+                return;
+            }
+
             setLoading(true);
             setError(null);
 
             const response = await announcementApi.getPublicAndHomeInfo();
 
             if (response.code === 20000) {
-                // 如果后端返回了home_info，则使用后端数据，否则使用默认数据
-                if (response.data.home_info) {
-                    setHomeInfo(response.data.home_info);
-                } else {
-                    // 如果后端还没有home_info字段，继续使用默认数据
-                    console.warn('后端尚未返回home_info数据，使用默认配置');
-                    setHomeInfo(defaultHomeInfo);
-                }
+                const data = response.data.home_info || defaultHomeInfo;
+                setHomeInfo(data);
+                cachedData = data;
+                cacheTimestamp = now;
             } else {
                 throw new Error(response.msg || '获取首页信息失败');
             }
         } catch (err) {
             console.error('获取首页信息失败:', err);
             setError(err instanceof Error ? err.message : '网络错误');
-            // 发生错误时使用默认数据
-            setHomeInfo(defaultHomeInfo);
+            // 优先使用缓存数据，其次使用默认数据
+            if (cachedData) {
+                setHomeInfo(cachedData);
+            } else {
+                setHomeInfo(defaultHomeInfo);
+            }
         } finally {
             setLoading(false);
         }
@@ -272,4 +285,4 @@ export const HomeInfoProvider: React.FC<HomeInfoProviderProps> = ({ children }) 
             {children}
         </HomeInfoContext.Provider>
     );
-}; 
+};
