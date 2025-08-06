@@ -1,6 +1,6 @@
 // 使用IIFE包裹以避免全局变量污染
 (async function() {
-    // 等待页面加载完成
+    // 等待页面初始加载完成（基础DOM就绪）
     await new Promise(resolve => {
         if (document.readyState === 'complete') {
             resolve();
@@ -45,14 +45,18 @@
         }
     }
 
-    // 检测是否存在"密码"标签
+    // 检测是否存在"密码"标签（精准匹配）
     function hasPasswordFieldLabel() {
-        const labels = document.querySelectorAll('.semi-form-field-label-text');
+        // 精准选择器：类名 + 属性 + 文本内容
+        const labels = document.querySelectorAll('.semi-form-field-label-text[x-semi-prop="label"]');
         for (const label of labels) {
-            if (label.textContent.trim() === "密码" && label.hasAttribute('x-semi-prop') && label.getAttribute('x-semi-prop') === 'label') {
+            // 严格匹配文本（去除空格后比较）
+            if (label.textContent.trim() === "密码") {
+                console.log("成功检测到密码标签");
                 return true;
             }
         }
+        console.log("未找到符合条件的密码标签（类名、属性或文本不匹配）");
         return false;
     }
 
@@ -90,7 +94,6 @@
         const mainDomain = getMainDomain();
         const currentDomain = window.location.hostname;
         
-        // 检查是否存在注册按钮（用于判断是否需要跳转）
         const registerButton = getTargetButton("注册");
         const registerButtonExists = !!registerButton && !isButtonDisabled(registerButton);
         
@@ -116,11 +119,11 @@
         setTimeout(() => window.location.href = registerUrl, 0);
     }
 
-    // 路由变化处理函数
+    // 路由变化处理函数（延迟1秒检测）
     function handleRouteChange() {
-        console.log("检测到前端路由变化，执行检查...");
-        // 路由变化后DOM可能未更新，延迟检查
-        setTimeout(checkAndHandleActions, 300);
+        console.log("检测到前端路由变化，1秒后执行检查...");
+        // 延迟1秒，确保动态内容加载完成
+        setTimeout(checkAndHandleActions, 1000);
     }
 
     // 监听路由变化
@@ -139,9 +142,9 @@
 
     window.addEventListener('popstate', handleRouteChange);
 
-    // 初始检查
-    console.log("页面初始加载，执行首次检查...");
-    checkAndHandleActions();
+    // 初始检查（延迟1秒，确保页面完全加载）
+    console.log("页面初始加载，1秒后执行首次检查...");
+    setTimeout(checkAndHandleActions, 1000);
 
     // 页面卸载时清理
     window.addEventListener('beforeunload', () => {
