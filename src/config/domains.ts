@@ -35,27 +35,27 @@ export interface DomainConfig {
  * 修改这里的值来更改域名设置
  */
 export const domainConfig: DomainConfig = {
-    // 主域名
-    mainDomain: '183ai.com',
+    // 主域名 通过获取的方式动态获取
+    mainDomain: window.location.hostname.split(".").slice(-2).join("."),
 
     // Cookie 作用域域名
-    cookieDomain: '.183ai.com',
+    cookieDomain: `.${window.location.hostname.split(".").slice(-2).join(".")}`,
 
     // API 基础URL
-    apiBaseUrl: 'https://183ai.com',
+    apiBaseUrl: `https://${window.location.hostname.split(".").slice(-2).join(".")}`,
 
     // 登录API URL
-    loginApiUrl: 'https://183ai.com/u/login',
+    loginApiUrl: `https://${window.location.hostname.split(".").slice(-2).join(".")}/u/login`,
 
     // 用户信息API URL
-    userInfoApiUrl: 'https://183ai.com/u/get_user_info',
+    userInfoApiUrl: `https://${window.location.hostname.split(".").slice(-2).join(".")}/u/get_user_info`,
 
     // 静态资源域名
-    staticDomain: 'https://183ai.com',
+    staticDomain: `https://${window.location.hostname.split(".").slice(-2).join(".")}`,
 
     // 跳转目标域名配置
     redirectTargets: {
-        'share': 'https://share.183ai.com/',
+        'share': `https://${window.location.hostname.split(".").slice(-2).join(".")}/`,
         'zz': 'aa',
         // 在这里添加更多跳转目标
         // 'admin': 'https://admin.niceaigc.com/',
