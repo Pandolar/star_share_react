@@ -27,7 +27,7 @@ const LoginPage: React.FC = () => {
     setIsLoggingIn(true);
     try {
       const data = await loginUser(identifier, password);
-      if (data && data.xuserid && data.xtoken) {
+      if (data && data.xuserid && data.xtoken && data.xy_uuid_token) {
         setAuthCookies({ xuserid: data.xuserid, xtoken: data.xtoken, xy_uuid_token: data.xy_uuid_token });
         toast.success('登录成功！正在跳转...');
         redirect();

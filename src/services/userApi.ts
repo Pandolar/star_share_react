@@ -27,7 +27,7 @@ const getCookie = (name: string): string | null => {
 const getUserAuthHeaders = (): { [key: string]: string } => {
     const xuserid = getCookie('xuserid');
     const xtoken = getCookie('xtoken');
-
+    const xy_uuid_token = getCookie('xy_uuid_token');
     const headers: { [key: string]: string } = {};
 
     if (xuserid) {
@@ -36,6 +36,10 @@ const getUserAuthHeaders = (): { [key: string]: string } => {
 
     if (xtoken) {
         headers['xtoken'] = xtoken;
+    }
+
+    if (xy_uuid_token) {
+        headers['xy_uuid_token'] = xy_uuid_token;
     }
 
     return headers;
@@ -127,7 +131,8 @@ export const userAuthApi = {
     isAuthenticated: (): boolean => {
         const xuserid = getCookie('xuserid');
         const xtoken = getCookie('xtoken');
-        return !!(xuserid && xtoken);
+        const xy_uuid_token = getCookie('xy_uuid_token');
+        return !!(xuserid && xtoken && xy_uuid_token);
     },
 };
 

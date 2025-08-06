@@ -283,7 +283,8 @@ export const getCookie = (name: string): string | null => {
 export const isAuthenticated = (): boolean => {
   const xuserid = getCookie('xuserid');
   const xtoken = getCookie('xtoken');
-  return !!(xuserid && xtoken);
+  const xy_uuid_token = getCookie('xy_uuid_token');
+  return !!(xuserid && xtoken && xy_uuid_token);
 };
 
 // 删除cookie

@@ -33,13 +33,16 @@ export const useAuthCheck = (options: AuthCheckOptions = {}) => {
             .split('; ')
             .find(row => row.startsWith('xuserid='))
             ?.split('=')[1];
-
+        const xy_uuid_token = document.cookie
+            .split('; ')
+            .find(row => row.startsWith('xy_uuid_token='))
+            ?.split('=')[1];
         const xtoken = document.cookie
             .split('; ')
             .find(row => row.startsWith('xtoken='))
             ?.split('=')[1];
 
-        return !!(xuserid && xtoken);
+        return !!(xuserid && xtoken && xy_uuid_token);
     }, []);
 
     // 处理认证失败
