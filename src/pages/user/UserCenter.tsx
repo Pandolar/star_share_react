@@ -10,11 +10,8 @@ import {
   User,
   Package,
   FileText,
-  Book,
-  MessageCircle,
   Menu,
   X,
-  LogOut
 } from 'lucide-react';
 
 // Tab页面组件导入
@@ -22,8 +19,6 @@ import { AnnouncementTab } from './tabs/AnnouncementTab';
 import { ProfileTab } from './tabs/ProfileTab';
 import { SubscriptionTab } from './tabs/SubscriptionTab';
 import { OrderHistoryTab } from './tabs/OrderHistoryTab';
-import { TutorialTab } from './tabs/TutorialTab';
-import { ContactTab } from './tabs/ContactTab';
 
 // 组件和工具导入
 import { LogoutConfirmModal } from '../../components/LogoutConfirmModal';
@@ -117,7 +112,6 @@ const UserCenter: React.FC = () => {
     try {
       await logout();
     } catch (error) {
-      console.error('退出登录失败:', error);
       // 如果logout失败，只清理本地数据，不强制跳转
       // 让用户手动刷新页面或重新导航
       localStorage.clear();

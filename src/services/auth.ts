@@ -31,7 +31,6 @@ export const getUserInfo = async (xuserid: string, xtoken: string): Promise<User
 
         return await response.json();
     } catch (error) {
-        console.error('获取用户信息失败:', error);
         throw error;
     }
 };
@@ -47,7 +46,6 @@ export const getLoginUrl = async (fromUrl: string, domain: string): Promise<Logi
 
         return await response.json();
     } catch (error) {
-        console.error('获取登录URL失败:', error);
         throw error;
     }
 };
@@ -65,12 +63,10 @@ export const redirectToLogin = async (): Promise<void> => {
         if (result.code === 20000 && result.data) {
             window.location.href = result.data;
         } else {
-            console.error('获取登录url失败', result.msg);
             // 如果获取登录URL失败，跳转到默认登录页面
             window.location.href = domainConfig.loginPath;
         }
     } catch (error) {
-        console.error('请求失败', error);
         // 如果请求失败，跳转到默认登录页面
         window.location.href = domainConfig.loginPath;
     }

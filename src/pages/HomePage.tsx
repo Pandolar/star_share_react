@@ -5,6 +5,7 @@ import LatestModels from '../components/LatestModels';
 import Footer from '../components/Footer';
 import SEOHead from '../components/SEOHead';
 import { homeSEOConfig } from '../config/seo';
+import { HomeInfoProvider } from '../contexts/HomeInfoContext';
 
 // 骨架屏组件
 const HomePageSkeleton: React.FC = () => (
@@ -32,7 +33,7 @@ const HomePageSkeleton: React.FC = () => (
 
 const HomePage: React.FC = () => {
   return (
-    <>
+    <HomeInfoProvider>
       <SEOHead config={homeSEOConfig} />
       <Suspense fallback={<HomePageSkeleton />}>
         <div className="HomePage">
@@ -44,7 +45,7 @@ const HomePage: React.FC = () => {
           <Footer />
         </div>
       </Suspense>
-    </>
+    </HomeInfoProvider>
   );
 };
 

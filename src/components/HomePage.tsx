@@ -2,8 +2,6 @@ import React from 'react';
 import Header from './Header';
 import Hero from './Hero';
 import LatestModels from './LatestModels';
-import NativeApplications from './NativeApplications';
-import NewsUpdates from './NewsUpdates';
 import Footer from './Footer';
 
 // 主页组件 - 整合所有页面组件

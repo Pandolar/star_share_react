@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useReducer, useCallback, useMemo, useRef } from 'react';
+import React, { useEffect, useReducer, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Play, ArrowRight } from 'lucide-react';
 import { useHomeInfo } from '../contexts/HomeInfoContext';
@@ -22,20 +22,6 @@ type CarouselAction =
   | { type: 'END_TRANSITION' }
   | { type: 'PAUSE_AUTOPLAY' }
   | { type: 'RESUME_AUTOPLAY' };
-
-// 幻灯片数据接口
-interface SlideData {
-  id: number;
-  title: string;
-  subtitle: string;
-  description: string;
-  image: string;
-  gradient: string;
-  ctaText: string;
-  ctaUrl: string;
-  learnMoreText: string;
-  learnMoreUrl: string;
-}
 
 // 轮播状态reducer
 const carouselReducer = (state: CarouselState, action: CarouselAction): CarouselState => {
@@ -248,8 +234,8 @@ const Hero: React.FC = () => {
   const { homeInfo, loading } = useHomeInfo();
 
   // 从homeInfo获取轮播数据
-  const slides: HeroSlide[] = useMemo(() => homeInfo.hero.slides, [homeInfo.hero.slides]);
-  const carouselInterval = useMemo(() => homeInfo.hero.autoPlayInterval, [homeInfo.hero.autoPlayInterval]);
+  const slides: HeroSlide[] = useMemo(() => homeInfo?.hero?.slides || [], [homeInfo?.hero?.slides]);
+  const carouselInterval = useMemo(() => homeInfo?.hero?.autoPlayInterval || 6000, [homeInfo?.hero?.autoPlayInterval]);
 
   // 状态管理
   const [state, dispatch] = useReducer(carouselReducer, {
@@ -293,7 +279,7 @@ const Hero: React.FC = () => {
   }, [slides.length]);
 
   // 如果正在加载，显示加载状态
-  if (loading || !currentSlideData) {
+  if (loading || !homeInfo?.hero) {
     return (
       <div className="w-full pt-20 pb-8 px-4 sm:px-6 lg:px-8">
         <section className="relative group min-h-[600px] lg:h-[600px] max-w-7xl mx-auto overflow-hidden rounded-3xl shadow-2xl border border-gray-100 bg-gray-100 animate-pulse">
@@ -327,7 +313,6 @@ const Hero: React.FC = () => {
         className="relative group min-h-[600px] lg:h-[600px] max-w-7xl mx-auto overflow-hidden rounded-3xl shadow-2xl border border-gray-100"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
-        role="region"
         aria-label="产品轮播展示"
         aria-live="polite"
       >

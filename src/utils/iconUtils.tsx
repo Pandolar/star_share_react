@@ -13,7 +13,6 @@ export const getDynamicIcon = (iconName: string, fallbackIcon: LucideIconName = 
   }
   
   // 如果图标不存在，返回备用图标
-  console.warn(`图标 "${iconName}" 不存在于 lucide-react 中，使用备用图标 "${fallbackIcon}"`);
   const FallbackIcon = LucideIcons[fallbackIcon] as React.ComponentType<any>;
   return FallbackIcon;
 };
@@ -149,6 +148,5 @@ export const getSmartIcon = (iconName: string, fallbackIcon: LucideIconName = 'H
   }
   
   // 最后使用备用图标
-  console.warn(`无法找到图标 "${iconName}"，使用备用图标 "${fallbackIcon}"`);
   return getDynamicIcon(fallbackIcon, 'HelpCircle');
 }; 

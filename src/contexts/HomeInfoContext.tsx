@@ -252,7 +252,6 @@ export const HomeInfoProvider: React.FC<HomeInfoProviderProps> = ({ children }) 
                 throw new Error(response.msg || '获取首页信息失败');
             }
         } catch (err) {
-            console.error('获取首页信息失败:', err);
             setError(err instanceof Error ? err.message : '网络错误');
             // 优先使用缓存数据，其次使用默认数据
             if (cachedData) {

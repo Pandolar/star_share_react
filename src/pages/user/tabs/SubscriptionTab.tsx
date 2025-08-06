@@ -14,12 +14,11 @@ import {
   ModalHeader,
   ModalBody,
   ModalFooter,
-  Divider,
   Tab,
   Tabs
 } from '@heroui/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Package, Star, Crown, AlertCircle, CheckCircle, QrCode, Zap, Calendar, Timer, LucideIcon } from 'lucide-react';
+import { Package, Star, Crown, AlertCircle, CheckCircle, QrCode, Calendar, Timer } from 'lucide-react';
 import { packageUserApi, orderUserApi } from '../../../services/userApi';
 import QRCodeGenerator from 'qrcode-generator';
 
@@ -70,7 +69,7 @@ export const SubscriptionTab: React.FC = () => {
   const [qrCodeTimer, setQrCodeTimer] = useState<NodeJS.Timeout | null>(null);
 
   // 套餐分类配置
-  const subscriptionCategories: SubscriptionCategory[] = [
+  const subscriptionCategories: SubscriptionCategory[] = useMemo(() => [
     {
       key: 'weekly',
       label: '周订阅',
@@ -101,7 +100,7 @@ export const SubscriptionTab: React.FC = () => {
       icon: <Timer className="w-6 h-6" />,
       description: '其他时长'
     }
-  ];
+  ], []);
 
   // 根据时长分类套餐
   const categorizePackage = (duration: number): SubscriptionType => {
@@ -139,7 +138,7 @@ export const SubscriptionTab: React.FC = () => {
     return subscriptionCategories.filter(category =>
       groupedPackages[category.key].length > 0
     );
-  }, [groupedPackages]);
+  }, [groupedPackages, subscriptionCategories]);
 
   // 计算日均价格（保留1位小数，四舍五入）
   const calculateDailyPrice = (price: number, duration: number): string => {
@@ -149,7 +148,7 @@ export const SubscriptionTab: React.FC = () => {
   };
 
   // 获取套餐列表
-  const fetchPackages = async () => {
+  const fetchPackages = React.useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -173,7 +172,7 @@ export const SubscriptionTab: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [subscriptionCategories]);
 
   // 创建订单
   const createOrder = async (packageId: number) => {
@@ -241,7 +240,6 @@ export const SubscriptionTab: React.FC = () => {
           clearInterval(interval);
         }
       } catch (err) {
-        console.error('检查支付状态失败:', err);
       }
     }, 1500);
 
@@ -300,7 +298,7 @@ export const SubscriptionTab: React.FC = () => {
         clearTimeout(qrCodeTimer);
       }
     };
-  }, []);
+  }, [checkInterval, fetchPackages, qrCodeTimer]);
 
   return (
     <div

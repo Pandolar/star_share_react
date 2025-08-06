@@ -3,15 +3,12 @@
  * 提供客服联系方式和意见反馈渠道
  */
 import React from 'react';
-import { Card, CardBody, Button, Input, Textarea, Select, SelectItem } from '@heroui/react';
+import { Card, CardBody, Button } from '@heroui/react';
 import { motion } from 'framer-motion';
 import { 
   MessageCircle, 
   Mail, 
-  Phone, 
   Clock, 
-  Send, 
-  MapPin,
   MessageSquare,
   Headphones,
   Globe,

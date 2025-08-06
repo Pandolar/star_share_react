@@ -235,10 +235,12 @@ export const orderUserApi = {
 };
 
 // 导出所有用户端API
-export default {
+const userApi = {
     auth: userAuthApi,
     announcement: announcementApi,
     userInfo: userInfoApi,
     package: packageUserApi,
     order: orderUserApi,
 }; 
+
+export default userApi; 

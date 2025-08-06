@@ -8,6 +8,12 @@ function getCookie(name) {
     }
     return null;
 }
+// 获取当前页面的全部url
+const currentUrl = window.location.href;
+// 获取当前页面的域名
+const currentDomain = window.location.hostname;
+// 域名的主域名 比如是y.xxx.com  就取出xxx.com 如果本来就是主域名就不变直接赋值
+const mainDomain = currentDomain.split(".").slice(-2).join(".");
 
 // 设置cookie值
 function setCookie(name, value, days) {
@@ -30,20 +36,11 @@ function clearCookies() {
 
 // 跳转到登录页面
 function redirectToLogin() {
-    const fromUrl = "https://183ai.com/handle_callback";
-    const domain = "share";
-    
-    fetch(`https://183ai.com/u/login?from_url=${encodeURIComponent(fromUrl)}&domain=${encodeURIComponent(domain)}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.code === 20000) {
-                window.location.href = data.data;
-            } else {
-                console.error("获取登录url失败", data.msg);
-            }
-        })
-        .catch(error => console.error("请求失败", error));
+
+    // 跳转到mainDomain/login?fromurl=currentUrl
+    window.location.href = `https://${mainDomain}/login?fromurl=${encodeURIComponent(currentUrl)}`;
 }
+
 
 // 检查登录状态并跳转
 function checkCookiesAndRedirect() {
@@ -68,7 +65,7 @@ function checkCookiesAndRedirect() {
         const newCheckTime = currentTime;
 
         // 修复协议不一致问题，使用https
-        fetch("https://183ai.com/u/get_user_info", {
+        fetch(`https://${mainDomain}/u/get_user_info`, {
             method: "GET",
             headers: {
                 "xuserid": xUserId,
@@ -106,9 +103,9 @@ function checkCookiesAndRedirect() {
 
     if (xyUuidToken && validPaths.some(path => window.location.pathname.startsWith(path))) {
         const allCookies = getAllCookies();
-
+        console.log(allCookies);
         // 发起带所有cookie的请求
-        fetch("https://share.183ai.com/client-api/info", {
+        fetch(`https://${currentDomain}/client-api/info`, {
             method: "GET",
             headers: {
                 "cache-control": "max-age=0",
@@ -124,7 +121,7 @@ function checkCookiesAndRedirect() {
         })
         .then(data => {
             if (!data.user || !data.user.username) {
-                window.location.href = `https://share.183ai.com/client-api/login?code=${xyUuidToken}&redirect=true`;
+                window.location.href = `https://${currentDomain}/client-api/login?code=${xyUuidToken}&redirect=true`;
             }
         })
         .catch(error => {

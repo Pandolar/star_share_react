@@ -26,8 +26,6 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Error caught by boundary:', error, errorInfo);
-    
     // 自动刷新逻辑
     if (this.props.autoReload !== false) {
       const delay = this.props.reloadDelay || 2000;
@@ -53,7 +51,6 @@ class ErrorBoundary extends Component<Props, State> {
       } else {
         // 超过3次错误，停止自动刷新
         this.setState({ isReloading: false });
-        console.warn('页面错误次数过多，停止自动刷新');
       }
     }, delay);
   }

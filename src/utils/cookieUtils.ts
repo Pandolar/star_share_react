@@ -26,54 +26,9 @@ const getCurrentDomain = (): { currentDomain: string; mainDomain: string } => {
   };
 };
 
-// 删除指定域名下的所有cookie
-const clearCookiesForDomain = (domain: string): void => {
-  const cookies = document.cookie.split(';');
-
-  for (let cookie of cookies) {
-    const eqPos = cookie.indexOf('=');
-    const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
-
-    if (name) {
-      // 尝试多种删除方式，确保彻底清除
-      const expireDate = 'Thu, 01 Jan 1970 00:00:00 GMT';
-
-      // 1. 删除当前域名，根路径
-      document.cookie = `${name}=; expires=${expireDate}; path=/`;
-
-      // 2. 删除当前域名，当前路径
-      document.cookie = `${name}=; expires=${expireDate}; path=${window.location.pathname}`;
-
-      // 3. 删除指定域名，根路径
-      document.cookie = `${name}=; expires=${expireDate}; path=/; domain=${domain}`;
-
-      // 4. 删除指定域名前缀点，根路径
-      document.cookie = `${name}=; expires=${expireDate}; path=/; domain=.${domain}`;
-
-      // 5. 删除当前完整域名
-      document.cookie = `${name}=; expires=${expireDate}; path=/; domain=${window.location.hostname}`;
-
-      // 6. 删除当前完整域名前缀点
-      document.cookie = `${name}=; expires=${expireDate}; path=/; domain=.${window.location.hostname}`;
-
-      // 7. 尝试删除所有可能的路径组合
-      const pathParts = window.location.pathname.split('/').filter(part => part);
-      let currentPath = '';
-      for (const part of pathParts) {
-        currentPath += `/${part}`;
-        document.cookie = `${name}=; expires=${expireDate}; path=${currentPath}`;
-        document.cookie = `${name}=; expires=${expireDate}; path=${currentPath}; domain=${domain}`;
-        document.cookie = `${name}=; expires=${expireDate}; path=${currentPath}; domain=.${domain}`;
-      }
-    }
-  }
-};
-
 // 彻底清除所有相关域名的cookie（超强版）
 const clearAllRelatedCookies = (currentDomain: string, mainDomain: string): void => {
   try {
-    console.log('🍪 当前所有cookies:', document.cookie);
-
     // 获取当前所有cookie名称
     const cookies = document.cookie.split(';');
     const cookieNames = cookies.map(cookie => {
@@ -81,13 +36,9 @@ const clearAllRelatedCookies = (currentDomain: string, mainDomain: string): void
       return name;
     }).filter(name => name);
 
-    console.log('🍪 发现的cookie名称:', cookieNames);
-
     // 对每个cookie进行暴力删除，尝试所有可能的组合
     cookieNames.forEach(cookieName => {
       if (cookieName) {
-        console.log(`🗑️ 正在删除cookie: ${cookieName}`);
-
         // 1. 基础删除（无domain）
         document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
 
@@ -142,11 +93,8 @@ const clearAllRelatedCookies = (currentDomain: string, mainDomain: string): void
     const start2 = Date.now();
     while (Date.now() - start2 < 50) { /* 等待50ms */ }
 
-    console.log('🍪 清理后剩余cookies:', document.cookie);
-
     // 如果还有cookie，再进行一轮强制清理
     if (document.cookie.trim()) {
-      console.log('⚠️ 发现残留cookie，进行强制清理');
       const remainingCookies = document.cookie.split(';');
       remainingCookies.forEach(cookie => {
         const cookieName = cookie.split('=')[0].trim();
@@ -165,10 +113,7 @@ const clearAllRelatedCookies = (currentDomain: string, mainDomain: string): void
       });
     }
 
-    console.log('🍪 最终剩余cookies:', document.cookie);
-
   } catch (error) {
-    console.error('❌ Cookie清理过程出错:', error);
     // 应急清理
     try {
       const allCookies = document.cookie.split(';');
@@ -180,7 +125,6 @@ const clearAllRelatedCookies = (currentDomain: string, mainDomain: string): void
         }
       });
     } catch (basicError) {
-      console.error('❌ 应急清理也失败:', basicError);
     }
   }
 };
@@ -203,77 +147,58 @@ const notifyParentToDeleteCookies = (): void => {
         domain: domainConfig.cookieDomain,
         cookies: document.cookie.split(';').map(c => c.split('=')[0].trim()).filter(name => name)
       }, '*');
-      console.log('📤 已通知父页面删除cookies');
     }
   } catch (e) {
-    console.warn('⚠️ 无法通知父页面删除cookies:', e);
   }
 };
 
 // 退出登录功能（强化版）
 export const logout = async (): Promise<void> => {
-  console.log('🚀 开始执行logout流程');
 
   // 检测iframe环境
   const inIframe = isInIframe();
-  console.log('🖼️ 是否在iframe中:', inIframe);
 
   try {
     const { currentDomain, mainDomain } = getCurrentDomain();
-    console.log('📍 域名信息:', { currentDomain, mainDomain });
 
     // 在清除cookie之前先获取cas_access_token
     const casAccessToken = getCookie('cas_access_token');
-    console.log('🔑 获取到的cas_access_token:', casAccessToken ? '存在' : '不存在');
 
     try {
       // 动态导入 postMessage 工具（避免循环依赖）
-      console.log('📞 准备发送postMessage通知');
       const { notifyLogout } = await import('./postMessage');
 
       // 先发送退出登录通知到父页面，自动获取当前页面地址
       notifyLogout();
-      console.log('✅ postMessage通知发送完成');
 
       // 等待一小段时间确保消息发送完成
       await new Promise(resolve => setTimeout(resolve, 100));
     } catch (postMessageError) {
-      console.warn('⚠️ postMessage发送失败，继续执行清理:', postMessageError);
       // 不让postMessage错误中断整个流程
     }
 
     // 清除localStorage和sessionStorage
-    console.log('🗑️ 开始清除本地存储');
     try {
       localStorage.clear();
       sessionStorage.clear();
-      console.log('✅ 本地存储清除完成');
     } catch (storageError) {
-      console.error('❌ 本地存储清除失败:', storageError);
     }
 
     // 如果在iframe中，先通知父页面删除cookie
     if (inIframe) {
-      console.log('🖼️ 检测到iframe环境，通知父页面删除cookies');
       notifyParentToDeleteCookies();
       // 等待一下让父页面有时间处理
       await new Promise(resolve => setTimeout(resolve, 200));
     }
 
     // 彻底清除所有相关域名的cookie
-    console.log('🍪 开始清除cookies');
     try {
-      console.log('🍪 清除前的cookies:', document.cookie);
       clearAllRelatedCookies(currentDomain, mainDomain);
-      console.log('🍪 清除后的cookies:', document.cookie);
-      console.log('✅ Cookie清除完成');
     } catch (cookieError) {
-      console.error('❌ Cookie清除失败:', cookieError);
     }
 
     // 如果在iframe中且仍有cookie残留，再次通知父页面
     if (inIframe && document.cookie.trim()) {
-      console.log('🖼️ iframe中仍有cookie残留，再次通知父页面');
       notifyParentToDeleteCookies();
       await new Promise(resolve => setTimeout(resolve, 300));
     }
@@ -287,16 +212,13 @@ export const logout = async (): Promise<void> => {
       // 当前是主域名，跳转到根路径
       redirectUri = `${window.location.protocol}//${currentDomain}/`;
     }
-    console.log('🔗 重定向URI:', redirectUri);
 
     // 构造Casdoor logout URL
     const casdoorLogoutUrl = getCasdoorLogoutUrl(redirectUri, casAccessToken || undefined);
 
-    console.log('🎯 最终跳转URL:', casdoorLogoutUrl);
 
     // 如果在iframe中，需要特殊处理跳转
     if (inIframe) {
-      console.log('🖼️ iframe环境，通知父页面跳转');
       try {
         // 通知父页面进行跳转
         window.parent.postMessage({
@@ -309,22 +231,18 @@ export const logout = async (): Promise<void> => {
           window.location.href = casdoorLogoutUrl;
         }, 500);
       } catch (e) {
-        console.warn('⚠️ 无法通知父页面跳转，直接跳转');
         window.location.href = casdoorLogoutUrl;
       }
     } else {
       // 强制等待一下，确保所有操作完成
       await new Promise(resolve => setTimeout(resolve, 200));
-      console.log('🚀 准备跳转到Casdoor');
       // 跳转到Casdoor logout接口
       window.location.href = casdoorLogoutUrl;
     }
 
   } catch (error) {
-    console.error('❌ logout函数执行失败:', error);
 
     // 如果全流程失败，至少执行基础清理
-    console.log('🛡️ 执行应急清理');
     try {
       localStorage.clear();
       sessionStorage.clear();
@@ -339,14 +257,12 @@ export const logout = async (): Promise<void> => {
         }
       });
 
-      console.log('🛡️ 应急清理完成，强制跳转到主页');
       // 应急跳转
       if (inIframe) {
         window.parent.postMessage({ action: 'logout_redirect', url: `https://${domainConfig.mainDomain}/` }, '*');
       }
       window.location.href = `https://${domainConfig.mainDomain}/`;
     } catch (emergencyError) {
-      console.error('❌ 应急清理也失败了:', emergencyError);
       // 最后的手段
       alert('退出登录时发生错误，请手动清除浏览器缓存或刷新页面');
     }
@@ -368,4 +284,9 @@ export const isAuthenticated = (): boolean => {
   const xuserid = getCookie('xuserid');
   const xtoken = getCookie('xtoken');
   return !!(xuserid && xtoken);
+};
+
+// 删除cookie
+export const removeCookie = (name: string) => {
+    document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
 }; 

@@ -57,9 +57,7 @@ export const postNavigate = (url: string, newWindow: boolean = false) => {
 
     try {
         window.parent.postMessage(message, '*'); // 使用 '*' 表示任意目标 origin
-        console.log('[通信] 发送跳转指令:', message);
     } catch (error) {
-        console.error('[通信] 发送跳转指令失败:', error);
     }
 };
 
@@ -70,9 +68,7 @@ export const postNavigate = (url: string, newWindow: boolean = false) => {
 export const postMessageToParent = (options: PostMessageOptions) => {
     try {
         window.parent.postMessage(options, '*');
-        console.log('[通信] 发送自定义消息:', options);
     } catch (error) {
-        console.error('[通信] 发送自定义消息失败:', error);
     }
 };
 
@@ -123,7 +119,6 @@ export const notifyLogout = (redirectUrl?: string) => {
             targetUrl = getLogoutTargetUrl(strategy, customUrl);
         } catch (error) {
             // 如果获取配置失败，使用默认的auto策略
-            console.warn('[通信] 获取配置失败，使用默认策略:', error);
             targetUrl = getLogoutTargetUrl('auto', '/');
         }
     }
@@ -136,11 +131,6 @@ export const notifyLogout = (redirectUrl?: string) => {
     };
 
     postMessageToParent(message);
-    console.log('[通信] 发送退出登录导航指令:', {
-        from: window.location.href,
-        to: targetUrl,
-        strategy: redirectUrl ? 'manual' : 'config'
-    });
 };
 
 /**

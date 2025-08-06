@@ -4,16 +4,17 @@ import { HelmetProvider } from 'react-helmet-async';
 import HomePage from './pages/HomePage';
 import UserCenter from './pages/user/UserCenter';
 import { ToastContainer } from './components/Toast';
-import { RedirectPage, GoPlusPage } from './pages/other';
+import GoPlusPage from './pages/features/GoPlusPage';
+import RedirectPage from './pages/features/RedirectPage';
+import LoginPage from './pages/auth/LoginPage';
+import RegisterPage from './pages/auth/RegisterPage';
 import { HeroUIProvider } from '@heroui/react';
-import { HomeInfoProvider } from './contexts/HomeInfoContext';
 import ErrorBoundary from './components/ErrorBoundary';
 
 const App: React.FC = () => {
   return (
     <HelmetProvider>
       <HeroUIProvider>
-        <HomeInfoProvider>
           <Router>
             <div className="App">
               {/* 全局Toast通知容器 */}
@@ -29,6 +30,10 @@ const App: React.FC = () => {
                   } 
                 />
 
+                {/* 认证路由 */}
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+
                 {/* 用户中心路由 */}
                 <Route path="/user-center" element={<UserCenter />} />
 
@@ -38,7 +43,6 @@ const App: React.FC = () => {
               </Routes>
             </div>
           </Router>
-        </HomeInfoProvider>
       </HeroUIProvider>
     </HelmetProvider>
   );

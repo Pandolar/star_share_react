@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
 import { useHomeInfo } from '../contexts/HomeInfoContext';
-import { NavAction as NavActionType, ButtonType, TargetType } from '../types/homeInfo';
+import { NavAction as NavActionType } from '../types/homeInfo';
 
 // 按钮渲染函数
 const renderNavAction = (
@@ -62,7 +62,7 @@ const Header: React.FC = () => {
   const { homeInfo, loading } = useHomeInfo();
 
   // 如果还在加载中，显示默认的导航
-  if (loading) {
+  if (loading || !homeInfo?.siteInfo || !homeInfo?.navigation) {
     return (
       <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -79,7 +79,7 @@ const Header: React.FC = () => {
   }
 
   const { siteInfo, navigation } = homeInfo;
-  const navActions = navigation.navActions;
+  const navActions = navigation?.navActions || [];
 
   // 拆分导航项和右侧按钮
   const navItems = navActions.filter((item) => item.type === 'text');

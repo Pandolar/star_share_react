@@ -91,22 +91,18 @@ export const toast = {
 // Toast消息工具 - 使用页面级别的美观提示替代浏览器弹窗
 export const showMessage = {
   success: (message: string) => {
-    console.log('Success:', message);
     return toast.success(message);
   },
 
   error: (message: string) => {
-    console.error('Error:', message);
     return toast.error(message);
   },
 
   warning: (message: string) => {
-    console.warn('Warning:', message);
     return toast.warning(message);
   },
 
   info: (message: string) => {
-    console.log('Info:', message);
     return toast.info(message);
   }
 };
