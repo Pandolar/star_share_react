@@ -9,107 +9,40 @@
         }
     });
 
-    // 异步检查是否存在目标"继续"按钮
-    async function hasContinueButton() {
-        return new Promise(resolve => {
-            requestIdleCallback(() => {
-                const continueButtons = document.querySelectorAll(
-                    'button.semi-button.semi-button-primary.semi-button-size-large.w-full.!rounded-full[type="submit"]'
-                );
-                
-                let found = false;
-                for (let btn of continueButtons) {
-                    const isDisabled = btn.getAttribute('aria-disabled') === 'true' || btn.disabled;
-                    const hasContinueText = btn.textContent.trim() === "继续";
-                    
-                    if (hasContinueText && !isDisabled) {
-                        found = true;
-                        break;
-                    }
-                }
-                resolve(found);
-            });
-        });
-    }
-
-    // 异步提取主域名
-    async function getMainDomain() {
-        return new Promise(resolve => {
-            requestIdleCallback(() => {
-                const currentDomain = window.location.hostname;
-                const domainParts = currentDomain.split('.');
-                const mainDomain = domainParts.length >= 2 
-                    ? domainParts.slice(-2).join('.') 
-                    : currentDomain;
-                resolve(mainDomain);
-            });
-        });
-    }
-
-    // 异步检查是否存在注册按钮
-    async function hasRegisterButton() {
-        return new Promise(resolve => {
-            requestIdleCallback(() => {
-                const buttons = document.querySelectorAll(
-                    'button.semi-button.semi-button-primary.semi-button-size-large.w-full.!rounded-full[type="submit"]'
-                );
-                
-                let found = false;
-                for (let btn of buttons) {
-                    if (btn.textContent.trim() === "注册" && !btn.disabled) {
-                        found = true;
-                        break;
-                    }
-                }
-                resolve(found);
-            });
-        });
-    }
-
-    // 主逻辑执行函数（异步）
-    async function handlePageActions() {
+    // 检查逻辑（核心函数）
+    async function checkAndHandleActions() {
         try {
-            // 先检查是否存在继续按钮和注册按钮
-            const [continueButtonExists, registerButtonExists] = await Promise.all([
-                hasContinueButton(),
-                hasRegisterButton()
-            ]);
+            // 直接通过精准选择器获取按钮
+            const continueButton = getContinueButton();
+            const registerButton = getRegisterButton();
             
-            // 如果两个按钮都不存在，不执行任何操作
+            // 检查按钮是否存在且可用
+            const continueButtonExists = !!continueButton && !isButtonDisabled(continueButton);
+            const registerButtonExists = !!registerButton && !isButtonDisabled(registerButton);
+            
+            // 日志与逻辑处理
             if (!continueButtonExists && !registerButtonExists) {
-                console.log("未检测到继续按钮和注册按钮，不执行任何操作");
+                console.log("未检测到可用的继续按钮和注册按钮");
                 return;
             }
             
-            // 只有存在继续按钮时才执行后续操作
             if (continueButtonExists) {
-                console.log("检测到目标'继续'按钮");
-                
-                const mainDomain = await getMainDomain();
+                console.log("检测到可用的'继续'按钮");
+                const mainDomain = getMainDomain();
                 const currentDomain = window.location.hostname;
-                console.log("主域名为：", mainDomain);
-
+                
                 if (registerButtonExists) {
-                    console.log("检测到注册按钮，准备跳转至注册页面");
+                    console.log("检测到可用的'注册'按钮，准备跳转");
                     const registerUrl = `https://${mainDomain}/register?fromurl=https://${currentDomain}/login`;
-                    // 延迟跳转，避免阻塞
-                    setTimeout(() => {
-                        window.location.href = registerUrl;
-                    }, 0);
+                    setTimeout(() => window.location.href = registerUrl, 0);
                 } else {
-                    console.log("未检测到注册按钮，准备请求check_newapi接口");
+                    console.log("未检测到可用的'注册'按钮，准备请求接口");
                     const apiUrl = `https://${mainDomain}/u/check_newapi`;
-                    // 异步请求API
                     fetch(apiUrl)
-                        .then(response => {
-                            console.log("API请求响应状态：", response.status);
-                        })
-                        .catch(error => {
-                            console.error("API请求失败：", error);
-                        });
+                        .then(res => console.log("接口请求状态：", res.status))
+                        .catch(err => console.error("接口请求失败：", err));
                 }
             } else {
-                // 存在注册按钮但不存在继续按钮的情况，也不执行操作
                 console.log("仅检测到注册按钮，未检测到继续按钮，不执行操作");
             }
         } catch (error) {
@@ -117,9 +50,65 @@
         }
     }
 
-    // 使用requestIdleCallback在浏览器空闲时执行主逻辑
-    requestIdleCallback(() => {
-        handlePageActions();
-    }, { timeout: 2000 }); // 最多延迟2秒执行，避免长时间不触发
-})();
+    // 精准获取"继续"按钮（利用子元素文本和类名组合定位）
+    function getContinueButton() {
+        return document.querySelector(
+            'button.semi-button.semi-button-primary.semi-button-size-large.w-full.\\!rounded-full[type="submit"]:has(.semi-button-content:contains("继续"))'
+        );
+    }
+
+    // 精准获取"注册"按钮
+    function getRegisterButton() {
+        return document.querySelector(
+            'button.semi-button.semi-button-primary.semi-button-size-large.w-full.\\!rounded-full[type="submit"]:has(.semi-button-content:contains("注册"))'
+        );
+    }
+
+    // 检查按钮是否禁用
+    function isButtonDisabled(button) {
+        return button.disabled || button.getAttribute('aria-disabled') === 'true';
+    }
+
+    // 提取主域名（同步方法，无需异步）
+    function getMainDomain() {
+        const currentDomain = window.location.hostname;
+        const domainParts = currentDomain.split('.');
+        return domainParts.length >= 2 
+            ? domainParts.slice(-2).join('.') 
+            : currentDomain;
+    }
+
+    // 路由变化处理函数
+    function handleRouteChange() {
+        console.log("检测到前端路由变化，执行检查...");
+        // 路由变化后DOM可能未更新，延迟检查
+        setTimeout(checkAndHandleActions, 300);
+    }
+
+    // 监听路由变化
+    const originalPushState = history.pushState;
+    const originalReplaceState = history.replaceState;
     
+    history.pushState = function(...args) {
+        originalPushState.apply(this, args);
+        handleRouteChange();
+    };
+    
+    history.replaceState = function(...args) {
+        originalReplaceState.apply(this, args);
+        handleRouteChange();
+    };
+
+    window.addEventListener('popstate', handleRouteChange);
+
+    // 初始检查
+    console.log("页面初始加载，执行首次检查...");
+    checkAndHandleActions();
+
+    // 页面卸载时清理
+    window.addEventListener('beforeunload', () => {
+        window.removeEventListener('popstate', handleRouteChange);
+        history.pushState = originalPushState;
+        history.replaceState = originalReplaceState;
+    });
+})();
