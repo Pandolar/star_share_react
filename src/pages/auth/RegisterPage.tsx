@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import AuthLayout from '../../components/auth/AuthLayout';
 import { Input, Button, Spinner } from '@heroui/react';
 import { Eye, EyeOff } from 'lucide-react';
@@ -21,6 +21,7 @@ const RegisterPage: React.FC = () => {
 
   const isLoggedIn = useAutoLogin();
   const redirect = useRedirect();
+  const location = useLocation();
 
   const validateEmail = (value: string) => {
     if (!value || /^[\w-.+]+@([\w-]+\.)+[\w-]{2,4}$/.test(value)) {
@@ -152,7 +153,7 @@ const RegisterPage: React.FC = () => {
           {isRegistering ? <Spinner size="sm" color="white" /> : '注册'}
         </Button>
         <div className="text-center mt-4">
-          <Link to="/login" className="text-sm text-primary-600 hover:text-primary-500">
+          <Link to={`/login${location.search}`} className="text-sm text-primary-600 hover:text-primary-500">
             已有账户？直接登录
           </Link>
         </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import AuthLayout from '../../components/auth/AuthLayout';
 import { Input, Button, Spinner } from '@heroui/react';
 import { Eye, EyeOff } from 'lucide-react';
@@ -17,6 +17,7 @@ const LoginPage: React.FC = () => {
 
   const isLoggedIn = useAutoLogin();
   const redirect = useRedirect();
+  const location = useLocation();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,7 +83,7 @@ const LoginPage: React.FC = () => {
             {isLoggingIn ? <Spinner size="sm" color="white" /> : '登录'}
           </Button>
           <div className="text-center mt-4">
-            <Link to="/register" className="text-sm text-primary-600 hover:text-primary-500">
+            <Link to={`/register${location.search}`} className="text-sm text-primary-600 hover:text-primary-500">
               还没有账户？立即注册
             </Link>
           </div>
