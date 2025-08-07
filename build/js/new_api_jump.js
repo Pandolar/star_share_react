@@ -89,6 +89,23 @@
             : currentDomain;
     }
 
+    // 从cookie中获取指定名称的值
+    function getCookie(name) {
+        // 将cookie字符串分割成单个cookie
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            // 去除首尾空格
+            cookie = cookie.trim();
+            // 检查当前cookie是否是目标cookie
+            if (cookie.startsWith(`${name}=`)) {
+                // 提取并返回cookie值
+                return cookie.substring(name.length + 1);
+            }
+        }
+        // 如果没有找到指定cookie，返回空字符串
+        return '';
+    }
+
     // 处理继续按钮逻辑
     function handleContinueAction() {
         const mainDomain = getMainDomain();
@@ -104,9 +121,32 @@
         } else {
             console.log("未检测到注册按钮，准备请求check_newapi接口");
             const apiUrl = `https://${mainDomain}/u/check_newapi`;
-            fetch(apiUrl)
-                .then(res => console.log("接口请求状态：", res.status))
-                .catch(err => console.error("接口请求失败：", err));
+            
+            // 从cookie获取xuserid和xtoken
+            const xuserId = getCookie('xuserid');
+            const xToken = getCookie('xtoken');
+            
+            console.log(`从cookie获取到xuserid: ${xuserId}, xtoken: ${xToken ? '已获取' : '未获取'}`);
+            
+            // 配置请求头，包含必要参数
+            const headers = new Headers();
+            headers.append('xuserid', xuserId);
+            headers.append('xtoken', xToken);
+            
+            // 发送GET请求并设置请求头
+            fetch(apiUrl, {
+                method: 'GET',
+                headers: headers,
+                credentials: 'include' // 确保请求包含凭证信息（如cookie）
+            })
+            .then(res => {
+                console.log("接口请求状态：", res.status);
+                return res.text(); // 可以根据实际情况改为res.json()
+            })
+            .then(data => {
+                console.log("接口返回数据：", data);
+            })
+            .catch(err => console.error("接口请求失败：", err));
         }
     }
 

@@ -49,7 +49,8 @@
 
         // --- URL 与 存储 ---
         urls: {
-            iframe: 'https://183ai.com/user-center'
+            iframe: 'https://183ai.com/user-center',
+            checkToken: 'https://183ai.com/u/check_xtoken'  // 新增：token验证接口
         },
 
         // --- Cookie 配置（重点：在这里统一管理需要清除Cookie的域名）---
@@ -69,6 +70,67 @@
     console.log('[初始化] window.__actions_config 已设置:', window.__actions_config);
 
     // --------------------- 工具函数 ---------------------
+    /**
+     * 从cookie中获取指定名称的值
+     * @param {string} name - cookie名称
+     * @returns {string|null} - cookie值，不存在则返回null
+     */
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return null;
+    }
+
+    /**
+     * 清空所有cookie（包括本域名和父域名）
+     */
+    function clearAllCookies() {
+        console.log('[Cookie] 开始清空所有cookie（本域名和父域名）');
+        const cookies = document.cookie.split(';');
+        const domains = [
+            CONFIG.cookieSettings.mainDomain,
+            CONFIG.cookieSettings.rootDomain,
+            ''  // 空字符串表示当前域名
+        ];
+
+        // 遍历所有cookie并删除
+        cookies.forEach(cookie => {
+            const eqPos = cookie.indexOf('=');
+            const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+            if (name) {
+                domains.forEach(domain => {
+                    // 多种方式删除cookie确保彻底清除
+                    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+                    if (domain) {
+                        document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${domain}`;
+                        document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${domain}; secure`;
+                        document.cookie = `${name}=; max-age=0; path=/; domain=${domain}`;
+                    } else {
+                        document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; secure`;
+                        document.cookie = `${name}=; max-age=0; path=/`;
+                    }
+                });
+            }
+        });
+
+        // 额外清理常见认证相关cookie
+        const commonAuthCookies = [
+            'xuserid', 'xtoken', 'cas_access_token', 'access_token', 'refresh_token',
+            'user_session', 'auth_token', 'session_id', 'JSESSIONID', 'sessionid'
+        ];
+        commonAuthCookies.forEach(name => {
+            domains.forEach(domain => {
+                document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+                if (domain) {
+                    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${domain}`;
+                }
+            });
+        });
+
+        console.log('[Cookie] 所有cookie已清空');
+    }
+
     function isMobile() {
         const mobileRegex = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
         const result = mobileRegex.test(navigator.userAgent);
@@ -359,6 +421,70 @@
         });
     }
 
+    /**
+     * 检查xuserid和xtoken的有效性
+     * 1. 检查cookie中是否存在这两个参数
+     * 2. 如不存在，清空cookie并刷新
+     * 3. 如存在，调用接口验证有效性
+     * 4. 验证失败则清空cookie并刷新
+     */
+    function checkTokenValidity() {
+        return new Promise((resolve, reject) => {
+            console.log('[Token检查] 开始验证xuserid和xtoken有效性');
+
+            // 1. 从cookie获取参数
+            const xuserid = getCookie('xuserid');
+            const xtoken = getCookie('xtoken');
+
+            console.log('[Token检查] xuserid存在:', !!xuserid);
+            console.log('[Token检查] xtoken存在:', !!xtoken);
+
+            // 2. 检查参数是否完整
+            if (!xuserid || !xtoken) {
+                console.log('[Token检查] 缺少xuserid或xtoken，需要清理并刷新');
+                clearAllCookies();
+                window.location.reload();
+                return;
+            }
+
+            // 3. 调用接口验证有效性
+            console.log('[Token检查] 调用验证接口:', CONFIG.urls.checkToken);
+            fetch(CONFIG.urls.checkToken, {
+                method: 'GET',
+                headers: {
+                    'xuserid': xuserid,
+                    'xtoken': xtoken,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`接口请求失败，状态码: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('[Token检查] 接口返回数据:', data);
+                
+                // 4. 验证code是否为20000
+                if (data.code === 20000) {
+                    console.log('[Token检查] 验证通过，无需操作');
+                    resolve();
+                } else {
+                    console.log('[Token检查] 验证失败，code非20000');
+                    clearAllCookies();
+                    window.location.reload();
+                }
+            })
+            .catch(error => {
+                console.error('[Token检查] 验证过程出错:', error);
+                // 请求失败也视为验证失败
+                clearAllCookies();
+                window.location.reload();
+            });
+        });
+    }
+
     // --------------------- 初始化 ---------------------
     function init() {
         console.log('[初始化] 启动悬浮球系统，配置已加载');
@@ -383,10 +509,17 @@
 
     // ==================== 启动 ====================
     loadJQuery(function () {
+        // 页面完全加载后先执行token检查，再初始化系统
+        function onPageReady() {
+            // 先检查token有效性，通过后再执行原有初始化逻辑
+            checkTokenValidity().then(init);
+        }
+
+        // 确保页面完全加载后执行
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', init);
+            document.addEventListener('DOMContentLoaded', onPageReady);
         } else {
-            init();
+            onPageReady();
         }
     });
 
