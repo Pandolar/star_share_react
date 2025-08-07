@@ -286,7 +286,7 @@ export const dropdownApi = {
 };
 
 // 导出所有API
-export default {
+const apis = {
   auth: authApi,
   package: packageApi,
   user: userApi,
@@ -297,3 +297,5 @@ export default {
   logout: logoutApi,
   dropdown: dropdownApi,
 };
+
+export default apis;

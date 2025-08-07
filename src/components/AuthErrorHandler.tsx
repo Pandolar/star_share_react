@@ -11,7 +11,7 @@ export const AuthErrorHandler: React.FC = () => {
 
   useEffect(() => {
     const handleAuthFailure = (event: CustomEvent) => {
-      const { message, code } = event.detail;
+      const { message } = event.detail;
 
       // 显示美观的页面提示，不再使用浏览器弹窗
       showMessage.error(message || '认证失败，请重新登录');

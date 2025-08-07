@@ -86,7 +86,6 @@ export const setAuthCookies = (cookies: {
     cas_access_token?: string;
 }): void => {
     const { xuserid, xtoken, xy_uuid_token, cas_access_token } = cookies;
-    console.log('setAuthCookies', cookies);
     if (xuserid) setCookie('xuserid', xuserid);
     if (xtoken) setCookie('xtoken', xtoken);
     if (xy_uuid_token) setCookie('xy_uuid_token', xy_uuid_token);

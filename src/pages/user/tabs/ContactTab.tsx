@@ -52,14 +52,7 @@ export const ContactTab: React.FC = () => {
     }
   ];
 
-  // 工单类型选项
-  const ticketTypes = [
-    { key: 'technical', label: '技术问题' },
-    { key: 'billing', label: '账单问题' },
-    { key: 'feature', label: '功能建议' },
-    { key: 'bug', label: '错误报告' },
-    { key: 'other', label: '其他问题' }
-  ];
+  
 
   return (
     <motion.div

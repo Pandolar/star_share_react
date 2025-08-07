@@ -8,6 +8,7 @@ import GoPlusPage from './pages/features/GoPlusPage';
 import RedirectPage from './pages/features/RedirectPage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
+import NewApiPage from './pages/features/NewApiPage';
 import { HeroUIProvider } from '@heroui/react';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -40,6 +41,7 @@ const App: React.FC = () => {
                 {/* 其他功能路由 */}
                 <Route path="/handle_callback" element={<RedirectPage />} />
                 <Route path="/goplus" element={<GoPlusPage />} />
+                <Route path="/new-api" element={<NewApiPage />} />
               </Routes>
             </div>
           </Router>
