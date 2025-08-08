@@ -315,7 +315,11 @@ export const SubscriptionTab: React.FC = () => {
   // 提交兑换CDK
   const handleRedeemCdk = async () => {
     const cdk = cdkValue.trim();
-    if (!cdk) return;
+    if (!cdk) {
+      setRedeemStatus('failed');
+      setRedeemMessage('请输入有效的CDK');
+      return;
+    }
     try {
       setRedeemLoading(true);
       setRedeemStatus('idle');
@@ -584,17 +588,10 @@ export const SubscriptionTab: React.FC = () => {
         }
       `}</style>
 
-      {/* 页面标题 + 操作入口 */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="text-left">
-          <h1 className="text-3xl font-bold text-foreground mb-2">订阅套餐</h1>
-          <p className="text-default-500 max-w-md">选择适合您的订阅方案，享受优质服务</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button color="primary" variant="flat" onPress={openRedeemModal}>
-            兑换激活码
-          </Button>
-        </div>
+      {/* 页面标题（居中，避免在被嵌套环境中头部入口被裁剪） */}
+      <div className="text-center mb-8">
+        <h1 className="text-3xl font-bold text-foreground mb-2">订阅套餐</h1>
+        <p className="text-default-500 max-w-md mx-auto">选择适合您的订阅方案，享受优质服务</p>
       </div>
 
       {/* 加载状态 */}
@@ -776,6 +773,22 @@ export const SubscriptionTab: React.FC = () => {
         </div>
       )}
 
+      {/* 右下角悬浮按钮：兑换激活码 */}
+      <div
+        className="fixed bottom-6 right-6 z-50"
+        style={{ pointerEvents: 'none' }}
+      >
+        <Button
+          color="primary"
+          variant="solid"
+          onPress={openRedeemModal}
+          className="shadow-lg"
+          style={{ pointerEvents: 'auto' }}
+        >
+          兑换激活码
+        </Button>
+      </div>
+
       {/* 支付弹窗 */}
       <Modal
         isOpen={paymentModal}
@@ -929,7 +942,8 @@ export const SubscriptionTab: React.FC = () => {
         onClose={closeRedeemModal}
         size="md"
         classNames={{
-          base: 'max-h-[80vh]'
+          base: 'max-h-[80vh]',
+          footer: 'sticky bottom-0 bg-background border-t border-divider'
         }}
       >
         <ModalContent>
@@ -972,7 +986,7 @@ export const SubscriptionTab: React.FC = () => {
                 <Button variant="light" onPress={closeRedeemModal} isDisabled={redeemLoading}>
                   取消
                 </Button>
-                <Button color="primary" onPress={handleRedeemCdk} isLoading={redeemLoading} isDisabled={!cdkValue.trim()}>
+                <Button color="primary" variant="solid" onPress={handleRedeemCdk} isLoading={redeemLoading}>
                   确认兑换
                 </Button>
               </>
