@@ -144,10 +144,10 @@ export const announcementApi = {
             method: 'GET',
         });
     },
-    
+
     // 获取公告信息和Home页面配置信息
-    getPublicAndHomeInfo: async (): Promise<ApiResponse<{ 
-        notice: string; 
+    getPublicAndHomeInfo: async (): Promise<ApiResponse<{
+        notice: string;
         home_info: import('../types/homeInfo').HomeInfo;
     }>> => {
         return createUserRequest(getUserApiUrl('/u/get_public_info'), {
@@ -239,6 +239,17 @@ export const orderUserApi = {
     },
 };
 
+// 兑换激活码API
+export const exchangeUserApi = {
+    // 兑换CDK
+    exchangeCdk: async (cdk: string): Promise<ApiResponse<any>> => {
+        return createUserRequest(getUserApiUrl('/u/exchange_cdk'), {
+            method: 'POST',
+            body: JSON.stringify({ cdk }),
+        });
+    },
+};
+
 // 导出所有用户端API
 const userApi = {
     auth: userAuthApi,
@@ -246,6 +257,7 @@ const userApi = {
     userInfo: userInfoApi,
     package: packageUserApi,
     order: orderUserApi,
-}; 
+    exchange: exchangeUserApi,
+};
 
 export default userApi; 

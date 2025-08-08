@@ -288,12 +288,15 @@
         ball.alt = '悬浮球';
         ball.title = CONFIG.ball.title;
 
+        // 移动端可以适当调整悬浮球大小
+        const ballSize = isMobile() ? CONFIG.ball.size * 1.2 : CONFIG.ball.size;
+        
         ball.style.cssText = `
             position: fixed;
             top: ${CONFIG.ball.top};
             right: ${CONFIG.ball.right}px;
-            width: ${CONFIG.ball.size}px;
-            height: ${CONFIG.ball.size}px;
+            width: ${ballSize}px;
+            height: ${ballSize}px;
             border-radius: 50%;
             cursor: pointer;
             z-index: 99998;
@@ -491,18 +494,17 @@
 
         setupMessageListener();
 
-        if (isMobile()) {
-            if (CONFIG.behavior.forceOpenOnceIn24h && !hasOpenedInLast24Hours()) {
-                window.open(CONFIG.urls.iframe, '_blank');
-                setLastOpenTime();
-            }
-            return;
-        }
-
+        // 移动端和PC端统一执行24小时强制打开逻辑
         if (CONFIG.behavior.forceOpenOnceIn24h && !hasOpenedInLast24Hours()) {
-            openIframeModal();
+            if (isMobile() && CONFIG.behavior.mobile.openInNewWindow) {
+                window.open(CONFIG.urls.iframe, '_blank');
+            } else {
+                openIframeModal();
+            }
+            setLastOpenTime();
         }
 
+        // 移动端和PC端都创建悬浮球并启动定时检查
         createFloatingBall();
         setInterval(checkAndCreateBall, CONFIG.behavior.checkInterval);
     }

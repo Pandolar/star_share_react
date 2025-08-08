@@ -15,11 +15,12 @@ import {
   ModalBody,
   ModalFooter,
   Tab,
-  Tabs
+  Tabs,
+  Input
 } from '@heroui/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Package, Star, Crown, AlertCircle, CheckCircle, QrCode, Calendar, Timer } from 'lucide-react';
-import { packageUserApi, orderUserApi } from '../../../services/userApi';
+import { packageUserApi, orderUserApi, exchangeUserApi } from '../../../services/userApi';
 import QRCodeGenerator from 'qrcode-generator';
 
 interface PackageInfo {
@@ -67,6 +68,13 @@ export const SubscriptionTab: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<SubscriptionType>('monthly');
   const [qrCodeExpired, setQrCodeExpired] = useState(false);
   const [qrCodeTimer, setQrCodeTimer] = useState<NodeJS.Timeout | null>(null);
+
+  // 兑换CDK弹窗与状态
+  const [redeemModal, setRedeemModal] = useState(false);
+  const [cdkValue, setCdkValue] = useState('');
+  const [redeemLoading, setRedeemLoading] = useState(false);
+  const [redeemStatus, setRedeemStatus] = useState<'idle' | 'success' | 'failed'>('idle');
+  const [redeemMessage, setRedeemMessage] = useState<string>('');
 
   // 套餐分类配置
   const subscriptionCategories: SubscriptionCategory[] = useMemo(() => [
@@ -285,6 +293,57 @@ export const SubscriptionTab: React.FC = () => {
     const sortedByPrice = [...categoryPackages].sort((a, b) => a.price - b.price);
     const middleIndex = Math.floor(sortedByPrice.length / 2);
     return sortedByPrice[middleIndex];
+  };
+
+  // 打开兑换弹窗
+  const openRedeemModal = () => {
+    setRedeemModal(true);
+    setCdkValue('');
+    setRedeemStatus('idle');
+    setRedeemMessage('');
+  };
+
+  // 关闭兑换弹窗
+  const closeRedeemModal = () => {
+    setRedeemModal(false);
+    setCdkValue('');
+    setRedeemLoading(false);
+    setRedeemStatus('idle');
+    setRedeemMessage('');
+  };
+
+  // 提交兑换CDK
+  const handleRedeemCdk = async () => {
+    const cdk = cdkValue.trim();
+    if (!cdk) return;
+    try {
+      setRedeemLoading(true);
+      setRedeemStatus('idle');
+      setRedeemMessage('');
+
+      // 调用兑换接口，接口头部将自动携带 xuserid 与 xtoken
+      const res = await exchangeUserApi.exchangeCdk(cdk);
+
+      if (res.code === 20000) {
+        setRedeemStatus('success');
+        setRedeemMessage('兑换成功，正在刷新页面...');
+        // 成功后短暂提示并刷新
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } else {
+        // 按照约定：非20000为失败，提示msg
+        setRedeemStatus('failed');
+        setRedeemMessage(res.msg || '兑换失败');
+      }
+    } catch (err) {
+      // 当后端返回非20000时，底层会抛出异常，err.message包含msg
+      const msg = err instanceof Error ? err.message : '兑换失败，请稍后重试';
+      setRedeemStatus('failed');
+      setRedeemMessage(msg);
+    } finally {
+      setRedeemLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -525,10 +584,17 @@ export const SubscriptionTab: React.FC = () => {
         }
       `}</style>
 
-      {/* 页面标题 */}
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-foreground mb-2">订阅套餐</h1>
-        <p className="text-default-500 max-w-md mx-auto">选择适合您的订阅方案，享受优质服务</p>
+      {/* 页面标题 + 操作入口 */}
+      <div className="flex items-center justify-between mb-8">
+        <div className="text-left">
+          <h1 className="text-3xl font-bold text-foreground mb-2">订阅套餐</h1>
+          <p className="text-default-500 max-w-md">选择适合您的订阅方案，享受优质服务</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button color="primary" variant="flat" onPress={openRedeemModal}>
+            兑换激活码
+          </Button>
+        </div>
       </div>
 
       {/* 加载状态 */}
@@ -851,6 +917,68 @@ export const SubscriptionTab: React.FC = () => {
                 onPress={closePaymentModal}
               >
                 取消支付
+              </Button>
+            )}
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* 兑换激活码弹窗 */}
+      <Modal
+        isOpen={redeemModal}
+        onClose={closeRedeemModal}
+        size="md"
+        classNames={{
+          base: 'max-h-[80vh]'
+        }}
+      >
+        <ModalContent>
+          <ModalHeader>
+            <div>
+              <h2 className="text-xl font-bold">兑换激活码 CDK</h2>
+              <p className="text-sm text-default-500 mt-1">输入您获得的 CDK 激活码，兑换相应权益</p>
+            </div>
+          </ModalHeader>
+          <ModalBody>
+            {redeemStatus === 'success' ? (
+              <div className="text-center space-y-4 py-4">
+                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', duration: 0.6 }}>
+                  <CheckCircle className="w-16 h-16 mx-auto text-success" />
+                </motion.div>
+                <p className="text-success font-semibold">{redeemMessage || '兑换成功'}</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <Input
+                  label="激活码"
+                  placeholder="请输入CDK，例如：XXXX-XXXX-XXXX"
+                  value={cdkValue}
+                  onValueChange={setCdkValue}
+                  isDisabled={redeemLoading}
+                  isRequired
+                />
+                {redeemStatus === 'failed' && (
+                  <div className="flex items-center gap-2 text-danger text-sm">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{redeemMessage}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            {redeemStatus !== 'success' ? (
+              <>
+                <Button variant="light" onPress={closeRedeemModal} isDisabled={redeemLoading}>
+                  取消
+                </Button>
+                <Button color="primary" onPress={handleRedeemCdk} isLoading={redeemLoading} isDisabled={!cdkValue.trim()}>
+                  确认兑换
+                </Button>
+              </>
+            ) : (
+              <Button color="primary" onPress={closeRedeemModal}>
+                关闭
               </Button>
             )}
           </ModalFooter>
