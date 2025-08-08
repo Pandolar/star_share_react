@@ -78,7 +78,7 @@ async function createUserRequest(
         // 处理HTTP错误
         if (!response.ok) {
             if (response.status === 401 || response.status === 403) {
-                // 触发全局认证失败处理
+                // 触发全局认证失败处理（HTTP层鉴权失败）
                 const event = new CustomEvent('authFailure', {
                     detail: { message: '登录状态已过期' }
                 });
@@ -92,15 +92,19 @@ async function createUserRequest(
 
         // 检查业务错误码
         if (data.code !== undefined && data.code !== 20000) {
-            // 触发全局认证失败处理
-            const event = new CustomEvent('authFailure', {
-                detail: {
-                    message: data.msg || '接口返回错误，请重新登录',
-                    code: data.code
-                }
-            });
-            window.dispatchEvent(event);
-            throw new Error(data.msg || '请求失败');
+            // 仅当为 20009（登录过期）时触发全局登录失效
+            if (Number(data.code) === 20009) {
+                const event = new CustomEvent('authFailure', {
+                    detail: {
+                        message: data.msg || '登录状态已过期，请重新登录',
+                        code: data.code
+                    }
+                });
+                window.dispatchEvent(event);
+                throw new Error(data.msg || '请求失败');
+            }
+            // 其他非20000的业务错误，直接返回给调用方处理
+            return data;
         }
 
         return data;

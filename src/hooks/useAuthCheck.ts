@@ -74,10 +74,10 @@ export const useAuthCheck = (options: AuthCheckOptions = {}) => {
         }
     }, [navigate, showCountdown, countdownSeconds]);
 
-    // 检查接口响应的code
+    // 检查接口响应的code（仅20009代表登录过期）
     const checkApiResponse = useCallback((response: any): boolean => {
-        if (response && response.code !== undefined && response.code !== 20000) {
-            handleAuthFailure('接口返回错误，请重新登录');
+        if (response && response.code !== undefined && Number(response.code) === 20009) {
+            handleAuthFailure('登录状态已过期，请重新登录');
             return false;
         }
         return true;

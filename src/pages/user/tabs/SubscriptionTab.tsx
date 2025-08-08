@@ -588,10 +588,17 @@ export const SubscriptionTab: React.FC = () => {
         }
       `}</style>
 
-      {/* 页面标题（居中，避免在被嵌套环境中头部入口被裁剪） */}
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-foreground mb-2">订阅套餐</h1>
-        <p className="text-default-500 max-w-md mx-auto">选择适合您的订阅方案，享受优质服务</p>
+      {/* 页面标题 + 操作入口（右侧文字按钮） */}
+      <div className="flex items-center justify-between mb-8">
+        <div className="text-left">
+          <h1 className="text-3xl font-bold text-foreground mb-2">订阅套餐</h1>
+          <p className="text-default-500 max-w-md">选择适合您的订阅方案，享受优质服务</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button color="primary" variant="flat" onPress={openRedeemModal}>
+            兑换激活码
+          </Button>
+        </div>
       </div>
 
       {/* 加载状态 */}
@@ -773,22 +780,6 @@ export const SubscriptionTab: React.FC = () => {
         </div>
       )}
 
-      {/* 右下角悬浮按钮：兑换激活码 */}
-      <div
-        className="fixed bottom-6 right-6 z-50"
-        style={{ pointerEvents: 'none' }}
-      >
-        <Button
-          color="primary"
-          variant="solid"
-          onPress={openRedeemModal}
-          className="shadow-lg"
-          style={{ pointerEvents: 'auto' }}
-        >
-          兑换激活码
-        </Button>
-      </div>
-
       {/* 支付弹窗 */}
       <Modal
         isOpen={paymentModal}
@@ -941,8 +932,10 @@ export const SubscriptionTab: React.FC = () => {
         isOpen={redeemModal}
         onClose={closeRedeemModal}
         size="md"
+        scrollBehavior="inside"
         classNames={{
           base: 'max-h-[80vh]',
+          body: 'py-6',
           footer: 'sticky bottom-0 bg-background border-t border-divider'
         }}
       >
@@ -977,6 +970,12 @@ export const SubscriptionTab: React.FC = () => {
                     <span>{redeemMessage}</span>
                   </div>
                 )}
+                {/* 备用确认按钮：在小屏或极端场景仍可点击提交 */}
+                <div className="flex md:hidden justify-end">
+                  <Button variant="light" size="sm" onPress={handleRedeemCdk} isLoading={redeemLoading}>
+                    确认兑换
+                  </Button>
+                </div>
               </div>
             )}
           </ModalBody>
@@ -986,7 +985,7 @@ export const SubscriptionTab: React.FC = () => {
                 <Button variant="light" onPress={closeRedeemModal} isDisabled={redeemLoading}>
                   取消
                 </Button>
-                <Button color="primary" variant="solid" onPress={handleRedeemCdk} isLoading={redeemLoading}>
+                <Button variant="light" onPress={handleRedeemCdk} isLoading={redeemLoading}>
                   确认兑换
                 </Button>
               </>
