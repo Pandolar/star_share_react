@@ -13,6 +13,19 @@
             hoverShadow: '0 6px 16px rgba(0,0,0,0.3)'
         },
 
+        // --- 右键菜单设置 ---
+        contextMenu: {
+            width: 150,         // 菜单宽度(px)
+            backgroundColor: '#fff',
+            borderRadius: '6px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            itemHeight: 36,     // 菜单项高度(px)
+            itemPadding: '0 16px',
+            itemHoverColor: '#f5f5f5',
+            itemFontSize: '14px',
+            itemColor: '#333'
+        },
+
         // --- iframe 弹窗设置 ---
         modal: {
             width: '80%',       // 占视口宽度
@@ -278,6 +291,135 @@
         console.log('[状态] __actions_config.hidden = true');
     }
 
+    // --------------------- 右键菜单相关函数 ---------------------
+    /**
+     * 移除右键菜单
+     */
+    function removeContextMenu() {
+        const menu = document.getElementById('floating-ball-context-menu');
+        if (menu) {
+            menu.remove();
+            console.log('[右键菜单] 已移除');
+        }
+    }
+
+    /**
+     * 创建并显示右键菜单
+     * @param {number} x - 菜单显示的X坐标
+     * @param {number} y - 菜单显示的Y坐标
+     */
+    function createContextMenu(x, y) {
+        // 先移除已存在的菜单
+        removeContextMenu();
+
+        // 创建菜单容器
+        const menu = document.createElement('div');
+        menu.id = 'floating-ball-context-menu';
+        menu.style.cssText = `
+            position: fixed;
+            left: ${x}px;
+            top: ${y}px;
+            width: ${CONFIG.contextMenu.width}px;
+            background: ${CONFIG.contextMenu.backgroundColor};
+            border-radius: ${CONFIG.contextMenu.borderRadius};
+            box-shadow: ${CONFIG.contextMenu.boxShadow};
+            padding: 4px 0;
+            z-index: 99999;
+            margin: 0;
+            list-style: none;
+        `;
+
+        // 创建"退出登录"菜单项
+        const logoutItem = document.createElement('div');
+        logoutItem.textContent = '退出登录';
+        logoutItem.style.cssText = `
+            height: ${CONFIG.contextMenu.itemHeight}px;
+            line-height: ${CONFIG.contextMenu.itemHeight}px;
+            padding: ${CONFIG.contextMenu.itemPadding};
+            cursor: pointer;
+            font-size: ${CONFIG.contextMenu.itemFontSize};
+            color: ${CONFIG.contextMenu.itemColor};
+        `;
+
+        // 菜单项 hover 效果
+        logoutItem.addEventListener('mouseenter', () => {
+            logoutItem.style.backgroundColor = CONFIG.contextMenu.itemHoverColor;
+        });
+        logoutItem.addEventListener('mouseleave', () => {
+            logoutItem.style.backgroundColor = 'transparent';
+        });
+
+        // 点击退出登录
+        logoutItem.addEventListener('click', () => {
+            removeContextMenu();
+            performLogout();
+        });
+
+        menu.appendChild(logoutItem);
+        document.body.appendChild(menu);
+        console.log('[右键菜单] 已创建');
+
+        // 点击页面其他地方关闭菜单
+        document.addEventListener('click', function closeMenuOnClick(e) {
+            if (!menu.contains(e.target)) {
+                removeContextMenu();
+                document.removeEventListener('click', closeMenuOnClick);
+            }
+        });
+    }
+
+    /**
+     * 执行退出登录流程
+     */
+    function performLogout() {
+        console.log('[退出登录] 开始执行退出登录流程');
+        
+        // 从配置中获取主域名（去除前面的点）
+        const mainDomain = CONFIG.cookieSettings.mainDomain.replace(/^\./, '');
+        const shareLogoutUrl = `https://share.${mainDomain}/auth/logout`;
+        const mainLogoutUrl = `https://${mainDomain}/logout`;
+        const homeUrl = `https://${mainDomain}`;
+
+        console.log('[退出登录] 准备请求:', shareLogoutUrl);
+        console.log('[退出登录] 准备请求:', mainLogoutUrl);
+
+        // 1. 发送第一个logout请求
+        fetch(shareLogoutUrl, {
+            method: 'GET',
+            credentials: 'include',
+            mode: 'cors'
+        })
+        .then(response => {
+            console.log(`[退出登录] 第一个请求响应: ${response.status}`);
+            // 2. 发送第二个logout请求
+            return fetch(mainLogoutUrl, {
+                method: 'GET',
+                credentials: 'include',
+                mode: 'cors'
+            });
+        })
+        .then(response => {
+            console.log(`[退出登录] 第二个请求响应: ${response.status}`);
+            // 3. 清空所有cookie
+            clearAllCookies();
+            
+            // 4. 新窗口打开主域名
+            console.log('[退出登录] 打开主域名:', homeUrl);
+            window.open(homeUrl, '_blank');
+            
+            // 5. 关闭当前窗口
+            console.log('[退出登录] 关闭当前窗口');
+            window.close();
+        })
+        .catch(error => {
+            console.error('[退出登录] 请求失败:', error);
+            // 即使请求失败也执行后续清理操作
+            clearAllCookies();
+            window.open(homeUrl, '_blank');
+            window.close();
+        });
+    }
+
     // --------------------- 创建悬浮球 ---------------------
     function createFloatingBall() {
         if (document.getElementById('floating-ball')) return;
@@ -304,6 +446,7 @@
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         `;
 
+        // 鼠标悬停效果
         ball.addEventListener('mouseenter', () => {
             ball.style.transform = `scale(${CONFIG.ball.hoverScale})`;
             ball.style.boxShadow = CONFIG.ball.hoverShadow;
@@ -312,13 +455,29 @@
             ball.style.transform = 'scale(1)';
             ball.style.boxShadow = CONFIG.ball.boxShadow;
         });
+
+        // 左键点击打开弹窗
         ball.addEventListener('click', () => {
-            console.log('[悬浮球] 被点击');
+            console.log('[悬浮球] 左键被点击');
             if (isMobile() && CONFIG.behavior.mobile.openInNewWindow) {
                 window.open(CONFIG.urls.iframe, '_blank');
             } else {
                 openIframeModal();
             }
+        });
+
+        // 右键点击显示菜单
+        ball.addEventListener('contextmenu', (e) => {
+            e.preventDefault(); // 阻止默认右键菜单
+            e.stopPropagation();
+            console.log('[悬浮球] 右键被点击');
+            
+            // 获取悬浮球位置信息
+            const rect = ball.getBoundingClientRect();
+            // 计算菜单位置：悬浮球正下方，右对齐（菜单右侧与悬浮球右侧对齐）
+            const menuLeft = rect.right - CONFIG.contextMenu.width; // 右对齐
+            const menuTop = rect.bottom; // 正下方
+            createContextMenu(menuLeft, menuTop);
         });
 
         document.body.appendChild(ball);
