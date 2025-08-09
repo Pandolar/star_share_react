@@ -1100,20 +1100,17 @@ const GoPlusPage: React.FC = () => {
                                     >
                                         <div className="space-y-4">
                                             <p className="text-gray-600">
-                                                我们提供24小时在线客服支持，如果您在使用过程中遇到任何问题，请随时联系我们。
+                                                我们提供24小时在线客服支持，如果您在使用过程中遇到任何问题，请随时联系我们。<br />
+                                                您可以通过扫描下方二维码添加客服微信：
                                             </p>
-                                            <Button
-                                                color="primary"
-                                                variant="flat"
-                                                as="a"
-                                                href={config.supportContact}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                startContent={<MessageCircle className="w-4 h-4" />}
-                                                className="w-full sm:w-auto"
-                                            >
-                                                联系客服
-                                            </Button>
+                                            <div className="flex flex-col items-center space-y-2">
+                                                <img
+                                                    src="https://niceaigc-cos.niceaigc.com/myimg/NiceAIGC-kefu.jpg"
+                                                    alt="客服微信二维码"
+                                                    className="w-40 h-40 rounded-lg border border-gray-200 shadow"
+                                                />
+                                                <span className="text-xs text-gray-500">扫一扫，添加客服</span>
+                                            </div>
                                         </div>
                                     </AccordionItem>
                                 </Accordion>
