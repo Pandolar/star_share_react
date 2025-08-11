@@ -622,7 +622,7 @@ const GoPlusPage: React.FC = () => {
                     className="text-center mb-12"
                 >
                     <h1 className="text-4xl font-bold text-gray-900 mb-4">
-                        ChatGPT Plus 自助充值
+                        ChatGPT Plus 个人自助充值
                     </h1>
                     <p className="text-xl text-gray-600">
                         安全快速，专业可靠的ChatGPT Plus充值服务
@@ -672,7 +672,7 @@ const GoPlusPage: React.FC = () => {
                         <CardBody className="p-6">
                             <div className="flex items-center space-x-3 mb-4">
                                 <Zap className="w-8 h-8 text-primary" />
-                                <h2 className="text-2xl font-semibold text-gray-900">极简步骤，一分钟搞定！</h2>
+                                <h2 className="text-2xl font-semibold text-gray-900">无需账密，极简步骤，一分钟搞定！</h2>
                             </div>
                             <div className="text-lg text-gray-700 space-y-2">
                                 <p><span className="font-semibold text-primary">第一步.</span> 登录ChatGPT官网后，复制JSON到本页面</p>
