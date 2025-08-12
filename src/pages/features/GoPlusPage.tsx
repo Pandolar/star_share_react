@@ -116,12 +116,16 @@ const GoPlusPage: React.FC = () => {
     const [orderInfo, setOrderInfo] = useState<OrderInfo | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [paymentTimer, setPaymentTimer] = useState<NodeJS.Timeout | null>(null);
-    
+
     // 二维码过期相关状态
     const [qrCodeExpiryTime, setQrCodeExpiryTime] = useState<number | null>(null);
     const [remainingTime, setRemainingTime] = useState<number>(300); // 5分钟，单位：秒
     const [isQrCodeExpired, setIsQrCodeExpired] = useState<boolean>(false);
-    
+
+    // **新增：CDK兑换相关状态**
+    const [cdkInput, setCdkInput] = useState<string>(''); // CDK兑换码输入
+    const [isCdkLoading, setIsCdkLoading] = useState<boolean>(false); // CDK兑换中状态
+
     // JSON验证状态 - 明确区分格式验证和字段验证
     const [validationState, setValidationState] = useState<JsonValidationState>({
         isJsonValid: false,
@@ -132,9 +136,9 @@ const GoPlusPage: React.FC = () => {
     const {
         isOpen: isPaymentModalOpen,
         onOpen: openPaymentModal,
-        onClose: closePaymentModal, 
+        onClose: closePaymentModal,
         onOpenChange: onPaymentModalChange
-      } = useDisclosure();
+    } = useDisclosure();
 
     // **新增：充值等待/结果弹窗控制**
     const { isOpen: isRechargeModalOpen, onOpen: openRechargeModal, onOpenChange: onRechargeModalChange } = useDisclosure();
@@ -205,39 +209,39 @@ const GoPlusPage: React.FC = () => {
             answer: '可以不到期续费，但是不能叠加，比如您原有的plus到8月15日过期，今天是7月25，您再使用自助激活的话，只能将会员续费到8月25日而不是叠加，所以建议过期后或过期前一天再进行续费。'
         }
     ];
-    
+
     const compareRows = [
         {
-          label: '充值渠道',
-          ours: '✅官方 IOS 渠道 (海外地区 / 正规扣款)',
-          card: '❌第三方虚拟信用卡（来源不明）'
+            label: '充值渠道',
+            ours: '✅官方 IOS 渠道 (海外地区 / 正规扣款)',
+            card: '❌第三方虚拟信用卡（来源不明）'
         },
         {
-          label: '到手价格',
-          ours: '✅$18 ~ $20 / 月（0 手续费）',
-          card: '❌≥ $20 + 平台手续费，折合更贵'
+            label: '到手价格',
+            ours: '✅$18 ~ $20 / 月（0 手续费）',
+            card: '❌≥ $20 + 平台手续费，折合更贵'
         },
         {
-          label: '是否预充',
-          ours: '✅无需预充；按需直购',
-          card: '❌必须先充额；有跑路风险'
+            label: '是否预充',
+            ours: '✅无需预充；按需直购',
+            card: '❌必须先充额；有跑路风险'
         },
         {
-          label: '操作复杂度',
-          ours: '✅极简 2 步完成，小白1分钟搞定',
-          card: '❌步骤繁琐，对小白不友好'
+            label: '操作复杂度',
+            ours: '✅极简 2 步完成，小白1分钟搞定',
+            card: '❌步骤繁琐，对小白不友好'
         },
         {
-          label: '隐私安全',
-          ours: '✅无需实名；全程数据加密',
-          card: '❌需要实名；卡信息易泄露'
+            label: '隐私安全',
+            ours: '✅无需实名；全程数据加密',
+            card: '❌需要实名；卡信息易泄露'
         },
         {
-          label: '平台盈利模式',
-          ours: '✅仅赚汇率差，流程透明',
-          card: '❌未知；部分依靠手续费或跑路'
+            label: '平台盈利模式',
+            ours: '✅仅赚汇率差，流程透明',
+            card: '❌未知；部分依靠手续费或跑路'
         }
-      ];
+    ];
 
     // 清理定时器
     useEffect(() => {
@@ -264,30 +268,30 @@ const GoPlusPage: React.FC = () => {
     // 二维码过期计时器
     useEffect(() => {
         let timer: NodeJS.Timeout;
-        
+
         if (qrCodeExpiryTime && !isQrCodeExpired) {
             timer = setInterval(() => {
                 const now = Date.now();
                 const remaining = Math.ceil((qrCodeExpiryTime - now) / 1000);
-                
+
                 if (remaining <= 0) {
                     // 二维码已过期
                     setIsQrCodeExpired(true);
                     setRemainingTime(0);
-                    
+
                     // 停止订单检查
                     if (paymentTimer) {
                         clearTimeout(paymentTimer);
                         setPaymentTimer(null);
                     }
-                    
+
                     clearInterval(timer);
                 } else {
                     setRemainingTime(remaining);
                 }
             }, 1000);
         }
-        
+
         return () => {
             if (timer) clearInterval(timer);
         };
@@ -321,10 +325,10 @@ const GoPlusPage: React.FC = () => {
         try {
             const parsed = JSON.parse(input);
             setValidatedData(parsed);
-            
+
             // JSON格式有效
             setValidationState(prev => ({ ...prev, isJsonValid: true }));
-            
+
             // 第二步：验证必要字段
             const requiredFields = ['user.id', 'user.email', 'account.id', 'accessToken'];
             const missingFields: string[] = [];
@@ -375,13 +379,13 @@ const GoPlusPage: React.FC = () => {
             showMessage.error(validationState.errorMessage || 'JSON格式不正确，请检查');
             return;
         }
-        
+
         // 再检查字段是否完整
         if (!validationState.hasAllFields) {
             showMessage.error(validationState.errorMessage || 'JSON格式不正确，请检查并复制完整数据到输入框');
             return;
         }
-        
+
         // 验证通过，进入下一步
         setCurrentStep(RechargeStep.JSON_VERIFY);
         showMessage.success('JSON验证通过，包含所有必要字段');
@@ -408,13 +412,13 @@ const GoPlusPage: React.FC = () => {
                 setOrderInfo(result.data);
                 setCurrentStep(RechargeStep.PAYMENT);
                 openPaymentModal();
-                
+
                 // 设置二维码过期时间为5分钟后
                 const expiryTime = Date.now() + 5 * 60 * 1000; // 5分钟
                 setQrCodeExpiryTime(expiryTime);
                 setIsQrCodeExpired(false);
                 setRemainingTime(300); // 5分钟 = 300秒
-                
+
                 startPaymentCheck(result.data.order_id);
             } else {
                 showMessage.error('创建订单失败，请重试');
@@ -432,7 +436,7 @@ const GoPlusPage: React.FC = () => {
         const checkPayment = async () => {
             // 如果二维码已过期，停止检查
             if (isQrCodeExpired) return;
-            
+
             try {
                 const response = await fetch(`/u/go_plus_order?order_id=${orderId}`);
                 const result = await response.json();
@@ -474,7 +478,7 @@ const GoPlusPage: React.FC = () => {
 
     // 执行充值（显示等待弹窗；成功或失败在该弹窗内提示）
     const performRecharge = async (orderId: string) => {
-        // 打开“正在充值”弹窗
+        // 打开"正在充值"弹窗
         setRechargeStatus('waiting');
         setRechargeMessage('正在充值... 请稍等10~60秒');
         setRechargeRaw(null);
@@ -518,6 +522,75 @@ const GoPlusPage: React.FC = () => {
     };
 
 
+    // **新增：CDK兑换功能 - 跳过付款直接充值**
+    const performCdkRecharge = async () => {
+        // 检查CDK输入是否为空
+        if (!cdkInput.trim()) {
+            showMessage.error('请输入CDK兑换码');
+            return;
+        }
+
+        // 检查是否有有效的JSON数据
+        if (!validatedData) {
+            showMessage.error('请先完成JSON数据验证');
+            return;
+        }
+
+        setIsCdkLoading(true);
+
+        try {
+            // 关闭支付弹窗，打开充值等待弹窗
+            closePaymentModal();
+            setRechargeStatus('waiting');
+            setRechargeMessage('正在使用CDK兑换码充值... 请稍等10~60秒');
+            setRechargeRaw(null);
+            openRechargeModal();
+
+            // 调用CDK兑换接口
+            const response = await fetch('/u/go_plus_cdk', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_data: validatedData,
+                    cdk: cdkInput.trim()
+                })
+            });
+
+            // 这里接口可能耗时较长
+            const result = await response.json();
+            setRechargeRaw(result);
+
+            if (result.code === 20000 && result.msg === 'ok') {
+                // CDK兑换成功
+                setRechargeStatus('success');
+                setRechargeMessage('CDK兑换成功！请返回ChatGPT官网刷新！如有任何问题请联系客服~');
+                setCurrentStep(RechargeStep.SUCCESS);
+                showMessage.success('CDK兑换成功！');
+
+                // 清空CDK输入
+                setCdkInput('');
+            } else {
+                // CDK兑换失败
+                setRechargeStatus('error');
+                setRechargeMessage('CDK兑换失败：请截图下方返回信息并联系在线客服处理');
+                showMessage.error('CDK兑换失败，请查看弹窗信息');
+            }
+        } catch (error: any) {
+            setRechargeStatus('error');
+            setRechargeMessage('CDK兑换失败：网络错误。请截图下方信息并联系在线客服处理');
+            setRechargeRaw({
+                error: 'network_error',
+                message: error?.message || '未知错误'
+            });
+            showMessage.error('CDK兑换失败: 网络错误，请联系客服');
+        } finally {
+            setIsCdkLoading(false);
+        }
+    };
+
+
     // 重置流程
     const resetProcess = () => {
         setCurrentStep(RechargeStep.JSON_INPUT);
@@ -530,7 +603,11 @@ const GoPlusPage: React.FC = () => {
         setRechargeStatus('idle');
         setRechargeMessage('');
         setRechargeRaw(null);
-        
+
+        // **新增：重置CDK相关状态**
+        setCdkInput('');
+        setIsCdkLoading(false);
+
         if (paymentTimer) {
             clearTimeout(paymentTimer);
             setPaymentTimer(null);
@@ -746,26 +823,24 @@ const GoPlusPage: React.FC = () => {
                                                 value={jsonInput}
                                                 onChange={(e) => setJsonInput(e.target.value)}
                                                 minRows={8}
-                                                className={`w-full transition-all duration-300 ${
-                                                    jsonInput 
-                                                        ? validationState.isJsonValid
-                                                            ? validationState.hasAllFields
-                                                                ? 'border-green-500 focus:ring-green-200'  // 完全有效
-                                                                : 'border-yellow-500 focus:ring-yellow-200' // 格式有效但字段不全
-                                                            : 'border-red-500 focus:ring-red-200'  // 格式无效
-                                                        : ''  // 未输入
-                                                }`}
+                                                className={`w-full transition-all duration-300 ${jsonInput
+                                                    ? validationState.isJsonValid
+                                                        ? validationState.hasAllFields
+                                                            ? 'border-green-500 focus:ring-green-200'  // 完全有效
+                                                            : 'border-yellow-500 focus:ring-yellow-200' // 格式有效但字段不全
+                                                        : 'border-red-500 focus:ring-red-200'  // 格式无效
+                                                    : ''  // 未输入
+                                                    }`}
                                             />
-                                            
+
                                             {/* 实时验证提示 */}
                                             {jsonInput && (
-                                                <div className={`text-sm flex items-center ${
-                                                    validationState.isJsonValid
-                                                        ? validationState.hasAllFields
-                                                            ? 'text-green-600'  // 完全有效
-                                                            : 'text-yellow-600' // 格式有效但字段不全
-                                                        : 'text-red-600'  // 格式无效
-                                                }`}>
+                                                <div className={`text-sm flex items-center ${validationState.isJsonValid
+                                                    ? validationState.hasAllFields
+                                                        ? 'text-green-600'  // 完全有效
+                                                        : 'text-yellow-600' // 格式有效但字段不全
+                                                    : 'text-red-600'  // 格式无效
+                                                    }`}>
                                                     {validationState.isJsonValid
                                                         ? validationState.hasAllFields
                                                             ? <CheckCircle className="w-4 h-4 mr-1" />
@@ -775,7 +850,7 @@ const GoPlusPage: React.FC = () => {
                                                     {validationState.errorMessage}
                                                 </div>
                                             )}
-                                            
+
                                             {/* 按钮区域 - 确保始终显示 */}
                                             <div className="flex flex-col sm:flex-row gap-4 pt-4">
                                                 <Button
@@ -800,23 +875,23 @@ const GoPlusPage: React.FC = () => {
                                         {/* 示例JSON手风琴 */}
 
 
-                                            <CardBody className="p-6">
-                                                <Accordion variant="splitted">
-                                                    <AccordionItem
-                                                        key="example-json"
-                                                        aria-label="示例JSON格式"
-                                                        startContent={<Copy className="w-5 h-5 text-primary" />}
-                                                        title="查看示例JSON格式"
-                                                        subtitle="点击展开查看完整的JSON示例"
-                                                    >
-                                                        <div className="space-y-3">
-                                                            <p className="text-gray-600">
-                                                                以下是ChatGPT Session JSON的标准格式示例（即使收缩到一行也可以）：
-                                                            </p>
-                                                            <div className="bg-gray-50 p-4 rounded-lg">
-                                                                <pre className="text-xs text-gray-800 overflow-x-auto">
-                                                                    <code>
-                                                                        {`{
+                                        <CardBody className="p-6">
+                                            <Accordion variant="splitted">
+                                                <AccordionItem
+                                                    key="example-json"
+                                                    aria-label="示例JSON格式"
+                                                    startContent={<Copy className="w-5 h-5 text-primary" />}
+                                                    title="查看示例JSON格式"
+                                                    subtitle="点击展开查看完整的JSON示例"
+                                                >
+                                                    <div className="space-y-3">
+                                                        <p className="text-gray-600">
+                                                            以下是ChatGPT Session JSON的标准格式示例（即使收缩到一行也可以）：
+                                                        </p>
+                                                        <div className="bg-gray-50 p-4 rounded-lg">
+                                                            <pre className="text-xs text-gray-800 overflow-x-auto">
+                                                                <code>
+                                                                    {`{
   "user": {
     "id": "user-xxx",
     "email": "xxx@xx.com",
@@ -842,13 +917,13 @@ const GoPlusPage: React.FC = () => {
     }
   }
 }`}
-                                                                    </code>
-                                                                </pre>
-                                                            </div>
+                                                                </code>
+                                                            </pre>
                                                         </div>
-                                                    </AccordionItem>
-                                                </Accordion>
-                                            </CardBody>
+                                                    </div>
+                                                </AccordionItem>
+                                            </Accordion>
+                                        </CardBody>
 
 
                                     </motion.div>
@@ -976,51 +1051,51 @@ const GoPlusPage: React.FC = () => {
                 </motion.div>
 
                 {/* 充值方式对比表格 */}
-            <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.75 }}
-            className="mb-12"
-            >
-            <h2 className="text-2xl font-semibold text-gray-900 text-center mb-8">
-                充值方式对比
-            </h2>
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.75 }}
+                    className="mb-12"
+                >
+                    <h2 className="text-2xl font-semibold text-gray-900 text-center mb-8">
+                        充值方式对比
+                    </h2>
 
-            <Card shadow="sm">
-                <CardBody className="overflow-x-auto p-0">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead className="bg-gray-50">
-                    <tr>
-                        <th className="px-6 py-4 font-semibold text-left text-gray-700 w-40">
-                        {/* 对比维度 */}
-                        </th>
-                        <th className="px-6 py-4 font-semibold text-center text-primary">
-                        本站自助充值
-                        </th>
-                        <th className="px-6 py-4 font-semibold text-center text-gray-600">
-                        虚拟卡充值
-                        </th>
-                    </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 bg-white">
-                    {compareRows.map((row, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-800">
-                            {row.label}
-                        </td>
-                        <td className="px-6 py-4 text-gray-900">
-                            {row.ours}
-                        </td>
-                        <td className="px-6 py-4 text-gray-700">
-                            {row.card}
-                        </td>
-                        </tr>
-                    ))}
-                    </tbody>
-                </table>
-                </CardBody>
-            </Card>
-            </motion.div>
+                    <Card shadow="sm">
+                        <CardBody className="overflow-x-auto p-0">
+                            <table className="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-6 py-4 font-semibold text-left text-gray-700 w-40">
+                                            {/* 对比维度 */}
+                                        </th>
+                                        <th className="px-6 py-4 font-semibold text-center text-primary">
+                                            本站自助充值
+                                        </th>
+                                        <th className="px-6 py-4 font-semibold text-center text-gray-600">
+                                            虚拟卡充值
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 bg-white">
+                                    {compareRows.map((row, idx) => (
+                                        <tr key={idx} className="hover:bg-gray-50">
+                                            <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-800">
+                                                {row.label}
+                                            </td>
+                                            <td className="px-6 py-4 text-gray-900">
+                                                {row.ours}
+                                            </td>
+                                            <td className="px-6 py-4 text-gray-700">
+                                                {row.card}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </CardBody>
+                    </Card>
+                </motion.div>
 
 
                 {/* 帮助中心 - 手风琴样式 */}
@@ -1143,11 +1218,10 @@ const GoPlusPage: React.FC = () => {
                                             <img
                                                 src={generateQRCode(orderInfo.qr_code)}
                                                 alt="支付二维码"
-                                                className={`w-48 h-48 mx-auto transition-opacity duration-300 ${
-                                                    isQrCodeExpired ? 'opacity-50' : 'opacity-100'
-                                                }`}
+                                                className={`w-48 h-48 mx-auto transition-opacity duration-300 ${isQrCodeExpired ? 'opacity-50' : 'opacity-100'
+                                                    }`}
                                             />
-                                            
+
                                             {/* 过期覆盖层 */}
                                             {isQrCodeExpired && (
                                                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-white bg-opacity-80 rounded-lg">
@@ -1158,7 +1232,7 @@ const GoPlusPage: React.FC = () => {
                                                     </div>
                                                 </div>
                                             )}
-                                            
+
                                             {/* 倒计时提示 */}
                                             {!isQrCodeExpired && (
                                                 <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-yellow-900 text-xs px-4 py-1.5 rounded-full flex items-center shadow-lg border border-yellow-300 font-semibold transition-all duration-300">
@@ -1190,7 +1264,7 @@ const GoPlusPage: React.FC = () => {
                                                         {orderInfo.pay_type === 'wxpay' ? '微信支付' : '支付宝'}
                                                     </span>
                                                 </div>
-                                                
+
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div className="flex flex-col items-start">
                                                         <span className="text-xs text-gray-500 mb-1">订单号</span>
@@ -1207,16 +1281,45 @@ const GoPlusPage: React.FC = () => {
                                                         <span className="text-xl font-bold text-gray-900">{orderInfo.price}元</span>
                                                     </div>
                                                 </div>
-                                                
-                                                <div className={`p-3 rounded-lg text-sm ${
-                                                    isQrCodeExpired 
-                                                        ? 'bg-red-50 text-red-600' 
-                                                        : 'bg-blue-50 text-blue-800'
-                                                }`}>
-                                                    {isQrCodeExpired 
-                                                        ? '二维码已过期，请刷新页面重新创建订单' 
+
+                                                <div className={`p-3 rounded-lg text-sm ${isQrCodeExpired
+                                                    ? 'bg-red-50 text-red-600'
+                                                    : 'bg-blue-50 text-blue-800'
+                                                    }`}>
+                                                    {isQrCodeExpired
+                                                        ? '二维码已过期，请刷新页面重新创建订单'
                                                         : `请使用${orderInfo.pay_type === 'wxpay' ? '微信' : '支付宝'}扫码支付，支付完成后会自动跳转`
                                                     }
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* **新增：CDK兑换码表单** */}
+                                        <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl shadow-sm border border-orange-200 overflow-hidden">
+                                            <div className="p-5 space-y-4">
+                                                <div className="space-y-3">
+                                                    <Textarea
+                                                        label="CDK兑换码"
+                                                        placeholder="如果您已购买了CDK兑换码，可直接进行兑换"
+                                                        value={cdkInput}
+                                                        onChange={(e) => setCdkInput(e.target.value)}
+                                                        minRows={1}
+                                                        maxRows={2}
+                                                        className="w-full"
+                                                        variant="bordered"
+                                                        isDisabled={isCdkLoading}
+                                                    />
+
+                                                    <Button
+                                                        color="warning"
+                                                        onPress={performCdkRecharge}
+                                                        isLoading={isCdkLoading}
+                                                        className="w-full !bg-orange-600 !text-white hover:!bg-orange-700"
+                                                        isDisabled={!cdkInput.trim() || isCdkLoading}
+                                                    >
+                                                        {isCdkLoading ? 'CDK兑换中...' : '使用CDK兑换码'}
+                                                    </Button>
+
                                                 </div>
                                             </div>
                                         </div>
@@ -1237,7 +1340,7 @@ const GoPlusPage: React.FC = () => {
                                 >
                                     取消支付
                                 </Button>
-                                
+
                                 {/* 二维码过期时显示刷新按钮 */}
                                 {isQrCodeExpired && (
                                     <Button
@@ -1304,7 +1407,7 @@ const GoPlusPage: React.FC = () => {
                                         </div>
                                         <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-72 overflow-auto">
                                             <pre className="text-xs text-gray-800 break-all whitespace-pre-wrap">
-{JSON.stringify(rechargeRaw, null, 2)}
+                                                {JSON.stringify(rechargeRaw, null, 2)}
                                             </pre>
                                         </div>
                                     </div>
