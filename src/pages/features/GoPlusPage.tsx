@@ -57,7 +57,7 @@ const defaultConfig: PageConfig = {
         // { label: '关于我们', href: '/about', external: false }
     ],
     videoTutorialUrl: 'https://example.com/tutorial',
-    supportContact: 'https://example.com/support'
+    supportContact: 'https://niceaigc-cos.niceaigc.com/myimg/NiceAIGC-kefu.jpg'
 };
 
 
