@@ -39,7 +39,7 @@ const RegisterPage: React.FC = () => {
     validateEmail(newEmail);
   };
 
-    const handleSendCode = async () => {
+  const handleSendCode = async () => {
     if (!validateEmail(email)) return;
     setIsSendingCode(true);
     try {
@@ -75,7 +75,7 @@ const RegisterPage: React.FC = () => {
         setAuthCookies({ xuserid: data.xuserid, xtoken: data.xtoken, xy_uuid_token: data.xy_uuid_token });
         toast.success('注册成功！正在跳转...');
         redirect();
-      } 
+      }
     } catch (error) {
     } finally {
       setIsRegistering(false);
@@ -89,75 +89,75 @@ const RegisterPage: React.FC = () => {
           <p>您已登录，正在跳转...</p>
         </div>
       ) : (
-      <form onSubmit={handleRegister} className="space-y-6">
-        <div>
-          <Input
-            label="邮箱"
-            type="email"
-            placeholder="请输入您的邮箱地址"
-            value={email}
-            onChange={handleEmailChange}
-            onBlur={() => validateEmail(email)}
-            errorMessage={emailError}
-            isInvalid={!!emailError}
-            fullWidth
-            required
-          />
-        </div>
-        <div className="flex items-start space-x-2">
-          <div className="flex-grow">
+        <form onSubmit={handleRegister} className="space-y-6">
+          <div>
             <Input
-              label="邮箱验证码"
-              placeholder="请输入验证码"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
+              label="邮箱"
+              type="email"
+              placeholder="请输入您的邮箱地址"
+              value={email}
+              onChange={handleEmailChange}
+              onBlur={() => validateEmail(email)}
+              errorMessage={emailError}
+              isInvalid={!!emailError}
               fullWidth
               required
             />
           </div>
-          <div className="h-14 flex items-center">
-            <Button
-              type="button"
-              color="primary"
-              onClick={handleSendCode}
-              disabled={!!emailError || !email || isSendingCode || countdown > 0}
-              className="h-10 shrink-0 bg-primary-500 text-white hover:bg-primary-600 disabled:bg-gray-300"
-            >
-              {isSendingCode ? <Spinner size="sm" /> : (countdown > 0 ? `${countdown}s` : '发送验证码')}
-            </Button>
+          <div className="flex items-start space-x-2">
+            <div className="flex-grow">
+              <Input
+                label="邮箱验证码"
+                placeholder="请输入验证码"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                fullWidth
+                required
+              />
+            </div>
+            <div className="h-14 flex items-center">
+              <Button
+                type="button"
+                color="primary"
+                onClick={handleSendCode}
+                disabled={!!emailError || !email || isSendingCode || countdown > 0}
+                className="h-10 shrink-0 bg-primary-500 text-white hover:bg-primary-600 disabled:bg-gray-300"
+              >
+                {isSendingCode ? <Spinner size="sm" /> : (countdown > 0 ? `${countdown}s` : '发送验证码')}
+              </Button>
+            </div>
           </div>
-        </div>
-        <div>
-          <Input
-            label="密码"
-            type={showPassword ? 'text' : 'password'}
-            placeholder="请输入您的密码"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+          <div>
+            <Input
+              label="密码"
+              type={showPassword ? 'text' : 'password'}
+              placeholder="请输入您的密码"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              fullWidth
+              required
+              endContent={
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="focus:outline-none">
+                  {showPassword ? <EyeOff className="h-5 w-5 text-gray-400" /> : <Eye className="h-5 w-5 text-gray-400" />}
+                </button>
+              }
+            />
+          </div>
+          <Button
+            type="submit"
+            color="primary"
             fullWidth
-            required
-            endContent={
-              <button type="button" onClick={() => setShowPassword(!showPassword)} className="focus:outline-none">
-                {showPassword ? <EyeOff className="h-5 w-5 text-gray-400" /> : <Eye className="h-5 w-5 text-gray-400" />}
-              </button>
-            }
-          />
-        </div>
-        <Button
-          type="submit"
-          color="primary"
-          fullWidth
-          disabled={isRegistering}
-          className="!mt-8 bg-primary-500 text-white hover:bg-primary-600 disabled:bg-gray-300"
-        >
-          {isRegistering ? <Spinner size="sm" color="white" /> : '注册'}
-        </Button>
-        <div className="text-center mt-4">
-          <Link to={`/login${location.search}`} className="text-sm text-primary-600 hover:text-primary-500">
-            已有账户？直接登录
-          </Link>
-        </div>
-      </form>
+            disabled={isRegistering}
+            className="!mt-8 bg-primary-500 text-white hover:bg-primary-600 disabled:bg-gray-300"
+          >
+            {isRegistering ? <Spinner size="sm" color="white" /> : '注册'}
+          </Button>
+          <div className="text-center mt-4 space-y-2">
+            <Link to={`/login${location.search}`} className="block text-sm text-primary-600 hover:text-primary-500">
+              已有账户？直接登录
+            </Link>
+          </div>
+        </form>
       )}
     </AuthLayout>
   );

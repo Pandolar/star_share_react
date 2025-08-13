@@ -35,7 +35,7 @@ authApi.interceptors.response.use(
       return Promise.reject(new Error(msg || 'Error'));
     }
   },
-    (error) => {
+  (error) => {
     // 处理网络层面的错误
     if (error.response) {
       const status = error.response.status;
@@ -92,11 +92,20 @@ export const checkToken = (xuserid: string, xtoken: string): Promise<ApiResponse
     timeout: 10000,
   });
   return instance.get('/check_xtoken', {
-    headers: { 
+    headers: {
       'xuserid': xuserid,
       'xtoken': xtoken
     }
   }).then(response => response.data);
+};
+
+/**
+ * 找回密码
+ */
+export const resetPassword = (email: string, email_code: string, password: string): Promise<void> => {
+  const encodedPassword = btoa(password.trim());
+  // 类型断言：告诉TypeScript，拦截器处理后的返回值是Promise<void>
+  return authApi.post('/back_password', { email, email_code, password: encodedPassword }) as unknown as Promise<void>;
 };
 
 export default authApi;

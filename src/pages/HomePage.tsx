@@ -4,8 +4,11 @@ import Hero from '../components/Hero';
 import LatestModels from '../components/LatestModels';
 import Footer from '../components/Footer';
 import SEOHead from '../components/SEOHead';
+import WeChatBrowserTip from '../components/WeChatBrowserTip';
+import ForceBrowserPage from '../components/ForceBrowserPage';
 import { homeSEOConfig } from '../config/seo';
 import { HomeInfoProvider } from '../contexts/HomeInfoContext';
+import { useWeChatDetection } from '../hooks/useWeChatDetection';
 
 // 骨架屏组件
 const HomePageSkeleton: React.FC = () => (
@@ -32,6 +35,27 @@ const HomePageSkeleton: React.FC = () => (
 );
 
 const HomePage: React.FC = () => {
+  // 微信检测功能 - 启用强制模式
+  const { isWeChat, showBrowserTip, forceBlockWeChat, hideTip } = useWeChatDetection({
+    forceMode: true, // 启用强制模式，不允许在微信中访问
+    showTipByDefault: false // 强制模式下不使用普通提示
+  });
+
+  // 如果在微信中且启用强制模式，显示强制浏览器打开页面
+  if (forceBlockWeChat) {
+    return (
+      <>
+        <SEOHead config={homeSEOConfig} />
+        <ForceBrowserPage
+          siteName=""
+          customTitle="需要在浏览器中打开"
+          customDescription="暂不支持在微信内置浏览器中访问。请您使用浏览器打开本页面，享受完整功能。"
+          showCurrentUrl={true}
+        />
+      </>
+    );
+  }
+
   return (
     <HomeInfoProvider>
       <SEOHead config={homeSEOConfig} />
@@ -43,6 +67,13 @@ const HomePage: React.FC = () => {
             <LatestModels />
           </main>
           <Footer />
+
+          {/* 微信浏览器提示组件（强制模式下不会显示，保留用于其他模式） */}
+          <WeChatBrowserTip
+            show={showBrowserTip}
+            onHide={hideTip}
+            customMessage="为了获得最佳浏览体验，推荐您在浏览器中打开本页面"
+          />
         </div>
       </Suspense>
     </HomeInfoProvider>

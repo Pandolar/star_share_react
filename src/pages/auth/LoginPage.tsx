@@ -32,7 +32,7 @@ const LoginPage: React.FC = () => {
         setAuthCookies({ xuserid: data.xuserid, xtoken: data.xtoken, xy_uuid_token: data.xy_uuid_token });
         toast.success('登录成功！正在跳转...');
         redirect();
-      } 
+      }
     } catch (error) {
     } finally {
       setIsLoggingIn(false);
@@ -82,10 +82,25 @@ const LoginPage: React.FC = () => {
           >
             {isLoggingIn ? <Spinner size="sm" color="white" /> : '登录'}
           </Button>
-          <div className="text-center mt-4">
-            <Link to={`/register${location.search}`} className="text-sm text-primary-600 hover:text-primary-500">
-              还没有账户？立即注册
-            </Link>
+          <div className="text-center mt-4 space-y-2">
+            <div className="flex flex-col items-center space-y-1">
+              <Link
+                to={`/forgot-password${location.search}`}
+                className="text-xs text-gray-400 hover:text-primary-500 transition-colors"
+                style={{ marginBottom: 2 }}
+              >
+                找回密码
+              </Link>
+              <Link
+                to={`/register${location.search}`}
+                className="text-sm text-primary-700 hover:text-primary-600 font-medium"
+              >
+                还没有账户？
+                <span className="ml-1 text-sm text-primary-600 hover:text-primary-700 underline underline-offset-2">
+                  立即注册
+                </span>
+              </Link>
+            </div>
           </div>
         </form>
       )}
