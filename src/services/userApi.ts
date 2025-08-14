@@ -241,6 +241,13 @@ export const orderUserApi = {
             method: 'GET',
         });
     },
+
+    // 强制查询订单支付状态
+    forceGetPayStatus: async (order_id: string): Promise<ApiResponse<{}>> => {
+        return createUserRequest(getUserApiUrl(`/u/force_get_pay_status?order_id=${order_id}`), {
+            method: 'GET',
+        });
+    },
 };
 
 // 兑换激活码API

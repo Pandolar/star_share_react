@@ -754,6 +754,11 @@ const GoPlusPage: React.FC = () => {
                             <div className="text-lg text-gray-700 space-y-2">
                                 <p><span className="font-semibold text-primary">第一步.</span> 登录ChatGPT官网后，复制JSON到本页面</p>
                                 <p><span className="font-semibold text-primary">第二步.</span> 支付完成并充值到账</p>
+                                <div className="border-t border-dashed border-gray-300 my-4"></div>
+                                <p>
+                                    <span className="font-semibold text-primary">价格说明：</span>
+                                    由于汇率和风控等因素，价格会动态浮动，当前价格区间为 <span className="font-semibold text-primary">95~140元</span>左右，请以实际支付页面为准。
+                                </p>
                             </div>
                         </CardBody>
                     </Card>

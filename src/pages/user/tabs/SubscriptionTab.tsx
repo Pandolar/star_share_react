@@ -68,6 +68,7 @@ export const SubscriptionTab: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<SubscriptionType>('monthly');
   const [qrCodeExpired, setQrCodeExpired] = useState(false);
   const [qrCodeTimer, setQrCodeTimer] = useState<NodeJS.Timeout | null>(null);
+  const [manualCheckLoading, setManualCheckLoading] = useState(false);
 
   // 兑换CDK弹窗与状态
   const [redeemModal, setRedeemModal] = useState(false);
@@ -262,6 +263,38 @@ export const SubscriptionTab: React.FC = () => {
     return qr.createDataURL(8, 4);
   };
 
+  // 手动检查支付状态
+  const handleManualPaymentCheck = async () => {
+    if (!orderInfo?.order_id) return;
+
+    try {
+      setManualCheckLoading(true);
+      const response = await orderUserApi.forceGetPayStatus(orderInfo.order_id);
+
+      // 使用与自动检查相同的判断逻辑
+      if (response.data && (response.data as { success?: boolean }).success === true) {
+        setPaymentStatus('success');
+        if (checkInterval) {
+          clearInterval(checkInterval);
+          setCheckInterval(null);
+        }
+        if (qrCodeTimer) {
+          clearTimeout(qrCodeTimer);
+        }
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      } else {
+        // 支付检查失败，显示提示信息
+        alert('请确认是否已支付，若确认支付但仍无反应，请联系客服，我们会加急处理您的问题');
+      }
+    } catch (err) {
+      alert('请确认是否已支付，若确认支付但仍无反应，请联系客服，我们会加急处理您的问题');
+    } finally {
+      setManualCheckLoading(false);
+    }
+  };
+
   // 获取时长描述
   const getDurationText = (duration: number) => {
     if (duration === 7) return '1周';
@@ -285,6 +318,7 @@ export const SubscriptionTab: React.FC = () => {
     setOrderInfo(null);
     setPaymentStatus('pending');
     setQrCodeExpired(false);
+    setManualCheckLoading(false);
   };
 
   // 计算最受欢迎的套餐
@@ -843,6 +877,21 @@ export const SubscriptionTab: React.FC = () => {
                         {qrCodeExpired && (
                           <p className="text-danger font-medium">二维码已过期，请重新创建订单</p>
                         )}
+                      </div>
+
+                      {/* 手动检查支付状态按钮 */}
+                      <div className="mt-4">
+                        <Button
+                          size="sm"
+                          variant="light"
+                          color="primary"
+                          onPress={handleManualPaymentCheck}
+                          isLoading={manualCheckLoading}
+                          isDisabled={qrCodeExpired}
+                          className="text-xs"
+                        >
+                          付款后没有反应？请点这里
+                        </Button>
                       </div>
                     </div>
                   )}
