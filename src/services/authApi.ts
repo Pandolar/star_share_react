@@ -15,6 +15,30 @@ export interface LoginResponse {
   xy_uuid_token: string;
 }
 
+// 微信二维码获取响应数据结构
+export interface WechatQRResponse {
+  qr_code_url: string;
+  ticket: string;
+}
+
+// 微信登录状态检查响应数据结构
+export interface WechatLoginStatusResponse {
+  // 用户选择绑定已有账号时返回
+  wechat_temp_token?: string;
+  // 用户直接登录成功时返回
+  xuserid?: string;
+  xtoken?: string;
+  xy_uuid_token?: string;
+}
+
+// 微信绑定请求数据结构
+export interface WechatBindRequest {
+  is_bind?: boolean;
+  wechat_temp_token: string;
+  xuserid?: number;
+  xtoken?: string;
+}
+
 // 创建一个配置好的axios实例
 const authApi = axios.create({
   baseURL: '/u', // 接口统一前缀
@@ -106,6 +130,54 @@ export const resetPassword = (email: string, email_code: string, password: strin
   const encodedPassword = btoa(password.trim());
   // 类型断言：告诉TypeScript，拦截器处理后的返回值是Promise<void>
   return authApi.post('/back_password', { email, email_code, password: encodedPassword }) as unknown as Promise<void>;
+};
+
+/**
+ * 获取微信登录二维码
+ */
+export const getWechatQRCode = (): Promise<WechatQRResponse> => {
+  // 类型断言：告诉TypeScript，拦截器处理后的返回值是Promise<WechatQRResponse>
+  return authApi.get('/wechat_login_qr') as unknown as Promise<WechatQRResponse>;
+};
+
+/**
+ * 检查微信二维码登录状态
+ * 这个函数需要处理多种状态码，所以不使用authApi的拦截器
+ * @returns Promise<WechatLoginStatusResponse | null> - 返回token数据或null（用户未扫码）
+ */
+export const checkWechatLoginStatus = (ticket: string): Promise<WechatLoginStatusResponse | null> => {
+  const instance = axios.create({
+    baseURL: '/u',
+    timeout: 10000,
+  });
+
+  return instance.get('/qr_login_status', { params: { ticket } }).then(response => {
+    const { code, msg, data } = response.data;
+    if (code === 20000) {
+      if (data && (data.wechat_temp_token || (data.xuserid && data.xtoken && data.xy_uuid_token))) {
+        // 情况1: 获取到wechat_temp_token，用户扫码选择绑定已有账号
+        // 情况2: 直接获取到登录凭据，用户扫码直接登录成功
+        return data;
+      } else {
+        // code 20000 但没有有效数据，说明用户还没扫码，返回null继续轮询
+        return null;
+      }
+    } else if (code === 20001) {
+      // 二维码过期，抛出特定错误
+      throw new Error(msg || '二维码已过期');
+    } else {
+      // 其他错误
+      throw new Error(msg || '未知错误');
+    }
+  });
+};
+
+/**
+ * 微信绑定/登录
+ */
+export const wechatBind = (data: WechatBindRequest): Promise<LoginResponse> => {
+  // 类型断言：告诉TypeScript，拦截器处理后的返回值是Promise<LoginResponse>
+  return authApi.post('/wechat_bind', data) as unknown as Promise<LoginResponse>;
 };
 
 export default authApi;
