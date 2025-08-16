@@ -96,24 +96,25 @@ const LoginPage: React.FC = () => {
         const statusData = await checkWechatLoginStatus(currentTicket);
 
         if (statusData) {
+          setQrStatus('scanned');
+
+          // 清除轮询
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+
+          // 清除过期定时器
+          if (qrTimeoutRef.current) {
+            clearTimeout(qrTimeoutRef.current);
+            qrTimeoutRef.current = null;
+          }
+
           if (statusData.wechat_temp_token) {
-            console.log('获取到wechat_temp_token，开始绑定流程:', statusData.wechat_temp_token);
+            // 新用户，需要通过wechat_bind接口进行绑定/登录
+            console.log('检测到新用户，获取到wechat_temp_token，开始绑定流程:', statusData.wechat_temp_token);
             setWechatTempToken(statusData.wechat_temp_token);
-            setQrStatus('scanned');
 
-            // 清除轮询
-            if (pollingIntervalRef.current) {
-              clearInterval(pollingIntervalRef.current);
-              pollingIntervalRef.current = null;
-            }
-
-            // 清除过期定时器
-            if (qrTimeoutRef.current) {
-              clearTimeout(qrTimeoutRef.current);
-              qrTimeoutRef.current = null;
-            }
-
-            // 进行微信绑定流程
             try {
               await handleWechatLogin(statusData.wechat_temp_token);
             } catch (loginError) {
@@ -121,29 +122,31 @@ const LoginPage: React.FC = () => {
               setQrStatus('expired');
             }
           } else if (statusData.xuserid && statusData.xtoken && statusData.xy_uuid_token) {
-            console.log('用户直接登录成功，设置认证信息:', statusData);
-            setQrStatus('scanned');
-
-            // 清除轮询
-            if (pollingIntervalRef.current) {
-              clearInterval(pollingIntervalRef.current);
-              pollingIntervalRef.current = null;
-            }
-
-            // 清除过期定时器
-            if (qrTimeoutRef.current) {
-              clearTimeout(qrTimeoutRef.current);
-              qrTimeoutRef.current = null;
-            }
-
-            // 直接设置认证信息并跳转
-            setAuthCookies({
+            // 老用户，直接获取到了完整的登录信息，可以直接登录
+            console.log('检测到老用户，直接获取到登录信息，开始登录:', {
               xuserid: statusData.xuserid,
-              xtoken: statusData.xtoken,
-              xy_uuid_token: statusData.xy_uuid_token
+              xtoken: statusData.xtoken.substring(0, 8) + '...',
+              xy_uuid_token: statusData.xy_uuid_token.substring(0, 8) + '...'
             });
-            toast.success('微信登录成功！正在跳转...');
-            redirect();
+
+            try {
+              // 直接设置cookies并跳转
+              setAuthCookies({
+                xuserid: statusData.xuserid,
+                xtoken: statusData.xtoken,
+                xy_uuid_token: statusData.xy_uuid_token
+              });
+              toast.success('微信登录成功！正在跳转...');
+              redirect();
+            } catch (loginError) {
+              console.error('老用户登录过程失败:', loginError);
+              toast.error('登录失败，请重试');
+              setQrStatus('expired');
+            }
+          } else {
+            console.error('获取到的登录数据格式异常:', statusData);
+            toast.error('登录数据异常，请重试');
+            setQrStatus('expired');
           }
         } else {
           // statusData 为 null，说明用户还没扫码，继续轮询
@@ -170,9 +173,9 @@ const LoginPage: React.FC = () => {
     }, 2000); // 每2秒检查一次
   };
 
-  // 处理微信登录
+  // 处理微信登录（新用户绑定流程）
   const handleWechatLogin = async (tempToken: string) => {
-    console.log('开始微信登录流程，tempToken:', tempToken);
+    console.log('开始新用户微信绑定流程，tempToken:', tempToken);
     setIsWechatBinding(true);
     try {
       const data = await wechatBind({
@@ -180,10 +183,10 @@ const LoginPage: React.FC = () => {
         wechat_temp_token: tempToken
       });
 
-      console.log('微信绑定API返回数据:', data);
+      console.log('新用户微信绑定API返回数据:', data);
 
       if (data && data.xuserid && data.xtoken && data.xy_uuid_token) {
-        console.log('微信登录成功，设置cookies并跳转');
+        console.log('新用户微信绑定成功，设置cookies并跳转');
         setAuthCookies({
           xuserid: data.xuserid,
           xtoken: data.xtoken,
@@ -192,7 +195,7 @@ const LoginPage: React.FC = () => {
         toast.success('微信登录成功！正在跳转...');
         redirect();
       } else {
-        console.error('微信绑定返回数据不完整:', data);
+        console.error('新用户微信绑定返回数据不完整:', data);
         toast.error('登录数据异常，请重试');
         setQrStatus('expired');
       }

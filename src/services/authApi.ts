@@ -23,12 +23,10 @@ export interface WechatQRResponse {
 
 // 微信登录状态检查响应数据结构
 export interface WechatLoginStatusResponse {
-  // 用户选择绑定已有账号时返回
-  wechat_temp_token?: string;
-  // 用户直接登录成功时返回
-  xuserid?: string;
-  xtoken?: string;
-  xy_uuid_token?: string;
+  wechat_temp_token?: string; // 新用户
+  xuserid?: string;           // 老用户直接登录
+  xtoken?: string;            // 老用户直接登录  
+  xy_uuid_token?: string;     // 老用户直接登录
 }
 
 // 微信绑定请求数据结构
@@ -155,11 +153,10 @@ export const checkWechatLoginStatus = (ticket: string): Promise<WechatLoginStatu
     const { code, msg, data } = response.data;
     if (code === 20000) {
       if (data && (data.wechat_temp_token || (data.xuserid && data.xtoken && data.xy_uuid_token))) {
-        // 情况1: 获取到wechat_temp_token，用户扫码选择绑定已有账号
-        // 情况2: 直接获取到登录凭据，用户扫码直接登录成功
+        // 成功获取到登录数据：新用户(wechat_temp_token) 或 老用户(xuserid+xtoken+xy_uuid_token)
         return data;
       } else {
-        // code 20000 但没有有效数据，说明用户还没扫码，返回null继续轮询
+        // code 20000 但没有有效登录数据，说明用户还没扫码，返回null继续轮询
         return null;
       }
     } else if (code === 20001) {
