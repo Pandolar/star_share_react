@@ -238,7 +238,7 @@ export const ProfileTab: React.FC = () => {
             <Card>
               <CardBody className="p-4 text-center">
                 <div className="text-2xl font-bold text-warning mb-1">
-                  {userInfo.user_active_packages?.level || 'N/A'}
+                  {userInfo.user_active_packages?.level || 'Free'}
                 </div>
                 <div className="text-sm text-default-500">会员等级</div>
               </CardBody>

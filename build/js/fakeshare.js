@@ -28,8 +28,8 @@
 
         // --- iframe 弹窗设置 ---
         modal: {
-            width: '80%',       // 占视口宽度
-            height: '80%',      // 占视口高度
+            width: '82%',       // 占视口宽度
+            height: '92%',      // 占视口高度
             maxWidth: 1200,     // 最大宽度（px）
             maxHeight: 800,     // 最大高度（px）
             overlayColor: 'rgba(0, 0, 0, 0.6)',

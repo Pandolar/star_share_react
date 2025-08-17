@@ -865,22 +865,22 @@ export const SubscriptionTab: React.FC = () => {
                 {/* 支付状态 */}
                 <div className="text-center">
                   {paymentStatus === 'pending' && (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-center gap-3">
-                        <QrCode className="w-6 h-6 text-primary" />
-                        <span className="text-lg font-medium">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-center gap-2">
+                        <QrCode className="w-5 h-5 text-primary" />
+                        <span className="text-base font-medium">
                           {orderInfo.pay_type === 'wxpay' ? '请使用微信扫码支付' : '请扫码支付'}
                         </span>
                       </div>
-                      <div className="text-sm text-default-500 space-y-1">
-                        <p>二维码5分钟内有效</p>
+                      <div className="text-sm text-default-500">
+                        <p className="mb-1">二维码5分钟内有效</p>
                         {qrCodeExpired && (
                           <p className="text-danger font-medium">二维码已过期，请重新创建订单</p>
                         )}
                       </div>
 
                       {/* 手动检查支付状态按钮 */}
-                      <div className="mt-4">
+                      <div className="mt-3">
                         <Button
                           size="sm"
                           variant="light"
@@ -888,7 +888,7 @@ export const SubscriptionTab: React.FC = () => {
                           onPress={handleManualPaymentCheck}
                           isLoading={manualCheckLoading}
                           isDisabled={qrCodeExpired}
-                          className="text-xs"
+                          className="text-xs h-8"
                         >
                           付款后没有反应？请点这里
                         </Button>
