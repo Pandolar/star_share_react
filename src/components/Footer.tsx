@@ -71,7 +71,7 @@ const Footer: React.FC = () => {
                 transition={{ duration: 0.6 }}
                 viewport={{ once: true }}
               >
-                <div className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent mb-4">
+                <div className="text-2xl font-bold text-blue-600 mb-4">
                   {siteInfo.siteName}
                 </div>
                 <p className="text-gray-400 mb-6 leading-relaxed">

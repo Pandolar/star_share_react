@@ -74,7 +74,7 @@ const NativeApplications: React.FC = () => {
                 className="bg-gray-50 rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300"
               >
                 {/* 应用图片 */}
-                <div className="h-48 bg-gradient-to-br from-blue-500 to-purple-600 relative overflow-hidden">
+                <div className="h-48 bg-blue-600 relative overflow-hidden">
                   <img
                     src={app.image}
                     alt={app.name}

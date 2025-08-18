@@ -100,7 +100,7 @@ const Header: React.FC = () => {
               alt="Logo"
               className="w-8 h-8"
             />
-            <div className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            <div className="text-2xl font-bold text-gray-900">
               {siteInfo.siteName}
             </div>
           </motion.div>

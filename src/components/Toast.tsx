@@ -123,4 +123,20 @@ export const ToastContainer: React.FC = () => {
       </AnimatePresence>
     </div>
   );
+};
+
+// 导出便捷的showToast函数
+export const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+  switch (type) {
+    case 'success':
+      return toast.success(message);
+    case 'error':
+      return toast.error(message);
+    case 'warning':
+      return toast.warning(message);
+    case 'info':
+      return toast.info(message);
+    default:
+      return toast.info(message);
+  }
 }; 

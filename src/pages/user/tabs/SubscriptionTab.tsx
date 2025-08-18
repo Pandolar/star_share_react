@@ -445,7 +445,7 @@ export const SubscriptionTab: React.FC = () => {
           left: 0;
           right: 0;
           height: 4px;
-          background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+                                background: #3b82f6;
         }
         
         .subscription-tab-wrapper .popular-badge {

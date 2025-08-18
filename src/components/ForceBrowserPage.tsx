@@ -51,7 +51,7 @@ const ForceBrowserPage: React.FC<ForceBrowserPageProps> = ({
     const description = customDescription || `为了提供最佳的用户体验和功能支持，${siteName}暂不支持在微信内置浏览器中访问。请您使用手机浏览器打开本页面。`;
 
     return (
-        <div className="force-browser-page min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="force-browser-page min-h-screen bg-gray-50 flex items-center justify-center p-4">
             <div className="max-w-md w-full">
                 {/* 主卡片 */}
                 <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
@@ -93,8 +93,8 @@ const ForceBrowserPage: React.FC<ForceBrowserPageProps> = ({
                             <button
                                 onClick={handleCopyUrl}
                                 className={`w-full py-3 px-4 rounded-lg font-medium transition-all ${copySuccess
-                                        ? 'bg-green-600 text-white'
-                                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                                    ? 'bg-green-600 text-white'
+                                    : 'bg-blue-600 text-white hover:bg-blue-700'
                                     }`}
                                 disabled={copySuccess}
                             >

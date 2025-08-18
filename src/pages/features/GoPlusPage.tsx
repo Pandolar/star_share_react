@@ -745,7 +745,7 @@ const GoPlusPage: React.FC = () => {
                     transition={{ delay: 0.6 }}
                     className="mb-12"
                 >
-                    <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-l-primary">
+                    <Card className="bg-blue-50 border-l-4 border-l-primary">
                         <CardBody className="p-6">
                             <div className="flex items-center space-x-3 mb-4">
                                 <Zap className="w-8 h-8 text-primary" />
@@ -1300,7 +1300,7 @@ const GoPlusPage: React.FC = () => {
                                         </div>
 
                                         {/* **新增：CDK兑换码表单** */}
-                                        <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl shadow-sm border border-orange-200 overflow-hidden">
+                                        <div className="bg-orange-50 rounded-xl shadow-sm border border-orange-200 overflow-hidden">
                                             <div className="p-5 space-y-4">
                                                 <div className="space-y-3">
                                                     <Textarea
