@@ -176,9 +176,47 @@ export const userInfoApi = {
         status: number;
         inviter_user: string;
         created_at: string;
+        wechat_openid?: string;
     }>> => {
         return createUserRequest(getUserApiUrl('/u/get_user_info'), {
             method: 'GET',
+        });
+    },
+
+    // 发送邮箱验证码
+    sendEmailCode: async (email: string): Promise<ApiResponse<any>> => {
+        return createUserRequest(getUserApiUrl('/u/send_email'), {
+            method: 'POST',
+            body: JSON.stringify({
+                email,
+                type_: 'register'
+            }),
+        });
+    },
+
+    // 修改用户信息
+    changeUserInfo: async (params: {
+        change_type: 'username' | 'email';
+        username?: string;
+        email?: string;
+        email_code?: string;
+    }): Promise<ApiResponse<any>> => {
+        return createUserRequest(getUserApiUrl('/u/change_user_info'), {
+            method: 'POST',
+            body: JSON.stringify(params),
+        });
+    },
+
+    // 微信绑定
+    wechatBind: async (params: {
+        is_bind: boolean;
+        wechat_temp_token: string;
+        xuserid?: number;
+        xtoken?: string;
+    }): Promise<ApiResponse<any>> => {
+        return createUserRequest(getUserApiUrl('/u/wechat_bind'), {
+            method: 'POST',
+            body: JSON.stringify(params),
         });
     },
 };

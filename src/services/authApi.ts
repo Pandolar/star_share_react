@@ -141,7 +141,7 @@ export const getWechatQRCode = (): Promise<WechatQRResponse> => {
 /**
  * 检查微信二维码登录状态
  * 这个函数需要处理多种状态码，所以不使用authApi的拦截器
- * @returns Promise<WechatLoginStatusResponse | null> - 返回token数据或null（用户未扫码）
+ * @returns Promise<  WechatLoginStatusResponse | null> - 返回token数据或null（用户未扫码）
  */
 export const checkWechatLoginStatus = (ticket: string): Promise<WechatLoginStatusResponse | null> => {
   const instance = axios.create({

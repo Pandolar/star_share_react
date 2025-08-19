@@ -620,6 +620,24 @@ export const SubscriptionTab: React.FC = () => {
           margin: 16px 0;
           border: none;
         }
+        
+        /* 分类标签页优化样式 */
+        .subscription-tab-wrapper [data-slot="tabList"] {
+          backdrop-filter: blur(8px);
+          background: rgba(255, 255, 255, 0.95);
+        }
+        
+        .subscription-tab-wrapper [data-slot="tab"]:not([data-selected="true"]):hover {
+          background: rgba(59, 130, 246, 0.08);
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(30, 104, 224, 0.15);
+        }
+        
+        .subscription-tab-wrapper [data-slot="cursor"] {
+          background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(59, 130, 246, 0.12) 100%);
+          border: 1px solid rgba(29, 89, 185, 0.15);
+          backdrop-filter: blur(4px);
+        }
       `}</style>
 
       {/* 页面标题 + 操作入口（右侧文字按钮） */}
@@ -665,29 +683,29 @@ export const SubscriptionTab: React.FC = () => {
           <Tabs
             selectedKey={selectedCategory}
             onSelectionChange={(key) => setSelectedCategory(key as SubscriptionType)}
-            variant="underlined"
+            variant="light"
             color="primary"
+            size="lg"
             classNames={{
               base: "w-full",
-              tabList: "gap-6 w-full relative rounded-none p-0 border-b border-divider",
-              cursor: "w-full bg-primary",
-              tab: "max-w-fit px-3 h-16",
-              tabContent: "group-data-[selected=true]:text-primary"
+              tabList: "gap-4 w-full justify-center bg-content1 rounded-xl p-2 shadow-sm border border-divider/20",
+              cursor: "w-full bg-primary/10 rounded-lg border border-primary/20 shadow-sm",
+              tab: "px-4 py-3 h-auto min-h-0 data-[selected=true]:bg-transparent data-[hover-unselected=true]:bg-primary/5 rounded-lg transition-all duration-200",
+              tabContent: "group-data-[selected=true]:text-primary font-medium"
             }}
           >
             {availableCategories.map((category) => (
               <Tab
                 key={category.key}
                 title={
-                  <div className="flex items-center gap-3 py-1">
-                    <div className="flex-shrink-0 text-primary">{category.icon}</div>
-                    <div className="flex flex-col items-start">
-                      <span className="font-medium text-base">{category.label}</span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs text-default-500">{category.description}</span>
-                        <Chip size="sm" variant="flat" color="primary" className="h-5 text-xs px-1.5">
-                          {groupedPackages[category.key].length}
-                        </Chip>
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex-shrink-0 w-5 h-5 transition-colors duration-200 group-data-[selected=true]:text-primary text-default-500">
+                      {category.icon}
+                    </div>
+                    <div className="flex flex-col items-start gap-0.5">
+                      <span className="text-lg font-extrabold leading-none">{category.label}</span>
+                      <div className="flex items-center gap-1.5 opacity-80">
+                        <span className="text-xs text-default-400 leading-none">{category.description}</span>
                       </div>
                     </div>
                   </div>

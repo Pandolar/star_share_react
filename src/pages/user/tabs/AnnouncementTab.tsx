@@ -51,7 +51,6 @@ export const AnnouncementTab: React.FC = () => {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-default-900">公告通知</h1>
-          <p className="text-sm text-default-500 mt-1">查看最新的系统公告和重要通知</p>
         </div>
       </div>
 
