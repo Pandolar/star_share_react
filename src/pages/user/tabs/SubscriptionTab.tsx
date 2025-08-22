@@ -65,7 +65,7 @@ export const SubscriptionTab: React.FC = () => {
   const [paymentModal, setPaymentModal] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<'pending' | 'checking' | 'success' | 'failed'>('pending');
   const [checkInterval, setCheckInterval] = useState<NodeJS.Timeout | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<SubscriptionType>('monthly');
+  const [selectedCategory, setSelectedCategory] = useState<SubscriptionType>('yearly');
   const [qrCodeExpired, setQrCodeExpired] = useState(false);
   const [qrCodeTimer, setQrCodeTimer] = useState<NodeJS.Timeout | null>(null);
   const [manualCheckLoading, setManualCheckLoading] = useState(false);
@@ -80,16 +80,10 @@ export const SubscriptionTab: React.FC = () => {
   // 套餐分类配置
   const subscriptionCategories: SubscriptionCategory[] = useMemo(() => [
     {
-      key: 'weekly',
-      label: '周订阅',
-      icon: <Calendar className="w-6 h-6" />,
-      description: '7天体验'
-    },
-    {
-      key: 'monthly',
-      label: '月订阅',
-      icon: <Package className="w-6 h-6" />,
-      description: '30天经济'
+      key: 'yearly',
+      label: '年订阅',
+      icon: <Crown className="w-6 h-6" />,
+      description: '365天超值'
     },
     {
       key: 'quarterly',
@@ -98,10 +92,16 @@ export const SubscriptionTab: React.FC = () => {
       description: '90天优惠'
     },
     {
-      key: 'yearly',
-      label: '年订阅',
-      icon: <Crown className="w-6 h-6" />,
-      description: '365天超值'
+      key: 'monthly',
+      label: '月订阅',
+      icon: <Package className="w-6 h-6" />,
+      description: '30天经济'
+    },
+    {
+      key: 'weekly',
+      label: '周订阅',
+      icon: <Calendar className="w-6 h-6" />,
+      description: '7天体验'
     },
     {
       key: 'more',
@@ -154,6 +154,19 @@ export const SubscriptionTab: React.FC = () => {
     if (duration <= 0) return '0.0';
     const dailyPrice = price / duration;
     return (Math.round(dailyPrice * 10) / 10).toString();
+  };
+
+  // 计算月均价格（保留1位小数，四舍五入）
+  const calculateMonthlyPrice = (price: number, duration: number): string => {
+    if (duration <= 0) return '0.0';
+    const monthlyPrice = price / duration * 30;
+    return (Math.round(monthlyPrice * 10) / 10).toString();
+  };
+
+  // 判断是否需要显示月均价格
+  const shouldShowMonthlyPrice = (duration: number): boolean => {
+    // 年卡和季卡显示月均价格
+    return (duration >= 90 && duration <= 93) || (duration >= 364 && duration <= 366);
   };
 
   // 获取套餐列表
@@ -731,6 +744,8 @@ export const SubscriptionTab: React.FC = () => {
               const mostPopular = getMostPopularPackage(groupedPackages[selectedCategory]);
               const isPopular = mostPopular?.id === pkg.id;
               const dailyPrice = calculateDailyPrice(pkg.price, pkg.duration);
+              const monthlyPrice = calculateMonthlyPrice(pkg.price, pkg.duration);
+              const showMonthlyPrice = shouldShowMonthlyPrice(pkg.duration);
 
               return (
                 <motion.div
@@ -776,13 +791,22 @@ export const SubscriptionTab: React.FC = () => {
 
                       {/* 价格信息 */}
                       <div className="package-price">
-                        <div className="price-main">
-                          <span className="price-amount">¥{pkg.price}</span>
-                          <span className="price-unit">/ {getDurationText(pkg.duration)}</span>
-                        </div>
-                        <p className="price-daily">
-                          约 ¥{dailyPrice} / 天
-                        </p>
+                        {showMonthlyPrice ? (
+                          <>
+                            <div className="price-main">
+                              <span className="price-amount">≈¥{monthlyPrice}</span>
+                              <span className="price-unit">/ 月</span>
+                            </div>
+                            <p className="price-daily">
+                              共 ¥{pkg.price} / {getDurationText(pkg.duration)}
+                            </p>
+                          </>
+                        ) : (
+                          <div className="price-main">
+                            <span className="price-amount">¥{pkg.price}</span>
+                            <span className="price-unit">/ {getDurationText(pkg.duration)}</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* 套餐描述 */}
