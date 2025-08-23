@@ -21,6 +21,7 @@ import {
     Mail,
     Clock8,
     Tag,
+    Play,
 } from 'lucide-react';
 import QRCodeGenerator from 'qrcode-generator';
 import { showMessage } from '../../utils/toast';
@@ -56,7 +57,7 @@ const defaultConfig: PageConfig = {
         { label: '首页', href: '/', external: true },
         // { label: '关于我们', href: '/about', external: false }
     ],
-    videoTutorialUrl: 'https://example.com/tutorial',
+    videoTutorialUrl: 'https://niceaigc-cos.niceaigc.com/myvideo/%E8%87%AA%E5%8A%A9%E5%85%85%E5%80%BC%E8%A7%86%E9%A2%91.mp4',
     supportContact: 'https://niceaigc-cos.niceaigc.com/myimg/NiceAIGC-kefu.jpg'
 };
 
@@ -145,6 +146,9 @@ const GoPlusPage: React.FC = () => {
     const [rechargeStatus, setRechargeStatus] = useState<'idle' | 'waiting' | 'success' | 'error'>('idle');
     const [rechargeMessage, setRechargeMessage] = useState<string>('');
     const [rechargeRaw, setRechargeRaw] = useState<any>(null);
+
+    // **新增：视频教程弹窗控制**
+    const { isOpen: isVideoModalOpen, onOpen: openVideoModal, onOpenChange: onVideoModalChange } = useDisclosure();
 
 
     // 特点数据
@@ -774,7 +778,26 @@ const GoPlusPage: React.FC = () => {
                 >
                     <Card className="shadow-lg">
                         <CardBody className="p-8">
-                            <h2 className="text-2xl font-semibold text-gray-900 mb-6">开始充值</h2>
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-2xl font-semibold text-gray-900">开始充值</h2>
+                                <Button
+                                    onPress={openVideoModal}
+                                    className="group relative overflow-hidden px-7 py-2 rounded-full border-0 shadow-lg font-bold text-lg flex items-center gap-2 bg-blue-600 hover:bg-blue-700 transition-all duration-200"
+                                    style={{
+                                        color: '#fff',
+                                        fontWeight: 800,
+                                        letterSpacing: '0.03em',
+                                        boxShadow: '0 6px 24px 0 rgba(37,99,235,0.18)',
+                                    }}
+                                >
+                                    <span className="absolute left-0 top-0 w-full h-full bg-white opacity-0 group-hover:opacity-10 transition-all duration-300 pointer-events-none"></span>
+                                    <span className="flex items-center gap-2 z-10 relative">
+                                        {/* <span className="mr-1 text-2xl animate-bounce">🎬</span> */}
+                                        <Play className="w-5 h-5" />
+                                        <span className="ml-1">🎬视频教程</span>
+                                    </span>
+                                </Button>
+                            </div>
 
 
                             <AnimatePresence mode="wait">
@@ -1471,6 +1494,64 @@ const GoPlusPage: React.FC = () => {
                                     </>
                                 )}
                             </ModalFooter>
+                        </>
+                    )}
+                </ModalContent>
+            </Modal>
+
+            {/* **新增：视频教程 Modal** */}
+            <Modal
+                isOpen={isVideoModalOpen}
+                onOpenChange={onVideoModalChange}
+                size="5xl"
+                hideCloseButton={false}
+                isDismissable={true}
+            >
+                <ModalContent
+                    style={{
+                        maxWidth: '1200px',
+                        width: '98vw',
+                        minWidth: '0',
+                        padding: 0,
+                        // 让内容自适应移动端
+                    }}
+                >
+                    {(onClose) => (
+                        <>
+                            <ModalHeader className="flex items-center gap-2">
+                                <Play className="w-6 h-6 text-primary" />
+                                视频教程
+                            </ModalHeader>
+                            <ModalBody className="pb-6">
+                                <div
+                                    className="w-full relative bg-gray-100 rounded-lg overflow-hidden"
+                                    style={{
+                                        aspectRatio: '16/9', // 适配移动端更常见的比例
+                                        minHeight: '220px',
+                                        maxHeight: '60vw',
+                                        height: 'auto',
+                                    }}
+                                >
+                                    <iframe
+                                        src={config.videoTutorialUrl}
+                                        title="ChatGPT Plus 充值教程"
+                                        className="absolute top-0 left-0 w-full h-full"
+                                        style={{
+                                            minHeight: '220px',
+                                            border: 0,
+                                        }}
+                                        frameBorder="0"
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                        allowFullScreen
+                                    />
+                                </div>
+                                <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                                    <p className="text-sm text-blue-800">
+                                        <strong>提示：</strong>观看完整视频教程，了解详细的充值操作流程，确保充值成功。
+                                    </p>
+                                </div>
+                            </ModalBody>
+                            {/* 不再显示关闭按钮 */}
                         </>
                     )}
                 </ModalContent>
