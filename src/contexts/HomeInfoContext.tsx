@@ -38,13 +38,13 @@ const defaultHomeInfo: HomeInfo = {
             {
                 name: '开放平台',
                 type: 'outline',
-                url: 'https://api.niceaigc.com/',
+                url: 'https://api.183ai.com/',
                 target: '_blank',
             },
             {
                 name: '开始对话',
                 type: 'solid',
-                url: 'https://share.niceaigc.com/',
+                url: 'https://share.183ai.com/',
                 target: '_blank',
             },
         ]
@@ -60,9 +60,9 @@ const defaultHomeInfo: HomeInfo = {
                 image: 'https://niceaigc-cos.niceaigc.com/casdoor/resource/built-in/admin/Snipaste_2025-07-08_22-57-31.png',
                 gradient: 'from-purple-25 to-pink-25',
                 ctaText: '立即体验',
-                ctaUrl: 'https://share.niceaigc.com/',
+                ctaUrl: 'https://share.183ai.com/',
                 learnMoreText: '了解更多',
-                learnMoreUrl: 'https://share.niceaigc.com/'
+                learnMoreUrl: 'https://share.183ai.com/'
             },
             {
                 id: 2,
@@ -72,9 +72,9 @@ const defaultHomeInfo: HomeInfo = {
                 image: 'https://niceaigc-cos.niceaigc.com/casdoor/resource/built-in/admin/kgWeN216754042602034_l.jpg',
                 gradient: 'from-blue-25 to-cyan-25',
                 ctaText: '立即充值',
-                ctaUrl: 'https://goplus.niceaigc.com/',
+                ctaUrl: 'https://183ai.com/goplus',
                 learnMoreText: '产品详情',
-                learnMoreUrl: 'https://goplus.niceaigc.com/'
+                learnMoreUrl: 'https://183ai.com/goplus'
             },
             {
                 id: 3,
@@ -84,9 +84,9 @@ const defaultHomeInfo: HomeInfo = {
                 image: 'https://niceaigc-cos.niceaigc.com/casdoor/resource/built-in/admin/Snipaste_2025-07-08_23-02-23.png',
                 gradient: 'from-green-25 to-emerald-25',
                 ctaText: '立刻接入',
-                ctaUrl: 'https://api.niceaigc.com/',
+                ctaUrl: 'https://api.183ai.com/',
                 learnMoreText: '',
-                learnMoreUrl: 'https://api.niceaigc.com/'
+                learnMoreUrl: 'https://api.183ai.com/'
             }
         ]
     },
@@ -104,7 +104,7 @@ const defaultHomeInfo: HomeInfo = {
                 hoverColor: 'hover:bg-purple-100',
                 badge: 'User System',
                 badgeColor: 'bg-purple-100 text-purple-700',
-                link: 'https://share.niceaigc.com/'
+                link: 'https://share.183ai.com/'
             },
             {
                 id: 2,
@@ -116,7 +116,7 @@ const defaultHomeInfo: HomeInfo = {
                 hoverColor: 'hover:bg-blue-100',
                 badge: 'STABLE',
                 badgeColor: 'bg-blue-100 text-blue-700',
-                link: 'https://share.niceaigc.com/'
+                link: 'https://share.183ai.com/'
             },
             {
                 id: 3,
@@ -128,7 +128,7 @@ const defaultHomeInfo: HomeInfo = {
                 hoverColor: 'hover:bg-green-100',
                 badge: 'BETA',
                 badgeColor: 'bg-green-100 text-green-700',
-                link: 'https://goplus.niceaigc.com/'
+                link: 'https://183ai.com/goplus'
             },
             {
                 id: 4,
@@ -140,7 +140,7 @@ const defaultHomeInfo: HomeInfo = {
                 hoverColor: 'hover:bg-orange-100',
                 badge: 'COMING',
                 badgeColor: 'bg-orange-100 text-orange-700',
-                link: 'https://api.niceaigc.com/'
+                link: 'https://api.183ai.com/'
             },
             {
                 id: 5,
@@ -152,7 +152,7 @@ const defaultHomeInfo: HomeInfo = {
                 hoverColor: 'hover:bg-red-100',
                 badge: 'COMING',
                 badgeColor: 'bg-red-100 text-red-700',
-                link: 'https://share.niceaigc.com/'
+                link: 'https://share.183ai.com/'
             },
             {
                 id: 6,
@@ -164,7 +164,7 @@ const defaultHomeInfo: HomeInfo = {
                 hoverColor: 'hover:bg-purple-100',
                 badge: 'COMING',
                 badgeColor: 'bg-purple-100 text-purple-700',
-                link: 'https://share.niceaigc.com/'
+                link: 'https://share.183ai.com/'
             },
         ]
     },

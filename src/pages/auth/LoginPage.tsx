@@ -8,6 +8,7 @@ import { setAuthCookies } from '../../utils/cookies';
 import { toast } from '../../utils/toast';
 import { useAutoLogin } from '../../hooks/useAutoLogin';
 import { useRedirect } from '../../hooks/useRedirect';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 const LoginPage: React.FC = () => {
   // 邮箱登录相关状态
@@ -24,9 +25,6 @@ const LoginPage: React.FC = () => {
   const [wechatTempToken, setWechatTempToken] = useState('');
   const [isWechatBinding, setIsWechatBinding] = useState(false);
 
-  // 登录方式切换
-  const [loginMethod, setLoginMethod] = useState<'wechat' | 'email'>('wechat');
-
   // 轮询相关
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const qrTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -34,6 +32,10 @@ const LoginPage: React.FC = () => {
   const isLoggedIn = useAutoLogin();
   const redirect = useRedirect();
   const location = useLocation();
+  const isMobile = useIsMobile();
+
+  // 登录方式切换
+  const [loginMethod, setLoginMethod] = useState<'wechat' | 'email'>('wechat');
 
   // 获取微信二维码
   const fetchWechatQR = async () => {
@@ -239,9 +241,27 @@ const LoginPage: React.FC = () => {
     fetchWechatQR();
   };
 
+  // 处理登录方式切换
+  const handleLoginMethodChange = (method: 'wechat' | 'email') => {
+    setLoginMethod(method);
+    // 如果切换到微信登录且还没有二维码，则获取二维码
+    if (method === 'wechat' && !qrCodeUrl) {
+      fetchWechatQR();
+    }
+  };
+
+  // 根据设备类型设置默认登录方式
+  useEffect(() => {
+    if (isMobile) {
+      setLoginMethod('email');
+    } else {
+      setLoginMethod('wechat');
+    }
+  }, [isMobile]);
+
   // 组件挂载时获取微信二维码
   useEffect(() => {
-    if (!isLoggedIn && !qrCodeUrl) {
+    if (!isLoggedIn && !qrCodeUrl && loginMethod === 'wechat') {
       fetchWechatQR();
     }
 
@@ -254,7 +274,7 @@ const LoginPage: React.FC = () => {
         clearTimeout(qrTimeoutRef.current);
       }
     };
-  }, [isLoggedIn]);
+  }, [isLoggedIn, loginMethod]);
 
   // 当登录方式切换时不需要清理二维码状态
 
@@ -269,7 +289,7 @@ const LoginPage: React.FC = () => {
           {/* 登录方式选择 */}
           <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
             <button
-              onClick={() => setLoginMethod('wechat')}
+              onClick={() => handleLoginMethodChange('wechat')}
               className={`flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-md text-sm font-medium transition-colors ${loginMethod === 'wechat'
                 ? 'bg-white text-primary-600 shadow-sm'
                 : 'text-gray-500 hover:text-gray-700'
@@ -279,7 +299,7 @@ const LoginPage: React.FC = () => {
               <span>微信登录</span>
             </button>
             <button
-              onClick={() => setLoginMethod('email')}
+              onClick={() => handleLoginMethodChange('email')}
               className={`flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-md text-sm font-medium transition-colors ${loginMethod === 'email'
                 ? 'bg-white text-primary-600 shadow-sm'
                 : 'text-gray-500 hover:text-gray-700'
