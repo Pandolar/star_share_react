@@ -44,7 +44,7 @@ const RegisterPage: React.FC = () => {
     setIsSendingCode(true);
     try {
       await sendEmailCode(email, 'register');
-      toast.success('验证码已发送，请注意查收');
+      toast.success('验证码已发送到您的邮箱，请在邮箱中查看！若没有收到邮件请检查邮箱是否正确，或前往垃圾箱确认');
       setIsSendingCode(false);
       setCountdown(60);
       const timer = setInterval(() => {

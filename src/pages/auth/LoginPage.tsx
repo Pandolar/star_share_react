@@ -264,8 +264,12 @@ const LoginPage: React.FC = () => {
     if (!isLoggedIn && !qrCodeUrl && loginMethod === 'wechat') {
       fetchWechatQR();
     }
+  }, [isLoggedIn, loginMethod]);
 
-    // 清理所有定时器
+  // 当登录方式切换时不需要清理二维码状态
+
+  // 仅在组件卸载时清理所有定时器，避免切换登录方式时中断轮询
+  useEffect(() => {
     return () => {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
@@ -274,9 +278,7 @@ const LoginPage: React.FC = () => {
         clearTimeout(qrTimeoutRef.current);
       }
     };
-  }, [isLoggedIn, loginMethod]);
-
-  // 当登录方式切换时不需要清理二维码状态
+  }, []);
 
   return (
     <AuthLayout title="登录您的账户">
