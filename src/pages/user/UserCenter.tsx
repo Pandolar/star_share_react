@@ -74,7 +74,7 @@ const tabConfigs: TabConfig[] = [
 ];
 
 const UserCenter: React.FC = () => {
-  const [activeTab, setActiveTab] = useState(tabConfigs[0].key);
+  const [activeTab, setActiveTab] = useState('subscription');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
 
@@ -192,6 +192,31 @@ const UserCenter: React.FC = () => {
         >
           <Menu size={20} />
         </Button>
+      </div>
+
+      {/* 移动端顶部标签栏（便于发现可切换） */}
+      <div className="lg:hidden sticky top-0 z-20 bg-gray-50/95 backdrop-blur supports-[backdrop-filter]:bg-gray-50/80">
+        <div className="px-4 pt-16 pb-3 border-b border-gray-200">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+            {tabConfigs.map(tab => {
+              const isActive = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-full whitespace-nowrap transition-colors text-sm ${isActive
+                    ? 'bg-blue-600 text-white shadow'
+                    : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+                    }`}
+                  aria-pressed={isActive}
+                >
+                  <span className="flex-shrink-0">{tab.icon}</span>
+                  <span className="font-medium">{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       <div className="container mx-auto px-4 lg:px-6 py-6">

@@ -56,7 +56,7 @@
             forceOpenOnceIn24h: true,       // 是否24小时内强制打开一次
             closeOnOverlayClick: true,      // 是否点击遮罩层关闭弹窗
             mobile: {
-                openInNewWindow: true       // 移动端是否新窗口打开
+                openInNewWindow: false      // 移动端是否新窗口打开（改为false，移动端走iframe）
             }
         },
 
@@ -221,8 +221,8 @@
         const container = document.createElement('div');
         container.style.cssText = `
             position: relative;
-            width: ${CONFIG.modal.width};
-            height: ${CONFIG.modal.height};
+            width: ${isMobile() ? '90%' : CONFIG.modal.width};
+            height: ${isMobile() ? '90%' : CONFIG.modal.height};
             max-width: ${CONFIG.modal.maxWidth}px;
             max-height: ${CONFIG.modal.maxHeight}px;
             background: white;
@@ -373,7 +373,7 @@
      */
     function performLogout() {
         console.log('[退出登录] 开始执行退出登录流程');
-        
+
         // 从配置中获取主域名（去除前面的点）
         const mainDomain = CONFIG.cookieSettings.mainDomain.replace(/^\./, '');
         const shareLogoutUrl = `https://share.${mainDomain}/auth/logout`;
@@ -389,35 +389,35 @@
             credentials: 'include',
             mode: 'cors'
         })
-        .then(response => {
-            console.log(`[退出登录] 第一个请求响应: ${response.status}`);
-            // 2. 发送第二个logout请求
-            return fetch(mainLogoutUrl, {
-                method: 'GET',
-                credentials: 'include',
-                mode: 'cors'
+            .then(response => {
+                console.log(`[退出登录] 第一个请求响应: ${response.status}`);
+                // 2. 发送第二个logout请求
+                return fetch(mainLogoutUrl, {
+                    method: 'GET',
+                    credentials: 'include',
+                    mode: 'cors'
+                });
+            })
+            .then(response => {
+                console.log(`[退出登录] 第二个请求响应: ${response.status}`);
+                // 3. 清空所有cookie
+                clearAllCookies();
+
+                // 4. 新窗口打开主域名
+                console.log('[退出登录] 打开主域名:', homeUrl);
+                window.open(homeUrl, '_blank');
+
+                // 5. 关闭当前窗口
+                console.log('[退出登录] 关闭当前窗口');
+                window.close();
+            })
+            .catch(error => {
+                console.error('[退出登录] 请求失败:', error);
+                // 即使请求失败也执行后续清理操作
+                clearAllCookies();
+                window.open(homeUrl, '_blank');
+                window.close();
             });
-        })
-        .then(response => {
-            console.log(`[退出登录] 第二个请求响应: ${response.status}`);
-            // 3. 清空所有cookie
-            clearAllCookies();
-            
-            // 4. 新窗口打开主域名
-            console.log('[退出登录] 打开主域名:', homeUrl);
-            window.open(homeUrl, '_blank');
-            
-            // 5. 关闭当前窗口
-            console.log('[退出登录] 关闭当前窗口');
-            window.close();
-        })
-        .catch(error => {
-            console.error('[退出登录] 请求失败:', error);
-            // 即使请求失败也执行后续清理操作
-            clearAllCookies();
-            window.open(homeUrl, '_blank');
-            window.close();
-        });
     }
 
     // --------------------- 创建悬浮球 ---------------------
@@ -432,7 +432,7 @@
 
         // 移动端可以适当调整悬浮球大小
         const ballSize = isMobile() ? CONFIG.ball.size * 1.2 : CONFIG.ball.size;
-        
+
         ball.style.cssText = `
             position: fixed;
             top: ${CONFIG.ball.top};
@@ -456,14 +456,10 @@
             ball.style.boxShadow = CONFIG.ball.boxShadow;
         });
 
-        // 左键点击打开弹窗
+        // 左键点击打开弹窗（移动端与PC端统一使用iframe弹窗）
         ball.addEventListener('click', () => {
             console.log('[悬浮球] 左键被点击');
-            if (isMobile() && CONFIG.behavior.mobile.openInNewWindow) {
-                window.open(CONFIG.urls.iframe, '_blank');
-            } else {
-                openIframeModal();
-            }
+            openIframeModal();
         });
 
         // 右键点击显示菜单
@@ -471,7 +467,7 @@
             e.preventDefault(); // 阻止默认右键菜单
             e.stopPropagation();
             console.log('[悬浮球] 右键被点击');
-            
+
             // 获取悬浮球位置信息
             const rect = ball.getBoundingClientRect();
             // 计算菜单位置：悬浮球正下方，右对齐（菜单右侧与悬浮球右侧对齐）
@@ -619,31 +615,31 @@
                     'Content-Type': 'application/json'
                 }
             })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`接口请求失败，状态码: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log('[Token检查] 接口返回数据:', data);
-                
-                // 4. 验证code是否为20000
-                if (data.code === 20000) {
-                    console.log('[Token检查] 验证通过，无需操作');
-                    resolve();
-                } else {
-                    console.log('[Token检查] 验证失败，code非20000');
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`接口请求失败，状态码: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('[Token检查] 接口返回数据:', data);
+
+                    // 4. 验证code是否为20000
+                    if (data.code === 20000) {
+                        console.log('[Token检查] 验证通过，无需操作');
+                        resolve();
+                    } else {
+                        console.log('[Token检查] 验证失败，code非20000');
+                        clearAllCookies();
+                        window.location.reload();
+                    }
+                })
+                .catch(error => {
+                    console.error('[Token检查] 验证过程出错:', error);
+                    // 请求失败也视为验证失败
                     clearAllCookies();
                     window.location.reload();
-                }
-            })
-            .catch(error => {
-                console.error('[Token检查] 验证过程出错:', error);
-                // 请求失败也视为验证失败
-                clearAllCookies();
-                window.location.reload();
-            });
+                });
         });
     }
 
@@ -653,13 +649,9 @@
 
         setupMessageListener();
 
-        // 移动端和PC端统一执行24小时强制打开逻辑
-        if (CONFIG.behavior.forceOpenOnceIn24h && !hasOpenedInLast24Hours()) {
-            if (isMobile() && CONFIG.behavior.mobile.openInNewWindow) {
-                window.open(CONFIG.urls.iframe, '_blank');
-            } else {
-                openIframeModal();
-            }
+        // 仅在PC端执行24小时强制打开逻辑（移动端不强制）
+        if (!isMobile() && CONFIG.behavior.forceOpenOnceIn24h && !hasOpenedInLast24Hours()) {
+            openIframeModal();
             setLastOpenTime();
         }
 
