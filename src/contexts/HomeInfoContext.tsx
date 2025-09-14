@@ -61,8 +61,10 @@ const defaultHomeInfo: HomeInfo = {
                 gradient: 'from-purple-25 to-pink-25',
                 ctaText: '立即体验',
                 ctaUrl: 'https://share.183ai.com/',
+                ctaTarget: '_self',
                 learnMoreText: '了解更多',
-                learnMoreUrl: 'https://share.183ai.com/'
+                learnMoreUrl: 'https://share.183ai.com/',
+                learnMoreTarget: '_self'
             },
             {
                 id: 2,
@@ -73,8 +75,10 @@ const defaultHomeInfo: HomeInfo = {
                 gradient: 'from-blue-25 to-cyan-25',
                 ctaText: '立即充值',
                 ctaUrl: 'https://183ai.com/goplus',
+                ctaTarget: '_self',
                 learnMoreText: '产品详情',
-                learnMoreUrl: 'https://183ai.com/goplus'
+                learnMoreUrl: 'https://183ai.com/goplus',
+                learnMoreTarget: '_self'
             },
             {
                 id: 3,
@@ -85,8 +89,10 @@ const defaultHomeInfo: HomeInfo = {
                 gradient: 'from-green-25 to-emerald-25',
                 ctaText: '立刻接入',
                 ctaUrl: 'https://api.183ai.com/',
+                ctaTarget: '_self',
                 learnMoreText: '',
-                learnMoreUrl: 'https://api.183ai.com/'
+                learnMoreUrl: 'https://api.183ai.com/',
+                learnMoreTarget: '_self'
             }
         ]
     },

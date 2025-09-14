@@ -24,8 +24,10 @@ export interface HeroSlide {
   gradient: string;
   ctaText: string;
   ctaUrl: string;
+  ctaTarget?: TargetType;
   learnMoreText: string;
   learnMoreUrl: string;
+  learnMoreTarget?: TargetType;
 }
 
 // 特点/模型展示数据
@@ -86,21 +88,21 @@ export interface LatestModelsSection {
 export interface HomeInfo {
   // 网站基本信息
   siteInfo: SiteInfo;
-  
+
   // 导航菜单配置
   navigation: {
     navActions: NavAction[];
   };
-  
+
   // Hero轮播区域
   hero: {
     slides: HeroSlide[];
     autoPlayInterval: number;
   };
-  
+
   // 特点展示区域
   features: LatestModelsSection;
-  
+
   // 页脚信息
   footer: {
     footerLinks: FooterLinkGroup;

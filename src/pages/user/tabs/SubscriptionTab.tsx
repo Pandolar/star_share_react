@@ -22,6 +22,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Package, Star, Crown, AlertCircle, CheckCircle, QrCode, Calendar, Timer } from 'lucide-react';
 import { packageUserApi, orderUserApi, exchangeUserApi } from '../../../services/userApi';
 import QRCodeGenerator from 'qrcode-generator';
+import { useIsMobile } from '../../../hooks/useIsMobile';
 
 interface PackageInfo {
   id: number;
@@ -69,6 +70,9 @@ export const SubscriptionTab: React.FC = () => {
   const [qrCodeExpired, setQrCodeExpired] = useState(false);
   const [qrCodeTimer, setQrCodeTimer] = useState<NodeJS.Timeout | null>(null);
   const [manualCheckLoading, setManualCheckLoading] = useState(false);
+
+  // 使用现有的移动端检测 hook
+  const isMobileDevice = useIsMobile();
 
   // 兑换CDK弹窗与状态
   const [redeemModal, setRedeemModal] = useState(false);
@@ -140,6 +144,11 @@ export const SubscriptionTab: React.FC = () => {
     });
 
     return groups;
+  }, [packages]);
+
+  // 移动端：获取所有套餐（按优先级排序）
+  const allPackages = useMemo(() => {
+    return [...packages].sort((a, b) => a.priority - b.priority);
   }, [packages]);
 
   // 可用的分类
@@ -690,8 +699,8 @@ export const SubscriptionTab: React.FC = () => {
         </div>
       )}
 
-      {/* 分类标签页 */}
-      {!loading && !error && availableCategories.length > 0 && (
+      {/* 分类标签页 - 仅桌面端显示 */}
+      {!loading && !error && availableCategories.length > 0 && !isMobileDevice && (
         <div className="mb-8">
           <Tabs
             selectedKey={selectedCategory}
@@ -729,8 +738,8 @@ export const SubscriptionTab: React.FC = () => {
         </div>
       )}
 
-      {/* 套餐列表 - 重构版本 */}
-      {!loading && !error && availableCategories.length > 0 && (
+      {/* 套餐列表 - 桌面端版本 */}
+      {!loading && !error && availableCategories.length > 0 && !isMobileDevice && (
         <AnimatePresence mode="wait">
           <motion.div
             key={selectedCategory}
@@ -845,6 +854,110 @@ export const SubscriptionTab: React.FC = () => {
             })}
           </motion.div>
         </AnimatePresence>
+      )}
+
+      {/* 套餐列表 - 移动端版本 */}
+      {!loading && !error && packages.length > 0 && isMobileDevice && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="grid gap-4 grid-cols-1 max-w-2xl mx-auto"
+        >
+          {allPackages.map((pkg, index) => {
+            const dailyPrice = calculateDailyPrice(pkg.price, pkg.duration);
+            const monthlyPrice = calculateMonthlyPrice(pkg.price, pkg.duration);
+            const showMonthlyPrice = shouldShowMonthlyPrice(pkg.duration);
+
+            return (
+              <motion.div
+                key={pkg.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05, duration: 0.3 }}
+                className="relative"
+              >
+                <div className="subscription-card">
+                  <div className="card-body" style={{ minHeight: 'auto', padding: '20px' }}>
+                    {/* 套餐标题 */}
+                    <div className="package-header" style={{ marginBottom: '16px' }}>
+                      <h3 className="package-title" style={{ fontSize: '18px', marginBottom: '8px' }}>
+                        {pkg.package_name}
+                      </h3>
+                      <div className="package-badges" style={{ gap: '6px' }}>
+                        <Chip
+                          size="sm"
+                          color="default"
+                          variant="flat"
+                        >
+                          {pkg.level}
+                        </Chip>
+                        <Chip
+                          size="sm"
+                          variant="bordered"
+                          startContent={<Timer className="w-3 h-3" />}
+                        >
+                          {getDurationText(pkg.duration)}
+                        </Chip>
+                      </div>
+                    </div>
+
+                    {/* 价格信息 */}
+                    <div className="package-price" style={{ margin: '16px 0' }}>
+                      {showMonthlyPrice ? (
+                        <>
+                          <div className="price-main">
+                            <span className="price-amount" style={{ fontSize: '28px' }}>≈¥{monthlyPrice}</span>
+                            <span className="price-unit">/ 月</span>
+                          </div>
+                          <p className="price-daily">
+                            共 ¥{pkg.price} / {getDurationText(pkg.duration)}
+                          </p>
+                        </>
+                      ) : (
+                        <div className="price-main">
+                          <span className="price-amount" style={{ fontSize: '28px' }}>¥{pkg.price}</span>
+                          <span className="price-unit">/ {getDurationText(pkg.duration)}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 套餐描述 */}
+                    <div className="package-description" style={{ margin: '12px 0 20px 0' }}>
+                      <div className="description-box" style={{ minHeight: '60px', padding: '12px' }}>
+                        <p className="description-text" style={{ fontSize: '13px' }}>
+                          {pkg.introduce || '暂无详细描述'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* 订阅按钮 */}
+                    <div className="subscribe-button">
+                      <button
+                        className="hero-button primary"
+                        disabled={pkg.status !== 1 || (orderLoading && selectedPackage?.id === pkg.id)}
+                        onClick={() => {
+                          setSelectedPackage(pkg);
+                          createOrder(pkg.id);
+                        }}
+                        style={{ height: '40px', fontSize: '14px' }}
+                      >
+                        {orderLoading && selectedPackage?.id === pkg.id ? (
+                          <>
+                            <div className="loading-spinner" />
+                            处理中...
+                          </>
+                        ) : (
+                          pkg.status === 1 ? '立即订阅' : '暂不可用'
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </motion.div>
       )}
 
       {/* 空状态 */}

@@ -642,13 +642,60 @@
                 });
         });
     }
+    // --------------------- 绑定注销按钮事件 ---------------------
+    /**
+     * 绑定目标注销按钮的点击事件，触发退出登录逻辑并拦截原行为
+     */
+    function bindLogoutButton() {
+        // 目标按钮的选择器（根据data-testid定位，最精准）
+        const logoutButton = document.querySelector('[data-testid="log-out-menu-item"]');
+        
+        if (logoutButton) {
+            console.log('[注销按钮] 找到目标按钮，绑定点击事件');
+            
+            // 绑定点击事件（使用once确保只绑定一次，避免重复触发）
+            logoutButton.addEventListener('click', function(e) {
+                e.preventDefault(); // 阻止默认行为
+                e.stopPropagation(); // 阻止事件冒泡（拦截原逻辑）
+                console.log('[注销按钮] 点击事件触发，执行退出登录');
+                performLogout(); // 调用现有退出登录逻辑
+            }, { once: true }); // once:true 确保只绑定一次
+        } else {
+            console.log('[注销按钮] 暂未找到目标按钮，等待动态加载...');
+        }
+    }
+    /**
+     * 启动DOM监听，检测目标注销按钮是否动态加载
+     */
+    function startLogoutButtonObserver() {
+        // 监听body及其子元素的变化（按钮可能被动态添加到body中）
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                // 检查新增的节点中是否包含目标按钮
+                if (mutation.addedNodes.length) {
+                    bindLogoutButton(); // 每次有新节点添加时尝试绑定
+                }
+            });
+        });
 
+        // 配置监听参数：监听子节点变化和子树变化
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: false,
+            characterData: false
+        });
+
+        console.log('[DOM监听] 已启动，等待注销按钮加载...');
+    }
     // --------------------- 初始化 ---------------------
     function init() {
         console.log('[初始化] 启动悬浮球系统，配置已加载');
 
         setupMessageListener();
-
+        bindLogoutButton(); // 先尝试绑定一次（如果按钮已存在）
+        startLogoutButtonObserver(); // 启动动态监听
+    
         // 仅在PC端执行24小时强制打开逻辑（移动端不强制）
         if (!isMobile() && CONFIG.behavior.forceOpenOnceIn24h && !hasOpenedInLast24Hours()) {
             openIframeModal();
