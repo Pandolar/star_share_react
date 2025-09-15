@@ -209,13 +209,22 @@ export const SubscriptionTab: React.FC = () => {
   const createOrder = async (packageId: number) => {
     try {
       setOrderLoading(true);
-      const response = await orderUserApi.createOrder(packageId);
+
+      // 移动端添加 device 参数
+      const requestData = isMobileDevice ? { device: "mobile" } : {};
+      const response = await orderUserApi.createOrder(packageId, requestData);
 
       if (response.code === 20000) {
         setOrderInfo(response.data);
         setPaymentModal(true);
         setPaymentStatus('pending');
         setQrCodeExpired(false);
+
+        // 移动端直接打开支付URL
+        if (isMobileDevice && response.data.payment_url) {
+          window.open(response.data.payment_url, '_blank');
+        }
+
         startPaymentStatusCheck(response.data.order_id);
         startQrCodeTimer();
       } else {
@@ -1021,33 +1030,77 @@ export const SubscriptionTab: React.FC = () => {
                 <div className="text-center">
                   {paymentStatus === 'pending' && (
                     <div className="space-y-3">
-                      <div className="flex items-center justify-center gap-2">
-                        <QrCode className="w-5 h-5 text-primary" />
-                        <span className="text-base font-medium">
-                          {orderInfo.pay_type === 'wxpay' ? '请使用微信扫码支付' : '请扫码支付'}
-                        </span>
-                      </div>
-                      <div className="text-sm text-default-500">
-                        <p className="mb-1">二维码5分钟内有效</p>
-                        {qrCodeExpired && (
-                          <p className="text-danger font-medium">二维码已过期，请重新创建订单</p>
-                        )}
-                      </div>
+                      {isMobileDevice ? (
+                        // 移动端支付提示
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-center gap-2">
+                            <QrCode className="w-5 h-5 text-primary" />
+                            <span className="text-base font-medium">
+                              支付页面已在新窗口打开
+                            </span>
+                          </div>
+                          <div className="text-sm text-default-500">
+                            <p className="mb-2">请在新窗口中完成支付</p>
+                            <p className="text-primary font-medium">支付完成后，请点击下方按钮确认</p>
+                          </div>
 
-                      {/* 手动检查支付状态按钮 */}
-                      <div className="mt-3">
-                        <Button
-                          size="sm"
-                          variant="light"
-                          color="primary"
-                          onPress={handleManualPaymentCheck}
-                          isLoading={manualCheckLoading}
-                          isDisabled={qrCodeExpired}
-                          className="text-xs h-8"
-                        >
-                          付款后没有反应？请点这里
-                        </Button>
-                      </div>
+                          {/* 移动端支付确认按钮 */}
+                          <div className="flex gap-3 justify-center">
+                            <Button
+                              color="success"
+                              variant="flat"
+                              onPress={() => {
+                                setPaymentStatus('success');
+                                setTimeout(() => {
+                                  window.location.reload();
+                                }, 1000);
+                              }}
+                              className="min-w-20"
+                            >
+                              已支付
+                            </Button>
+                            <Button
+                              color="default"
+                              variant="light"
+                              onPress={closePaymentModal}
+                              className="min-w-20"
+                            >
+                              未支付
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        // 桌面端二维码支付
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-center gap-2">
+                            <QrCode className="w-5 h-5 text-primary" />
+                            <span className="text-base font-medium">
+                              {orderInfo.pay_type === 'wxpay' ? '请使用微信扫码支付' : '请扫码支付'}
+                            </span>
+                          </div>
+                          <div className="text-sm text-default-500">
+                            <p className="mb-1">二维码5分钟内有效</p>
+                            {qrCodeExpired && (
+                              <p className="text-danger font-medium">二维码已过期，请重新创建订单</p>
+                            )}
+                          </div>
+
+                          {/* 手动检查支付状态按钮 */}
+                          <div className="mt-3">
+                            <Button
+                              size="sm"
+                              variant="light"
+                              color="primary"
+                              onPress={handleManualPaymentCheck}
+                              isLoading={manualCheckLoading}
+                              isDisabled={qrCodeExpired}
+                              className="text-xs h-8"
+                            >
+                              付款后没有反应？请点这里
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -1085,8 +1138,8 @@ export const SubscriptionTab: React.FC = () => {
                   )}
                 </div>
 
-                {/* 二维码 */}
-                {orderInfo.qr_code && paymentStatus === 'pending' && (
+                {/* 二维码 - 仅桌面端显示 */}
+                {orderInfo.qr_code && paymentStatus === 'pending' && !isMobileDevice && (
                   <div className="flex justify-center">
                     <Card className="p-6 relative">
                       <motion.img

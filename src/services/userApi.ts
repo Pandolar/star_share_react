@@ -245,7 +245,7 @@ export const packageUserApi = {
 // 订单API
 export const orderUserApi = {
     // 创建订单
-    createOrder: async (package_id: number): Promise<ApiResponse<{
+    createOrder: async (package_id: number, extraData?: any): Promise<ApiResponse<{
         success: boolean;
         trade_no: string;
         order_id: string;
@@ -256,7 +256,7 @@ export const orderUserApi = {
     }>> => {
         return createUserRequest(getUserApiUrl('/u/pay_order'), {
             method: 'POST',
-            body: JSON.stringify({ package_id }),
+            body: JSON.stringify({ package_id, ...extraData }),
         });
     },
 
