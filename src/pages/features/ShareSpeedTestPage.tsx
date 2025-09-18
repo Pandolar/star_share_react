@@ -131,7 +131,7 @@ const ShareSpeedTestPage: React.FC = () => {
                                             <div className="text-sm font-medium text-gray-900 truncate">{`节点${i + 1}`}</div>
                                         </div>
                                         <div className="text-xs tabular-nums text-gray-700">
-                                            {r.status === 'pending' ? '测试中…' : `${Math.round(r.durationMs)} ms`}
+                                            {r.status === 'pending' ? '测试中…' : `${(r.durationMs / 1000).toFixed(3)} 秒`}
                                         </div>
                                     </li>
                                 ))}
