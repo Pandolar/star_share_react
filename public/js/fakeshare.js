@@ -172,28 +172,6 @@
         return isWithin24h;
     }
 
-    // --------------------- 动态加载 jQuery ---------------------
-    function loadJQuery(callback) {
-        if (typeof window.jQuery !== 'undefined') {
-            console.log('[jQuery] 已存在');
-            callback();
-            return;
-        }
-
-        console.log('[jQuery] 动态加载中...');
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js';
-        script.crossOrigin = 'anonymous';
-        script.onload = () => {
-            console.log('[jQuery] 加载完成，版本:', jQuery.fn.jquery);
-            callback();
-        };
-        script.onerror = () => {
-            console.warn('[jQuery] 加载失败，使用原生 DOM 操作');
-            callback();
-        };
-        document.head.appendChild(script);
-    }
 
     // --------------------- 打开 iframe 弹窗 ---------------------
     function openIframeModal() {
@@ -649,12 +627,12 @@
     function bindLogoutButton() {
         // 目标按钮的选择器（根据data-testid定位，最精准）
         const logoutButton = document.querySelector('[data-testid="log-out-menu-item"]');
-        
+
         if (logoutButton) {
             console.log('[注销按钮] 找到目标按钮，绑定点击事件');
-            
+
             // 绑定点击事件（使用once确保只绑定一次，避免重复触发）
-            logoutButton.addEventListener('click', function(e) {
+            logoutButton.addEventListener('click', function (e) {
                 e.preventDefault(); // 阻止默认行为
                 e.stopPropagation(); // 阻止事件冒泡（拦截原逻辑）
                 console.log('[注销按钮] 点击事件触发，执行退出登录');
@@ -669,8 +647,8 @@
      */
     function startLogoutButtonObserver() {
         // 监听body及其子元素的变化（按钮可能被动态添加到body中）
-        const observer = new MutationObserver(function(mutations) {
-            mutations.forEach(function(mutation) {
+        const observer = new MutationObserver(function (mutations) {
+            mutations.forEach(function (mutation) {
                 // 检查新增的节点中是否包含目标按钮
                 if (mutation.addedNodes.length) {
                     bindLogoutButton(); // 每次有新节点添加时尝试绑定
@@ -695,7 +673,7 @@
         setupMessageListener();
         bindLogoutButton(); // 先尝试绑定一次（如果按钮已存在）
         startLogoutButtonObserver(); // 启动动态监听
-    
+
         // 仅在PC端执行24小时强制打开逻辑（移动端不强制）
         if (!isMobile() && CONFIG.behavior.forceOpenOnceIn24h && !hasOpenedInLast24Hours()) {
             openIframeModal();
@@ -708,19 +686,17 @@
     }
 
     // ==================== 启动 ====================
-    loadJQuery(function () {
-        // 页面完全加载后先执行token检查，再初始化系统
-        function onPageReady() {
-            // 先检查token有效性，通过后再执行原有初始化逻辑
-            checkTokenValidity().then(init);
-        }
+    // 页面完全加载后先执行token检查，再初始化系统
+    function onPageReady() {
+        // 先检查token有效性，通过后再执行原有初始化逻辑
+        checkTokenValidity().then(init);
+    }
 
-        // 确保页面完全加载后执行
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', onPageReady);
-        } else {
-            onPageReady();
-        }
-    });
+    // 确保页面完全加载后执行
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', onPageReady);
+    } else {
+        onPageReady();
+    }
 
 })();
