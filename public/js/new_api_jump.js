@@ -1,5 +1,5 @@
 // 使用IIFE包裹以避免全局变量污染
-(async function() {
+(async function () {
     // 等待页面初始加载完成（基础DOM就绪）
     await new Promise(resolve => {
         if (document.readyState === 'complete') {
@@ -14,25 +14,25 @@
         try {
             // 先检测是否存在"密码"标签
             const hasPasswordLabel = hasPasswordFieldLabel();
-            
+
             if (!hasPasswordLabel) {
                 console.log("未检测到密码标签，不执行操作");
                 return;
             }
-            
+
             // 检测按钮
             const continueButton = getTargetButton("继续");
             const registerButton = getTargetButton("注册");
-            
+
             // 检查按钮是否存在且可用
             const continueButtonValid = !!continueButton && !isButtonDisabled(continueButton);
             const registerButtonValid = !!registerButton && !isButtonDisabled(registerButton);
-            
+
             // 组合判断逻辑
             if (continueButtonValid) {
                 console.log("检测到密码标签和可用的'继续'按钮，执行继续按钮逻辑");
                 handleContinueAction();
-            } 
+            }
             else if (registerButtonValid) {
                 console.log("检测到密码标签和可用的'注册'按钮，执行注册按钮逻辑");
                 handleRegisterAction();
@@ -63,9 +63,9 @@
     // 获取目标按钮（根据文本内容）
     function getTargetButton(text) {
         const buttons = document.querySelectorAll(
-            'button.semi-button.semi-button-primary.semi-button-size-large.w-full.\\!rounded-full[type="submit"]'
+            'button.semi-button.semi-button-primary.w-full.\\!rounded-full[type="submit"]'
         );
-        
+
         for (const btn of buttons) {
             const contentSpan = btn.querySelector('.semi-button-content');
             if (contentSpan && contentSpan.textContent.trim() === text) {
@@ -84,8 +84,8 @@
     function getMainDomain() {
         const currentDomain = window.location.hostname;
         const domainParts = currentDomain.split('.');
-        return domainParts.length >= 2 
-            ? domainParts.slice(-2).join('.') 
+        return domainParts.length >= 2
+            ? domainParts.slice(-2).join('.')
             : currentDomain;
     }
 
@@ -110,10 +110,10 @@
     function handleContinueAction() {
         const mainDomain = getMainDomain();
         const currentDomain = window.location.hostname;
-        
+
         const registerButton = getTargetButton("注册");
         const registerButtonExists = !!registerButton && !isButtonDisabled(registerButton);
-        
+
         if (registerButtonExists) {
             console.log("检测到注册按钮，准备跳转至注册页面");
             const registerUrl = `https://${mainDomain}/register?fromurl=https://${currentDomain}/login`;
@@ -121,32 +121,32 @@
         } else {
             console.log("未检测到注册按钮，准备请求check_newapi接口");
             const apiUrl = `https://${mainDomain}/u/check_newapi`;
-            
+
             // 从cookie获取xuserid和xtoken
             const xuserId = getCookie('xuserid');
             const xToken = getCookie('xtoken');
-            
+
             console.log(`从cookie获取到xuserid: ${xuserId}, xtoken: ${xToken ? '已获取' : '未获取'}`);
-            
+
             // 配置请求头，包含必要参数
             const headers = new Headers();
             headers.append('xuserid', xuserId);
             headers.append('xtoken', xToken);
-            
+
             // 发送GET请求并设置请求头
             fetch(apiUrl, {
                 method: 'GET',
                 headers: headers,
                 credentials: 'include' // 确保请求包含凭证信息（如cookie）
             })
-            .then(res => {
-                console.log("接口请求状态：", res.status);
-                return res.text(); // 可以根据实际情况改为res.json()
-            })
-            .then(data => {
-                console.log("接口返回数据：", data);
-            })
-            .catch(err => console.error("接口请求失败：", err));
+                .then(res => {
+                    console.log("接口请求状态：", res.status);
+                    return res.text(); // 可以根据实际情况改为res.json()
+                })
+                .then(data => {
+                    console.log("接口返回数据：", data);
+                })
+                .catch(err => console.error("接口请求失败：", err));
         }
     }
 
@@ -169,13 +169,13 @@
     // 监听路由变化
     const originalPushState = history.pushState;
     const originalReplaceState = history.replaceState;
-    
-    history.pushState = function(...args) {
+
+    history.pushState = function (...args) {
         originalPushState.apply(this, args);
         handleRouteChange();
     };
-    
-    history.replaceState = function(...args) {
+
+    history.replaceState = function (...args) {
         originalReplaceState.apply(this, args);
         handleRouteChange();
     };
