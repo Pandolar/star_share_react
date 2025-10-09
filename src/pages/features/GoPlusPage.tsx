@@ -511,17 +511,17 @@ const GoPlusPage: React.FC = () => {
                 showMessage.success('充值成功！');
             } else {
                 setRechargeStatus('error');
-                setRechargeMessage('充值失败：请截图下方返回信息并联系在线客服处理');
-                showMessage.error('充值失败，请查看弹窗信息并联系售后');
+                setRechargeMessage('充值失败：请截图下方返回信息并联系在线客服处理，客服二维码联系方式在网站下方');
+                showMessage.error('充值失败，请查看弹窗信息并联系售后，客服二维码联系方式在网站下方');
             }
         } catch (error: any) {
             setRechargeStatus('error');
-            setRechargeMessage('充值失败：网络错误。请截图下方信息并联系在线客服处理');
+            setRechargeMessage('充值失败：网络错误。请截图下方信息并联系在线客服处理，客服二维码联系方式在网站下方');
             setRechargeRaw({
                 error: 'network_error',
                 message: error?.message || '未知错误'
             });
-            showMessage.error('执行充值失败: 网络错误，请联系客服');
+            showMessage.error('执行充值失败: 网络错误，请联系客服，客服二维码联系方式在网站下方');
         }
     };
 
@@ -578,17 +578,17 @@ const GoPlusPage: React.FC = () => {
             } else {
                 // CDK兑换失败
                 setRechargeStatus('error');
-                setRechargeMessage('CDK兑换失败：请截图下方返回信息并联系在线客服处理');
-                showMessage.error('CDK兑换失败，请查看弹窗信息');
+                setRechargeMessage('CDK兑换失败：请截图下方返回信息并联系在线客服处理，客服二维码联系方式在网站下方');
+                showMessage.error('CDK兑换失败，请查看弹窗信息，客服二维码联系方式在网站下方');
             }
         } catch (error: any) {
             setRechargeStatus('error');
-            setRechargeMessage('CDK兑换失败：网络错误。请截图下方信息并联系在线客服处理');
+            setRechargeMessage('CDK兑换失败：网络错误。请截图下方信息并联系在线客服处理，客服二维码联系方式在网站下方');
             setRechargeRaw({
                 error: 'network_error',
                 message: error?.message || '未知错误'
             });
-            showMessage.error('CDK兑换失败: 网络错误，请联系客服');
+            showMessage.error('CDK兑换失败: 网络错误，请联系客服，客服二维码联系方式在网站下方');
         } finally {
             setIsCdkLoading(false);
         }
@@ -1208,7 +1208,7 @@ const GoPlusPage: React.FC = () => {
                                             </p>
                                             <div className="flex flex-col items-center space-y-2">
                                                 <img
-                                                    src="https://niceaigc-cos.niceaigc.com/myimg/NiceAIGC-kefu.jpg"
+                                                    src="https://niceaigc-cos.niceaigc.com/article-picture/20250921220151886.jpg"
                                                     alt="客服微信二维码"
                                                     className="w-40 h-40 rounded-lg border border-gray-200 shadow"
                                                 />

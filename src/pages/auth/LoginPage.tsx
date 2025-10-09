@@ -381,10 +381,7 @@ const LoginPage: React.FC = () => {
                 <div className="text-center space-y-2">
                   <div className="space-y-1">
                     <p className="text-xs text-gray-400">
-                      使用手机微信扫描二维码
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      扫码后即可自动登录
+                      若二维码过期或扫码后无反应请刷新！
                     </p>
                   </div>
                   <Button
