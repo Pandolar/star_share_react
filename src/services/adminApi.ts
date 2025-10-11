@@ -110,9 +110,12 @@ class AdminApiService {
             username,
             password: hashedPassword,
         });
-
+        // 打日志
+        console.log('[AdminLogin] 登录响应:', response.data);
         if (response.data.code === 20000 && response.data.data?.admin_token) {
             this.setAdminToken(response.data.data.admin_token);
+            // 打日志
+            console.log('[AdminLogin] 登录成功，token:', response.data.data.admin_token);
         }
 
         return response.data;
