@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 import md5 from 'md5';
+import { storage as storageConfig } from '../config';
 import {
     AdminApiResponse,
     Package,
@@ -29,8 +30,12 @@ import {
  */
 class AdminApiService {
     private api: AxiosInstance;
+    private readonly tokenKey: string;
 
     constructor() {
+        // 读取存储key（默认使用配置中的 key）
+        this.tokenKey = (storageConfig && storageConfig.tokenKey) || 'admin_token';
+
         // 创建axios实例
         this.api = axios.create({
             baseURL: process.env.REACT_APP_API_BASE_URL || '',
@@ -67,21 +72,80 @@ class AdminApiService {
      * 获取管理员token
      */
     private getAdminToken(): string | null {
-        return localStorage.getItem('admin_token') || null;
+        try {
+            const fromLocal = localStorage.getItem(this.tokenKey);
+            if (fromLocal) return fromLocal;
+        } catch (_) {
+            // ignore
+        }
+
+        // 尝试从 cookie 读取（作为兜底方案）
+        try {
+            const name = `${this.tokenKey}=`;
+            const decodedCookie = decodeURIComponent(document.cookie || '');
+            const ca = decodedCookie.split(';');
+            for (let c of ca) {
+                while (c.charAt(0) === ' ') c = c.substring(1);
+                if (c.indexOf(name) === 0) {
+                    return c.substring(name.length, c.length);
+                }
+            }
+        } catch (_) {
+            // ignore
+        }
+        return null;
     }
 
     /**
      * 保存管理员token
      */
     private setAdminToken(token: string): void {
-        localStorage.setItem('admin_token', token);
+        // 优先写入 localStorage，失败则写入 cookie
+        let written = false;
+        try {
+            const testKey = `__ls_test___${Date.now()}`;
+            localStorage.setItem(testKey, '1');
+            localStorage.removeItem(testKey);
+            localStorage.setItem(this.tokenKey, token);
+            written = true;
+        } catch (_) {
+            written = false;
+        }
+
+        // 同步写入 cookie 作为兜底（即便 localStorage 成功也写入，增强稳健性）
+        try {
+            const days = 7; // 有效期 7 天
+            const d = new Date();
+            d.setTime(d.getTime() + days * 24 * 60 * 60 * 1000);
+            const expires = `expires=${d.toUTCString()}`;
+            // SameSite=Lax 兼容大多数场景；开发环境不强制 Secure
+            document.cookie = `${this.tokenKey}=${encodeURIComponent(token)}; ${expires}; path=/; SameSite=Lax`;
+        } catch (_) {
+            // ignore
+        }
+
+        if (!written) {
+            // 作为最后手段再尝试 sessionStorage（某些浏览器隐私模式允许）
+            try {
+                sessionStorage.setItem(this.tokenKey, token);
+            } catch (_) {
+                // ignore
+            }
+        }
     }
 
     /**
      * 清除管理员token
      */
     private clearAdminToken(): void {
-        localStorage.removeItem('admin_token');
+        try { localStorage.removeItem(this.tokenKey); } catch (_) {}
+        try { sessionStorage.removeItem(this.tokenKey); } catch (_) {}
+        try {
+            // 通过设置过期时间清除 cookie
+            document.cookie = `${this.tokenKey}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax`;
+        } catch (_) {
+            // ignore
+        }
     }
 
     /**
