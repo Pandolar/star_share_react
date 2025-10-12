@@ -87,14 +87,23 @@ const UserPackagesManagePage: React.FC = () => {
             const response = await adminApiService.getUserPackages(params);
 
             if (response.code === 20000) {
-                setUserPackages(response.data || []);
-                setTotal(response.total || 0);
-                setTotalPages(Math.ceil((response.total || 0) / pageSize));
+                setUserPackages(Array.isArray(response.data) ? response.data : []);
+                const totalNum = Number(response.total) || 0;
+                setTotal(totalNum);
+                setTotalPages(Math.ceil(totalNum / pageSize));
             } else {
+                // 错误捕获：显示空表格
+                setUserPackages([]);
+                setTotal(0);
+                setTotalPages(1);
                 showToast(response.msg || '获取用户套餐记录失败', 'error');
             }
         } catch (error) {
             console.error('获取用户套餐记录失败:', error);
+            // 错误捕获：显示空表格
+            setUserPackages([]);
+            setTotal(0);
+            setTotalPages(1);
             showToast('获取用户套餐记录失败', 'error');
         } finally {
             setLoading(false);
@@ -201,6 +210,7 @@ const UserPackagesManagePage: React.FC = () => {
           </Select>
                         <div className="flex gap-2">
                             <Button
+                                className="admin-action-btn"
                                 color="primary"
                                 onPress={handleSearch}
                                 startContent={<Search className="w-4 h-4" />}
@@ -233,10 +243,12 @@ const UserPackagesManagePage: React.FC = () => {
                         aria-label="用户套餐记录列表"
                         isHeaderSticky
                         classNames={{
-                            wrapper: "max-h-[600px]",
+                            wrapper: "max-h-[600px] overflow-x-auto",
+                            table: "min-w-[1100px]",
                         }}
                     >
                         <TableHeader>
+                            <TableColumn width={100}>记录ID</TableColumn>
                             <TableColumn>记录信息</TableColumn>
                             <TableColumn>用户信息</TableColumn>
                             <TableColumn>套餐信息</TableColumn>
@@ -254,12 +266,10 @@ const UserPackagesManagePage: React.FC = () => {
                         >
                             {userPackages.map((userPackage) => (
                                 <TableRow key={userPackage.id}>
+                                    <TableCell>{userPackage.id}</TableCell>
                                     <TableCell>
                                         <div className="space-y-1">
-                                            <div className="font-medium">ID: {userPackage.id}</div>
-                                            {userPackage.way && (
-                                                <div className="text-xs text-gray-500">获取方式: {userPackage.way}</div>
-                                            )}
+                                            <div className="font-medium">{userPackage.way ? `获取方式: ${userPackage.way}` : '记录'}</div>
                                         </div>
                                     </TableCell>
                                     <TableCell>

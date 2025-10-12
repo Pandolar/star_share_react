@@ -97,14 +97,23 @@ const OrdersManagePage: React.FC = () => {
             const response = await adminApiService.getOrders(params);
 
             if (response.code === 20000) {
-                setOrders(response.data || []);
-                setTotal(response.total || 0);
-                setTotalPages(Math.ceil((response.total || 0) / pageSize));
+                setOrders(Array.isArray(response.data) ? response.data : []);
+                const totalNum = Number(response.total) || 0;
+                setTotal(totalNum);
+                setTotalPages(Math.ceil(totalNum / pageSize));
             } else {
+                // 错误捕获：显示空表格
+                setOrders([]);
+                setTotal(0);
+                setTotalPages(1);
                 showToast(response.msg || '获取订单列表失败', 'error');
             }
         } catch (error) {
             console.error('获取订单列表失败:', error);
+            // 错误捕获：显示空表格
+            setOrders([]);
+            setTotal(0);
+            setTotalPages(1);
             showToast('获取订单列表失败', 'error');
         } finally {
             setLoading(false);
@@ -301,6 +310,7 @@ const OrdersManagePage: React.FC = () => {
             </Select>
                         <div className="flex gap-2">
                             <Button
+                                className="admin-action-btn"
                                 color="primary"
                                 onPress={handleSearch}
                                 startContent={<Search className="w-4 h-4" />}
@@ -333,10 +343,12 @@ const OrdersManagePage: React.FC = () => {
                         aria-label="订单列表"
                         isHeaderSticky
                         classNames={{
-                            wrapper: "max-h-[600px]",
+                            wrapper: "max-h-[600px] overflow-x-auto",
+                            table: "min-w-[1100px]",
                         }}
                     >
                         <TableHeader>
+                            <TableColumn width={100}>ID</TableColumn>
                             <TableColumn>订单信息</TableColumn>
                             <TableColumn>用户信息</TableColumn>
                             <TableColumn>套餐信息</TableColumn>
@@ -352,13 +364,13 @@ const OrdersManagePage: React.FC = () => {
                         >
                             {orders.map((order) => (
                                 <TableRow key={order.id}>
+                                    <TableCell>{order.id}</TableCell>
                                     <TableCell>
                                         <div className="space-y-1">
                                             <div className="font-medium">{order.order_id}</div>
                                             {order.trade_no && (
                                                 <div className="text-xs text-gray-500">交易号: {order.trade_no}</div>
                                             )}
-                                            <div className="text-xs text-gray-400">ID: {order.id}</div>
                                         </div>
                                     </TableCell>
                                     <TableCell>
@@ -435,7 +447,7 @@ const OrdersManagePage: React.FC = () => {
                             <Textarea
                                 label="备注"
                                 placeholder="请输入备注信息"
-
+                                value={typeof (formData as any).remarks === 'string' ? (formData as any).remarks : ''}
                                 onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
                                 minRows={3}
                             />
@@ -445,7 +457,7 @@ const OrdersManagePage: React.FC = () => {
                         <Button variant="light" onPress={onEditClose}>
                             取消
                         </Button>
-                        <Button color="primary" onPress={handleEdit}>
+                        <Button className="admin-action-btn" color="primary" onPress={handleEdit}>
                             保存
                         </Button>
                     </ModalFooter>

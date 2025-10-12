@@ -110,14 +110,23 @@ const PackagesManagePage: React.FC = () => {
             const response = await adminApiService.getPackages(params);
 
             if (response.code === 20000) {
-                setPackages(response.data || []);
-                setTotal(response.total || 0);
-                setTotalPages(Math.ceil((response.total || 0) / pageSize));
+                setPackages(Array.isArray(response.data) ? response.data : []);
+                const totalNum = Number(response.total) || 0;
+                setTotal(totalNum);
+                setTotalPages(Math.ceil(totalNum / pageSize));
             } else {
+                // 错误捕获：显示空表格
+                setPackages([]);
+                setTotal(0);
+                setTotalPages(1);
                 showToast(response.msg || '获取套餐列表失败', 'error');
             }
         } catch (error) {
             console.error('获取套餐列表失败:', error);
+            // 错误捕获：显示空表格
+            setPackages([]);
+            setTotal(0);
+            setTotalPages(1);
             showToast('获取套餐列表失败', 'error');
         } finally {
             setLoading(false);
@@ -352,6 +361,7 @@ const PackagesManagePage: React.FC = () => {
                         </Select>
                         <div className="flex gap-2">
                             <Button
+                                className="admin-action-btn"
                                 color="primary"
                                 onPress={handleSearch}
                                 startContent={<Search className="w-4 h-4" />}
@@ -376,6 +386,7 @@ const PackagesManagePage: React.FC = () => {
                     共 {total} 个套餐
                 </div>
                 <Button
+                    className="admin-action-btn"
                     color="primary"
                     startContent={<Plus className="w-4 h-4" />}
                     onPress={onCreateOpen}
@@ -391,12 +402,15 @@ const PackagesManagePage: React.FC = () => {
                         aria-label="套餐列表"
                         isHeaderSticky
                         classNames={{
-                            wrapper: "max-h-[600px]",
+                            wrapper: "max-h-[600px] overflow-x-auto",
+                            table: "min-w-[1100px]",
                         }}
                     >
                         <TableHeader>
+                            <TableColumn width={100}>ID</TableColumn>
                             <TableColumn>套餐信息</TableColumn>
-                            <TableColumn>价格/时长</TableColumn>
+                            <TableColumn>价格</TableColumn>
+                            <TableColumn>时长</TableColumn>
                             <TableColumn>等级</TableColumn>
                             <TableColumn>优先级</TableColumn>
                             <TableColumn>状态</TableColumn>
@@ -410,23 +424,23 @@ const PackagesManagePage: React.FC = () => {
                         >
                             {packages.map((pkg) => (
                                 <TableRow key={pkg.id}>
+                                    <TableCell>{pkg.id}</TableCell>
                                     <TableCell>
                                         <div className="space-y-1">
                                             <div className="font-medium">{pkg.package_name}</div>
                                             <div className="text-sm text-gray-500">{pkg.category}</div>
-                                            <div className="text-xs text-gray-400">ID: {pkg.id}</div>
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="space-y-1">
-                                            <div className="flex items-center gap-1 text-sm font-medium text-green-600">
-                                                <DollarSign className="w-3 h-3" />
-                                                ¥{pkg.price}
-                                            </div>
-                                            <div className="flex items-center gap-1 text-xs text-gray-500">
-                                                <Clock className="w-3 h-3" />
-                                                {pkg.duration}天
-                                            </div>
+                                        <div className="flex items-center gap-1 text-sm font-medium text-green-600">
+                                            <DollarSign className="w-3 h-3" />
+                                            ¥{pkg.price}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-1 text-xs text-gray-500">
+                                            <Clock className="w-3 h-3" />
+                                            {pkg.duration}天
                                         </div>
                                     </TableCell>
                                     <TableCell>{renderLevel(pkg.level)}</TableCell>
@@ -566,7 +580,7 @@ const PackagesManagePage: React.FC = () => {
                         <Button variant="light" onPress={onCreateClose}>
                             取消
                         </Button>
-                        <Button color="primary" onPress={handleCreate}>
+                        <Button className="admin-action-btn" color="primary" onPress={handleCreate}>
                             创建
                         </Button>
                     </ModalFooter>
@@ -590,7 +604,7 @@ const PackagesManagePage: React.FC = () => {
                             <Input
                                 label="套餐名称"
                                 placeholder="请输入套餐名称"
-
+                                value={typeof (formData as any).package_name === 'string' ? (formData as any).package_name : ''}
                                 onChange={(e) => setFormData({ ...formData, package_name: e.target.value })}
                             />
                             <Select
@@ -609,7 +623,7 @@ const PackagesManagePage: React.FC = () => {
                                 label="套餐价格"
                                 type="number"
                                 placeholder="请输入价格（元）"
-
+                                value={(formData as any).price !== undefined ? String((formData as any).price) : ''}
                                 onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
                                 startContent={<DollarSign className="w-4 h-4" />}
                             />
@@ -617,7 +631,7 @@ const PackagesManagePage: React.FC = () => {
                                 label="套餐时长"
                                 type="number"
                                 placeholder="请输入时长（天）"
-
+                                value={(formData as any).duration !== undefined ? String((formData as any).duration) : ''}
                                 onChange={(e) => setFormData({ ...formData, duration: Number(e.target.value) })}
                                 startContent={<Clock className="w-4 h-4" />}
                             />
@@ -637,14 +651,14 @@ const PackagesManagePage: React.FC = () => {
                                 label="优先级"
                                 type="number"
                                 placeholder="请输入优先级"
-
+                                value={(formData as any).priority !== undefined ? String((formData as any).priority) : ''}
                                 onChange={(e) => setFormData({ ...formData, priority: Number(e.target.value) })}
                             />
                         </div>
                         <Textarea
                             label="套餐介绍"
                             placeholder="请输入套餐介绍"
-
+                            value={typeof (formData as any).introduce === 'string' ? (formData as any).introduce : ''}
                             onChange={(e) => setFormData({ ...formData, introduce: e.target.value })}
                             minRows={3}
                             className="mt-4"
@@ -652,7 +666,7 @@ const PackagesManagePage: React.FC = () => {
                         <Textarea
                             label="备注"
                             placeholder="请输入备注信息"
-
+                            value={typeof (formData as any).remarks === 'string' ? (formData as any).remarks : ''}
                             onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
                             minRows={2}
                         />
@@ -661,7 +675,7 @@ const PackagesManagePage: React.FC = () => {
                         <Button variant="light" onPress={onEditClose}>
                             取消
                         </Button>
-                        <Button color="primary" onPress={handleEdit}>
+                        <Button className="admin-action-btn" color="primary" onPress={handleEdit}>
                             保存
                         </Button>
                     </ModalFooter>

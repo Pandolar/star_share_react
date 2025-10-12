@@ -333,3 +333,17 @@ button:focus,
   background-size: 200px 100%;
   animation: skeleton-loading 1.5s infinite;
 }
+
+/* Admin 特定操作按钮样式（仅用于搜索/新增等关键动作，不影响全局） */
+.admin-action-btn {
+  background-color: #006FEE !important;
+  color: #ffffff !important;
+  border: 1px solid #006FEE !important;
+}
+.admin-action-btn:hover {
+  background-color: #005BC4 !important;
+  border-color: #005BC4 !important;
+}
+.admin-action-btn svg {
+  color: #ffffff !important;
+}

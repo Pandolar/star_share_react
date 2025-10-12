@@ -183,7 +183,7 @@ export interface SystemConfig {
     description: string;
     group: string;
     editable: boolean;
-    type: 'str' | 'int' | 'bool';
+    type: 'str' | 'int' | 'bool' | 'json';
     required: boolean;
     created_at: string;
     updated_at: string;

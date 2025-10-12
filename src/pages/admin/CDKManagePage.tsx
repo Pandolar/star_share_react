@@ -62,6 +62,7 @@ const CDKManagePage: React.FC = () => {
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
     const [selectedCDK, setSelectedCDK] = useState<CDK | null>(null);
+    const [selectedKeys, setSelectedKeys] = useState<Set<React.Key> | 'all'>(new Set());
     const [formData, setFormData] = useState<Partial<CreateCDKRequest | UpdateCDKRequest>>({});
 
     // Modal控制
@@ -85,7 +86,7 @@ const CDKManagePage: React.FC = () => {
         try {
             const response = await adminApiService.getPackages();
             if (response.code === 20000) {
-                setPackages(response.data || []);
+                setPackages(Array.isArray(response.data) ? response.data : []);
             }
         } catch (error) {
             console.error('获取套餐列表失败:', error);
@@ -112,14 +113,23 @@ const CDKManagePage: React.FC = () => {
             const response = await adminApiService.getCDKs(params);
 
             if (response.code === 20000) {
-                setCDKs(response.data || []);
-                setTotal(response.total || 0);
-                setTotalPages(Math.ceil((response.total || 0) / pageSize));
+                setCDKs(Array.isArray(response.data) ? response.data : []);
+                const totalNum = Number(response.total) || 0;
+                setTotal(totalNum);
+                setTotalPages(Math.ceil(totalNum / pageSize));
             } else {
+                // 错误捕获：显示空表格
+                setCDKs([]);
+                setTotal(0);
+                setTotalPages(1);
                 showToast(response.msg || '获取CDK列表失败', 'error');
             }
         } catch (error) {
             console.error('获取CDK列表失败:', error);
+            // 错误捕获：显示空表格
+            setCDKs([]);
+            setTotal(0);
+            setTotalPages(1);
             showToast('获取CDK列表失败', 'error');
         } finally {
             setLoading(false);
@@ -221,6 +231,28 @@ const CDKManagePage: React.FC = () => {
             await navigator.clipboard.writeText(cdk);
             showToast('CDK已复制到剪贴板', 'success');
         } catch (error) {
+            showToast('复制失败', 'error');
+        }
+    };
+
+    // 复制选中的CDK到剪贴板（每行一个）
+    const handleCopySelectedCDKs = async () => {
+        try {
+            let list: CDK[] = [];
+            if (selectedKeys === 'all') {
+                list = cdks;
+            } else {
+                const keySet = selectedKeys as Set<React.Key>;
+                list = cdks.filter((c) => keySet.has(c.id));
+            }
+            if (list.length === 0) {
+                showToast('请先选择需要复制的CDK', 'warning');
+                return;
+            }
+            const text = list.map((c) => c.cdk).join('\n');
+            await navigator.clipboard.writeText(text);
+            showToast(`已复制 ${list.length} 个CDK`, 'success');
+        } catch (_) {
             showToast('复制失败', 'error');
         }
     };
@@ -358,6 +390,7 @@ const CDKManagePage: React.FC = () => {
             </Select>
                         <div className="flex gap-2">
                             <Button
+                                className="admin-action-btn"
                                 color="primary"
                                 onPress={handleSearch}
                                 startContent={<Search className="w-4 h-4" />}
@@ -382,11 +415,22 @@ const CDKManagePage: React.FC = () => {
                     共 {total} 个CDK
                 </div>
                 <Button
+                    className="admin-action-btn"
                     color="primary"
                     startContent={<Plus className="w-4 h-4" />}
                     onPress={onCreateOpen}
                 >
                     批量生成CDK
+                </Button>
+            </div>
+            <div className="flex justify-end mt-2">
+                <Button
+                    variant="flat"
+                    color="primary"
+                    onPress={handleCopySelectedCDKs}
+                    isDisabled={selectedKeys !== 'all' && !(selectedKeys as Set<React.Key>).size}
+                >
+                    复制选中CDK
                 </Button>
             </div>
 
@@ -397,10 +441,21 @@ const CDKManagePage: React.FC = () => {
                         aria-label="CDK列表"
                         isHeaderSticky
                         classNames={{
-                            wrapper: "max-h-[600px]",
+                            wrapper: "max-h-[600px] overflow-x-auto",
+                            table: "min-w-[1100px]",
+                        }}
+                        selectionMode="multiple"
+                        selectedKeys={selectedKeys as any}
+                        onSelectionChange={(keys) => {
+                            if (keys === 'all') {
+                                setSelectedKeys(new Set(cdks.map((c) => c.id)) as any);
+                            } else {
+                                setSelectedKeys(keys as any);
+                            }
                         }}
                     >
                         <TableHeader>
+                            <TableColumn width={100}>ID</TableColumn>
                             <TableColumn>CDK信息</TableColumn>
                             <TableColumn>关联套餐</TableColumn>
                             <TableColumn>状态</TableColumn>
@@ -416,18 +471,23 @@ const CDKManagePage: React.FC = () => {
                         >
                             {cdks.map((cdk) => (
                                 <TableRow key={cdk.id}>
+                                    <TableCell>{cdk.id}</TableCell>
                                     <TableCell>
                                         <div className="space-y-1">
                                             <div className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
                                                 {cdk.cdk}
                                             </div>
-                                            <div className="text-xs text-gray-400">ID: {cdk.id}</div>
                                         </div>
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
                                             <Package className="w-4 h-4 text-gray-400" />
-                                            <span className="text-sm">套餐ID: {cdk.package_id}</span>
+                                            <span className="text-sm">
+                                                {(() => {
+                                                    const pkg = packages.find(p => p.id === cdk.package_id);
+                                                    return pkg ? `${pkg.package_name} (ID: ${cdk.package_id})` : `套餐ID: ${cdk.package_id}`;
+                                                })()}
+                                            </span>
                                         </div>
                                     </TableCell>
                                     <TableCell>{renderStatus(cdk.status)}</TableCell>
@@ -503,6 +563,11 @@ const CDKManagePage: React.FC = () => {
                                 selectedKeys={formData.package_id ? [String(formData.package_id)] : []}
                                 onChange={(e) => setFormData({ ...formData, package_id: Number(e.target.value) })}
                                 isRequired
+                                classNames={{
+                                    trigger: "bg-white",
+                                    value: "text-gray-900",
+                                    label: "text-gray-600",
+                                }}
                             >
                                 {packages.map((pkg) => (
                                     <SelectItem key={pkg.id}>
@@ -523,7 +588,7 @@ const CDKManagePage: React.FC = () => {
                         <Button variant="light" onPress={onCreateClose}>
                             取消
                         </Button>
-                        <Button color="primary" onPress={handleCreate}>
+                        <Button className="admin-action-btn" color="primary" onPress={handleCreate}>
                             生成
                         </Button>
                     </ModalFooter>
@@ -556,7 +621,7 @@ const CDKManagePage: React.FC = () => {
                             <Textarea
                                 label="备注"
                                 placeholder="请输入备注信息"
-
+                                value={typeof (formData as any).remarks === 'string' ? (formData as any).remarks : ''}
                                 onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
                                 minRows={3}
                             />
@@ -566,7 +631,7 @@ const CDKManagePage: React.FC = () => {
                         <Button variant="light" onPress={onEditClose}>
                             取消
                         </Button>
-                        <Button color="primary" onPress={handleEdit}>
+                        <Button className="admin-action-btn" color="primary" onPress={handleEdit}>
                             保存
                         </Button>
                     </ModalFooter>

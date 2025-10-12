@@ -29,6 +29,7 @@ import {
     LogOut,
     Shield,
     Home,
+    BarChart3,
 } from 'lucide-react';
 import adminApiService from '../../services/adminApi';
 
@@ -60,6 +61,12 @@ const AdminLayout: React.FC = () => {
 
     // 导航菜单项配置
     const menuItems = [
+        {
+            key: 'overview',
+            label: '系统总览',
+            icon: <BarChart3 className="w-4 h-4" />,
+            path: '/star-admin/overview',
+        },
         {
             key: 'users',
             label: '用户管理',
@@ -188,22 +195,24 @@ const AdminLayout: React.FC = () => {
                 </NavbarMenu>
             </Navbar>
 
-            {/* 主要内容区域 */}
-            <div className="container mx-auto px-4 py-6 max-w-7xl">
-                {/* 桌面端Tab导航 */}
-                <div className="hidden sm:block mb-6">
-                    <Card className="bg-white shadow-sm">
-                        <CardBody className="px-6 py-4">
+            {/* 主要内容区域：左侧垂直Tabs + 右侧页面内容 */}
+            <div className="mx-auto px-4 py-6 w-full max-w-[1600px]">
+                <div className="hidden sm:flex gap-6">
+                    {/* 左侧导航（垂直 Tabs） */}
+                    <Card className="bg-white shadow-sm w-64 shrink-0 h-fit">
+                        <CardBody className="p-0">
                             <Tabs
                                 aria-label="管理后台导航"
+                                placement="start"
                                 selectedKey={getCurrentTab()}
                                 onSelectionChange={(key) => handleTabChange(key as string)}
-                                variant="underlined"
+                                variant="light"
+                                className="w-full"
                                 classNames={{
-                                    tabList: "gap-6 w-full relative rounded-none p-0 border-b border-divider",
-                                    cursor: "w-full bg-blue-600",
-                                    tab: "max-w-fit px-0 h-12",
-                                    tabContent: "group-data-[selected=true]:text-blue-600"
+                                    tabList: "gap-2 p-3",
+                                    tab: "justify-start h-10 px-3",
+                                    tabContent: "gap-2 text-gray-700 group-data-[selected=true]:text-blue-600",
+                                    cursor: "bg-blue-100",
                                 }}
                             >
                                 {menuItems.map((item) => (
@@ -220,10 +229,19 @@ const AdminLayout: React.FC = () => {
                             </Tabs>
                         </CardBody>
                     </Card>
+
+                    {/* 右侧内容 */}
+                    <div className="flex-1 min-w-0">
+                        <Card className="bg-white shadow-sm min-h-[600px]">
+                            <CardBody className="p-6">
+                                <Outlet />
+                            </CardBody>
+                        </Card>
+                    </div>
                 </div>
 
-                {/* 页面内容 */}
-                <div className="w-full">
+                {/* 移动端：保留顶部菜单 + 内容 */}
+                <div className="sm:hidden">
                     <Card className="bg-white shadow-sm min-h-[600px]">
                         <CardBody className="p-6">
                             <Outlet />

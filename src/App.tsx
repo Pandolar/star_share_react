@@ -17,6 +17,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 // Admin相关组件
 import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminLayout from './components/admin/AdminLayout';
+import OverviewDashboardPage from './pages/admin/OverviewDashboardPage';
 import AdminProtectedRoute from './components/admin/AdminProtectedRoute';
 import UsersManagePage from './pages/admin/UsersManagePage';
 import PackagesManagePage from './pages/admin/PackagesManagePage';
@@ -66,7 +67,8 @@ const App: React.FC = () => {
                 </AdminProtectedRoute>
               }>
                 {/* Admin子路由 - 默认重定向到用户管理 */}
-                <Route index element={<Navigate to="/star-admin/users" replace />} />
+                <Route index element={<Navigate to="/star-admin/overview" replace />} />
+                <Route path="overview" element={<OverviewDashboardPage />} />
                 <Route path="users" element={<UsersManagePage />} />
                 <Route path="packages" element={<PackagesManagePage />} />
                 <Route path="user-packages" element={<UserPackagesManagePage />} />

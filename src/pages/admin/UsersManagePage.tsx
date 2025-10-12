@@ -98,14 +98,23 @@ const UsersManagePage: React.FC = () => {
             const response = await adminApiService.getUsers(params);
 
             if (response.code === 20000) {
-                setUsers(response.data || []);
-                setTotal(response.total || 0);
-                setTotalPages(Math.ceil((response.total || 0) / pageSize));
+                setUsers(Array.isArray(response.data) ? response.data : []);
+                const totalNum = Number(response.total) || 0;
+                setTotal(totalNum);
+                setTotalPages(Math.ceil(totalNum / pageSize));
             } else {
+                // 错误捕获：显示空表格
+                setUsers([]);
+                setTotal(0);
+                setTotalPages(1);
                 showToast(response.msg || '获取用户列表失败', 'error');
             }
         } catch (error) {
             console.error('获取用户列表失败:', error);
+            // 错误捕获：显示空表格
+            setUsers([]);
+            setTotal(0);
+            setTotalPages(1);
             showToast('获取用户列表失败', 'error');
         } finally {
             setLoading(false);
@@ -314,6 +323,7 @@ const UsersManagePage: React.FC = () => {
                         </Select>
                         <div className="flex gap-2">
                             <Button
+                                className="admin-action-btn"
                                 color="primary"
                                 onPress={handleSearch}
                                 startContent={<Search className="w-4 h-4" />}
@@ -338,6 +348,7 @@ const UsersManagePage: React.FC = () => {
                     共 {total} 个用户
                 </div>
                 <Button
+                    className="admin-action-btn"
                     color="primary"
                     startContent={<Plus className="w-4 h-4" />}
                     onPress={onCreateOpen}
@@ -353,10 +364,12 @@ const UsersManagePage: React.FC = () => {
                         aria-label="用户列表"
                         isHeaderSticky
                         classNames={{
-                            wrapper: "max-h-[600px]",
+                            wrapper: "max-h-[600px] overflow-x-auto",
+                            table: "min-w-[1100px]",
                         }}
                     >
                         <TableHeader>
+                            <TableColumn width={100}>ID</TableColumn>
                             <TableColumn>用户信息</TableColumn>
                             <TableColumn>联系方式</TableColumn>
                             <TableColumn>状态</TableColumn>
@@ -371,10 +384,10 @@ const UsersManagePage: React.FC = () => {
                         >
                             {users.map((user) => (
                                 <TableRow key={user.id}>
+                                    <TableCell>{user.id}</TableCell>
                                     <TableCell>
                                         <UserComponent
                                             name={user.username || '未设置'}
-                                            description={`ID: ${user.id}`}
                                             avatarProps={{
                                                 src: "",
                                                 fallback: user.username?.[0]?.toUpperCase() || 'U',
@@ -478,7 +491,7 @@ const UsersManagePage: React.FC = () => {
                         <Button variant="light" onPress={onCreateClose}>
                             取消
                         </Button>
-                        <Button color="primary" onPress={handleCreate}>
+                        <Button className="admin-action-btn" color="primary" onPress={handleCreate}>
                             创建
                         </Button>
                     </ModalFooter>
@@ -502,13 +515,13 @@ const UsersManagePage: React.FC = () => {
                             <Input
                                 label="邮箱"
                                 placeholder="请输入用户邮箱"
-
+                                value={typeof (formData as any).email === 'string' ? (formData as any).email : ''}
                                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                             />
                             <Input
                                 label="用户名"
                                 placeholder="请输入用户名"
-
+                                value={typeof (formData as any).username === 'string' ? (formData as any).username : ''}
                                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                             />
                             <Select
@@ -523,7 +536,7 @@ const UsersManagePage: React.FC = () => {
                             <Textarea
                                 label="备注"
                                 placeholder="请输入备注信息"
-
+                                value={typeof (formData as any).remarks === 'string' ? (formData as any).remarks : ''}
                                 onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
                                 minRows={3}
                             />
@@ -533,7 +546,7 @@ const UsersManagePage: React.FC = () => {
                         <Button variant="light" onPress={onEditClose}>
                             取消
                         </Button>
-                        <Button color="primary" onPress={handleEdit}>
+                        <Button className="admin-action-btn" color="primary" onPress={handleEdit}>
                             保存
                         </Button>
                     </ModalFooter>

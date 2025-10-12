@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     Input,
     Button,
@@ -8,9 +8,15 @@ import {
     Textarea,
     Switch,
     Divider,
-    Accordion,
-    AccordionItem,
     Spinner,
+    Tabs,
+    Tab,
+    Modal,
+    ModalContent,
+    ModalHeader,
+    ModalBody,
+    ModalFooter,
+    useDisclosure,
 } from '@heroui/react';
 import {
     Settings,
@@ -37,6 +43,9 @@ const SettingsManagePage: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [configValues, setConfigValues] = useState<Record<string, string>>({});
+    const [selectedGroup, setSelectedGroup] = useState<string>('');
+    const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onOpenChange: onConfirmOpenChange } = useDisclosure();
+    const [pendingConfig, setPendingConfig] = useState<{ key: string; value: string; description: string } | null>(null);
 
     // 获取系统配置
     const fetchConfigs = useCallback(async () => {
@@ -44,10 +53,11 @@ const SettingsManagePage: React.FC = () => {
         try {
             const response = await adminApiService.getConfigs();
             if (response.code === 20000) {
-                setConfigs(response.data || []);
+                const list: SystemConfig[] = Array.isArray(response.data) ? response.data : [];
+                setConfigs(list);
                 // 初始化配置值
                 const values: Record<string, string> = {};
-                response.data.forEach((config) => {
+                list.forEach((config) => {
                     values[config.key] = config.value;
                 });
                 setConfigValues(values);
@@ -96,12 +106,22 @@ const SettingsManagePage: React.FC = () => {
     const saveAllConfigs = async () => {
         setSaving(true);
         try {
-            const changedConfigs = configs.filter(config =>
+            const scope = selectedGroup ? (groupedConfigs[selectedGroup] || []) : configs;
+            const changedConfigs = scope.filter(config =>
                 configValues[config.key] !== config.value && config.editable
             );
 
             if (changedConfigs.length === 0) {
                 showToast('没有配置需要保存', 'warning');
+                return;
+            }
+
+            // JSON 校验：若存在无效 JSON，阻止保存
+            const invalidJson = changedConfigs.find(c => c.type === 'json' && (() => {
+                try { JSON.parse(configValues[c.key] || ''); return false; } catch { return true; }
+            })());
+            if (invalidJson) {
+                showToast(`配置项 ${invalidJson.description} 的 JSON 格式无效，请修正后再保存`, 'error');
                 return;
             }
 
@@ -131,23 +151,34 @@ const SettingsManagePage: React.FC = () => {
 
     // 重置配置
     const resetConfigs = () => {
-        const values: Record<string, string> = {};
-        configs.forEach((config) => {
+        if (!selectedGroup) return;
+        const values: Record<string, string> = { ...configValues };
+        (groupedConfigs[selectedGroup] || []).forEach((config) => {
             values[config.key] = config.value;
         });
         setConfigValues(values);
-        showToast('配置已重置', 'success');
+        showToast('当前分类配置已重置', 'success');
     };
 
     // 按分组分类配置
-    const groupedConfigs = configs.reduce((groups, config) => {
+    const groupedConfigs = useMemo(() => configs.reduce((groups, config) => {
         const group = config.group || '其他';
         if (!groups[group]) {
             groups[group] = [];
         }
         groups[group].push(config);
         return groups;
-    }, {} as Record<string, SystemConfig[]>);
+    }, {} as Record<string, SystemConfig[]>), [configs]);
+
+    // 分组列表
+    const groupKeys = useMemo(() => Object.keys(groupedConfigs), [groupedConfigs]);
+
+    // 初始化选中的分组
+    useEffect(() => {
+        if (!selectedGroup && groupKeys.length > 0) {
+            setSelectedGroup(groupKeys[0]);
+        }
+    }, [groupKeys, selectedGroup]);
 
     // 分组图标映射
     const getGroupIcon = (group: string) => {
@@ -166,6 +197,15 @@ const SettingsManagePage: React.FC = () => {
     const renderConfigInput = (config: SystemConfig) => {
         const value = configValues[config.key] || '';
         const isChanged = value !== config.value;
+        const isJson = config.type === 'json';
+        const isJsonValid = !isJson ? true : (() => {
+            try {
+                JSON.parse(value || '');
+                return true;
+            } catch {
+                return false;
+            }
+        })();
 
         if (config.type === 'bool') {
             return (
@@ -192,31 +232,45 @@ const SettingsManagePage: React.FC = () => {
                         <div className="text-sm text-gray-500">配置键: {config.key}</div>
                     </div>
                     {config.editable && isChanged && (
-                        <Button
-                            size="sm"
-                            color="primary"
-                            variant="flat"
-                            startContent={<Save className="w-3 h-3" />}
-                            onPress={() => saveConfig(config.key, value)}
-                        >
-                            保存
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                size="sm"
+                                color="primary"
+                                variant="flat"
+                                startContent={<Save className="w-3 h-3" />}
+                                className="admin-action-btn"
+                                isDisabled={!isJsonValid}
+                                onPress={() => {
+                                    if (!isJsonValid) {
+                                        showToast('JSON 格式无效，请检查后再确认', 'warning');
+                                        return;
+                                    }
+                                    setPendingConfig({ key: config.key, value, description: config.description });
+                                    onConfirmOpen();
+                                }}
+                            >
+                                确认
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="light"
+                                onPress={() => {
+                                    // 取消改动，恢复到原始值
+                                    setConfigValues((prev) => ({
+                                        ...prev,
+                                        [config.key]: config.value,
+                                    }));
+                                }}
+                            >
+                                取消
+                            </Button>
+                        </div>
                     )}
                 </div>
 
-                {config.key.includes('PASSWORD') || config.key.includes('KEY') || config.key.includes('SECRET') ? (
-                    <Input
-                        type="password"
-
-                        onChange={(e) => updateConfigValue(config.key, e.target.value)}
-                        isDisabled={!config.editable}
-                        variant={isChanged ? 'bordered' : 'flat'}
-                        color={isChanged ? 'warning' : 'default'}
-                        placeholder={`请输入${config.description}`}
-                    />
-                ) : config.key === 'NOTICE' ? (
+                {config.key === 'NOTICE' ? (
                     <Textarea
-
+                        value={value}
                         onChange={(e) => updateConfigValue(config.key, e.target.value)}
                         isDisabled={!config.editable}
                         variant={isChanged ? 'bordered' : 'flat'}
@@ -224,9 +278,32 @@ const SettingsManagePage: React.FC = () => {
                         placeholder={`请输入${config.description}`}
                         minRows={3}
                     />
+                ) : isJson ? (
+                    <Textarea
+                        value={value}
+                        onChange={(e) => updateConfigValue(config.key, e.target.value)}
+                        isDisabled={!config.editable}
+                        variant="bordered"
+                        className="font-mono"
+                        isInvalid={!isJsonValid}
+                        color={!isJsonValid ? 'danger' : isChanged ? 'warning' : 'default'}
+                        placeholder={`请输入合法的 JSON（${config.description}）`}
+                        minRows={6}
+                    />
+                ) : config.type === 'int' ? (
+                    <Input
+                        type="number"
+                        value={value}
+                        onChange={(e) => updateConfigValue(config.key, e.target.value)}
+                        isDisabled={!config.editable}
+                        variant={isChanged ? 'bordered' : 'flat'}
+                        color={isChanged ? 'warning' : 'default'}
+                        placeholder={`请输入${config.description}`}
+                    />
                 ) : (
                     <Input
-
+                        type="text"
+                        value={value}
                         onChange={(e) => updateConfigValue(config.key, e.target.value)}
                         isDisabled={!config.editable}
                         variant={isChanged ? 'bordered' : 'flat'}
@@ -242,10 +319,12 @@ const SettingsManagePage: React.FC = () => {
         );
     };
 
-    // 检查是否有变更
-    const hasChanges = configs.some(config =>
-        configValues[config.key] !== config.value && config.editable
-    );
+    // 当前分组是否有变更
+    const hasChanges = useMemo(() => {
+        if (!selectedGroup) return false;
+        const currentGroup = groupedConfigs[selectedGroup] || [];
+        return currentGroup.some(config => configValues[config.key] !== config.value && config.editable);
+    }, [groupedConfigs, selectedGroup, configValues]);
 
     if (loading) {
         return (
@@ -273,13 +352,14 @@ const SettingsManagePage: React.FC = () => {
                         重置
                     </Button>
                     <Button
+                        className="admin-action-btn"
                         color="primary"
                         onPress={saveAllConfigs}
                         isLoading={saving}
                         isDisabled={!hasChanges}
                         startContent={<Save className="w-4 h-4" />}
                     >
-                        {hasChanges ? '保存全部' : '无变更'}
+                        {hasChanges ? '保存当前分类' : '无变更'}
                     </Button>
                 </div>
             </div>
@@ -295,32 +375,45 @@ const SettingsManagePage: React.FC = () => {
                 </CardBody>
             </Card>
 
-            {/* 配置列表 */}
-            <div className="space-y-4">
-                <Accordion variant="splitted" defaultExpandedKeys={Object.keys(groupedConfigs)}>
-                    {Object.entries(groupedConfigs).map(([group, groupConfigs]) => (
-                        <AccordionItem
-                            key={group}
-                            aria-label={group}
-                            title={
-                                <div className="flex items-center gap-3">
-                                    {getGroupIcon(group)}
-                                    <span className="font-medium">{group}</span>
-                                    <span className="text-sm text-gray-500">({groupConfigs.length}项)</span>
-                                </div>
-                            }
-                        >
-                            <div className="space-y-4">
-                                {groupConfigs.map((config, index) => (
-                                    <div key={config.key}>
-                                        {renderConfigInput(config)}
-                                        {index < groupConfigs.length - 1 && <Divider className="my-4" />}
+            {/* 二级Tab：配置分组 */}
+            <Card>
+                <CardBody>
+                    <Tabs
+                        aria-label="配置分组"
+                        selectedKey={selectedGroup}
+                        onSelectionChange={(key) => setSelectedGroup(key as string)}
+                        variant="underlined"
+                        classNames={{
+                            tabList: "gap-6 w-full relative rounded-none p-0 border-b border-divider",
+                            cursor: "w-full bg-blue-600",
+                            tab: "max-w-fit px-0 h-12",
+                            tabContent: "group-data-[selected=true]:text-blue-600"
+                        }}
+                    >
+                        {groupKeys.map((group) => (
+                            <Tab
+                                key={group}
+                                title={
+                                    <div className="flex items-center gap-2">
+                                        {getGroupIcon(group)}
+                                        <span>{group}</span>
+                                        <span className="text-sm text-gray-500">({groupedConfigs[group]?.length || 0})</span>
                                     </div>
-                                ))}
-                            </div>
-                        </AccordionItem>
-                    ))}
-                </Accordion>
+                                }
+                            />
+                        ))}
+                    </Tabs>
+                </CardBody>
+            </Card>
+
+            {/* 配置列表：当前分组 */}
+            <div className="space-y-4">
+                {(groupedConfigs[selectedGroup] || []).map((config, index, arr) => (
+                    <div key={config.key}>
+                        {renderConfigInput(config)}
+                        {index < arr.length - 1 && <Divider className="my-4" />}
+                    </div>
+                ))}
             </div>
 
             {/* 操作提示 */}
@@ -330,12 +423,51 @@ const SettingsManagePage: React.FC = () => {
                         <div className="flex items-center gap-2 text-warning-700">
                             <Bell className="w-4 h-4" />
                             <span className="text-sm">
-                                您有未保存的配置更改，请及时保存以避免数据丢失。
+                                当前分类有未保存的配置更改，请及时保存以避免数据丢失。
                             </span>
                         </div>
                     </CardBody>
                 </Card>
             )}
+
+            {/* 确认提交弹窗 */}
+            <Modal isOpen={isConfirmOpen} onOpenChange={onConfirmOpenChange} placement="center">
+                <ModalContent>
+                    {(onClose) => (
+                        <>
+                            <ModalHeader className="flex items-center gap-2">
+                                <Save className="w-4 h-4 text-primary" />
+                                <span>确认提交配置</span>
+                            </ModalHeader>
+                            <ModalBody>
+                                <div className="text-sm text-gray-700 space-y-1">
+                                    <div>即将提交以下配置项：</div>
+                                    <div className="font-medium">{pendingConfig?.description}</div>
+                                    <div className="text-gray-500">键：{pendingConfig?.key}</div>
+                                    <div className="break-all">新值：{pendingConfig?.value}</div>
+                                </div>
+                            </ModalBody>
+                            <ModalFooter>
+                                <Button variant="light" onPress={onClose}>取消</Button>
+                                <Button
+                                    color="primary"
+                                    className="admin-action-btn"
+                                    isLoading={saving}
+                                    onPress={async () => {
+                                        if (pendingConfig) {
+                                            await saveConfig(pendingConfig.key, pendingConfig.value);
+                                        }
+                                        onClose();
+                                        setPendingConfig(null);
+                                    }}
+                                >
+                                    确认提交
+                                </Button>
+                            </ModalFooter>
+                        </>
+                    )}
+                </ModalContent>
+            </Modal>
         </div>
     );
 };
