@@ -36,11 +36,9 @@ function clearCookies() {
 
 // 跳转到登录页面
 function redirectToLogin() {
-
     // 跳转到mainDomain/login?fromurl=currentUrl
     window.location.href = `https://${mainDomain}/login?fromurl=${encodeURIComponent(currentUrl)}`;
 }
-
 
 // 检查登录状态并跳转
 function checkCookiesAndRedirect() {
@@ -83,8 +81,10 @@ function checkCookiesAndRedirect() {
         })
         .then(data => {
             if (data.code === 20000) {
-                // 只有验证成功才更新检查时间
+                // 验证成功，更新检查时间并执行重定向
                 setCookie("lastCheckTime", newCheckTime, 1);
+                // 本页面重定向到指定地址
+                window.location.href = `https://${currentDomain}/service-api/chat/select-car/callback?ticket=${xyUuidToken}&isPlus=1`;
             } else {
                 console.error("用户信息验证失败", data.msg);
                 clearCookies();
@@ -95,38 +95,6 @@ function checkCookiesAndRedirect() {
             console.error("用户信息请求失败", error);
             // 只在确定认证失败时才跳转，网络错误暂时不跳转
             // 可以增加重试逻辑或其他处理
-        });
-    }
-
-    // 如果xyUuidToken存在且当前页面路径在指定的路径列表中，带着所有cookie请求 /client-api/info
-    const validPaths = ['/login', '/home', '/servers'];
-
-    if (xyUuidToken && validPaths.some(path => window.location.pathname.startsWith(path))) {
-        const allCookies = getAllCookies();
-        console.log(allCookies);
-        // 发起带所有cookie的请求
-        fetch(`https://${currentDomain}/client-api/info`, {
-            method: "GET",
-            headers: {
-                "cache-control": "max-age=0",
-                "priority": "u=0, i"
-            },
-            credentials: "include" // 携带cookie
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (!data.user || !data.user.username) {
-                window.location.href = `https://${currentDomain}/client-api/login?code=${xyUuidToken}&redirect=true`;
-            }
-        })
-        .catch(error => {
-            console.error("请求失败", error);
-            // 同样，网络错误不直接跳转
         });
     }
 }
