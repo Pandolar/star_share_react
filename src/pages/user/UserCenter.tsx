@@ -3,6 +3,7 @@
  * 提供用户个人信息管理、订阅套餐、订单记录等功能的统一入口
  */
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardBody, Button } from '@heroui/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -75,6 +76,7 @@ const tabConfigs: TabConfig[] = [
 
 const UserCenter: React.FC = () => {
   const [activeTab, setActiveTab] = useState('subscription');
+  const [searchParams, setSearchParams] = useSearchParams();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
 
@@ -98,6 +100,25 @@ const UserCenter: React.FC = () => {
       window.removeEventListener('authFailure', handleGlobalAuthFailure as EventListener);
     };
   }, [handleAuthFailure]);
+
+  // 根据 URL 查询参数同步激活的 Tab（支持 ?tab=subscription 等）
+  useEffect(() => {
+    const urlTab = searchParams.get('tab');
+    const validKeys = tabConfigs.map(t => t.key);
+    if (urlTab && validKeys.includes(urlTab) && urlTab !== activeTab) {
+      setActiveTab(urlTab);
+    }
+  }, [searchParams, activeTab]);
+
+  // 切换 Tab 并将 tab 写入 URL 查询参数
+  const switchTab = (key: string, isMobile = false) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('tab', key);
+    // push 模式：不传 replace 选项，新增浏览历史记录
+    setSearchParams(params);
+    setActiveTab(key);
+    if (isMobile) setMobileMenuOpen(false);
+  };
 
   // 获取当前激活的Tab组件
   const getCurrentTabComponent = () => {
@@ -128,10 +149,7 @@ const UserCenter: React.FC = () => {
     return (
       <motion.button
         key={tab.key}
-        onClick={() => {
-          setActiveTab(tab.key);
-          if (isMobile) setMobileMenuOpen(false);
-        }}
+        onClick={() => switchTab(tab.key, isMobile)}
         className={`
           w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all duration-200
           ${isActive
@@ -203,7 +221,7 @@ const UserCenter: React.FC = () => {
               return (
                 <button
                   key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
+                  onClick={() => switchTab(tab.key)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-full whitespace-nowrap transition-colors text-sm ${isActive
                     ? 'bg-blue-600 text-white shadow'
                     : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
@@ -219,7 +237,7 @@ const UserCenter: React.FC = () => {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 lg:px-6 py-6">
+      <div className="container max-w-[2700px] mx-auto px-4 lg:px-6 py-6">
         <div className="flex flex-col lg:flex-row gap-6">
           {/* 桌面端侧边导航栏 */}
           <motion.aside
@@ -324,7 +342,7 @@ const UserCenter: React.FC = () => {
             transition={{ duration: 0.3, delay: 0.1 }}
             className="flex-1 min-w-0"
           >
-            <Card className="min-h-[calc(100vh-12rem)]">
+            <Card className="min-h-[calc(min(100vh,1600px)-12rem)]">
               <CardBody className="p-6">
                 <AnimatePresence mode="wait">
                   <motion.div

@@ -161,7 +161,8 @@ async function testNode(node: string): Promise<SpeedTestResult> {
     let success = false;
     try {
         const base = toHttpsUrl(node);
-        const url = `${base.replace(/\/$/, '')}/client-api/info`;
+        // const url = `${base.replace(/\/$/, '')}/client-api/info`;
+        const url = `${base.replace(/\/$/, '')}/ces/v1/projects/oai/settings`;
         const resp = await fetch(url, {
             method: 'GET',
             signal: controller.signal,
@@ -170,16 +171,8 @@ async function testNode(node: string): Promise<SpeedTestResult> {
             }
         });
 
-        if (resp.ok) {
-            try {
-                await resp.clone().json();
-                success = true;
-            } catch (_) {
-                success = false;
-            }
-        } else {
-            success = false;
-        }
+        // ✅ 只要状态码是 200 就算成功
+        success = resp.status === 200;
     } catch (_) {
         success = false;
     } finally {
