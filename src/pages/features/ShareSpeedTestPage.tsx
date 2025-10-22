@@ -94,10 +94,16 @@ const ShareSpeedTestPage: React.FC = () => {
                     hasRedirectedRef.current = true;
                     const fastestIndex = finalResults.findIndex(r => r.node === fastest.node);
                     setStatusText(`正在跳转至最优节点（节点${fastestIndex + 1}）...`);
-                    // 直接跳转到该节点域名（保留 https 前缀）；
-                    const url = toHttpsUrl(fastest.node);
-                    window.location.replace(url);
+                
+                    // 构造目标跳转 URL: /login?fromurl=https://<node>/home
+                    const nodeUrl = toHttpsUrl(fastest.node); // 确保有 https://
+                    const fromUrl = `${nodeUrl}/home`; // 拼接 /home 路径
+                    const encodedFromUrl = encodeURIComponent(fromUrl); // 安全编码
+                    const redirectUrl = `/login?fromurl=${encodedFromUrl}`;
+                
+                    window.location.replace(redirectUrl);
                 }
+
             } catch (err: any) {
                 setErrorText(err?.message || '测速过程发生错误');
                 setStatusText('无法完成测速');
@@ -192,5 +198,3 @@ const Spinner: React.FC = () => (
 );
 
 export default ShareSpeedTestPage;
-
-
