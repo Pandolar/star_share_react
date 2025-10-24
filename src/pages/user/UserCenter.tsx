@@ -13,6 +13,7 @@ import {
   FileText,
   Menu,
   X,
+  LogOut,
 } from 'lucide-react';
 
 // Tab页面组件导入
@@ -257,9 +258,10 @@ const UserCenter: React.FC = () => {
                 <div className="my-6 border-t border-gray-200"></div>
 
                 {/* 退出登录按钮 */}
-                {/* <motion.button
+                <motion.button
                   onClick={() => setLogoutModalOpen(true)}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all duration-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all duration-200 
+                            text-red-400 hover:bg-red-50 hover:text-red-500" // 关键修改：将600→400（正常文本）、700→500（ hover文本），背景色保持浅红不变
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.98 }}
                 >
@@ -267,7 +269,7 @@ const UserCenter: React.FC = () => {
                     <LogOut size={20} />
                   </span>
                   <span className="flex-1 font-medium">退出登录</span>
-                </motion.button> */}
+                </motion.button>
               </CardBody>
             </Card>
           </motion.aside>
@@ -316,7 +318,7 @@ const UserCenter: React.FC = () => {
                   {/* <div className="my-6 border-t border-gray-200"></div> */}
 
                   {/* 退出登录按钮 */}
-                  {/* <motion.button
+                  <motion.button
                     onClick={() => {
                       setLogoutModalOpen(true);
                       setMobileMenuOpen(false);
@@ -329,7 +331,7 @@ const UserCenter: React.FC = () => {
                       <LogOut size={20} />
                     </span>
                     <span className="flex-1 font-medium">退出登录</span>
-                  </motion.button> */}
+                  </motion.button>
                 </nav>
               </motion.aside>
             )}

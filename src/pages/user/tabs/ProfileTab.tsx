@@ -577,10 +577,10 @@ export const ProfileTab: React.FC = () => {
                         <Calendar size={16} />
                         <span>到期时间：{userInfo.user_active_packages.expiry_date}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-default-600">
+                      {/* <div className="flex items-center gap-2 text-default-600">
                         <Shield size={16} />
                         <span>优先级：{userInfo.user_active_packages.priority}</span>
-                      </div>
+                      </div> */}
                     </div>
                   </div>
                 </div>

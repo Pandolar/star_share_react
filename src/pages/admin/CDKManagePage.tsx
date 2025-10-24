@@ -71,7 +71,7 @@ const CDKManagePage: React.FC = () => {
     const { isOpen: isViewOpen, onOpen: onViewOpen, onClose: onViewClose } = useDisclosure();
     const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
 
-    const pageSize = 10;
+    const [pageSize, setPageSize] = useState<number>(10);
 
   // 状态选项
   const statusOptions = [
@@ -134,7 +134,7 @@ const CDKManagePage: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [currentPage, searchQuery, statusFilter]);
+    }, [currentPage, searchQuery, statusFilter, pageSize]);
 
     // 初始化
     useEffect(() => {
@@ -470,7 +470,7 @@ const CDKManagePage: React.FC = () => {
                             emptyContent="暂无CDK数据"
                         >
                             {cdks.map((cdk) => (
-                                <TableRow key={cdk.id}>
+                                <TableRow key={cdk.id} onDoubleClick={() => openEditModal(cdk)}>
                                     <TableCell>{cdk.id}</TableCell>
                                     <TableCell>
                                         <div className="space-y-1">
@@ -523,8 +523,23 @@ const CDKManagePage: React.FC = () => {
             </Card>
 
             {/* 分页 */}
-            {totalPages > 1 && (
-                <div className="flex justify-center">
+            {totalPages > 0 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <span>每页</span>
+                        <Select
+                            aria-label="每页数量"
+                            value={String(pageSize)}
+                            onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                            className="w-28"
+                        >
+                            <SelectItem key="10">10</SelectItem>
+                            <SelectItem key="30">30</SelectItem>
+                            <SelectItem key="100">100</SelectItem>
+                            <SelectItem key="1000">1000</SelectItem>
+                        </Select>
+                        <span>条，共 {total} 条</span>
+                    </div>
                     <Pagination
                         total={totalPages}
                         page={currentPage}

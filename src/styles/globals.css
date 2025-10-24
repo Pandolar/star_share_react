@@ -347,3 +347,11 @@ button:focus,
 .admin-action-btn svg {
   color: #ffffff !important;
 }
+
+/* 允许表格内文本选择与拖动复制（覆盖组件默认的禁选中行为） */
+table, table *,
+[role="grid"], [role="grid"] *,
+.heroui-table, .heroui-table * {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}

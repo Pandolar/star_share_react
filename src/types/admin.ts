@@ -231,3 +231,77 @@ export interface PaginatedData<T> {
     current_page: number;
     page_size: number;
 } 
+
+// 仪表盘数据类型
+export interface DashboardUsers {
+    total: number;
+    active: number;
+    disabled: number;
+    with_inviter: number;
+    new_today: number;
+    new_yesterday: number;
+    new_7d: number;
+    new_30d: number;
+    first_paid_users_today: number;
+    first_paid_users_7d: number;
+    timeseries_7d_hourly: Array<{ ts: string; count: number }>;
+    timeseries_30d_daily: Array<{ date: string; count: number }>;
+}
+
+export interface DashboardOrders {
+    total: number;
+    pending: number;
+    paid: number;
+    failed: number;
+    paid_today: number;
+    paid_yesterday: number;
+    paid_7d: number;
+    paid_30d: number;
+    by_hour_7d: Array<{ ts: string; count: number }>;
+    by_day_30d: Array<{ date: string; count: number }>;
+}
+
+export interface DashboardRevenue {
+    total: number;
+    today: number;
+    yesterday: number;
+    last_7d: number;
+    last_30d: number;
+    by_hour_7d: Array<{ ts: string; amount: number }>;
+    by_day_30d: Array<{ date: string; amount: number }>;
+    paid_user_count: number;
+    arpu: number;
+    arppu: number;
+    conversion_rate: number; // 0 ~ 1
+}
+
+export interface DashboardPackages {
+    active_count: number;
+    frozen_count: number;
+    expired_count: number;
+    ways: { purchase?: number; exchange?: number; other?: number };
+    active_users_distinct: number;
+    top_by_sales: Array<{ package_id: number; package_name: string; count: number }>;
+    top_by_revenue: Array<{ package_id: number; package_name: string; amount: number }>;
+}
+
+export interface DashboardCDK {
+    unused: number;
+    used: number;
+    disabled: number;
+    used_today: number;
+    used_7d: number;
+}
+
+export interface DashboardMeta {
+    generated_at: string; // ISO Asia/Shanghai
+}
+
+export interface DashboardData {
+    users: DashboardUsers;
+    orders: DashboardOrders;
+    revenue: DashboardRevenue;
+    packages: DashboardPackages;
+    cdk: DashboardCDK;
+    meta: DashboardMeta;
+}

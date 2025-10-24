@@ -360,6 +360,16 @@ class AdminApiService {
         const response = await this.api.delete('/star/order', { data: { id } });
         return response.data;
     }
+
+    // ==================== 仪表盘 ====================
+
+    /**
+     * 获取仪表盘汇总数据
+     */
+    async getDashboard(): Promise<AdminApiResponse<import('../types/admin').DashboardData>> {
+        const response = await this.api.get('/star/dashboard');
+        return response.data;
+    }
 }
 
 // 创建单例实例
@@ -390,4 +400,5 @@ export const {
     getOrders,
     updateOrder,
     deleteOrder,
+    getDashboard,
 } = adminApiService; 

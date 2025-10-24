@@ -13,7 +13,7 @@ import {
     DropdownMenu,
     DropdownItem,
     Chip,
-    User as UserComponent,
+    // User as UserComponent,
     Pagination,
     Modal,
     ModalContent,
@@ -69,7 +69,7 @@ const UsersManagePage: React.FC = () => {
     const { isOpen: isViewOpen, onOpen: onViewOpen, onClose: onViewClose } = useDisclosure();
     const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
 
-    const pageSize = 10;
+    const [pageSize, setPageSize] = useState<number>(10);
 
     // 状态选项
     const statusOptions = [
@@ -119,7 +119,7 @@ const UsersManagePage: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [currentPage, searchQuery, statusFilter]);
+    }, [currentPage, searchQuery, statusFilter, pageSize]);
 
     // 初始化和依赖更新
     useEffect(() => {
@@ -383,17 +383,12 @@ const UsersManagePage: React.FC = () => {
                             emptyContent="暂无用户数据"
                         >
                             {users.map((user) => (
-                                <TableRow key={user.id}>
+                                <TableRow key={user.id} onDoubleClick={() => openEditModal(user)}>
                                     <TableCell>{user.id}</TableCell>
                                     <TableCell>
-                                        <UserComponent
-                                            name={user.username || '未设置'}
-                                            avatarProps={{
-                                                src: "",
-                                                fallback: user.username?.[0]?.toUpperCase() || 'U',
-                                                className: "bg-blue-100 text-blue-600",
-                                            }}
-                                        />
+                                        <div className="space-y-1">
+                                            <div className="font-medium">{user.username || '未设置'}</div>
+                                        </div>
                                     </TableCell>
                                     <TableCell>
                                         <div className="space-y-1">
@@ -421,8 +416,23 @@ const UsersManagePage: React.FC = () => {
             </Card>
 
             {/* 分页 */}
-            {totalPages > 1 && (
-                <div className="flex justify-center">
+            {totalPages > 0 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <span>每页</span>
+                        <Select
+                            aria-label="每页数量"
+                            value={String(pageSize)}
+                            onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                            className="w-28"
+                        >
+                            <SelectItem key="10">10</SelectItem>
+                            <SelectItem key="30">30</SelectItem>
+                            <SelectItem key="100">100</SelectItem>
+                            <SelectItem key="1000">1000</SelectItem>
+                        </Select>
+                        <span>条，共 {total} 条</span>
+                    </div>
                     <Pagination
                         total={totalPages}
                         page={currentPage}
