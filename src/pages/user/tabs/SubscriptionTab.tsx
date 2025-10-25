@@ -1044,8 +1044,25 @@ export const SubscriptionTab: React.FC = () => {
                             <p className="text-primary font-medium">支付完成后，请点击下方按钮确认</p>
                           </div>
 
-                          {/* 移动端支付确认按钮 */}
+                          {/* 移动端支付按钮：手动跳转 + 确认/取消 */}
                           <div className="flex gap-3 justify-center">
+                            {orderInfo?.payment_url && (
+                              <Button
+                                color="primary"
+                                variant="solid"
+                                onPress={() => {
+                                  try {
+                                    // 使用同页跳转，避免移动端拦截新窗口
+                                    window.location.href = orderInfo.payment_url as string;
+                                  } catch (e) {
+                                    alert('无法打开支付页面，请稍后重试');
+                                  }
+                                }}
+                                className="min-w-24"
+                              >
+                                立刻支付
+                              </Button>
+                            )}
                             <Button
                               color="success"
                               variant="flat"

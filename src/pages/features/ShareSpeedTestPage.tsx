@@ -17,6 +17,7 @@ const ShareSpeedTestPage: React.FC = () => {
     const [results, setResults] = useState<SpeedTestResult[]>([]);
     const [nodes, setNodes] = useState<string[]>([]);
     const hasRedirectedRef = useRef<boolean>(false);
+    const autoTimerRef = useRef<number | null>(null);
 
     const seoConfig = useMemo(() => ({
         title: '请稍后...',
@@ -80,29 +81,52 @@ const ShareSpeedTestPage: React.FC = () => {
 
                 setProgressText(`共 ${fetchedNodes.length} 个节点，成功 ${finalResults.filter(v => v.success).length} 个`);
 
-                const fastest = finalResults
-                    .filter(r => r.success)
-                    .sort((a, b) => a.durationMs - b.durationMs)[0];
+                // 仅保留成功节点
+                const successful = finalResults.filter(r => r.success);
 
-                if (!fastest) {
+                if (successful.length === 0) {
                     setErrorText('没有可用的节点');
                     setStatusText('无法完成测速');
                     return;
                 }
-
-                if (!hasRedirectedRef.current) {
-                    hasRedirectedRef.current = true;
-                    const fastestIndex = finalResults.findIndex(r => r.node === fastest.node);
-                    setStatusText(`正在跳转至最优节点（节点${fastestIndex + 1}）...`);
-                
-                    // 构造目标跳转 URL: /login?fromurl=https://<node>/home
-                    const nodeUrl = toHttpsUrl(fastest.node); // 确保有 https://
-                    const fromUrl = `${nodeUrl}/home`; // 拼接 /home 路径
-                    const encodedFromUrl = encodeURIComponent(fromUrl); // 安全编码
-                    const redirectUrl = `/login?fromurl=${encodedFromUrl}`;
-                
-                    window.location.replace(redirectUrl);
+                // 只有一个可用节点：直接跳转
+                if (successful.length === 1) {
+                    if (!hasRedirectedRef.current) {
+                        hasRedirectedRef.current = true;
+                        const onlyIndex = finalResults.findIndex(r => r.node === successful[0].node);
+                        setStatusText(`正在跳转至可用节点（节点${onlyIndex + 1}）...`);
+                        const nodeUrl = toHttpsUrl(successful[0].node);
+                        const fromUrl = `${nodeUrl}/home`;
+                        const encodedFromUrl = encodeURIComponent(fromUrl);
+                        const redirectUrl = `/login?fromurl=${encodedFromUrl}`;
+                        window.location.replace(redirectUrl);
+                    }
+                    return;
                 }
+
+                // 计算平均延迟（成功节点）
+                const avg = successful.reduce((sum, r) => sum + r.durationMs, 0) / successful.length;
+                // 过滤掉高于平均值 20% 的节点
+                const threshold = avg * 1.2;
+                const candidates = successful.filter(r => r.durationMs <= threshold);
+
+                // 候选至少有一个（数学上必然 >=1），但做个兜底
+                const pool = candidates.length > 0 ? candidates : successful;
+
+                // 展示完成提示，并在 2 秒后自动跳转（若期间用户未手动点击）
+                setStatusText('测速完成，2秒后自动跳转至优选节点…');
+
+                autoTimerRef.current = window.setTimeout(() => {
+                    if (hasRedirectedRef.current) return;
+                    const pick = pool[Math.floor(Math.random() * pool.length)];
+                    const pickIndex = finalResults.findIndex(r => r.node === pick.node);
+                    setStatusText(`正在跳转至优选节点（节点${pickIndex + 1}）...`);
+                    const nodeUrl = toHttpsUrl(pick.node);
+                    const fromUrl = `${nodeUrl}/home`;
+                    const encodedFromUrl = encodeURIComponent(fromUrl);
+                    const redirectUrl = `/login?fromurl=${encodedFromUrl}`;
+                    window.location.replace(redirectUrl);
+                }, 2000);
 
             } catch (err: any) {
                 setErrorText(err?.message || '测速过程发生错误');
@@ -111,7 +135,11 @@ const ShareSpeedTestPage: React.FC = () => {
         };
 
         fetchNodesAndTest();
-        // 不需要清理；若用户离开页面，导航会中止
+        return () => {
+            if (autoTimerRef.current) {
+                clearTimeout(autoTimerRef.current);
+            }
+        };
     }, []);
 
     return (
@@ -136,13 +164,36 @@ const ShareSpeedTestPage: React.FC = () => {
                                         <div className="text-left">
                                             <div className="text-sm font-medium text-gray-900 truncate">{`节点${i + 1}`}</div>
                                         </div>
-                                        <div className="text-xs tabular-nums text-gray-700">
-                                            {r.status === 'pending' ? '测试中…' : `${(r.durationMs / 1000).toFixed(3)} 秒`}
+                                        <div className="flex items-center gap-2">
+                                            <div className="text-xs tabular-nums text-gray-700 min-w-[88px] text-right">
+                                                {r.status === 'pending' ? '测试中…' : (r.success ? `${(r.durationMs / 1000).toFixed(3)} 秒` : '超时')}
+                                            </div>
+                                            <button
+                                                className="px-2 py-1 text-xs rounded border border-gray-200 hover:bg-gray-50 text-blue-600 disabled:text-gray-400 disabled:border-gray-100"
+                                                onClick={() => {
+                                                    if (hasRedirectedRef.current) return;
+                                                    // 用户手动点击则立即跳转并取消自动跳转
+                                                    hasRedirectedRef.current = true;
+                                                    if (autoTimerRef.current) {
+                                                        clearTimeout(autoTimerRef.current);
+                                                        autoTimerRef.current = null;
+                                                    }
+                                                    setStatusText(`正在跳转至节点（节点${i + 1}）...`);
+                                                    const nodeUrl = toHttpsUrl(r.node);
+                                                    const fromUrl = `${nodeUrl}/home`;
+                                                    const encodedFromUrl = encodeURIComponent(fromUrl);
+                                                    const redirectUrl = `/login?fromurl=${encodedFromUrl}`;
+                                                    window.location.replace(redirectUrl);
+                                                }}
+                                                aria-label={`直达节点${i + 1}`}
+                                            >
+                                                直达
+                                            </button>
                                         </div>
                                     </li>
                                 ))}
                             </ul>
-                            <p className="mt-3 text-xs text-gray-500">完成后将自动跳转至最快可用节点</p>
+                            <p className="mt-3 text-xs text-gray-500">即将自动跳转至优选节点</p>
                         </div>
                     )}
                 </div>
