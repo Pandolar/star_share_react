@@ -98,8 +98,8 @@ const ShareSpeedTestPage: React.FC = () => {
                         const nodeUrl = toHttpsUrl(successful[0].node);
                         const fromUrl = `${nodeUrl}/home`;
                         const encodedFromUrl = encodeURIComponent(fromUrl);
-                        const redirectUrl = `/login?fromurl=${encodedFromUrl}`;
-                        window.location.replace(redirectUrl);
+                        //const redirectUrl = `/login?fromurl=${encodedFromUrl}`;
+                        window.location.replace(fromUrl);
                     }
                     return;
                 }
