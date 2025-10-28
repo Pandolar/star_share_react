@@ -3,7 +3,7 @@
  * 提供用户个人信息管理、订阅套餐、订单记录等功能的统一入口
  */
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardBody, Button } from '@heroui/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   LogOut,
+  Home,
 } from 'lucide-react';
 
 // Tab页面组件导入
@@ -24,7 +25,7 @@ import { OrderHistoryTab } from './tabs/OrderHistoryTab';
 
 // 组件和工具导入
 import { LogoutConfirmModal } from '../../components/LogoutConfirmModal';
-import { logout } from '../../utils/cookieUtils';
+import { clearAuthCookies } from '../../utils/cookies';
 import { useAuthCheck } from '../../hooks/useAuthCheck';
 
 // Tab配置接口
@@ -80,6 +81,7 @@ const UserCenter: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
+  const navigate = useNavigate();
 
   // 使用认证检查Hook
   const { isAuthenticated, isChecking, countdown, handleAuthFailure } = useAuthCheck({
@@ -129,17 +131,26 @@ const UserCenter: React.FC = () => {
     return <Component />;
   };
 
-  // 处理退出登录
+  // 处理退出登录（本地快速清理并跳转到测速页）
   const handleLogout = async () => {
     try {
-      await logout();
-    } catch (error) {
-      // 如果logout失败，只清理本地数据，不强制跳转
-      // 让用户手动刷新页面或重新导航
+      // 清除本地存储与认证Cookie
       localStorage.clear();
       sessionStorage.clear();
-      // 注释掉强制跳转，避免覆盖casdoor的logout URL
-      // window.location.href = '/';
+      clearAuthCookies();
+
+      // 立即导航到测速页，避免等待远端注销导致卡住
+      navigate('/sharespeedtest', { replace: true });
+
+      // 兜底：若单页导航失败，强制跳转
+      setTimeout(() => {
+        if (window.location.pathname !== '/sharespeedtest') {
+          window.location.href = '/sharespeedtest';
+        }
+      }, 100);
+    } catch (error) {
+      // 出现异常也确保跳转离开当前页
+      navigate('/sharespeedtest', { replace: true });
     }
   };
 
@@ -257,6 +268,19 @@ const UserCenter: React.FC = () => {
                 {/* 分隔线 */}
                 <div className="my-6 border-t border-gray-200"></div>
 
+                {/* 返回首页 */}
+                <motion.button
+                  onClick={() => navigate('/sharespeedtest')}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all duration-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                  whileHover={{ x: 4 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <span className="flex-shrink-0">
+                    <Home size={20} />
+                  </span>
+                  <span className="flex-1 font-medium">返回首页</span>
+                </motion.button>
+
                 {/* 退出登录按钮 */}
                 <motion.button
                   onClick={() => setLogoutModalOpen(true)}
@@ -316,6 +340,22 @@ const UserCenter: React.FC = () => {
 
                   {/* 分隔线 */}
                   {/* <div className="my-6 border-t border-gray-200"></div> */}
+
+                  {/* 返回首页 */}
+                  <motion.button
+                    onClick={() => {
+                      navigate('/sharespeedtest');
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all duration-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                    whileHover={{ x: 4 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <span className="flex-shrink-0">
+                      <Home size={20} />
+                    </span>
+                    <span className="flex-1 font-medium">返回首页</span>
+                  </motion.button>
 
                   {/* 退出登录按钮 */}
                   <motion.button
