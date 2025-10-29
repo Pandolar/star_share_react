@@ -6,6 +6,7 @@ import UserCenter from './pages/user/UserCenter';
 import { ToastContainer } from './components/Toast';
 import GoPlusPage from './pages/features/GoPlusPage';
 import ShareSpeedTestPage from './pages/features/ShareSpeedTestPage';
+import JumpNsPage from './pages/features/JumpNsPage';
 import RedirectPage from './pages/features/RedirectPage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
@@ -57,6 +58,7 @@ const App: React.FC = () => {
               <Route path="/handle_callback" element={<RedirectPage />} />
               <Route path="/goplus" element={<GoPlusPage />} />
               <Route path="/sharespeedtest" element={<ShareSpeedTestPage />} />
+              <Route path="/jumpns" element={<JumpNsPage />} />
               <Route path="/new-api" element={<NewApiPage />} />
 
               {/* Admin管理后台路由 */}

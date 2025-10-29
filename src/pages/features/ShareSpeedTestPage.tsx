@@ -85,8 +85,19 @@ const ShareSpeedTestPage: React.FC = () => {
                 const successful = finalResults.filter(r => r.success);
 
                 if (successful.length === 0) {
+                    // 全部失败或超时：随机打开一个节点（新窗口）
                     setErrorText('没有可用的节点');
-                    setStatusText('无法完成测速');
+                    setStatusText('无法完成测速，随机尝试打开一个节点...');
+
+                    if (!hasRedirectedRef.current && fetchedNodes.length > 0) {
+                        hasRedirectedRef.current = true;
+                        const randIndex = Math.floor(Math.random() * fetchedNodes.length);
+                        const randNode = fetchedNodes[randIndex];
+                        const nodeUrl = toHttpsUrl(randNode);
+                        const fromUrl = `${nodeUrl}/home`;
+                        // 新窗口打开，避免当前页被卡住
+                        window.open(fromUrl, '_blank', 'noopener,noreferrer');
+                    }
                     return;
                 }
                 // 只有一个可用节点：直接跳转
