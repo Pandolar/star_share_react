@@ -975,7 +975,7 @@ export const ProfileTab: React.FC = () => {
                   使用手机微信扫描二维码
                 </p>
                 <p className="text-xs text-gray-400">
-                  扫码后即可完成绑定
+                  注意：如果被绑定的微信号之前注册过本平台，绑定后，之前微信注册的账号将无法登录！
                 </p>
               </div>
             </div>

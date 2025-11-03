@@ -25,7 +25,7 @@ import { OrderHistoryTab } from './tabs/OrderHistoryTab';
 
 // 组件和工具导入
 import { LogoutConfirmModal } from '../../components/LogoutConfirmModal';
-import { clearAuthCookies } from '../../utils/cookies';
+import { clearAuthCookies, getCookie } from '../../utils/cookies';
 import { useAuthCheck } from '../../hooks/useAuthCheck';
 
 // Tab配置接口
@@ -131,15 +131,46 @@ const UserCenter: React.FC = () => {
     return <Component />;
   };
 
-  // 处理退出登录（本地快速清理并跳转到测速页）
+  // 处理退出登录：先调用后端接口，再清理本地状态并跳转
   const handleLogout = async () => {
-    try {
-      // 清除本地存储与认证Cookie
-      localStorage.clear();
-      sessionStorage.clear();
-      clearAuthCookies();
+    // 准备鉴权参数（从cookie中读取）
+    const xuserid = getCookie('xuserid') || '';
+    const xtoken = getCookie('xtoken') || '';
+    const xyUuidToken = getCookie('xy_uuid_token') || '';
 
-      // 立即导航到测速页，避免等待远端注销导致卡住
+    const headers: Record<string, string> = {};
+    if (xuserid) headers['xuserid'] = xuserid;
+    if (xtoken) headers['xtoken'] = xtoken;
+    if (xyUuidToken) headers['xy_uuid_token'] = xyUuidToken;
+
+    // 调用后端登出接口（GET /u/logout），若非200则重试一次
+    const callLogoutOnce = async (): Promise<number | null> => {
+      try {
+        const resp = await fetch('/u/logout', {
+          method: 'GET',
+          headers,
+          credentials: 'include',
+        });
+        return resp.status;
+      } catch (e) {
+        return null;
+      }
+    };
+
+    try {
+      const status1 = await callLogoutOnce();
+      if (status1 !== 200) {
+        await callLogoutOnce(); // 最多重试一次
+      }
+    } finally {
+      // 无论接口是否成功，都进行清理和后续逻辑
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+        clearAuthCookies();
+      } catch {}
+
+      // 导航到测速页
       navigate('/sharespeedtest', { replace: true });
 
       // 兜底：若单页导航失败，强制跳转
@@ -148,9 +179,6 @@ const UserCenter: React.FC = () => {
           window.location.href = '/sharespeedtest';
         }
       }, 100);
-    } catch (error) {
-      // 出现异常也确保跳转离开当前页
-      navigate('/sharespeedtest', { replace: true });
     }
   };
 

@@ -86,8 +86,7 @@ const ShareSpeedTestPage: React.FC = () => {
 
                 if (successful.length === 0) {
                     // 全部失败或超时：随机打开一个节点（新窗口）
-                    setErrorText('没有可用的节点');
-                    setStatusText('无法完成测速，随机尝试打开一个节点...');
+                    setErrorText('正在随机尝试打开一个节点...');
 
                     if (!hasRedirectedRef.current && fetchedNodes.length > 0) {
                         hasRedirectedRef.current = true;
@@ -177,7 +176,7 @@ const ShareSpeedTestPage: React.FC = () => {
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <div className="text-xs tabular-nums text-gray-700 min-w-[88px] text-right">
-                                                {r.status === 'pending' ? '测试中…' : (r.success ? `${(r.durationMs / 1000).toFixed(3)} 秒` : '超时')}
+                                                {r.status === 'pending' ? '测试中…' : (r.success ? `${(r.durationMs / 1000).toFixed(3)} 秒` : 'timeout')}
                                             </div>
                                             <button
                                                 className="px-2 py-1 text-xs rounded border border-gray-200 hover:bg-gray-50 text-blue-600 disabled:text-gray-400 disabled:border-gray-100"
@@ -229,7 +228,8 @@ async function testNode(node: string): Promise<SpeedTestResult> {
     let success = false;
     try {
         const base = toHttpsUrl(node);
-        const url = `${base.replace(/\/$/, '')}/ces/v1/projects/oai/settings`;
+        //const url = `${base.replace(/\/$/, '')}/ces/v1/projects/oai/settings`;
+        const url = `${base.replace(/\/$/, '')}/starping`;
         const resp = await fetch(url, {
             method: 'GET',
             signal: controller.signal,
