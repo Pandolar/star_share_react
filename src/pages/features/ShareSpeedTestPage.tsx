@@ -228,8 +228,8 @@ async function testNode(node: string): Promise<SpeedTestResult> {
     let success = false;
     try {
         const base = toHttpsUrl(node);
-        //const url = `${base.replace(/\/$/, '')}/ces/v1/projects/oai/settings`;
-        const url = `${base.replace(/\/$/, '')}/starping`;
+        const url = `${base.replace(/\/$/, '')}/ces/v1/projects/oai/settings`;
+        //const url = `${base.replace(/\/$/, '')}/starping`;
         const resp = await fetch(url, {
             method: 'GET',
             signal: controller.signal,
