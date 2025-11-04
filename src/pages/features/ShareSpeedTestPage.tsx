@@ -79,7 +79,7 @@ const ShareSpeedTestPage: React.FC = () => {
                         status: success ? 'success' : 'fail'
                     }));
 
-                setProgressText(`共 ${fetchedNodes.length} 个节点，成功 ${finalResults.filter(v => v.success).length} 个`);
+                //setProgressText(`共 ${fetchedNodes.length} 个节点，成功 ${finalResults.filter(v => v.success).length} 个`);
 
                 // 仅保留成功节点
                 const successful = finalResults.filter(r => r.success);
@@ -93,9 +93,9 @@ const ShareSpeedTestPage: React.FC = () => {
                         const randIndex = Math.floor(Math.random() * fetchedNodes.length);
                         const randNode = fetchedNodes[randIndex];
                         const nodeUrl = toHttpsUrl(randNode);
-                        const fromUrl = `${nodeUrl}/home`;
-                        // 新窗口打开，避免当前页被卡住
-                        window.open(fromUrl, '_blank', 'noopener,noreferrer');
+                        const fromUrl = `${nodeUrl}/`;
+                        // 当前页面打开
+                        window.location.replace(fromUrl);
                     }
                     return;
                 }
@@ -176,7 +176,7 @@ const ShareSpeedTestPage: React.FC = () => {
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <div className="text-xs tabular-nums text-gray-700 min-w-[88px] text-right">
-                                                {r.status === 'pending' ? '测试中…' : (r.success ? `${(r.durationMs / 1000).toFixed(3)} 秒` : 'timeout')}
+                                                {r.status === 'pending' ? '测试中…' : (r.success ? `${(r.durationMs / 1000).toFixed(3)} 秒` : 'wait')}
                                             </div>
                                             <button
                                                 className="px-2 py-1 text-xs rounded border border-gray-200 hover:bg-gray-50 text-blue-600 disabled:text-gray-400 disabled:border-gray-100"
