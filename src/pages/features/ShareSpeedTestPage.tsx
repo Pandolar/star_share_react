@@ -188,12 +188,10 @@ const ShareSpeedTestPage: React.FC = () => {
                                                         clearTimeout(autoTimerRef.current);
                                                         autoTimerRef.current = null;
                                                     }
-                                                    setStatusText(`正在跳转至节点（节点${i + 1}）...`);
+                                                setStatusText(`正在跳转至节点（节点${i + 1}）...`);
                                                     const nodeUrl = toHttpsUrl(r.node);
                                                     const fromUrl = `${nodeUrl}/home`;
-                                                    const encodedFromUrl = encodeURIComponent(fromUrl);
-                                                    const redirectUrl = `/login?fromurl=${encodedFromUrl}`;
-                                                    window.location.replace(redirectUrl);
+                                                    window.location.replace(fromUrl);
                                                 }}
                                                 aria-label={`直达节点${i + 1}`}
                                             >
@@ -228,7 +226,8 @@ async function testNode(node: string): Promise<SpeedTestResult> {
     let success = false;
     try {
         const base = toHttpsUrl(node);
-        const url = `${base.replace(/\/$/, '')}/ces/v1/projects/oai/settings`;
+        const url = `${base.replace(/\/$/, '')}/u/ping`;
+        //const url = `${base.replace(/\/$/, '')}/ces/v1/projects/oai/settings`;
         //const url = `${base.replace(/\/$/, '')}/starping`;
         const resp = await fetch(url, {
             method: 'GET',

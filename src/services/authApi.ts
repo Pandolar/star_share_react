@@ -27,6 +27,8 @@ export interface WechatLoginStatusResponse {
   xuserid?: string;           // 老用户直接登录
   xtoken?: string;            // 老用户直接登录  
   xy_uuid_token?: string;     // 老用户直接登录
+  // 绑定模式下，后端可能返回是否已注册用于提示
+  registered?: boolean;
 }
 
 // 微信绑定请求数据结构
@@ -133,9 +135,9 @@ export const resetPassword = (email: string, email_code: string, password: strin
 /**
  * 获取微信登录二维码
  */
-export const getWechatQRCode = (): Promise<WechatQRResponse> => {
+export const getWechatQRCode = (mode: 'login' | 'bind' = 'login'): Promise<WechatQRResponse> => {
   // 类型断言：告诉TypeScript，拦截器处理后的返回值是Promise<WechatQRResponse>
-  return authApi.get('/wechat_login_qr') as unknown as Promise<WechatQRResponse>;
+  return authApi.get('/wechat_login_qr', { params: { mode } }) as unknown as Promise<WechatQRResponse>;
 };
 
 /**

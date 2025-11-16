@@ -52,6 +52,8 @@ export const ProfileTab: React.FC = () => {
   const [wechatQrStatus, setWechatQrStatus] = useState<'loading' | 'active' | 'expired' | 'scanned' | 'registered'>('loading');
   const [wechatBinding, setWechatBinding] = useState(false);
   const [showWechatQr, setShowWechatQr] = useState(false);
+  const [showRegisteredConfirm, setShowRegisteredConfirm] = useState(false);
+  const [pendingWechatToken, setPendingWechatToken] = useState('');
 
   // 轮询引用
   const wechatPollingRef = useRef<NodeJS.Timeout | null>(null);
@@ -172,7 +174,7 @@ export const ProfileTab: React.FC = () => {
     }
 
     try {
-      const data = await getWechatQRCode();
+      const data = await getWechatQRCode('bind');
       setWechatQrUrl(data.qr_code_url);
       setWechatTicket(data.ticket);
       setWechatQrStatus('active');
@@ -221,8 +223,15 @@ export const ProfileTab: React.FC = () => {
             wechatTimeoutRef.current = null;
           }
 
-          // 进行微信绑定
-          await handleWechatBind(statusData.wechat_temp_token);
+          // 绑定模式：若该微信已注册过，先弹二次确认
+          if (statusData.registered) {
+            console.log('[微信绑定] 该微信已注册，弹出确认框');
+            setPendingWechatToken(statusData.wechat_temp_token);
+            setShowRegisteredConfirm(true);
+          } else {
+            // 进行微信绑定
+            await handleWechatBind(statusData.wechat_temp_token);
+          }
         } else if (statusData?.xtoken && statusData?.xuserid && !statusData?.wechat_temp_token) {
           // 微信已注册，无法绑定
           console.log('[微信绑定] 检测到已注册微信，xtoken:', statusData.xtoken, 'xuserid:', statusData.xuserid);
@@ -911,7 +920,7 @@ export const ProfileTab: React.FC = () => {
                         </svg>
                       </div>
                       <p className="text-sm text-green-600">扫码成功</p>
-                      <p className="text-xs text-green-500">正在绑定中...</p>
+                      <p className="text-xs text-green-500">{showRegisteredConfirm ? '等待确认...' : '正在绑定中...'}</p>
                     </div>
                   </div>
                 ) : wechatQrStatus === 'registered' ? (
@@ -1005,6 +1014,72 @@ export const ProfileTab: React.FC = () => {
               }}
             >
               取消
+            </button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* 已注册微信二次确认弹窗 */}
+      <Modal
+        isOpen={showRegisteredConfirm}
+        onClose={() => setShowRegisteredConfirm(false)}
+        placement="center"
+        size="md"
+      >
+        <ModalContent>
+          <ModalHeader className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <AlertCircle size={20} className="text-warning" />
+              <span>确认绑定已注册微信</span>
+            </div>
+          </ModalHeader>
+          <ModalBody>
+            <div className="space-y-2 text-sm text-default-700">
+              <p>检测到该微信号已在本平台注册并绑定过其他账户。</p>
+              <p className="text-warning-600">继续绑定后：</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>该微信将与当前登录的邮箱账户绑定。</li>
+                <li>之前绑定该微信的账户将无法再使用微信登录。</li>
+              </ul>
+              <p>请确认是否继续操作。</p>
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <button
+              onClick={() => setShowRegisteredConfirm(false)}
+              style={{
+                backgroundColor: '#ffffff',
+                color: '#404040',
+                border: '1px solid #d4d4d8',
+                borderRadius: '6px',
+                padding: '8px 16px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer'
+              }}
+            >
+              取消
+            </button>
+            <button
+              onClick={async () => {
+                const token = pendingWechatToken;
+                setShowRegisteredConfirm(false);
+                if (token) {
+                  await handleWechatBind(token);
+                }
+              }}
+              style={{
+                backgroundColor: '#b45309',
+                color: '#ffffff',
+                border: '1px solid #b45309',
+                borderRadius: '6px',
+                padding: '8px 16px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer'
+              }}
+            >
+              继续绑定
             </button>
           </ModalFooter>
         </ModalContent>

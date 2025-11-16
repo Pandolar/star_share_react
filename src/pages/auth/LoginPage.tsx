@@ -53,7 +53,7 @@ const LoginPage: React.FC = () => {
     }
 
     try {
-      const data = await getWechatQRCode();
+      const data = await getWechatQRCode('login');
       setQrCodeUrl(data.qr_code_url);
       setTicket(data.ticket);
       setQrStatus('active');
