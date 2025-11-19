@@ -209,6 +209,21 @@ const UsersManagePage: React.FC = () => {
         }
     };
 
+    // 清除用户限速
+    const handleClearLimit = async (user: User) => {
+        try {
+            const response = await adminApiService.clearUserLimit(user.id);
+            if (response.code === 20000) {
+                showToast('已清除该用户的限速', 'success');
+            } else {
+                showToast(response.msg || '清除限速失败', 'error');
+            }
+        } catch (error) {
+            console.error('清除限速失败:', error);
+            showToast('清除限速失败', 'error');
+        }
+    };
+
     // 打开编辑Modal
     const openEditModal = (user: User) => {
         setSelectedUser(user);
@@ -263,6 +278,13 @@ const UsersManagePage: React.FC = () => {
                     onPress={() => openViewModal(user)}
                 >
                     查看详情
+                </DropdownItem>
+                <DropdownItem
+                    key="clear-limit"
+                    startContent={<RefreshCw className="w-4 h-4" />}
+                    onPress={() => handleClearLimit(user)}
+                >
+                    清除限速
                 </DropdownItem>
                 <DropdownItem
                     key="edit"

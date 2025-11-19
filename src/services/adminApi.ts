@@ -270,6 +270,14 @@ class AdminApiService {
         return response.data;
     }
 
+    /**
+     * 清除用户限速
+     */
+    async clearUserLimit(userId: number): Promise<AdminApiResponse> {
+        const response = await this.api.get(`/star/clear_user_limit?user_id=${userId}`);
+        return response.data;
+    }
+
     // ==================== 用户套餐记录 ====================
 
     /**
@@ -390,6 +398,7 @@ export const {
     getUsers,
     updateUser,
     deleteUser,
+    clearUserLimit,
     getUserPackages,
     getCDKs,
     createCDKs,
