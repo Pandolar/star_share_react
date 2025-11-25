@@ -157,17 +157,20 @@ export const checkWechatLoginStatus = (ticket: string): Promise<WechatLoginStatu
       if (data && (data.wechat_temp_token || (data.xuserid && data.xtoken && data.xy_uuid_token))) {
         // 成功获取到登录数据：新用户(wechat_temp_token) 或 老用户(xuserid+xtoken+xy_uuid_token)
         return data;
-      } else {
-        // code 20000 但没有有效登录数据，说明用户还没扫码，返回null继续轮询
-        return null;
       }
-    } else if (code === 20001) {
-      // 二维码过期，抛出特定错误
-      throw new Error(msg || '二维码已过期');
-    } else {
-      // 其他错误
-      throw new Error(msg || '未知错误');
+      // 未扫码，继续轮询
+      return null;
     }
+    // 兼容后端可能返回的错误文案
+    if (code === 20001) {
+      if (typeof msg === 'string' && (msg.includes('无数据') || msg.includes('尚未扫码'))) {
+        return null; // 不视为异常，继续轮询
+      }
+      // 二维码过期（或其他致命错误）
+      throw new Error(msg || '二维码已过期');
+    }
+    // 其他错误
+    throw new Error(msg || '未知错误');
   });
 };
 

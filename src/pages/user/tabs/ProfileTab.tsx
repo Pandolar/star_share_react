@@ -7,8 +7,8 @@ import { Card, CardBody, Avatar, Chip, Spinner, Modal, ModalContent, ModalHeader
 import { motion } from 'framer-motion';
 import { User, Mail, Calendar, Shield, AlertCircle, Package, Crown, Edit3, Send, Eye, EyeOff, MessageCircle } from 'lucide-react';
 import { userInfoApi } from '../../../services/userApi';
-import { getWechatQRCode, checkWechatLoginStatus } from '../../../services/authApi';
-import { getCookie } from '../../../utils/cookies';
+import { getWechatQRCode, checkWechatLoginStatus, sendEmailCode as sendAuthEmailCode, resetPassword } from '../../../services/authApi';
+import { getCookie, setAuthCookies } from '../../../utils/cookies';
 
 interface UserInfo {
   username: string;
@@ -33,7 +33,7 @@ export const ProfileTab: React.FC = () => {
 
   // 编辑弹窗状态
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'username' | 'email'>('username');
+  const [activeTab, setActiveTab] = useState<'username' | 'email' | 'password'>('username');
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string>('');
 
@@ -45,6 +45,24 @@ export const ProfileTab: React.FC = () => {
   const [emailCodeSending, setEmailCodeSending] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [showEmailCode, setShowEmailCode] = useState(false);
+  // 首次绑定邮箱时设置密码
+  const [bindPassword, setBindPassword] = useState('');
+  const [showBindPassword, setShowBindPassword] = useState(false);
+
+  // 修改密码Tab
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // 密码重置验证码相关
+  const [pwdEmailCode, setPwdEmailCode] = useState('');
+  const [pwdCodeSent, setPwdCodeSent] = useState(false);
+  const [pwdCodeSending, setPwdCodeSending] = useState(false);
+  const [pwdCountdown, setPwdCountdown] = useState(0);
+  const [showPwdEmailCode, setShowPwdEmailCode] = useState(false);
 
   // 微信绑定相关状态
   const [wechatQrUrl, setWechatQrUrl] = useState('');
@@ -101,8 +119,17 @@ export const ProfileTab: React.FC = () => {
     return () => clearTimeout(timer);
   }, [countdown]);
 
+  // 密码验证码倒计时
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (pwdCountdown > 0) {
+      timer = setTimeout(() => setPwdCountdown(pwdCountdown - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [pwdCountdown]);
+
   // 打开编辑弹窗
-  const openEditModal = (type?: 'username' | 'email') => {
+  const openEditModal = (type?: 'username' | 'email' | 'password') => {
     if (type) {
       setActiveTab(type);
     }
@@ -112,6 +139,16 @@ export const ProfileTab: React.FC = () => {
     setCountdown(0);
     setNewUsername(userInfo?.username || '');
     setNewEmail(userInfo?.email || '');
+    setBindPassword('');
+    setOldPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    // 重置密码验证码相关
+    setPwdEmailCode('');
+    setPwdCodeSent(false);
+    setPwdCodeSending(false);
+    setPwdCountdown(0);
+    setShowPwdEmailCode(false);
     setIsEditModalOpen(true);
   };
 
@@ -124,6 +161,15 @@ export const ProfileTab: React.FC = () => {
     setEmailCode('');
     setEmailCodeSent(false);
     setCountdown(0);
+    setBindPassword('');
+    setOldPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPwdEmailCode('');
+    setPwdCodeSent(false);
+    setPwdCodeSending(false);
+    setPwdCountdown(0);
+    setShowPwdEmailCode(false);
   };
 
   // 发送邮箱验证码
@@ -159,6 +205,25 @@ export const ProfileTab: React.FC = () => {
     }
   };
 
+  // 发送重置密码的邮箱验证码（当前绑定邮箱）
+  const sendPwdResetCode = async () => {
+    if (!userInfo?.email || userInfo.email.endsWith('@default.com')) {
+      setEditError('请先绑定非默认邮箱再重置密码');
+      return;
+    }
+    setPwdCodeSending(true);
+    setEditError('');
+    try {
+      await sendAuthEmailCode(userInfo.email, 'back_password');
+      setPwdCodeSent(true);
+      setPwdCountdown(60);
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : '发送验证码失败');
+    } finally {
+      setPwdCodeSending(false);
+    }
+  };
+
   // 获取微信二维码
   const fetchWechatQR = async () => {
     setWechatQrStatus('loading');
@@ -175,6 +240,7 @@ export const ProfileTab: React.FC = () => {
 
     try {
       const data = await getWechatQRCode('bind');
+      console.log('[微信绑定] 二维码生成成功:', data);
       setWechatQrUrl(data.qr_code_url);
       setWechatTicket(data.ticket);
       setWechatQrStatus('active');
@@ -189,7 +255,7 @@ export const ProfileTab: React.FC = () => {
         }
       }, 2 * 60 * 1000);
     } catch (error) {
-      console.error('获取微信二维码失败:', error);
+      console.error('[微信绑定] 获取微信二维码失败:', error);
       setWechatQrStatus('expired');
       setEditError('获取微信二维码失败，请重试');
     }
@@ -284,7 +350,7 @@ export const ProfileTab: React.FC = () => {
         xuserid: parseInt(xuserid),
         xtoken: xtoken
       });
-
+      console.log('[微信绑定] 绑定接口响应:', response);
       if (response.code === 20000) {
         // 绑定成功，更新用户信息
         await fetchUserInfo();
@@ -294,6 +360,7 @@ export const ProfileTab: React.FC = () => {
         setEditError(response.msg || '微信绑定失败');
       }
     } catch (err) {
+      console.error('[微信绑定] 绑定失败:', err);
       setEditError(err instanceof Error ? err.message : '微信绑定失败');
     } finally {
       setWechatBinding(false);
@@ -304,6 +371,7 @@ export const ProfileTab: React.FC = () => {
   const startWechatBind = () => {
     setShowWechatQr(true);
     setEditError('');
+    console.log('[微信绑定] 开始绑定流程，准备请求二维码');
     fetchWechatQR();
   };
 
@@ -334,7 +402,7 @@ export const ProfileTab: React.FC = () => {
         } else {
           setEditError(response.msg || '修改用户名失败');
         }
-      } else {
+      } else if (activeTab === 'email') {
         // 修改邮箱
         if (!userInfo?.email.endsWith('@default.com')) {
           setEditError('当前邮箱不是@default.com结尾，无法修改');
@@ -351,11 +419,21 @@ export const ProfileTab: React.FC = () => {
           return;
         }
 
-        const response = await userInfoApi.changeUserInfo({
+        // 如果设置了密码，校验长度
+        if (bindPassword && bindPassword.trim().length < 8) {
+          setEditError('密码至少8位');
+          return;
+        }
+
+        const payload: any = {
           change_type: 'email',
           email: newEmail.trim(),
           email_code: emailCode.trim()
-        });
+        };
+        if (bindPassword && bindPassword.trim()) {
+          payload.password = btoa(bindPassword.trim());
+        }
+        const response = await userInfoApi.changeUserInfo(payload);
 
         if (response.code === 20000) {
           // 更新本地用户信息
@@ -365,6 +443,39 @@ export const ProfileTab: React.FC = () => {
           closeEditModal();
         } else {
           setEditError(response.msg || '修改邮箱失败');
+        }
+      } else if (activeTab === 'password') {
+        // 通过邮箱验证码重置密码
+        if (!userInfo?.email || userInfo.email.endsWith('@default.com')) {
+          setEditError('请先绑定非默认邮箱再重置密码');
+          return;
+        }
+        if (!pwdEmailCode.trim() || !newPassword.trim() || !confirmPassword.trim()) {
+          setEditError('请填写完整');
+          return;
+        }
+        if (newPassword.trim().length < 8) {
+          setEditError('新密码至少8位');
+          return;
+        }
+        if (newPassword !== confirmPassword) {
+          setEditError('两次输入的新密码不一致');
+          return;
+        }
+        try {
+          const ret: any = await resetPassword(userInfo.email, pwdEmailCode.trim(), newPassword.trim());
+          // resetPassword 在后端会生成新的xtoken，若返回则更新cookie
+          if (ret && ret.xtoken && ret.xuserid) {
+            setAuthCookies({ xuserid: String(ret.xuserid), xtoken: String(ret.xtoken) });
+          }
+          // 清空输入
+          setPwdEmailCode('');
+          setNewPassword('');
+          setConfirmPassword('');
+          setEditError('');
+          closeEditModal();
+        } catch (e) {
+          // 错误已被拦截器提示
         }
       }
     } catch (err) {
@@ -496,6 +607,27 @@ export const ProfileTab: React.FC = () => {
                   >
                     <Edit3 size={12} />
                     修改资料
+                  </button>
+                  <button
+                    onClick={() => openEditModal('password')}
+                    style={{
+                      backgroundColor: '#ffffff',
+                      color: '#006FEE',
+                      border: '1px solid #006FEE',
+                      borderRadius: '8px',
+                      padding: '4px 8px',
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      cursor: 'pointer',
+                      minHeight: '24px',
+                      marginTop: '6px'
+                    }}
+                  >
+                    <Shield size={12} />
+                    修改密码
                   </button>
                 </div>
 
@@ -655,7 +787,7 @@ export const ProfileTab: React.FC = () => {
             <Tabs
               selectedKey={activeTab}
               onSelectionChange={(key) => {
-                setActiveTab(key as 'username' | 'email');
+                setActiveTab(key as 'username' | 'email' | 'password');
                 setEditError('');
                 setEmailCodeSent(false);
                 setEmailCode('');
@@ -794,6 +926,137 @@ export const ProfileTab: React.FC = () => {
                       </p>
                     </div>
                   )}
+
+                  {/* 首次绑定邮箱时，同步设置密码 */}
+                  {userInfo?.email && userInfo.email.endsWith('@default.com') && (
+                    <div>
+                      <label className="block text-sm font-medium text-default-700 mb-2">
+                        设置登录密码（可选，至少8位）
+                      </label>
+                      <Input
+                        value={bindPassword}
+                        onChange={(e) => setBindPassword(e.target.value)}
+                        placeholder="请输入新密码"
+                        variant="bordered"
+                        type={showBindPassword ? 'text' : 'password'}
+                        endContent={
+                          <button className="focus:outline-none" type="button" onClick={() => setShowBindPassword(!showBindPassword)}>
+                            {showBindPassword ? (
+                              <EyeOff size={16} className="text-default-400" />
+                            ) : (
+                              <Eye size={16} className="text-default-400" />
+                            )}
+                          </button>
+                        }
+                      />
+                      <p className="text-xs text-default-400 mt-1">建议同时设置密码，便于邮箱+密码登录</p>
+                    </div>
+                  )}
+                </div>
+              </Tab>
+
+              <Tab
+                key="password"
+                title={
+                  <div className="flex items-center space-x-2">
+                    <Shield size={16} />
+                    <span>密码</span>
+                  </div>
+                }
+              >
+                <div className="space-y-4 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-default-700 mb-2">当前邮箱</label>
+                    <Input value={userInfo?.email || ''} isReadOnly variant="flat" className="bg-default-100" />
+                    {userInfo?.email && userInfo.email.endsWith('@default.com') && (
+                      <p className="text-xs text-warning mt-1">请先在“邮箱”页绑定真实邮箱后再重置密码</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-default-700 mb-2">邮箱验证码 <span className="text-danger">*</span></label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={pwdEmailCode}
+                        onChange={(e) => setPwdEmailCode(e.target.value)}
+                        placeholder="请输入验证码"
+                        variant="bordered"
+                        type={showPwdEmailCode ? 'text' : 'password'}
+                        isInvalid={!!editError && !pwdEmailCode.trim()}
+                        className="flex-1"
+                        endContent={
+                          <button className="focus:outline-none" type="button" onClick={() => setShowPwdEmailCode(!showPwdEmailCode)}>
+                            {showPwdEmailCode ? (
+                              <EyeOff size={16} className="text-default-400" />
+                            ) : (
+                              <Eye size={16} className="text-default-400" />
+                            )}
+                          </button>
+                        }
+                        maxLength={6}
+                      />
+                      <button
+                        onClick={sendPwdResetCode}
+                        disabled={pwdCodeSending || pwdCountdown > 0 || !userInfo?.email || userInfo.email.endsWith('@default.com')}
+                        style={{
+                          backgroundColor: pwdCodeSending || pwdCountdown > 0 || !userInfo?.email || userInfo.email.endsWith('@default.com') ? '#d1d5db' : '#006FEE',
+                          color: '#ffffff',
+                          border: '1px solid #006FEE',
+                          borderRadius: '6px',
+                          padding: '8px 12px',
+                          fontSize: '12px',
+                          fontWeight: '500',
+                          cursor: pwdCodeSending || pwdCountdown > 0 || !userInfo?.email || userInfo.email.endsWith('@default.com') ? 'not-allowed' : 'pointer',
+                          minWidth: '80px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        {!pwdCodeSending && <Send size={14} />}
+                        {pwdCountdown > 0 ? `${pwdCountdown}s` : '发送验证码'}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-default-700 mb-2">新密码 <span className="text-danger">*</span></label>
+                    <Input
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="请输入新密码，至少8位"
+                      variant="bordered"
+                      type={showNewPassword ? 'text' : 'password'}
+                      endContent={
+                        <button className="focus:outline-none" type="button" onClick={() => setShowNewPassword(!showNewPassword)}>
+                          {showNewPassword ? (
+                            <EyeOff size={16} className="text-default-400" />
+                          ) : (
+                            <Eye size={16} className="text-default-400" />
+                          )}
+                        </button>
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-default-700 mb-2">确认新密码 <span className="text-danger">*</span></label>
+                    <Input
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="请再次输入新密码"
+                      variant="bordered"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      endContent={
+                        <button className="focus:outline-none" type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
+                          {showConfirmPassword ? (
+                            <EyeOff size={16} className="text-default-400" />
+                          ) : (
+                            <Eye size={16} className="text-default-400" />
+                          )}
+                        </button>
+                      }
+                    />
+                  </div>
+                  <p className="text-xs text-default-400">密码重置将通过邮箱验证码完成，发送至当前绑定邮箱</p>
                 </div>
               </Tab>
             </Tabs>
@@ -830,13 +1093,19 @@ export const ProfileTab: React.FC = () => {
               disabled={editLoading || (
                 activeTab === 'username'
                   ? !newUsername.trim()
-                  : (!newEmail.trim() || !emailCode.trim() || Boolean(userInfo?.email && !userInfo.email.endsWith('@default.com')))
+                  : activeTab === 'email'
+                    ? (!newEmail.trim() || !emailCode.trim() || Boolean(userInfo?.email && !userInfo.email.endsWith('@default.com')) || (bindPassword.trim().length > 0 && bindPassword.trim().length < 8))
+                    : (
+                      !userInfo?.email || userInfo.email.endsWith('@default.com') || !pwdEmailCode.trim() || !newPassword.trim() || !confirmPassword.trim() || newPassword !== confirmPassword || newPassword.length < 8
+                    )
               )}
               style={{
                 backgroundColor: editLoading || (
                   activeTab === 'username'
                     ? !newUsername.trim()
-                    : (!newEmail.trim() || !emailCode.trim() || Boolean(userInfo?.email && !userInfo.email.endsWith('@default.com')))
+                    : activeTab === 'email'
+                      ? (!newEmail.trim() || !emailCode.trim() || Boolean(userInfo?.email && !userInfo.email.endsWith('@default.com')) || (bindPassword.trim().length > 0 && bindPassword.trim().length < 8))
+                      : (!userInfo?.email || userInfo.email.endsWith('@default.com') || !pwdEmailCode.trim() || !newPassword.trim() || !confirmPassword.trim() || newPassword !== confirmPassword || newPassword.length < 8)
                 ) ? '#d1d5db' : '#006FEE',
                 color: '#ffffff',
                 border: '1px solid #006FEE',
@@ -847,7 +1116,9 @@ export const ProfileTab: React.FC = () => {
                 cursor: editLoading || (
                   activeTab === 'username'
                     ? !newUsername.trim()
-                    : (!newEmail.trim() || !emailCode.trim() || Boolean(userInfo?.email && !userInfo.email.endsWith('@default.com')))
+                    : activeTab === 'email'
+                      ? (!newEmail.trim() || !emailCode.trim() || Boolean(userInfo?.email && !userInfo.email.endsWith('@default.com')) || (bindPassword.trim().length > 0 && bindPassword.trim().length < 8))
+                      : (!userInfo?.email || userInfo.email.endsWith('@default.com') || !pwdEmailCode.trim() || !newPassword.trim() || !confirmPassword.trim() || newPassword !== confirmPassword || newPassword.length < 8)
                 ) ? 'not-allowed' : 'pointer'
               }}
             >
@@ -886,6 +1157,14 @@ export const ProfileTab: React.FC = () => {
               <p className="text-sm text-default-600">
                 使用微信扫描下方二维码完成绑定
               </p>
+              {editError && (
+                <div className="p-2 bg-danger/10 border border-danger/20 rounded text-left">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle size={14} className="text-danger flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-danger">{editError}</p>
+                  </div>
+                </div>
+              )}
 
               <div className="flex justify-center">
                 {wechatQrStatus === 'loading' ? (

@@ -196,10 +196,13 @@ export const userInfoApi = {
 
     // 修改用户信息
     changeUserInfo: async (params: {
-        change_type: 'username' | 'email';
+        change_type: 'username' | 'email' | 'password';
         username?: string;
         email?: string;
         email_code?: string;
+        // 为 change_type='password' 增加字段
+        old_password?: string; // base64 编码
+        password?: string;     // base64 编码（新密码）
     }): Promise<ApiResponse<any>> => {
         return createUserRequest(getUserApiUrl('/u/change_user_info'), {
             method: 'POST',
