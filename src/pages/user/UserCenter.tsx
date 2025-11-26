@@ -298,7 +298,7 @@ const UserCenter: React.FC = () => {
 
                 {/* 返回首页 */}
                 <motion.button
-                  onClick={() => navigate('/sharespeedtest')}
+                  onClick={() => navigate('/')}
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all duration-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.98 }}
