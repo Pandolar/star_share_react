@@ -5,6 +5,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { showMessage } from '../utils/toast';
+import { getCookie } from '../utils/cookies';
 
 interface AuthCheckOptions {
     // 是否在组件挂载时立即检查
@@ -29,19 +30,10 @@ export const useAuthCheck = (options: AuthCheckOptions = {}) => {
 
     // 检查cookie中的认证信息
     const checkCookieAuth = useCallback((): boolean => {
-        const xuserid = document.cookie
-            .split('; ')
-            .find(row => row.startsWith('xuserid='))
-            ?.split('=')[1];
-        const xy_uuid_token = document.cookie
-            .split('; ')
-            .find(row => row.startsWith('xy_uuid_token='))
-            ?.split('=')[1];
-        const xtoken = document.cookie
-            .split('; ')
-            .find(row => row.startsWith('xtoken='))
-            ?.split('=')[1];
-
+        // 统一用工具函数读取；当 Cookie 以 Host-Only 形式写入时，只会在当前域名可见
+        const xuserid = getCookie('xuserid');
+        const xy_uuid_token = getCookie('xy_uuid_token');
+        const xtoken = getCookie('xtoken');
         return !!(xuserid && xtoken && xy_uuid_token);
     }, []);
 

@@ -1,4 +1,5 @@
 import config from '../config';
+import { getCookie } from '../utils/cookies';
 
 // 请求响应类型定义
 interface ApiResponse<T = any> {
@@ -13,15 +14,7 @@ interface RequestConfig extends RequestInit {
     timeout?: number;
 }
 
-// 从cookies中获取指定名称的值
-const getCookie = (name: string): string | null => {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) {
-        return parts.pop()?.split(';').shift() || null;
-    }
-    return null;
-};
+// 统一使用 utils/cookies 中的实现（支持解码，且与域名策略一致）
 
 // 获取用户认证信息
 const getUserAuthHeaders = (): { [key: string]: string } => {
