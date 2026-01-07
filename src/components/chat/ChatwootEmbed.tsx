@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { CHATWOOT_BASE_URL, CHATWOOT_WEBSITE_TOKEN } from '../../config/chatwoot';
 import { getChatwootGuestSignature, getChatwootUserSignature } from '../../services/chatwootApi';
 import { getCookie } from '../../utils/cookies';
+import { chatwootRequestManager } from '../../utils/chatwootRequestManager';
 
 const GUEST_STORAGE_KEY = 'chatwoot_guest_identifier';
 const SIGNATURE_CACHE_PREFIX = 'chatwoot_signature_cache_';
@@ -125,84 +126,97 @@ export const ChatwootEmbed: React.FC<ChatwootEmbedProps> = ({ mode = 'auto', hei
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [isRateLimited, setIsRateLimited] = useState(false);
+  const [rateLimitInfo, setRateLimitInfo] = useState<string>('');
 
-  // 使用 ref 追踪请求状态，避免重复请求
-  const isLoadingRef = useRef(false);
-  const lastRequestTimeRef = useRef(0);
+  // 组件挂载标记，防止重复初始化
+  const isMountedRef = useRef(false);
+  const componentIdRef = useRef(`chatwoot-${Math.random().toString(36).substr(2, 9)}`);
 
   const desiredMode = useMemo(() => {
     const effectiveMode = mode === 'auto' ? (isLoggedIn() ? 'user' : 'guest') : mode;
-    log('Chatwoot 模式:', { requested: mode, effective: effectiveMode });
+    log('Chatwoot 模式:', { requested: mode, effective: effectiveMode, componentId: componentIdRef.current });
     return effectiveMode;
   }, [mode]);
 
   useEffect(() => {
+    // 防止重复挂载
+    if (isMountedRef.current) {
+      log('组件已挂载，跳过重复初始化', componentIdRef.current);
+      return;
+    }
+    isMountedRef.current = true;
+
     let isCancelled = false;
-    const MIN_REQUEST_INTERVAL = 2000; // 最小请求间隔 2 秒
 
     const loadSignature = async () => {
-      // 防止重复请求
-      if (isLoadingRef.current) {
-        log('已有请求正在进行中，跳过');
-        return;
-      }
-
-      // 请求节流：距离上次请求不足 2 秒则跳过
-      const timeSinceLastRequest = Date.now() - lastRequestTimeRef.current;
-      if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
-        log('请求过于频繁，跳过', { timeSinceLastRequest });
-        return;
-      }
-
-      isLoadingRef.current = true;
-      lastRequestTimeRef.current = Date.now();
-
       setErrorMessage('');
       setIsRateLimited(false);
-      setIframeUrl(null);
+      setRateLimitInfo('');
 
-      log('开始加载签名...', { mode: desiredMode });
+      log('开始加载签名...', { mode: desiredMode, componentId: componentIdRef.current });
 
       try {
         let signature: { identifier: string; identifier_hash: string };
         let cacheKey: string;
+        let requestKey: string; // 全局请求管理器的 key
 
         if (desiredMode === 'user') {
-          cacheKey = `${SIGNATURE_CACHE_PREFIX}user_${getCookie('xuserid')}`;
+          const xuserid = getCookie('xuserid');
+          cacheKey = `${SIGNATURE_CACHE_PREFIX}user_${xuserid}`;
+          requestKey = `user_signature_${xuserid}`;
 
           // 先尝试从缓存获取
           const cached = getCachedSignature(cacheKey);
           if (cached) {
             signature = cached;
-            log('使用用户签名缓存');
+            log('使用用户签名缓存', componentIdRef.current);
           } else {
-            log('请求用户签名...');
-            signature = await getChatwootUserSignature();
+            log('通过全局管理器请求用户签名...', componentIdRef.current);
+            // 使用全局请求管理器，防止并发
+            signature = await chatwootRequestManager.executeRequest(
+              requestKey,
+              () => getChatwootUserSignature()
+            );
             log('用户签名获取成功:', { identifier: signature.identifier.substring(0, 20) + '...' });
             setCachedSignature(cacheKey, signature);
           }
         } else {
           const guestIdentifier = getGuestIdentifier();
           cacheKey = `${SIGNATURE_CACHE_PREFIX}guest_${guestIdentifier}`;
+          requestKey = `guest_signature_${guestIdentifier}`;
 
           // 先尝试从缓存获取
           const cached = getCachedSignature(cacheKey);
           if (cached) {
             signature = cached;
-            log('使用游客签名缓存');
+            log('使用游客签名缓存', componentIdRef.current);
           } else {
-            log('请求游客签名...', { identifier: guestIdentifier });
-            signature = await getChatwootGuestSignature(guestIdentifier);
+            log('通过全局管理器请求游客签名...', componentIdRef.current);
+            // 使用全局请求管理器，防止并发
+            signature = await chatwootRequestManager.executeRequest(
+              requestKey,
+              () => getChatwootGuestSignature(guestIdentifier)
+            );
             log('游客签名获取成功:', { identifier: signature.identifier.substring(0, 20) + '...' });
             setCachedSignature(cacheKey, signature);
           }
         }
 
         if (!isCancelled) {
-          setIframeUrl(buildWidgetUrl(signature.identifier, signature.identifier_hash));
+          const url = buildWidgetUrl(signature.identifier, signature.identifier_hash);
+          setIframeUrl(url);
+
+          // 输出诊断信息
+          log('✅ Chatwoot 组件初始化完成', {
+            componentId: componentIdRef.current,
+            mode: desiredMode,
+            identifier: signature.identifier.substring(0, 30) + '...',
+            cacheKey,
+            managerStats: chatwootRequestManager.getStats(),
+          });
         }
       } catch (error: any) {
-        logError('加载签名失败:', error);
+        logError('加载签名失败:', error, componentIdRef.current);
         if (!isCancelled) {
           // 检查是否是 429 错误
           const is429 = error?.message?.includes('429') ||
@@ -211,15 +225,22 @@ export const ChatwootEmbed: React.FC<ChatwootEmbedProps> = ({ mode = 'auto', hei
 
           if (is429) {
             setIsRateLimited(true);
-            setErrorMessage('请求过于频繁，请稍后再试（建议等待 1-2 分钟）');
-            logError('触发限流保护 (429)');
+            const identifier = desiredMode === 'user'
+              ? getCookie('xy_uuid_token')?.substring(0, 30)
+              : getGuestIdentifier().substring(0, 30);
+
+            setRateLimitInfo(`当前标识: ${identifier}...`);
+            setErrorMessage('Chatwoot 服务器限流保护已触发');
+            logError('⚠️ 触发 Chatwoot 限流 (429)', {
+              identifier,
+              mode: desiredMode,
+              suggestion: '这个标识可能在之前的测试中被限流，建议：\n1. 等待 5-10 分钟\n2. 如果是用户模式，可尝试切换到游客模式\n3. 清除 sessionStorage 和 localStorage'
+            });
           } else {
             const errorMsg = error instanceof Error ? error.message : '客服加载失败，请稍后再试';
             setErrorMessage(errorMsg);
           }
         }
-      } finally {
-        isLoadingRef.current = false;
       }
     };
 
@@ -227,41 +248,109 @@ export const ChatwootEmbed: React.FC<ChatwootEmbedProps> = ({ mode = 'auto', hei
 
     return () => {
       isCancelled = true;
+      isMountedRef.current = false;
     };
-  }, [desiredMode]); // 只依赖 desiredMode，避免不必要的重新加载
+  }, [desiredMode]);
 
   const handleManualRetry = () => {
-    log('手动重试...');
+    log('手动重试...清除缓存并重新加载', componentIdRef.current);
+
+    // 清除缓存
+    try {
+      sessionStorage.clear();
+      localStorage.removeItem(GUEST_STORAGE_KEY);
+      log('✅ 缓存已清除');
+    } catch (err) {
+      logError('清除缓存失败:', err);
+    }
+
+    // 重置状态
     setErrorMessage('');
     setIsRateLimited(false);
+    setRateLimitInfo('');
     setIframeUrl(null);
-    // 重置请求时间，允许立即重试
-    lastRequestTimeRef.current = 0;
-    isLoadingRef.current = false;
-    // 强制重新加载（通过改变 key）
+    isMountedRef.current = false;
+
+    // 刷新页面
     window.location.reload();
+  };
+
+  const handleSwitchToGuest = () => {
+    log('切换到游客模式...');
+    window.location.href = '/customer-service';
   };
 
   if (errorMessage) {
     return (
-      <div className="w-full rounded-lg border border-dashed border-red-200 bg-red-50 p-6 text-center">
-        <p className="text-sm text-red-600 mb-3">{errorMessage}</p>
+      <div className="w-full rounded-lg border border-dashed border-red-200 bg-red-50 p-6">
+        <div className="text-center mb-4">
+          <p className="text-sm text-red-600 font-semibold mb-2">{errorMessage}</p>
+          {rateLimitInfo && (
+            <p className="text-xs text-gray-600 bg-white px-3 py-2 rounded inline-block">
+              {rateLimitInfo}
+            </p>
+          )}
+        </div>
+
         {isRateLimited && (
-          <div className="text-xs text-gray-600 mb-4 bg-yellow-50 p-3 rounded border border-yellow-200">
-            <p className="font-semibold mb-2">限流保护触发原因：</p>
-            <ul className="text-left space-y-1">
-              <li>• 短时间内请求次数过多</li>
-              <li>• 建议等待 1-2 分钟后重试</li>
-              <li>• 避免频繁刷新页面</li>
+          <div className="text-xs text-gray-700 mb-4 bg-yellow-50 p-4 rounded border border-yellow-200">
+            <p className="font-semibold mb-3 text-yellow-800">⚠️ 429 限流保护触发 - 诊断信息：</p>
+            <ul className="text-left space-y-2 mb-3">
+              <li className="flex items-start">
+                <span className="mr-2">•</span>
+                <span><strong>原因：</strong>这个标识（identifier）在短时间内请求 Chatwoot 次数过多</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">•</span>
+                <span><strong>持续时间：</strong>Chatwoot 限流通常持续 5-15 分钟</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">•</span>
+                <span><strong>当前模式：</strong>{desiredMode === 'user' ? '用户模式（使用 xy_uuid_token）' : '游客模式（使用 guest_xxx）'}</span>
+              </li>
             </ul>
+
+            <div className="bg-blue-50 p-3 rounded border border-blue-200">
+              <p className="font-semibold text-blue-800 mb-2">💡 解决方案：</p>
+              <ol className="text-left space-y-2 list-decimal list-inside">
+                <li><strong>等待 10 分钟</strong>后刷新页面（推荐）</li>
+                {desiredMode === 'user' && (
+                  <li><strong>切换到游客模式</strong>测试（使用新的 identifier）</li>
+                )}
+                <li>检查是否有<strong>多个页面/标签</strong>同时打开客服</li>
+                <li>避免<strong>频繁刷新</strong>页面</li>
+              </ol>
+            </div>
           </div>
         )}
-        <button
-          onClick={handleManualRetry}
-          className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded text-sm transition-colors"
-        >
-          {isRateLimited ? '等待后重试' : '重试'}
-        </button>
+
+        <div className="flex gap-2 justify-center flex-wrap">
+          <button
+            onClick={handleManualRetry}
+            className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded text-sm transition-colors"
+          >
+            清除缓存并重试
+          </button>
+          {desiredMode === 'user' && isRateLimited && (
+            <button
+              onClick={handleSwitchToGuest}
+              className="px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-sm transition-colors"
+            >
+              切换到游客模式
+            </button>
+          )}
+        </div>
+
+        {DEBUG && (
+          <div className="mt-4 text-xs text-left bg-gray-100 p-3 rounded">
+            <p className="font-mono text-gray-600">
+              <strong>调试信息：</strong><br/>
+              Component ID: {componentIdRef.current}<br/>
+              Mode: {desiredMode}<br/>
+              Manager Stats: {JSON.stringify(chatwootRequestManager.getStats(), null, 2)}
+            </p>
+          </div>
+        )}
       </div>
     );
   }
@@ -283,6 +372,7 @@ export const ChatwootEmbed: React.FC<ChatwootEmbedProps> = ({ mode = 'auto', hei
   return (
     <div className="w-full rounded-lg border border-gray-200 overflow-hidden">
       <iframe
+        key={iframeUrl} // 使用 key 强制重新挂载
         title="在线客服"
         src={iframeUrl}
         className="w-full"
@@ -290,12 +380,15 @@ export const ChatwootEmbed: React.FC<ChatwootEmbedProps> = ({ mode = 'auto', hei
         frameBorder={0}
         allow="microphone; camera"
         onError={(e) => {
-          logError('iframe 加载错误:', e);
-          if (!isLoadingRef.current) {
-            setErrorMessage('客服窗口加载失败，请刷新页面重试');
-          }
+          logError('iframe 加载错误:', e, componentIdRef.current);
+          setErrorMessage('客服窗口加载失败，请刷新页面重试');
         }}
       />
+      {DEBUG && (
+        <div className="text-xs p-2 bg-gray-50 border-t border-gray-200 text-gray-600">
+          <span className="font-mono">Component: {componentIdRef.current} | Mode: {desiredMode}</span>
+        </div>
+      )}
     </div>
   );
 };
