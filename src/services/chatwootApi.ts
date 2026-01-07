@@ -4,13 +4,43 @@ interface ApiResponse<T = any> {
   data: T;
 }
 
+class ApiError extends Error {
+  status: number;
+  response?: any;
+
+  constructor(message: string, status: number, response?: any) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.response = response;
+  }
+}
+
 const parseResponse = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
-    throw new Error(`HTTP Error: ${response.status}`);
+    const status = response.status;
+    let message = `HTTP Error: ${status}`;
+
+    // 特殊处理 429 错误
+    if (status === 429) {
+      message = '请求过于频繁，请稍后再试';
+    }
+
+    try {
+      const text = await response.text();
+      if (text) {
+        message += ` - ${text}`;
+      }
+    } catch {
+      // 忽略解析错误
+    }
+
+    throw new ApiError(message, status);
   }
+
   const payload: ApiResponse<T> = await response.json();
   if (payload.code !== 20000) {
-    throw new Error(payload.msg || '请求失败');
+    throw new ApiError(payload.msg || '请求失败', 500, payload);
   }
   return payload.data;
 };
