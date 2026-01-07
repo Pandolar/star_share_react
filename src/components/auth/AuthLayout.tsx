@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { setChatwootGuest } from '../../utils/chatwoot';
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -7,6 +8,12 @@ interface AuthLayoutProps {
 }
 
 const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title }) => {
+  useEffect(() => {
+    setChatwootGuest().catch(() => {
+      // 忽略客服初始化失败，避免影响认证流程
+    });
+  }, []);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-25 px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-8">

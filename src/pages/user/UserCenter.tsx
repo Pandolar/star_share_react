@@ -27,6 +27,7 @@ import { OrderHistoryTab } from './tabs/OrderHistoryTab';
 import { LogoutConfirmModal } from '../../components/LogoutConfirmModal';
 import { clearAuthCookies, getCookie } from '../../utils/cookies';
 import { useAuthCheck } from '../../hooks/useAuthCheck';
+import { resetChatwoot, setChatwootUser } from '../../utils/chatwoot';
 
 // Tab配置接口
 interface TabConfig {
@@ -113,6 +114,15 @@ const UserCenter: React.FC = () => {
     }
   }, [searchParams, activeTab]);
 
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+    setChatwootUser().catch(() => {
+      // 忽略客服初始化失败，避免影响主流程
+    });
+  }, [isAuthenticated]);
+
   // 切换 Tab 并将 tab 写入 URL 查询参数
   const switchTab = (key: string, isMobile = false) => {
     const params = new URLSearchParams(searchParams);
@@ -133,6 +143,7 @@ const UserCenter: React.FC = () => {
 
   // 处理退出登录：先调用后端接口，再清理本地状态并跳转
   const handleLogout = async () => {
+    resetChatwoot();
     // 准备鉴权参数（从cookie中读取）
     const xuserid = getCookie('xuserid') || '';
     const xtoken = getCookie('xtoken') || '';
