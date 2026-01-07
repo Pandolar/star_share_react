@@ -12,6 +12,7 @@ import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import NewApiPage from './pages/features/NewApiPage';
+import CustomerServicePage from './pages/features/CustomerServicePage';
 import { HeroUIProvider } from '@heroui/react';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -60,6 +61,7 @@ const App: React.FC = () => {
               <Route path="/sharespeedtest" element={<ShareSpeedTestPage />} />
               <Route path="/jumpns" element={<JumpNsPage />} />
               <Route path="/new-api" element={<NewApiPage />} />
+              <Route path="/customer-service" element={<CustomerServicePage />} />
 
               {/* Admin管理后台路由 */}
               <Route path="/star-admin/login" element={<AdminLoginPage />} />
