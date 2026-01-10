@@ -9,6 +9,8 @@ import { setAuthCookies } from '../../utils/cookies';
 import { useAutoLogin } from '../../hooks/useAutoLogin';
 import { useRedirect } from '../../hooks/useRedirect';
 
+const USER_AGREEMENT_URL = 'https://r7r3bw489x.feishu.cn/wiki/Mq7FwBuhdiNH12kmqFvc4W0onqg';
+
 const RegisterPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState('');
@@ -18,6 +20,7 @@ const RegisterPage: React.FC = () => {
   const [isSendingCode, setIsSendingCode] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [hasAgreedUserAgreement, setHasAgreedUserAgreement] = useState(true);
 
   const isLoggedIn = useAutoLogin();
   const redirect = useRedirect();
@@ -64,6 +67,10 @@ const RegisterPage: React.FC = () => {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasAgreedUserAgreement) {
+      toast.warning('请先勾选同意《用户协议》');
+      return;
+    }
     if (emailError || !code || !password) {
       toast.warning('请填写完整的注册信息');
       return;
@@ -143,11 +150,33 @@ const RegisterPage: React.FC = () => {
               }
             />
           </div>
+          <div className="flex items-start gap-2 text-sm text-gray-600">
+            <input
+              id="register-user-agreement"
+              type="checkbox"
+              checked={hasAgreedUserAgreement}
+              onChange={(e) => setHasAgreedUserAgreement(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+            />
+            <div className="leading-5">
+              <label htmlFor="register-user-agreement" className="select-none">
+                注册即代表同意
+              </label>
+              <a
+                href={USER_AGREEMENT_URL}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="ml-1 text-primary-700 hover:text-primary-600 underline underline-offset-2"
+              >
+                《用户协议》
+              </a>
+            </div>
+          </div>
           <Button
             type="submit"
             color="primary"
             fullWidth
-            disabled={isRegistering}
+            disabled={isRegistering || !hasAgreedUserAgreement}
             className="!mt-8 bg-primary-500 text-white hover:bg-primary-600 disabled:bg-gray-300"
           >
             {isRegistering ? <Spinner size="sm" color="white" /> : '注册'}
