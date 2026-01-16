@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import AuthLayout from '../../components/auth/AuthLayout';
-import { Input, Button, Spinner, Card, CardBody } from '@heroui/react';
-import { Eye, EyeOff, Smartphone, Mail, RotateCcw } from 'lucide-react';
+import { Input, Button, Spinner, Card, CardBody, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react';
+import { Eye, EyeOff, Smartphone, Mail, RotateCcw, Send, AlertCircle, Shield } from 'lucide-react';
 import { loginUser, getWechatQRCode, checkWechatLoginStatus, wechatBind } from '../../services/authApi';
 import { setAuthCookies } from '../../utils/cookies';
 import { toast } from '../../utils/toast';
+import { userInfoApi } from '../../services/userApi';
 import { useAutoLogin } from '../../hooks/useAutoLogin';
 import { useRedirect } from '../../hooks/useRedirect';
 import { useIsMobile } from '../../hooks/useIsMobile';
@@ -27,6 +28,21 @@ const LoginPage: React.FC = () => {
   const [qrStatus, setQrStatus] = useState<'loading' | 'active' | 'expired' | 'scanned'>('loading');
   const [wechatTempToken, setWechatTempToken] = useState('');
   const [isWechatBinding, setIsWechatBinding] = useState(false);
+
+  // 邮箱绑定相关状态（微信登录后强制绑定）
+  const [showEmailBindModal, setShowEmailBindModal] = useState(false);
+  const [bindEmail, setBindEmail] = useState('');
+  const [bindEmailCode, setBindEmailCode] = useState('');
+  const [bindPassword, setBindPassword] = useState('');
+  const [bindPasswordConfirm, setBindPasswordConfirm] = useState('');
+  const [bindEmailCodeSent, setBindEmailCodeSent] = useState(false);
+  const [bindEmailCodeSending, setBindEmailCodeSending] = useState(false);
+  const [bindCountdown, setBindCountdown] = useState(0);
+  const [bindLoading, setBindLoading] = useState(false);
+  const [bindError, setBindError] = useState('');
+  const [showBindPassword, setShowBindPassword] = useState(false);
+  const [showBindPasswordConfirm, setShowBindPasswordConfirm] = useState(false);
+  const [showBindEmailCode, setShowBindEmailCode] = useState(false);
 
   // 轮询相关
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -139,14 +155,44 @@ const LoginPage: React.FC = () => {
             });
 
             try {
-              // 直接设置cookies并跳转
+              // 先设置临时cookies，以便调用getUserInfo接口
               setAuthCookies({
                 xuserid: statusData.xuserid,
                 xtoken: statusData.xtoken,
                 xy_uuid_token: statusData.xy_uuid_token
               });
-              toast.success('微信登录成功！正在跳转...');
-              redirect();
+
+              // 检查用户邮箱是否需要绑定
+              try {
+                const userInfoResponse = await userInfoApi.getUserInfo();
+                if (userInfoResponse.code === 20000) {
+                  const userEmail = userInfoResponse.data.email;
+                  console.log('老用户邮箱:', userEmail);
+
+                  // 如果邮箱是@default.com，需要强制绑定
+                  if (userEmail && userEmail.endsWith('@default.com')) {
+                    console.log('检测到默认邮箱，需要绑定安全邮箱');
+                    toast.info('为了账户安全，请绑定安全邮箱');
+                    setShowEmailBindModal(true);
+                    // 不跳转，等待用户绑定
+                  } else {
+                    // 邮箱已绑定，直接跳转
+                    console.log('邮箱已绑定，直接跳转');
+                    toast.success('微信登录成功！正在跳转...');
+                    redirect();
+                  }
+                } else {
+                  // 获取用户信息失败，为了安全起见，还是直接跳转
+                  console.warn('获取用户信息失败，直接跳转');
+                  toast.success('微信登录成功！正在跳转...');
+                  redirect();
+                }
+              } catch (error) {
+                console.error('检查用户邮箱失败:', error);
+                // 出错时直接跳转
+                toast.success('微信登录成功！正在跳转...');
+                redirect();
+              }
             } catch (loginError) {
               console.error('老用户登录过程失败:', loginError);
               toast.error('登录失败，请重试');
@@ -195,14 +241,45 @@ const LoginPage: React.FC = () => {
       console.log('新用户微信绑定API返回数据:', data);
 
       if (data && data.xuserid && data.xtoken && data.xy_uuid_token) {
-        console.log('新用户微信绑定成功，设置cookies并跳转');
+        console.log('新用户微信绑定成功，设置临时cookies');
+        // 先设置临时cookies，以便调用getUserInfo接口
         setAuthCookies({
           xuserid: data.xuserid,
           xtoken: data.xtoken,
           xy_uuid_token: data.xy_uuid_token
         });
-        toast.success('微信登录成功！正在跳转...');
-        redirect();
+
+        // 检查用户邮箱是否需要绑定
+        try {
+          const userInfoResponse = await userInfoApi.getUserInfo();
+          if (userInfoResponse.code === 20000) {
+            const userEmail = userInfoResponse.data.email;
+            console.log('新用户邮箱:', userEmail);
+
+            // 如果邮箱是@default.com，需要强制绑定
+            if (userEmail && userEmail.endsWith('@default.com')) {
+              console.log('检测到默认邮箱，需要绑定安全邮箱');
+              toast.info('为了账户安全，请绑定安全邮箱');
+              setShowEmailBindModal(true);
+              // 不跳转，等待用户绑定
+            } else {
+              // 邮箱已绑定，直接跳转
+              console.log('邮箱已绑定，直接跳转');
+              toast.success('微信登录成功！正在跳转...');
+              redirect();
+            }
+          } else {
+            // 获取用户信息失败，为了安全起见，还是直接跳转
+            console.warn('获取用户信息失败，直接跳转');
+            toast.success('微信登录成功！正在跳转...');
+            redirect();
+          }
+        } catch (error) {
+          console.error('检查用户邮箱失败:', error);
+          // 出错时直接跳转
+          toast.success('微信登录成功！正在跳转...');
+          redirect();
+        }
       } else {
         console.error('新用户微信绑定返回数据不完整:', data);
         toast.error('登录数据异常，请重试');
@@ -252,6 +329,110 @@ const LoginPage: React.FC = () => {
     fetchWechatQR();
   };
 
+  // 发送邮箱绑定验证码
+  const sendBindEmailCode = async () => {
+    if (!bindEmail.trim()) {
+      setBindError('请输入邮箱地址');
+      return;
+    }
+
+    // 验证邮箱格式
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(bindEmail)) {
+      setBindError('请输入有效的邮箱地址');
+      return;
+    }
+
+    setBindEmailCodeSending(true);
+    setBindError('');
+
+    try {
+      const response = await userInfoApi.sendEmailCode(bindEmail);
+      if (response.code === 20000) {
+        setBindEmailCodeSent(true);
+        setBindCountdown(60);
+        setBindError('');
+        toast.success('验证码已发送，请查收邮箱');
+      } else {
+        setBindError(response.msg || '发送验证码失败');
+      }
+    } catch (err) {
+      setBindError(err instanceof Error ? err.message : '发送验证码失败');
+    } finally {
+      setBindEmailCodeSending(false);
+    }
+  };
+
+  // 提交邮箱绑定
+  const handleSubmitEmailBind = async () => {
+    // 验证邮箱
+    if (!bindEmail.trim()) {
+      setBindError('请输入邮箱地址');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(bindEmail)) {
+      setBindError('请输入有效的邮箱地址');
+      return;
+    }
+
+    // 验证验证码
+    if (!bindEmailCode.trim()) {
+      setBindError('请输入验证码');
+      return;
+    }
+
+    // 验证密码
+    if (!bindPassword.trim()) {
+      setBindError('请设置登录密码');
+      return;
+    }
+
+    if (bindPassword.trim().length < 8) {
+      setBindError('密码至少8位');
+      return;
+    }
+
+    // 验证确认密码
+    if (!bindPasswordConfirm.trim()) {
+      setBindError('请确认密码');
+      return;
+    }
+
+    if (bindPassword !== bindPasswordConfirm) {
+      setBindError('两次输入的密码不一致');
+      return;
+    }
+
+    setBindLoading(true);
+    setBindError('');
+
+    try {
+      const payload = {
+        change_type: 'email' as const,
+        email: bindEmail.trim(),
+        email_code: bindEmailCode.trim(),
+        password: btoa(bindPassword.trim())
+      };
+
+      const response = await userInfoApi.changeUserInfo(payload);
+
+      if (response.code === 20000) {
+        toast.success('邮箱绑定成功！正在跳转...');
+        setShowEmailBindModal(false);
+        // 绑定成功后跳转
+        redirect();
+      } else {
+        setBindError(response.msg || '邮箱绑定失败');
+      }
+    } catch (err) {
+      setBindError(err instanceof Error ? err.message : '邮箱绑定失败');
+    } finally {
+      setBindLoading(false);
+    }
+  };
+
   // 处理登录方式切换
   const handleLoginMethodChange = (method: 'wechat' | 'email') => {
     setLoginMethod(method);
@@ -260,6 +441,15 @@ const LoginPage: React.FC = () => {
       fetchWechatQR();
     }
   };
+
+  // 邮箱绑定验证码倒计时
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (bindCountdown > 0) {
+      timer = setTimeout(() => setBindCountdown(bindCountdown - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [bindCountdown]);
 
   // 根据设备类型设置默认登录方式
   useEffect(() => {
@@ -560,6 +750,236 @@ const LoginPage: React.FC = () => {
 
         </div>
       )}
+
+      {/* 邮箱绑定弹窗（微信登录后强制绑定） */}
+      <Modal
+        isOpen={showEmailBindModal}
+        onClose={() => {}} // 不允许关闭
+        isDismissable={false} // 禁止点击外部关闭
+        hideCloseButton={true} // 隐藏关闭按钮
+        placement="center"
+        size="lg"
+      >
+        <ModalContent>
+          <ModalHeader className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <Shield size={20} className="text-primary" />
+              <span>绑定安全邮箱</span>
+            </div>
+          </ModalHeader>
+          <ModalBody>
+            <div className="space-y-4">
+              <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <AlertCircle size={16} className="text-primary flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-primary">
+                    为了账户安全，请绑定您的安全邮箱并设置密码。绑定后可使用邮箱+密码登录。
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-default-700 mb-2">
+                  邮箱地址 <span className="text-danger">*</span>
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    value={bindEmail}
+                    onChange={(e) => setBindEmail(e.target.value)}
+                    placeholder="请输入您的邮箱地址"
+                    variant="bordered"
+                    isInvalid={!!bindError && !bindEmail.trim()}
+                    className="flex-1"
+                    type="email"
+                  />
+                  <button
+                    onClick={sendBindEmailCode}
+                    disabled={bindEmailCodeSending || bindCountdown > 0 || !bindEmail.trim()}
+                    style={{
+                      backgroundColor: bindEmailCodeSending || bindCountdown > 0 || !bindEmail.trim() ? '#d1d5db' : '#006FEE',
+                      color: '#ffffff',
+                      border: '1px solid #006FEE',
+                      borderRadius: '6px',
+                      padding: '8px 12px',
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      cursor: bindEmailCodeSending || bindCountdown > 0 || !bindEmail.trim() ? 'not-allowed' : 'pointer',
+                      minWidth: '100px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {bindEmailCodeSending ? (
+                      <Spinner size="sm" color="white" />
+                    ) : (
+                      <>
+                        {!bindCountdown && <Send size={14} />}
+                        {bindCountdown > 0 ? `${bindCountdown}s` : '发送验证码'}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {bindEmailCodeSent && (
+                <div>
+                  <label className="block text-sm font-medium text-default-700 mb-2">
+                    邮箱验证码 <span className="text-danger">*</span>
+                  </label>
+                  <Input
+                    value={bindEmailCode}
+                    onChange={(e) => setBindEmailCode(e.target.value)}
+                    placeholder="请输入6位验证码"
+                    variant="bordered"
+                    type={showBindEmailCode ? "text" : "password"}
+                    isInvalid={!!bindError && !bindEmailCode.trim()}
+                    endContent={
+                      <button
+                        className="focus:outline-none"
+                        type="button"
+                        onClick={() => setShowBindEmailCode(!showBindEmailCode)}
+                      >
+                        {showBindEmailCode ? (
+                          <EyeOff size={16} className="text-default-400" />
+                        ) : (
+                          <Eye size={16} className="text-default-400" />
+                        )}
+                      </button>
+                    }
+                    maxLength={6}
+                  />
+                  <p className="text-xs text-success mt-1">
+                    ✓ 验证码已发送，请查收邮箱
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-default-700 mb-2">
+                  设置登录密码 <span className="text-danger">*</span>
+                </label>
+                <Input
+                  value={bindPassword}
+                  onChange={(e) => setBindPassword(e.target.value)}
+                  placeholder="请输入密码，至少8位"
+                  variant="bordered"
+                  type={showBindPassword ? 'text' : 'password'}
+                  isInvalid={!!bindError && !bindPassword.trim()}
+                  endContent={
+                    <button
+                      className="focus:outline-none"
+                      type="button"
+                      onClick={() => setShowBindPassword(!showBindPassword)}
+                    >
+                      {showBindPassword ? (
+                        <EyeOff size={16} className="text-default-400" />
+                      ) : (
+                        <Eye size={16} className="text-default-400" />
+                      )}
+                    </button>
+                  }
+                />
+                <p className="text-xs text-default-400 mt-1">密码至少8位，用于邮箱+密码登录</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-default-700 mb-2">
+                  确认密码 <span className="text-danger">*</span>
+                </label>
+                <Input
+                  value={bindPasswordConfirm}
+                  onChange={(e) => setBindPasswordConfirm(e.target.value)}
+                  placeholder="请再次输入密码"
+                  variant="bordered"
+                  type={showBindPasswordConfirm ? 'text' : 'password'}
+                  isInvalid={!!bindError && !bindPasswordConfirm.trim()}
+                  endContent={
+                    <button
+                      className="focus:outline-none"
+                      type="button"
+                      onClick={() => setShowBindPasswordConfirm(!showBindPasswordConfirm)}
+                    >
+                      {showBindPasswordConfirm ? (
+                        <EyeOff size={16} className="text-default-400" />
+                      ) : (
+                        <Eye size={16} className="text-default-400" />
+                      )}
+                    </button>
+                  }
+                />
+              </div>
+            </div>
+
+            {/* 错误提示 */}
+            {bindError && (
+              <div className="p-3 bg-danger/10 border border-danger/20 rounded-lg mt-4">
+                <div className="flex items-start gap-2">
+                  <AlertCircle size={16} className="text-danger flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-danger">{bindError}</p>
+                </div>
+              </div>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <button
+              onClick={handleSubmitEmailBind}
+              disabled={
+                bindLoading ||
+                !bindEmail.trim() ||
+                !bindEmailCode.trim() ||
+                !bindPassword.trim() ||
+                !bindPasswordConfirm.trim() ||
+                bindPassword !== bindPasswordConfirm ||
+                bindPassword.length < 8
+              }
+              style={{
+                backgroundColor:
+                  bindLoading ||
+                  !bindEmail.trim() ||
+                  !bindEmailCode.trim() ||
+                  !bindPassword.trim() ||
+                  !bindPasswordConfirm.trim() ||
+                  bindPassword !== bindPasswordConfirm ||
+                  bindPassword.length < 8
+                    ? '#d1d5db'
+                    : '#006FEE',
+                color: '#ffffff',
+                border: '1px solid #006FEE',
+                borderRadius: '6px',
+                padding: '8px 16px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor:
+                  bindLoading ||
+                  !bindEmail.trim() ||
+                  !bindEmailCode.trim() ||
+                  !bindPassword.trim() ||
+                  !bindPasswordConfirm.trim() ||
+                  bindPassword !== bindPasswordConfirm ||
+                  bindPassword.length < 8
+                    ? 'not-allowed'
+                    : 'pointer',
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+            >
+              {bindLoading ? (
+                <>
+                  <Spinner size="sm" color="white" />
+                  <span>绑定中...</span>
+                </>
+              ) : (
+                '确认绑定'
+              )}
+            </button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </AuthLayout>
   );
 };
