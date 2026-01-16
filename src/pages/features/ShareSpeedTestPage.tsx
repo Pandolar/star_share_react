@@ -1,7 +1,20 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import SEOHead from '../../components/SEOHead';
 
+type NodeInfo = {
+    url: string;
+    weight: number;
+};
+
 type SpeedTestResult = {
+    node: string;
+    weight: number;
+    success: boolean;
+    durationMs: number;
+    status: 'pending' | 'success' | 'fail';
+};
+
+type TestResult = {
     node: string;
     success: boolean;
     durationMs: number;
@@ -15,7 +28,7 @@ const ShareSpeedTestPage: React.FC = () => {
     const [progressText, setProgressText] = useState<string>('');
     const [errorText, setErrorText] = useState<string>('');
     const [results, setResults] = useState<SpeedTestResult[]>([]);
-    const [nodes, setNodes] = useState<string[]>([]);
+    const [nodes, setNodes] = useState<NodeInfo[]>([]);
     const hasRedirectedRef = useRef<boolean>(false);
     const autoTimerRef = useRef<number | null>(null);
 
@@ -34,7 +47,7 @@ const ShareSpeedTestPage: React.FC = () => {
                     throw new Error(`获取节点失败: ${resp.status}`);
                 }
                 const data = await resp.json();
-                const fetchedNodes: string[] = Array.isArray(data?.data) ? data.data : [];
+                const fetchedNodes: NodeInfo[] = Array.isArray(data?.data) ? data.data : [];
 
                 if (fetchedNodes.length === 0) {
                     throw new Error('未获取到任何节点');
@@ -43,28 +56,30 @@ const ShareSpeedTestPage: React.FC = () => {
 
                 setStatusText('正在并行测试节点速度...');
 
-                // 初始化 pending 结果以呈现“节点1~N”
+                // 初始化 pending 结果以呈现"节点1~N"
                 setResults(fetchedNodes.map((n) => ({
-                    node: n,
+                    node: n.url,
+                    weight: n.weight,
                     success: false,
                     durationMs: 0,
                     status: 'pending'
                 })));
 
                 // 并行测试并逐项更新 UI
-                const testPromises = fetchedNodes.map((node, index) =>
-                    testNode(node).then((r) => {
+                const testPromises = fetchedNodes.map((nodeInfo, index) =>
+                    testNode(nodeInfo.url).then((r) => {
                         setResults((prev) => {
                             const copy = [...prev];
                             copy[index] = {
                                 node: r.node,
+                                weight: nodeInfo.weight,
                                 success: r.success,
                                 durationMs: r.durationMs,
                                 status: r.success ? 'success' : 'fail'
                             };
                             return copy;
                         });
-                        return { index, ...r };
+                        return { index, ...r, weight: nodeInfo.weight };
                     })
                 );
 
@@ -72,8 +87,9 @@ const ShareSpeedTestPage: React.FC = () => {
 
                 const finalResults: SpeedTestResult[] = finished
                     .sort((a, b) => a.index - b.index)
-                    .map(({ node, success, durationMs }) => ({
+                    .map(({ node, success, durationMs, weight }) => ({
                         node,
+                        weight,
                         success,
                         durationMs,
                         status: success ? 'success' : 'fail'
@@ -92,7 +108,7 @@ const ShareSpeedTestPage: React.FC = () => {
                         hasRedirectedRef.current = true;
                         const randIndex = Math.floor(Math.random() * fetchedNodes.length);
                         const randNode = fetchedNodes[randIndex];
-                        const nodeUrl = toHttpsUrl(randNode);
+                        const nodeUrl = toHttpsUrl(randNode.url);
                         const fromUrl = `${nodeUrl}/`;
                         // 当前页面打开
                         window.location.replace(fromUrl);
@@ -114,21 +130,29 @@ const ShareSpeedTestPage: React.FC = () => {
                     return;
                 }
 
-                // 计算平均延迟（成功节点）
-                const avg = successful.reduce((sum, r) => sum + r.durationMs, 0) / successful.length;
-                // 过滤掉高于平均值 20% 的节点
-                const threshold = avg * 1.2;
-                const candidates = successful.filter(r => r.durationMs <= threshold);
+                // 综合权重和延迟选择最佳节点
+                // 计算每个节点的综合评分：score = weight / durationMs
+                // 延迟越低、权重越高，score 越高
+                const scoredNodes = successful.map(r => ({
+                    ...r,
+                    score: r.weight / r.durationMs
+                }));
 
-                // 候选至少有一个（数学上必然 >=1），但做个兜底
-                const pool = candidates.length > 0 ? candidates : successful;
+                // 按评分排序（降序）
+                scoredNodes.sort((a, b) => b.score - a.score);
+
+                // 取前 30% 的高分节点作为候选池（至少1个）
+                const candidateCount = Math.max(1, Math.ceil(scoredNodes.length * 0.3));
+                const candidates = scoredNodes.slice(0, candidateCount);
+
+                // 从候选池中随机选择一个节点
+                const pick = candidates[Math.floor(Math.random() * candidates.length)];
 
                 // 展示完成提示，并在 2 秒后自动跳转（若期间用户未手动点击）
                 setStatusText('测速完成，2秒后自动跳转至优选节点…');
 
                 autoTimerRef.current = window.setTimeout(() => {
                     if (hasRedirectedRef.current) return;
-                    const pick = pool[Math.floor(Math.random() * pool.length)];
                     const pickIndex = finalResults.findIndex(r => r.node === pick.node);
                     setStatusText(`正在跳转至优选节点（节点${pickIndex + 1}）...`);
                     const nodeUrl = toHttpsUrl(pick.node);
@@ -217,7 +241,7 @@ function toHttpsUrl(node: string): string {
     return url;
 }
 
-async function testNode(node: string): Promise<SpeedTestResult> {
+async function testNode(node: string): Promise<TestResult> {
     const start = performance.now();
 
     const controller = new AbortController();
