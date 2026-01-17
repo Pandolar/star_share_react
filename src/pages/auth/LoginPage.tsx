@@ -54,7 +54,7 @@ const LoginPage: React.FC = () => {
   const isMobile = useIsMobile();
 
   // 登录方式切换
-  const [loginMethod, setLoginMethod] = useState<'wechat' | 'email'>('wechat');
+  const [loginMethod, setLoginMethod] = useState<'wechat' | 'email'>('email');
 
   // 获取微信二维码
   const fetchWechatQR = async () => {
@@ -460,15 +460,6 @@ const LoginPage: React.FC = () => {
     }
     return () => clearTimeout(timer);
   }, [bindCountdown]);
-
-  // 根据设备类型设置默认登录方式
-  useEffect(() => {
-    if (isMobile) {
-      setLoginMethod('email');
-    } else {
-      setLoginMethod('wechat');
-    }
-  }, [isMobile]);
 
   // 组件挂载时获取微信二维码
   useEffect(() => {
