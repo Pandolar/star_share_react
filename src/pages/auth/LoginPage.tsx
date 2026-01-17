@@ -331,33 +331,35 @@ const LoginPage: React.FC = () => {
 
   // 发送邮箱绑定验证码
   const sendBindEmailCode = async () => {
+    // 清空之前的错误
+    setBindError('');
+
+    // 验证邮箱是否为空
     if (!bindEmail.trim()) {
       setBindError('请输入邮箱地址');
       return;
     }
 
     // 验证邮箱格式
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(bindEmail)) {
-      setBindError('请输入有效的邮箱地址');
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(bindEmail.trim())) {
+      setBindError('邮箱格式不正确，请检查后重新输入');
       return;
     }
 
     setBindEmailCodeSending(true);
-    setBindError('');
 
     try {
-      const response = await userInfoApi.sendEmailCode(bindEmail);
+      const response = await userInfoApi.sendEmailCode(bindEmail.trim());
       if (response.code === 20000) {
         setBindEmailCodeSent(true);
         setBindCountdown(60);
-        setBindError('');
-        toast.success('验证码已发送，请查收邮箱');
+        toast.success('验证码已发送至您的邮箱，请查收');
       } else {
-        setBindError(response.msg || '发送验证码失败');
+        setBindError(response.msg || '发送验证码失败，请稍后重试');
       }
     } catch (err) {
-      setBindError(err instanceof Error ? err.message : '发送验证码失败');
+      setBindError(err instanceof Error ? err.message : '发送验证码失败，请检查网络后重试');
     } finally {
       setBindEmailCodeSending(false);
     }
@@ -365,21 +367,30 @@ const LoginPage: React.FC = () => {
 
   // 提交邮箱绑定
   const handleSubmitEmailBind = async () => {
+    // 清空之前的错误
+    setBindError('');
+
     // 验证邮箱
     if (!bindEmail.trim()) {
       setBindError('请输入邮箱地址');
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(bindEmail)) {
-      setBindError('请输入有效的邮箱地址');
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(bindEmail.trim())) {
+      setBindError('邮箱格式不正确，请检查后重新输入');
       return;
     }
 
     // 验证验证码
     if (!bindEmailCode.trim()) {
-      setBindError('请输入验证码');
+      setBindError('请输入邮箱验证码');
+      return;
+    }
+
+    // 验证验证码格式（只能是数字）
+    if (!/^\d+$/.test(bindEmailCode.trim())) {
+      setBindError('验证码只能是数字，请重新输入');
       return;
     }
 
@@ -390,23 +401,22 @@ const LoginPage: React.FC = () => {
     }
 
     if (bindPassword.trim().length < 8) {
-      setBindError('密码至少8位');
+      setBindError('密码长度至少为8位');
       return;
     }
 
     // 验证确认密码
     if (!bindPasswordConfirm.trim()) {
-      setBindError('请确认密码');
+      setBindError('请再次输入密码进行确认');
       return;
     }
 
     if (bindPassword !== bindPasswordConfirm) {
-      setBindError('两次输入的密码不一致');
+      setBindError('两次输入的密码不一致，请重新输入');
       return;
     }
 
     setBindLoading(true);
-    setBindError('');
 
     try {
       const payload = {
@@ -424,10 +434,10 @@ const LoginPage: React.FC = () => {
         // 绑定成功后跳转
         redirect();
       } else {
-        setBindError(response.msg || '邮箱绑定失败');
+        setBindError(response.msg || '邮箱绑定失败，请重试');
       }
     } catch (err) {
-      setBindError(err instanceof Error ? err.message : '邮箱绑定失败');
+      setBindError(err instanceof Error ? err.message : '邮箱绑定失败，请检查网络后重试');
     } finally {
       setBindLoading(false);
     }
@@ -821,40 +831,48 @@ const LoginPage: React.FC = () => {
                     )}
                   </button>
                 </div>
+                {bindEmailCodeSent && (
+                  <p className="text-xs text-success mt-1">
+                    ✓ 验证码已发送至您的邮箱，请查收
+                  </p>
+                )}
+                <p className="text-xs text-default-400 mt-1">
+                  验证码为纯数字。未收到验证码？请检查垃圾箱或确认邮箱地址是否正确
+                </p>
               </div>
 
-              {bindEmailCodeSent && (
-                <div>
-                  <label className="block text-sm font-medium text-default-700 mb-2">
-                    邮箱验证码 <span className="text-danger">*</span>
-                  </label>
-                  <Input
-                    value={bindEmailCode}
-                    onChange={(e) => setBindEmailCode(e.target.value)}
-                    placeholder="请输入6位验证码"
-                    variant="bordered"
-                    type={showBindEmailCode ? "text" : "password"}
-                    isInvalid={!!bindError && !bindEmailCode.trim()}
-                    endContent={
-                      <button
-                        className="focus:outline-none"
-                        type="button"
-                        onClick={() => setShowBindEmailCode(!showBindEmailCode)}
-                      >
-                        {showBindEmailCode ? (
-                          <EyeOff size={16} className="text-default-400" />
-                        ) : (
-                          <Eye size={16} className="text-default-400" />
-                        )}
-                      </button>
+              <div>
+                <label className="block text-sm font-medium text-default-700 mb-2">
+                  邮箱验证码 <span className="text-danger">*</span>
+                </label>
+                <Input
+                  value={bindEmailCode}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // 只允许输入数字
+                    if (value === '' || /^\d+$/.test(value)) {
+                      setBindEmailCode(value);
                     }
-                    maxLength={6}
-                  />
-                  <p className="text-xs text-success mt-1">
-                    ✓ 验证码已发送，请查收邮箱
-                  </p>
-                </div>
-              )}
+                  }}
+                  placeholder="请输入数字验证码"
+                  variant="bordered"
+                  type={showBindEmailCode ? "text" : "password"}
+                  isInvalid={!!bindError && !bindEmailCode.trim()}
+                  endContent={
+                    <button
+                      className="focus:outline-none"
+                      type="button"
+                      onClick={() => setShowBindEmailCode(!showBindEmailCode)}
+                    >
+                      {showBindEmailCode ? (
+                        <EyeOff size={16} className="text-default-400" />
+                      ) : (
+                        <Eye size={16} className="text-default-400" />
+                      )}
+                    </button>
+                  }
+                />
+              </div>
 
               <div>
                 <label className="block text-sm font-medium text-default-700 mb-2">
@@ -909,6 +927,13 @@ const LoginPage: React.FC = () => {
                     </button>
                   }
                 />
+              </div>
+
+              {/* 联系邮箱提示 */}
+              <div className="p-3 bg-default/10 border border-default/20 rounded-lg">
+                <p className="text-xs text-default-600 text-center">
+                  有疑问请联系邮箱 <a href="mailto:admin@nice188.com" className="text-primary hover:underline">admin@nice188.com</a>，我们会尽快回复
+                </p>
               </div>
             </div>
 

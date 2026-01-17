@@ -174,32 +174,34 @@ export const ProfileTab: React.FC = () => {
 
   // 发送邮箱验证码
   const sendEmailCode = async () => {
+    // 清空之前的错误
+    setEditError('');
+
+    // 验证邮箱是否为空
     if (!newEmail.trim()) {
       setEditError('请输入新邮箱地址');
       return;
     }
 
     // 验证邮箱格式
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(newEmail)) {
-      setEditError('请输入有效的邮箱地址');
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(newEmail.trim())) {
+      setEditError('邮箱格式不正确，请检查后重新输入');
       return;
     }
 
     setEmailCodeSending(true);
-    setEditError('');
 
     try {
-      const response = await userInfoApi.sendEmailCode(newEmail);
+      const response = await userInfoApi.sendEmailCode(newEmail.trim());
       if (response.code === 20000) {
         setEmailCodeSent(true);
         setCountdown(60);
-        setEditError('');
       } else {
-        setEditError(response.msg || '发送验证码失败');
+        setEditError(response.msg || '发送验证码失败，请稍后重试');
       }
     } catch (err) {
-      setEditError(err instanceof Error ? err.message : '发送验证码失败');
+      setEditError(err instanceof Error ? err.message : '发送验证码失败，请检查网络后重试');
     } finally {
       setEmailCodeSending(false);
     }
@@ -410,18 +412,31 @@ export const ProfileTab: React.FC = () => {
         }
 
         if (!newEmail.trim()) {
-          setEditError('新邮箱不能为空');
+          setEditError('请输入新邮箱地址');
+          return;
+        }
+
+        // 验证邮箱格式
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        if (!emailRegex.test(newEmail.trim())) {
+          setEditError('邮箱格式不正确，请检查后重新输入');
           return;
         }
 
         if (!emailCode.trim()) {
-          setEditError('请输入验证码');
+          setEditError('请输入邮箱验证码');
+          return;
+        }
+
+        // 验证验证码格式（只能是数字）
+        if (!/^\d+$/.test(emailCode.trim())) {
+          setEditError('验证码只能是数字，请重新输入');
           return;
         }
 
         // 如果设置了密码，校验长度
-        if (bindPassword && bindPassword.trim().length < 8) {
-          setEditError('密码至少8位');
+        if (bindPassword && bindPassword.trim().length > 0 && bindPassword.trim().length < 8) {
+          setEditError('密码长度至少为8位');
           return;
         }
 
@@ -442,7 +457,7 @@ export const ProfileTab: React.FC = () => {
           }
           closeEditModal();
         } else {
-          setEditError(response.msg || '修改邮箱失败');
+          setEditError(response.msg || '修改邮箱失败，请重试');
         }
       } else if (activeTab === 'password') {
         // 通过邮箱验证码重置密码
@@ -450,18 +465,38 @@ export const ProfileTab: React.FC = () => {
           setEditError('请先绑定非默认邮箱再重置密码');
           return;
         }
-        if (!pwdEmailCode.trim() || !newPassword.trim() || !confirmPassword.trim()) {
-          setEditError('请填写完整');
+
+        if (!pwdEmailCode.trim()) {
+          setEditError('请输入邮箱验证码');
           return;
         }
+
+        // 验证验证码格式（只能是数字）
+        if (!/^\d+$/.test(pwdEmailCode.trim())) {
+          setEditError('验证码只能是数字，请重新输入');
+          return;
+        }
+
+        if (!newPassword.trim()) {
+          setEditError('请输入新密码');
+          return;
+        }
+
         if (newPassword.trim().length < 8) {
-          setEditError('新密码至少8位');
+          setEditError('密码长度至少为8位');
           return;
         }
+
+        if (!confirmPassword.trim()) {
+          setEditError('请再次输入密码进行确认');
+          return;
+        }
+
         if (newPassword !== confirmPassword) {
-          setEditError('两次输入的新密码不一致');
+          setEditError('两次输入的密码不一致，请重新输入');
           return;
         }
+
         try {
           const ret: any = await resetPassword(userInfo.email, pwdEmailCode.trim(), newPassword.trim());
           // resetPassword 在后端会生成新的xtoken，若返回则更新cookie
@@ -869,6 +904,7 @@ export const ProfileTab: React.FC = () => {
                         variant="bordered"
                         isInvalid={!!editError && !newEmail.trim()}
                         className="flex-1"
+                        type="email"
                       />
                       <button
                         onClick={sendEmailCode}
@@ -882,50 +918,65 @@ export const ProfileTab: React.FC = () => {
                           fontSize: '12px',
                           fontWeight: '500',
                           cursor: emailCodeSending || countdown > 0 || !newEmail.trim() || Boolean(userInfo?.email && !userInfo.email.endsWith('@default.com')) ? 'not-allowed' : 'pointer',
-                          minWidth: '80px',
+                          minWidth: '100px',
                           display: 'flex',
                           alignItems: 'center',
                           gap: '4px',
                           justifyContent: 'center'
                         }}
                       >
-                        {!emailCodeSending && <Send size={14} />}
-                        {countdown > 0 ? `${countdown}s` : '发送验证码'}
+                        {emailCodeSending ? (
+                          <Spinner size="sm" color="white" />
+                        ) : (
+                          <>
+                            {!countdown && <Send size={14} />}
+                            {countdown > 0 ? `${countdown}s` : '发送验证码'}
+                          </>
+                        )}
                       </button>
                     </div>
-                  </div>
-                  {emailCodeSent && (
-                    <div>
-                      <label className="block text-sm font-medium text-default-700 mb-2">
-                        邮箱验证码 <span className="text-danger">*</span>
-                      </label>
-                      <Input
-                        value={emailCode}
-                        onChange={(e) => setEmailCode(e.target.value)}
-                        placeholder="请输入6位验证码"
-                        variant="bordered"
-                        type={showEmailCode ? "text" : "password"}
-                        isInvalid={!!editError && !emailCode.trim()}
-                        endContent={
-                          <button
-                            className="focus:outline-none"
-                            type="button"
-                            onClick={() => setShowEmailCode(!showEmailCode)}
-                          >
-                            {showEmailCode ? (
-                              <EyeOff size={16} className="text-default-400" />
-                            ) : (
-                              <Eye size={16} className="text-default-400" />
-                            )}
-                          </button>
-                        }
-                        maxLength={6}
-                      />
+                    {emailCodeSent && (
                       <p className="text-xs text-success mt-1">
-                        ✓ 验证码已发送至新邮箱，请查收
+                        ✓ 验证码已发送至您的邮箱，请查收
                       </p>
-                    </div>
-                  )}
+                    )}
+                    <p className="text-xs text-default-400 mt-1">
+                      验证码为纯数字。未收到验证码？请检查垃圾箱或确认邮箱地址是否正确
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-default-700 mb-2">
+                      邮箱验证码 <span className="text-danger">*</span>
+                    </label>
+                    <Input
+                      value={emailCode}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // 只允许输入数字
+                        if (value === '' || /^\d+$/.test(value)) {
+                          setEmailCode(value);
+                        }
+                      }}
+                      placeholder="请输入数字验证码"
+                      variant="bordered"
+                      type={showEmailCode ? "text" : "password"}
+                      isInvalid={!!editError && !emailCode.trim()}
+                      endContent={
+                        <button
+                          className="focus:outline-none"
+                          type="button"
+                          onClick={() => setShowEmailCode(!showEmailCode)}
+                        >
+                          {showEmailCode ? (
+                            <EyeOff size={16} className="text-default-400" />
+                          ) : (
+                            <Eye size={16} className="text-default-400" />
+                          )}
+                        </button>
+                      }
+                    />
+                  </div>
 
                   {/* 首次绑定邮箱时，同步设置密码 */}
                   {userInfo?.email && userInfo.email.endsWith('@default.com') && (
@@ -977,8 +1028,14 @@ export const ProfileTab: React.FC = () => {
                     <div className="flex gap-2">
                       <Input
                         value={pwdEmailCode}
-                        onChange={(e) => setPwdEmailCode(e.target.value)}
-                        placeholder="请输入验证码"
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // 只允许输入数字
+                          if (value === '' || /^\d+$/.test(value)) {
+                            setPwdEmailCode(value);
+                          }
+                        }}
+                        placeholder="请输入数字验证码"
                         variant="bordered"
                         type={showPwdEmailCode ? 'text' : 'password'}
                         isInvalid={!!editError && !pwdEmailCode.trim()}
@@ -992,7 +1049,6 @@ export const ProfileTab: React.FC = () => {
                             )}
                           </button>
                         }
-                        maxLength={6}
                       />
                       <button
                         onClick={sendPwdResetCode}
@@ -1006,17 +1062,31 @@ export const ProfileTab: React.FC = () => {
                           fontSize: '12px',
                           fontWeight: '500',
                           cursor: pwdCodeSending || pwdCountdown > 0 || !userInfo?.email || userInfo.email.endsWith('@default.com') ? 'not-allowed' : 'pointer',
-                          minWidth: '80px',
+                          minWidth: '100px',
                           display: 'flex',
                           alignItems: 'center',
                           gap: '4px',
                           justifyContent: 'center'
                         }}
                       >
-                        {!pwdCodeSending && <Send size={14} />}
-                        {pwdCountdown > 0 ? `${pwdCountdown}s` : '发送验证码'}
+                        {pwdCodeSending ? (
+                          <Spinner size="sm" color="white" />
+                        ) : (
+                          <>
+                            {!pwdCountdown && <Send size={14} />}
+                            {pwdCountdown > 0 ? `${pwdCountdown}s` : '发送验证码'}
+                          </>
+                        )}
                       </button>
                     </div>
+                    {pwdCodeSent && (
+                      <p className="text-xs text-success mt-1">
+                        ✓ 验证码已发送至您的邮箱，请查收
+                      </p>
+                    )}
+                    <p className="text-xs text-default-400 mt-1">
+                      验证码为纯数字。未收到验证码？请检查垃圾箱或确认邮箱地址是否正确
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-default-700 mb-2">新密码 <span className="text-danger">*</span></label>
