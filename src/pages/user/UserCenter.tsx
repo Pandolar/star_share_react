@@ -23,10 +23,10 @@ import { AnnouncementTab } from './tabs/AnnouncementTab';
 import { ProfileTab } from './tabs/ProfileTab';
 import { SubscriptionTab } from './tabs/SubscriptionTab';
 import { OrderHistoryTab } from './tabs/OrderHistoryTab';
-import { OnlineSupportTab } from './tabs/OnlineSupportTab';
 
 // 组件和工具导入
 import { LogoutConfirmModal } from '../../components/LogoutConfirmModal';
+import { ChatwootFloatingButton } from '../../components/chat/ChatwootFloatingButton';
 import { clearAuthCookies, getCookie } from '../../utils/cookies';
 import { useAuthCheck } from '../../hooks/useAuthCheck';
 
@@ -63,12 +63,6 @@ const tabConfigs: TabConfig[] = [
     label: '订单记录',
     icon: <FileText size={20} />,
     component: OrderHistoryTab
-  },
-  {
-    key: 'support',
-    label: '在线客服',
-    icon: <MessageCircle size={20} />,
-    component: OnlineSupportTab
   },
   // { // 临时注释
   //   key: 'tutorial',
@@ -445,6 +439,9 @@ const UserCenter: React.FC = () => {
         onOpenChange={setLogoutModalOpen}
         onConfirm={handleLogout}
       />
+
+      {/* 浮动客服按钮 - 用户模式 */}
+      <ChatwootFloatingButton mode="user" />
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { ChatwootFloatingButton } from '../chat/ChatwootFloatingButton';
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -34,6 +35,9 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title }) => {
           {children}
         </motion.div>
       </div>
+
+      {/* 浮动客服按钮 - 游客模式 */}
+      <ChatwootFloatingButton mode="guest" />
     </div>
   );
 };
