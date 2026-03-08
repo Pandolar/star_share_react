@@ -709,9 +709,10 @@ export const SubscriptionTab: React.FC = () => {
 
           {showSubscriptionGuide && (
             <div className="mt-4 rounded-xl bg-white/80 border border-default-100 px-4 py-3 text-sm text-default-700 leading-7">
-              <div>1. 若您已有订阅套餐，不可再次订阅更低等级套餐。</div>
-              <div>2. 订阅同等级套餐将直接叠加延期。</div>
-              <div>3. 订阅更高等级套餐后将自动冻结低等级套餐，待高等级套餐过期后将自动解冻。</div>
+              <div>1. 若您已有订阅套餐，不可再次订阅<strong className="font-semibold text-default-900">更低</strong>等级套餐。</div>
+              <div>2. 订阅同等级套餐将直接<strong className="font-semibold text-default-900">叠加延期</strong>。</div>
+              <div>3. 订阅更高等级套餐后将<strong className="font-semibold text-default-900">自动冻结低等级套餐</strong>，待高等级套餐过期后将自动解冻。</div>
+              <div>4. 如果您有激活码/CDK/兑换码，可直接在右上角【兑换激活码】直接兑换。</div>
             </div>
           )}
         </CardBody>
