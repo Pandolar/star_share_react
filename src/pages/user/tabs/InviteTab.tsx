@@ -26,6 +26,7 @@ interface InviteOverviewData {
     reward_ratio: number;
     reward_ratio_percent: number;
     has_package_specific_rules: boolean;
+    min_reward_duration_days: number;
   };
 }
 
@@ -158,6 +159,7 @@ export const InviteTab: React.FC = () => {
   const rewardModeText = overview?.reward_policy_summary?.reward_mode === 'cash' ? '返现' : '返时长';
   const rewardRatioPercent = overview?.reward_policy_summary?.reward_ratio_percent ?? 0;
   const hasPackageSpecificRules = Boolean(overview?.reward_policy_summary?.has_package_specific_rules);
+  const minRewardDurationDays = overview?.reward_policy_summary?.min_reward_duration_days ?? 7;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
@@ -280,9 +282,10 @@ export const InviteTab: React.FC = () => {
             <div>2. 当前默认邀请奖励类型：<span className="font-medium text-default-900">{rewardModeText}</span>，奖励比例约为 <span className="font-medium text-default-900">{rewardRatioPercent}%</span>。</div>
             <div>3. 例如：如您邀请了用户张三订阅了年卡，您可获得 <span className="font-medium text-default-900">365×{rewardRatioPercent}%={Number((365 * rewardRatioPercent / 100).toFixed(2))}</span> 天的奖励。</div>
             <div>4. 返时长奖励会按您当前可享受的最高套餐等级计算，且奖励等级不会超过被邀请人本次实际订阅的套餐等级。</div>
-            <div>5. 好友支付成功后，系统会按您的邀请规则自动计算奖励；若部分套餐有单独规则，则以实际订单结算为准。</div>
-            <div>6. 当前页面仅展示返时长相关数据；返现等其他后台配置暂不在前台显示。</div>
-            <div>7. 如有任何问题，请及时联系客服协助处理。</div>
+            <div>5. 若被邀请人订阅的套餐时长小于 <span className="font-medium text-default-900">{minRewardDurationDays} 天</span>，系统只会记录该订单，不发放返时长或返现奖励，且不占用前 N 笔奖励名额。</div>
+            <div>6. 好友支付成功后，系统会按您的邀请规则自动计算奖励；若部分套餐有单独规则，则以实际订单结算为准。</div>
+            <div>7. 当前页面仅展示返时长相关数据；返现等其他后台配置暂不在前台显示。</div>
+            <div>8. 如有任何问题，请及时联系客服协助处理。</div>
             {hasPackageSpecificRules && (
               <div className="text-xs text-primary-700 bg-primary/8 rounded-lg px-3 py-2">
                 您当前存在套餐级单独邀请规则，不同套餐的实际奖励比例可能略有不同。
@@ -351,8 +354,8 @@ export const InviteTab: React.FC = () => {
                           </div>
                         </div>
                       ) : (
-                        <div className="rounded-lg bg-default-50 px-4 py-3 text-sm text-default-500">
-                          当前未展示返时长明细，若该好友对应的是其他奖励模式，前台会暂时隐藏。
+                        <div className="rounded-lg bg-default-50 px-4 py-3 text-sm text-default-500 leading-6">
+                          当前未展示返时长明细，可能是该好友订单未达到 {minRewardDurationDays} 天奖励门槛，或该订单对应的是其他奖励模式，前台会暂时隐藏。
                         </div>
                       )}
                     </CardBody>

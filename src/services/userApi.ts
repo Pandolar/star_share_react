@@ -316,6 +316,7 @@ export const inviteUserApi = {
             reward_ratio: number;
             reward_ratio_percent: number;
             has_package_specific_rules: boolean;
+            min_reward_duration_days: number;
         };
     }>> => {
         return createUserRequest(getUserApiUrl('/u/invite_overview'), {
