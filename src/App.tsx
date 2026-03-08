@@ -27,6 +27,7 @@ import SettingsManagePage from './pages/admin/SettingsManagePage';
 import OrdersManagePage from './pages/admin/OrdersManagePage';
 import CDKManagePage from './pages/admin/CDKManagePage';
 import UserPackagesManagePage from './pages/admin/UserPackagesManagePage';
+import InviteManagePage from './pages/admin/InviteManagePage';
 
 const App: React.FC = () => {
   return (
@@ -79,6 +80,7 @@ const App: React.FC = () => {
                 <Route path="orders" element={<OrdersManagePage />} />
                 <Route path="cdk" element={<CDKManagePage />} />
                 <Route path="settings" element={<SettingsManagePage />} />
+                <Route path="invites" element={<InviteManagePage />} />
               </Route>
             </Routes>
           </div>

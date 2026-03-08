@@ -22,6 +22,12 @@ import {
     Order,
     UpdateOrderRequest,
     OrderQueryParams,
+    InvitePolicyResponseData,
+    InviteRewardRecord,
+    InviteRewardQueryParams,
+    WorkOrder,
+    WorkOrderQueryParams,
+    UpdateWorkOrderRequest,
 } from '../types/admin';
 
 /**
@@ -369,6 +375,51 @@ class AdminApiService {
         return response.data;
     }
 
+
+    // ==================== 邀请管理 ====================
+
+    /**
+     * 获取邀请规则
+     */
+    async getInvitePolicy(): Promise<AdminApiResponse<InvitePolicyResponseData>> {
+        const response = await this.api.get('/star/invite_policy');
+        return response.data;
+    }
+
+    /**
+     * 更新邀请规则
+     */
+    async updateInvitePolicy(policy: Record<string, any>): Promise<AdminApiResponse> {
+        const response = await this.api.put('/star/invite_policy', { policy });
+        return response.data;
+    }
+
+    /**
+     * 获取邀请奖励流水
+     */
+    async getInviteRewards(params: InviteRewardQueryParams = {}): Promise<AdminApiResponse<InviteRewardRecord[]>> {
+        const queryString = this.buildQueryString(params);
+        const response = await this.api.get(`/star/invite_reward?${queryString}`);
+        return response.data;
+    }
+
+    /**
+     * 获取工单列表
+     */
+    async getWorkorders(params: WorkOrderQueryParams = {}): Promise<AdminApiResponse<WorkOrder[]>> {
+        const queryString = this.buildQueryString(params);
+        const response = await this.api.get(`/star/workorder?${queryString}`);
+        return response.data;
+    }
+
+    /**
+     * 更新工单
+     */
+    async updateWorkorder(data: UpdateWorkOrderRequest): Promise<AdminApiResponse> {
+        const response = await this.api.put('/star/workorder', data);
+        return response.data;
+    }
+
     // ==================== 仪表盘 ====================
 
     /**
@@ -406,6 +457,11 @@ export const {
     deleteCDK,
     getConfigs,
     updateConfig,
+    getInvitePolicy,
+    updateInvitePolicy,
+    getInviteRewards,
+    getWorkorders,
+    updateWorkorder,
     getOrders,
     updateOrder,
     deleteOrder,

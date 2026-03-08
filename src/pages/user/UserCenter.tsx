@@ -23,6 +23,7 @@ import { AnnouncementTab } from './tabs/AnnouncementTab';
 import { ProfileTab } from './tabs/ProfileTab';
 import { SubscriptionTab } from './tabs/SubscriptionTab';
 import { OrderHistoryTab } from './tabs/OrderHistoryTab';
+import { InviteTab } from './tabs/InviteTab';
 
 // 组件和工具导入
 import { LogoutConfirmModal } from '../../components/LogoutConfirmModal';
@@ -63,6 +64,12 @@ const tabConfigs: TabConfig[] = [
     label: '订单记录',
     icon: <FileText size={20} />,
     component: OrderHistoryTab
+  },
+  {
+    key: 'invite',
+    label: '邀请好友',
+    icon: <MessageCircle size={20} />,
+    component: InviteTab
   },
   // { // 临时注释
   //   key: 'tutorial',

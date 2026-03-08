@@ -1,0 +1,330 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { Button, Card, CardBody, Chip, Divider, Input, Spinner } from '@heroui/react';
+import { motion } from 'framer-motion';
+import {
+  Copy,
+  Gift,
+  Link as LinkIcon,
+  Users,
+  Calendar,
+  Sparkles,
+  RefreshCw,
+  Info,
+} from 'lucide-react';
+import { inviteUserApi } from '../../../services/userApi';
+import { toast } from '../../../utils/toast';
+
+interface InviteOverviewData {
+  inviter_id: number;
+  inviter_code: string;
+  invite_link: string;
+  invitees_count: number;
+  granted_orders_count: number;
+  total_duration_days: number;
+}
+
+interface InviteOrderRecord {
+  order_id: string;
+  package_id: number;
+  package_name: string;
+  package_price: number;
+  reward_mode?: string;
+  reward_status?: string;
+  reward_ratio?: number | null;
+  reward_amount?: number;
+  reward_days?: number;
+  reward_order_index?: number | null;
+  created_at: string;
+}
+
+interface InviteeRecord {
+  user_id: number;
+  masked: string;
+  created_at: string;
+  orders_by_package: Array<{ package_name: string; count: number }>;
+  orders: InviteOrderRecord[];
+  total_reward_days?: number;
+}
+
+const copyText = async (text: string, successMessage: string) => {
+  if (!text) {
+    toast.warning('暂无可复制内容');
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success(successMessage);
+  } catch (error) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const copied = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    if (copied) {
+      toast.success(successMessage);
+      return;
+    }
+    toast.error('复制失败，请手动复制');
+  }
+};
+
+export const InviteTab: React.FC = () => {
+  const [overview, setOverview] = useState<InviteOverviewData | null>(null);
+  const [invitees, setInvitees] = useState<InviteeRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const fetchInviteData = async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      setError('');
+      const [overviewResponse, recordsResponse] = await Promise.all([
+        inviteUserApi.getOverview(),
+        inviteUserApi.getRecords(),
+      ]);
+
+      if (overviewResponse.code !== 20000) {
+        throw new Error(overviewResponse.msg || '获取邀请总览失败');
+      }
+      if (recordsResponse.code !== 20000) {
+        throw new Error(recordsResponse.msg || '获取邀请记录失败');
+      }
+
+      setOverview(overviewResponse.data || null);
+      setInvitees(Array.isArray(recordsResponse.data?.invitees) ? recordsResponse.data.invitees : []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '获取邀请信息失败');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInviteData();
+  }, []);
+
+  const filteredInvitees = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return invitees;
+    }
+    const keyword = searchTerm.trim().toLowerCase();
+    return invitees.filter((invitee) => {
+      const packageNames = invitee.orders_by_package.map((item) => item.package_name).join(' ');
+      return invitee.masked.toLowerCase().includes(keyword) || packageNames.toLowerCase().includes(keyword);
+    });
+  }, [invitees, searchTerm]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[320px] items-center justify-center">
+        <Spinner size="lg" label="正在加载邀请数据..." />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardBody className="flex flex-col items-center gap-4 py-12 text-center">
+          <div className="text-danger text-lg font-semibold">邀请信息加载失败</div>
+          <div className="text-default-500 text-sm">{error}</div>
+          <Button color="primary" onPress={() => fetchInviteData()} startContent={<RefreshCw className="w-4 h-4" />}>
+            重试
+          </Button>
+        </CardBody>
+      </Card>
+    );
+  }
+
+  const inviteLink = overview?.invite_link || '';
+  const inviterCode = overview?.inviter_code || '';
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Gift className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-default-900">邀请好友</h1>
+            <p className="text-sm text-default-500 mt-1">复制您的邀请链接或邀请码，好友注册并成功支付后，您将获得平台奖励。</p>
+          </div>
+        </div>
+        <Button
+          color="primary"
+          variant="flat"
+          isLoading={refreshing}
+          startContent={!refreshing ? <RefreshCw className="w-4 h-4" /> : undefined}
+          onPress={() => fetchInviteData(true)}
+        >
+          刷新数据
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardBody className="p-5">
+            <div className="flex items-center gap-3">
+              <Users className="w-5 h-5 text-primary" />
+              <div>
+                <div className="text-sm text-default-500">邀请人数</div>
+                <div className="text-2xl font-bold text-default-900">{overview?.invitees_count ?? 0}</div>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+        <Card>
+          <CardBody className="p-5">
+            <div className="flex items-center gap-3">
+              <Sparkles className="w-5 h-5 text-success" />
+              <div>
+                <div className="text-sm text-default-500">奖励订单数</div>
+                <div className="text-2xl font-bold text-default-900">{overview?.granted_orders_count ?? 0}</div>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+        <Card>
+          <CardBody className="p-5">
+            <div className="flex items-center gap-3">
+              <Calendar className="w-5 h-5 text-warning" />
+              <div>
+                <div className="text-sm text-default-500">累计返时长</div>
+                <div className="text-2xl font-bold text-default-900">{overview?.total_duration_days ?? 0} 天</div>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+      </div>
+
+      <Card>
+        <CardBody className="p-6 space-y-5">
+          <div className="flex items-center gap-2 text-default-800 font-semibold">
+            <LinkIcon className="w-4 h-4 text-primary" />
+            分享给好友
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-3 items-end">
+            <Input
+              label="邀请链接"
+              value={inviteLink}
+              isReadOnly
+              description="推荐直接分享注册链接，好友打开后会自动带上您的邀请码。"
+            />
+            <Button color="primary" onPress={() => copyText(inviteLink, '邀请链接已复制')} startContent={<Copy className="w-4 h-4" />}>
+              复制链接
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-3 items-end">
+            <Input
+              label="邀请码"
+              value={inviterCode}
+              isReadOnly
+              description="也可以单独复制邀请码，好友注册时展开邀请码输入框填写即可。"
+            />
+            <Button variant="flat" color="primary" onPress={() => copyText(inviterCode, '邀请码已复制')} startContent={<Copy className="w-4 h-4" />}>
+              复制邀请码
+            </Button>
+          </div>
+
+          <Divider />
+
+          <div className="rounded-xl bg-primary/5 border border-primary/10 p-4 text-sm text-default-700 leading-7">
+            <div className="flex items-center gap-2 font-semibold text-default-900 mb-2">
+              <Info className="w-4 h-4 text-primary" />
+              邀请说明
+            </div>
+            <div>1. 好友通过您的专属链接注册，或在注册时手动填写您的邀请码。</div>
+            <div>2. 好友支付成功后，系统会按您的邀请规则自动计算奖励。</div>
+            <div>3. 当前页面仅展示返时长相关数据；返现等其他后台配置暂不在前台显示。</div>
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardBody className="p-6 space-y-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="text-lg font-semibold text-default-900">我邀请的好友</h2>
+              <p className="text-sm text-default-500 mt-1">仅展示脱敏后的好友信息与返时长相关明细。</p>
+            </div>
+            <Input
+              className="w-full md:w-72"
+              placeholder="搜索好友标识或套餐名称"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          {filteredInvitees.length === 0 ? (
+            <div className="py-12 text-center text-default-500 text-sm">暂无邀请记录，快去复制邀请链接分享给好友吧。</div>
+          ) : (
+            <div className="space-y-4">
+              {filteredInvitees.map((invitee) => {
+                const durationOrders = (invitee.orders || []).filter((order) => Number(order.reward_days || 0) > 0);
+                return (
+                  <Card key={invitee.user_id} className="border border-default-100 shadow-sm">
+                    <CardBody className="p-5 space-y-4">
+                      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                        <div>
+                          <div className="text-base font-semibold text-default-900">{invitee.masked}</div>
+                          <div className="text-sm text-default-500 mt-1">注册时间：{invitee.created_at || '-'}</div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Chip color="primary" variant="flat">已购套餐 {invitee.orders_by_package?.reduce((sum, item) => sum + item.count, 0) || 0} 笔</Chip>
+                          <Chip color="success" variant="flat">累计返时长 {invitee.total_reward_days || 0} 天</Chip>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {(invitee.orders_by_package || []).map((item) => (
+                          <Chip key={`${invitee.user_id}-${item.package_name}`} variant="bordered" size="sm">
+                            {item.package_name} × {item.count}
+                          </Chip>
+                        ))}
+                      </div>
+
+                      {durationOrders.length > 0 ? (
+                        <div className="space-y-2">
+                          <div className="text-sm font-medium text-default-700">返时长明细</div>
+                          <div className="space-y-2">
+                            {durationOrders.map((order) => (
+                              <div key={order.order_id} className="rounded-lg bg-default-50 px-4 py-3 text-sm text-default-700 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                                <div>
+                                  <div className="font-medium text-default-900">{order.package_name}</div>
+                                  <div className="text-default-500">订单时间：{order.created_at || '-'} · 第 {order.reward_order_index || '-'} 单</div>
+                                </div>
+                                <Chip color="success" variant="flat">返时长 {order.reward_days || 0} 天</Chip>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="rounded-lg bg-default-50 px-4 py-3 text-sm text-default-500">
+                          当前未展示返时长明细，若该好友对应的是其他奖励模式，前台会暂时隐藏。
+                        </div>
+                      )}
+                    </CardBody>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </CardBody>
+      </Card>
+    </motion.div>
+  );
+};

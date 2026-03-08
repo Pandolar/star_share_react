@@ -71,6 +71,20 @@ export interface PackageQueryParams extends CommonQueryParams {
 }
 
 // 用户管理相关类型
+export interface InvitePolicyOverride {
+    enabled?: boolean;
+    reward_mode?: 'duration' | 'cash';
+    reward_ratio?: number;
+    max_reward_order_count?: number;
+    min_withdraw_amount?: number;
+    package_rules?: Record<string, {
+        reward_mode?: 'duration' | 'cash';
+        reward_ratio?: number;
+        max_reward_order_count?: number;
+        min_withdraw_amount?: number;
+    }>;
+}
+
 export interface User {
     id: number;
     username?: string;
@@ -81,6 +95,7 @@ export interface User {
     preferences?: Record<string, any>;
     inviter_user?: number;
     inviter_code?: string;
+    invite_bound_at?: string;
     remarks?: string;
     wechat_openid?: string;
 }
@@ -92,6 +107,7 @@ export interface CreateUserRequest {
     preferences?: Record<string, any>;
     status?: 0 | 1;
     inviter_user?: number;
+    invite_policy_override?: InvitePolicyOverride | Record<string, any>;
     remarks?: string;
 }
 
@@ -102,6 +118,7 @@ export interface UpdateUserRequest {
     preferences?: Record<string, any>;
     status?: 0 | 1;
     inviter_user?: number;
+    invite_policy_override?: InvitePolicyOverride | Record<string, any>;
     remarks?: string;
 }
 
@@ -304,4 +321,82 @@ export interface DashboardData {
     packages: DashboardPackages;
     cdk: DashboardCDK;
     meta: DashboardMeta;
+}
+
+
+export interface InvitePolicyConfig {
+    enabled: boolean;
+    bind_only_on_register: boolean;
+    reward_only_paid_purchase: boolean;
+    exclude_exchange_orders: boolean;
+    default_policy: {
+        reward_mode: 'duration' | 'cash';
+        reward_ratio: string | number;
+        max_reward_order_count: number;
+        min_withdraw_amount: string | number;
+    };
+    package_rules: Record<string, any>;
+}
+
+export interface InvitePolicyResponseData {
+    policy: InvitePolicyConfig;
+    docs?: Record<string, any>;
+}
+
+export interface InviteRewardRecord {
+    id: number;
+    order_id: string;
+    user_id: number;
+    invitee_email?: string;
+    inviter_id: number;
+    package_id: number;
+    package_name: string;
+    package_price: number;
+    status: 'pending' | 'paid' | 'failed';
+    invite_reward_status?: string;
+    invite_reward_mode?: 'duration' | 'cash';
+    invite_reward_ratio?: number | null;
+    invite_reward_order_index?: number | null;
+    invite_reward_days?: number;
+    invite_reward_amount?: number;
+    invite_reward_processed_at?: string | null;
+    invite_withdraw_ticket_id?: number | null;
+    created_at: string;
+    invite_reward_meta?: Record<string, any>;
+    invite_reward_remark?: string;
+}
+
+export interface InviteRewardQueryParams extends CommonQueryParams {
+    inviter_id?: number;
+    user_id?: number;
+    invite_reward_status?: string;
+    invite_reward_mode?: 'duration' | 'cash';
+}
+
+export interface WorkOrder {
+    id: number;
+    user_id: number;
+    ticket_type: string;
+    status: string;
+    title: string;
+    content?: string;
+    amount?: number;
+    extra_data?: Record<string, any>;
+    admin_remark?: string;
+    handled_admin?: string;
+    handled_at?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
+}
+
+export interface WorkOrderQueryParams extends CommonQueryParams {
+    ticket_type?: string;
+    status?: string;
+    user_id?: number;
+}
+
+export interface UpdateWorkOrderRequest {
+    id: number;
+    status?: string;
+    admin_remark?: string;
 }

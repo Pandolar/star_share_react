@@ -1,15 +1,16 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import AuthLayout from '../../components/auth/AuthLayout';
 import { Input, Button, Spinner } from '@heroui/react';
-import { Eye, EyeOff } from 'lucide-react';
-import { sendEmailCode, registerUser } from '../../services/authApi';
+import { Eye, EyeOff, ChevronDown, Gift } from 'lucide-react';
+import { sendEmailCode, registerUser, validateInviteAff } from '../../services/authApi';
 import { toast } from '../../utils/toast';
 import { setAuthCookies } from '../../utils/cookies';
 import { useAutoLogin } from '../../hooks/useAutoLogin';
 import { useRedirect } from '../../hooks/useRedirect';
 
 const USER_AGREEMENT_URL = 'https://r7r3bw489x.feishu.cn/wiki/Mq7FwBuhdiNH12kmqFvc4W0onqg';
+const AFF_STORAGE_KEY = 'register_aff';
 
 const RegisterPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -21,25 +22,68 @@ const RegisterPage: React.FC = () => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [hasAgreedUserAgreement, setHasAgreedUserAgreement] = useState(true);
+  const [showInviteField, setShowInviteField] = useState(false);
+  const [aff, setAff] = useState('');
+  const [affHelper, setAffHelper] = useState('');
+  const [affError, setAffError] = useState('');
+  const [validatingAff, setValidatingAff] = useState(false);
 
   const isLoggedIn = useAutoLogin();
   const redirect = useRedirect();
   const location = useLocation();
 
+  const initialAff = useMemo(() => {
+    const searchAff = new URLSearchParams(location.search).get('aff') || '';
+    const storedAff = sessionStorage.getItem(AFF_STORAGE_KEY) || '';
+    return (searchAff || storedAff).trim();
+  }, [location.search]);
+
+  useEffect(() => {
+    if (!initialAff) {
+      return;
+    }
+    setAff(initialAff);
+    setShowInviteField(true);
+    sessionStorage.setItem(AFF_STORAGE_KEY, initialAff);
+  }, [initialAff]);
+
   const validateEmail = (value: string) => {
     if (!value || /^[\w-.+]+@([\w-]+\.)+[\w-]{2,4}$/.test(value)) {
       setEmailError('');
       return true;
-    } else {
-      setEmailError('请输入有效的邮箱地址');
-      return false;
     }
+    setEmailError('请输入有效的邮箱地址');
+    return false;
   };
 
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newEmail = e.target.value;
     setEmail(newEmail);
     validateEmail(newEmail);
+  };
+
+  const handleValidateAff = async (value: string) => {
+    const trimmed = value.trim().toLowerCase();
+    if (!trimmed) {
+      setAffError('');
+      setAffHelper('邀请码为选填项，没有可留空。');
+      sessionStorage.removeItem(AFF_STORAGE_KEY);
+      return true;
+    }
+    setValidatingAff(true);
+    setAffError('');
+    try {
+      const result = await validateInviteAff(trimmed);
+      setAffHelper(`邀请码有效，邀请人：${result.masked}`);
+      sessionStorage.setItem(AFF_STORAGE_KEY, trimmed);
+      return true;
+    } catch (error) {
+      setAffError(error instanceof Error ? error.message : '邀请码校验失败');
+      setAffHelper('');
+      return false;
+    } finally {
+      setValidatingAff(false);
+    }
   };
 
   const handleSendCode = async () => {
@@ -51,7 +95,7 @@ const RegisterPage: React.FC = () => {
       setIsSendingCode(false);
       setCountdown(60);
       const timer = setInterval(() => {
-        setCountdown(prev => {
+        setCountdown((prev) => {
           if (prev === 1) {
             clearInterval(timer);
             return 0;
@@ -60,7 +104,6 @@ const RegisterPage: React.FC = () => {
         });
       }, 1000);
     } catch (error) {
-      // 错误已在拦截器中处理，此处无需额外提示
       setIsSendingCode(false);
     }
   };
@@ -75,11 +118,18 @@ const RegisterPage: React.FC = () => {
       toast.warning('请填写完整的注册信息');
       return;
     }
+    if (aff.trim()) {
+      const isAffValid = await handleValidateAff(aff);
+      if (!isAffValid) {
+        return;
+      }
+    }
     setIsRegistering(true);
     try {
-      const data = await registerUser(email, code, password);
+      const data = await registerUser(email, code, password, aff.trim() || undefined);
       if (data && data.xuserid && data.xtoken && data.xy_uuid_token) {
         setAuthCookies({ xuserid: data.xuserid, xtoken: data.xtoken, xy_uuid_token: data.xy_uuid_token });
+        sessionStorage.removeItem(AFF_STORAGE_KEY);
         toast.success('注册成功！正在跳转...');
         redirect();
       }
@@ -150,6 +200,40 @@ const RegisterPage: React.FC = () => {
               }
             />
           </div>
+
+          <div className="rounded-xl border border-default-200 bg-default-50/70 p-4 space-y-3">
+            <button
+              type="button"
+              onClick={() => setShowInviteField((prev) => !prev)}
+              className="w-full flex items-center justify-between text-left"
+            >
+              <div className="flex items-center gap-2">
+                <Gift className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium text-default-800">有邀请码？点击填写</span>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-default-500 transition-transform ${showInviteField ? 'rotate-180' : ''}`} />
+            </button>
+            {showInviteField && (
+              <div className="space-y-2">
+                <Input
+                  label="邀请码"
+                  placeholder="请输入邀请码"
+                  value={aff}
+                  onChange={(e) => {
+                    setAff(e.target.value.toLowerCase());
+                    setAffError('');
+                  }}
+                  onBlur={() => handleValidateAff(aff)}
+                  errorMessage={affError}
+                  isInvalid={!!affError}
+                  description={affHelper || (initialAff ? '已从邀请链接中自动识别邀请码，您也可以手动修改。' : '选填项，好友分享的邀请码可填写在这里。')}
+                  endContent={validatingAff ? <Spinner size="sm" /> : undefined}
+                  fullWidth
+                />
+              </div>
+            )}
+          </div>
+
           <div className="flex items-start gap-2 text-sm text-gray-600">
             <input
               id="register-user-agreement"

@@ -295,6 +295,59 @@ export const exchangeUserApi = {
     },
 };
 
+
+
+// 邀请相关API
+export const inviteUserApi = {
+    getOverview: async (): Promise<ApiResponse<{
+        inviter_id: number;
+        inviter_code: string;
+        invite_link: string;
+        invitees_count: number;
+        granted_orders_count: number;
+        total_duration_days: number;
+        cash_summary?: {
+            available_amount: number;
+            withdraw_pending_amount: number;
+            withdraw_done_amount: number;
+        };
+    }>> => {
+        return createUserRequest(getUserApiUrl('/u/invite_overview'), {
+            method: 'GET',
+        });
+    },
+
+    getRecords: async (): Promise<ApiResponse<{
+        inviter_id: number;
+        invitees_count: number;
+        invitees: Array<{
+            user_id: number;
+            masked: string;
+            created_at: string;
+            orders_by_package: Array<{ package_name: string; count: number }>;
+            orders: Array<{
+                order_id: string;
+                package_id: number;
+                package_name: string;
+                package_price: number;
+                reward_mode?: string;
+                reward_status?: string;
+                reward_ratio?: number | null;
+                reward_amount?: number;
+                reward_days?: number;
+                reward_order_index?: number | null;
+                created_at: string;
+            }>;
+            total_reward_amount?: number;
+            total_reward_days?: number;
+        }>;
+    }>> => {
+        return createUserRequest(getUserApiUrl('/u/get_inviter_data'), {
+            method: 'GET',
+        });
+    },
+};
+
 // 导出所有用户端API
 const userApi = {
     auth: userAuthApi,
@@ -303,6 +356,7 @@ const userApi = {
     package: packageUserApi,
     order: orderUserApi,
     exchange: exchangeUserApi,
+    invite: inviteUserApi,
 };
 
 export default userApi; 

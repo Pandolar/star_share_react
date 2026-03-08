@@ -92,10 +92,20 @@ export const sendEmailCode = (email: string, type_: 'register' | 'back_password'
 /**
  * 用户注册
  */
-export const registerUser = (email: string, email_code: string, password: string): Promise<LoginResponse> => {
+export const registerUser = (email: string, email_code: string, password: string, aff?: string): Promise<LoginResponse> => {
   const encodedPassword = btoa(password.trim());
-  // 类型断言：告诉TypeScript，拦截器处理后的返回值是Promise<LoginResponse>
-  return authApi.post('/register', { email, email_code, password: encodedPassword }) as unknown as Promise<LoginResponse>;
+  const payload: Record<string, string> = { email, email_code, password: encodedPassword };
+  if (aff && aff.trim()) {
+    payload.aff = aff.trim();
+  }
+  return authApi.post('/register', payload) as unknown as Promise<LoginResponse>;
+};
+
+/**
+ * 校验邀请参数 aff
+ */
+export const validateInviteAff = (aff: string): Promise<{ valid: boolean; inviter_user: number; masked: string }> => {
+  return authApi.get('/invite_validate', { params: { aff } }) as unknown as Promise<{ valid: boolean; inviter_user: number; masked: string }>;
 };
 
 /**

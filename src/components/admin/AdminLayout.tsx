@@ -30,6 +30,7 @@ import {
     Shield,
     Home,
     BarChart3,
+    Gift,
 } from 'lucide-react';
 import adminApiService from '../../services/adminApi';
 
@@ -102,6 +103,12 @@ const AdminLayout: React.FC = () => {
             label: '系统配置',
             icon: <Settings className="w-4 h-4" />,
             path: '/star-admin/settings',
+        },
+        {
+            key: 'invites',
+            label: '邀请管理',
+            icon: <Gift className="w-4 h-4" />,
+            path: '/star-admin/invites',
         },
     ];
 
