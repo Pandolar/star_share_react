@@ -15,7 +15,7 @@ export const useRedirect = () => {
         params.delete('fromurl');
 
         if (!rawFromUrl) {
-            navigate('/', { replace: true });
+            navigate('/sharespeedtest', { replace: true });
             return;
         }
 

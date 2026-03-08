@@ -19,7 +19,7 @@ import {
   Input
 } from '@heroui/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Package, Star, Crown, AlertCircle, CheckCircle, QrCode, Calendar, Timer } from 'lucide-react';
+import { Package, Star, Crown, AlertCircle, CheckCircle, QrCode, Calendar, Timer, ChevronDown, Info } from 'lucide-react';
 import { packageUserApi, orderUserApi, exchangeUserApi } from '../../../services/userApi';
 import QRCodeGenerator from 'qrcode-generator';
 import { useIsMobile } from '../../../hooks/useIsMobile';
@@ -70,6 +70,8 @@ export const SubscriptionTab: React.FC = () => {
   const [qrCodeExpired, setQrCodeExpired] = useState(false);
   const [qrCodeTimer, setQrCodeTimer] = useState<NodeJS.Timeout | null>(null);
   const [manualCheckLoading, setManualCheckLoading] = useState(false);
+  const [showSubscriptionGuide, setShowSubscriptionGuide] = useState(false);
+  const [showInlineQRCode, setShowInlineQRCode] = useState(false);
 
   // 使用现有的移动端检测 hook
   const isMobileDevice = useIsMobile();
@@ -219,6 +221,7 @@ export const SubscriptionTab: React.FC = () => {
         setPaymentModal(true);
         setPaymentStatus('pending');
         setQrCodeExpired(false);
+        setShowInlineQRCode(false);
 
         // 移动端直接打开支付URL
         if (isMobileDevice && response.data.payment_url) {
@@ -350,6 +353,7 @@ export const SubscriptionTab: React.FC = () => {
     setPaymentStatus('pending');
     setQrCodeExpired(false);
     setManualCheckLoading(false);
+    setShowInlineQRCode(false);
   };
 
   // 计算最受欢迎的套餐
@@ -672,7 +676,7 @@ export const SubscriptionTab: React.FC = () => {
       `}</style>
 
       {/* 页面标题 + 操作入口（右侧文字按钮） */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-8 gap-4 flex-wrap">
         <div className="text-left">
           <h1 className="text-3xl font-bold text-foreground mb-2">订阅套餐</h1>
           <p className="text-default-500 max-w-md">选择适合您的订阅方案，享受优质服务</p>
@@ -683,6 +687,35 @@ export const SubscriptionTab: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      <Card className="mb-6 border border-primary/10 bg-primary/5 shadow-sm">
+        <CardBody className="p-4 sm:p-5">
+          <button
+            type="button"
+            onClick={() => setShowSubscriptionGuide((prev) => !prev)}
+            className="w-full flex items-center justify-between gap-4 text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Info className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <div className="font-semibold text-default-900">订阅说明</div>
+                <div className="text-sm text-default-500">购买前可先展开查看套餐升降级与延期规则</div>
+              </div>
+            </div>
+            <ChevronDown className={`w-4 h-4 text-default-500 transition-transform ${showSubscriptionGuide ? 'rotate-180' : ''}`} />
+          </button>
+
+          {showSubscriptionGuide && (
+            <div className="mt-4 rounded-xl bg-white/80 border border-default-100 px-4 py-3 text-sm text-default-700 leading-7">
+              <div>1. 若您已有订阅套餐，不可再次订阅更低等级套餐。</div>
+              <div>2. 订阅同等级套餐将直接叠加延期。</div>
+              <div>3. 订阅更高等级套餐后将自动冻结低等级套餐，待高等级套餐过期后将自动解冻。</div>
+            </div>
+          )}
+        </CardBody>
+      </Card>
 
       {/* 加载状态 */}
       {loading && (
@@ -983,10 +1016,12 @@ export const SubscriptionTab: React.FC = () => {
         isOpen={paymentModal}
         onClose={closePaymentModal}
         size="lg"
+        scrollBehavior="inside"
         hideCloseButton={paymentStatus === 'success'}
         classNames={{
-          base: "max-h-[90vh]",
-          body: "py-6",
+          base: "max-h-[92vh] mx-2 sm:mx-0",
+          body: "py-4 sm:py-6 overflow-y-auto",
+          footer: "border-t border-divider bg-background sticky bottom-0",
         }}
       >
         <ModalContent>
@@ -1039,20 +1074,18 @@ export const SubscriptionTab: React.FC = () => {
                               支付页面已在新窗口打开
                             </span>
                           </div>
-                          <div className="text-sm text-default-500">
-                            <p className="mb-2">请在新窗口中完成支付</p>
-                            <p className="text-primary font-medium">支付完成后，请点击下方按钮确认</p>
+                          <div className="text-sm text-default-500 space-y-2">
+                            <p>请在新窗口中完成支付。</p>
+                            <p className="text-primary font-medium">若没有自动弹出，可直接显示二维码并截图后再扫码支付。</p>
                           </div>
 
-                          {/* 移动端支付按钮：手动跳转 + 确认/取消 */}
-                          <div className="flex gap-3 justify-center">
+                          <div className="flex flex-wrap gap-3 justify-center">
                             {orderInfo?.payment_url && (
                               <Button
                                 color="primary"
                                 variant="solid"
                                 onPress={() => {
                                   try {
-                                    // 使用同页跳转，避免移动端拦截新窗口
                                     window.location.href = orderInfo.payment_url as string;
                                   } catch (e) {
                                     alert('无法打开支付页面，请稍后重试');
@@ -1061,6 +1094,16 @@ export const SubscriptionTab: React.FC = () => {
                                 className="min-w-24"
                               >
                                 立刻支付
+                              </Button>
+                            )}
+                            {orderInfo?.qr_code && (
+                              <Button
+                                color="secondary"
+                                variant="flat"
+                                onPress={() => setShowInlineQRCode((prev) => !prev)}
+                                className="min-w-40"
+                              >
+                                {showInlineQRCode ? '收起支付二维码' : '没有弹出窗口？点我直接显示支付二维码'}
                               </Button>
                             )}
                             <Button
@@ -1085,6 +1128,38 @@ export const SubscriptionTab: React.FC = () => {
                               未支付
                             </Button>
                           </div>
+
+                          {showInlineQRCode && orderInfo?.qr_code && (
+                            <div className="rounded-2xl border border-primary/15 bg-default-50 px-4 py-5">
+                              <div className="flex justify-center">
+                                <Card className="p-4 relative shadow-sm">
+                                  <motion.img
+                                    src={generateQRCode(orderInfo.qr_code)}
+                                    alt="支付二维码"
+                                    className={`w-40 h-40 sm:w-48 sm:h-48 transition-all duration-500 ${qrCodeExpired ? 'opacity-30 grayscale' : ''}`}
+                                    initial={{ opacity: 0, scale: 0.8 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ delay: 0.2 }}
+                                  />
+                                  {qrCodeExpired && (
+                                    <motion.div
+                                      className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 rounded-lg"
+                                      initial={{ opacity: 0 }}
+                                      animate={{ opacity: 1 }}
+                                      transition={{ duration: 0.3 }}
+                                    >
+                                      <Chip color="danger" variant="solid" className="shadow-lg">
+                                        已过期
+                                      </Chip>
+                                    </motion.div>
+                                  )}
+                                </Card>
+                              </div>
+                              <p className="mt-3 text-xs leading-6 text-default-500 text-center">
+                                当前设备若无法直接拉起支付页面，可截图保存该二维码后，在微信或支付宝内识别扫码支付。
+                              </p>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         // 桌面端二维码支付
@@ -1157,12 +1232,12 @@ export const SubscriptionTab: React.FC = () => {
 
                 {/* 二维码 - 仅桌面端显示 */}
                 {orderInfo.qr_code && paymentStatus === 'pending' && !isMobileDevice && (
-                  <div className="flex justify-center">
-                    <Card className="p-6 relative">
+                  <div className="flex justify-center px-2">
+                    <Card className="p-4 sm:p-6 relative max-w-full">
                       <motion.img
                         src={generateQRCode(orderInfo.qr_code)}
                         alt="支付二维码"
-                        className={`w-48 h-48 transition-all duration-500 ${qrCodeExpired ? 'opacity-30 grayscale' : ''
+                        className={`w-40 h-40 sm:w-48 sm:h-48 transition-all duration-500 max-w-full ${qrCodeExpired ? 'opacity-30 grayscale' : ''
                           }`}
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}

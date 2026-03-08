@@ -369,7 +369,6 @@ export const OrderHistoryTab: React.FC = () => {
                     <Card className="hover:shadow-md transition-shadow">
                       <CardBody className="p-6">
                         <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4">
-                          {/* 订单基本信息 */}
                           <div className="flex-1 space-y-2">
                             <div className="flex items-center gap-3 flex-wrap">
                               <h3 className="font-semibold text-default-900 break-all">
@@ -394,18 +393,6 @@ export const OrderHistoryTab: React.FC = () => {
                                 {order.package_name}
                               </div>
                             </div>
-                          </div>
-
-                          {/* 操作按钮 */}
-                          <div className="flex flex-col gap-2">
-                            <Button size="sm" variant="bordered">
-                              查看详情
-                            </Button>
-                            {statusConfig.filterValue === 'completed' && (
-                              <Button size="sm" color="primary" variant="light">
-                                重新购买
-                              </Button>
-                            )}
                           </div>
                         </div>
                       </CardBody>

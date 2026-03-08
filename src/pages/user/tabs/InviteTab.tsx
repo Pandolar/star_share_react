@@ -21,6 +21,12 @@ interface InviteOverviewData {
   invitees_count: number;
   granted_orders_count: number;
   total_duration_days: number;
+  reward_policy_summary?: {
+    reward_mode: 'duration' | 'cash';
+    reward_ratio: number;
+    reward_ratio_percent: number;
+    has_package_specific_rules: boolean;
+  };
 }
 
 interface InviteOrderRecord {
@@ -149,6 +155,9 @@ export const InviteTab: React.FC = () => {
 
   const inviteLink = overview?.invite_link || '';
   const inviterCode = overview?.inviter_code || '';
+  const rewardModeText = overview?.reward_policy_summary?.reward_mode === 'cash' ? '返现' : '返时长';
+  const rewardRatioPercent = overview?.reward_policy_summary?.reward_ratio_percent ?? 0;
+  const hasPackageSpecificRules = Boolean(overview?.reward_policy_summary?.has_package_specific_rules);
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
@@ -216,40 +225,61 @@ export const InviteTab: React.FC = () => {
             分享给好友
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-3 items-end">
-            <Input
-              label="邀请链接"
-              value={inviteLink}
-              isReadOnly
-              description="推荐直接分享注册链接，好友打开后会自动带上您的邀请码。"
-            />
-            <Button color="primary" onPress={() => copyText(inviteLink, '邀请链接已复制')} startContent={<Copy className="w-4 h-4" />}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="flex-1">
+              <Input
+                label="邀请链接"
+                value={inviteLink}
+                isReadOnly
+                description="推荐直接分享注册链接，好友打开后会自动带上您的邀请码。"
+              />
+            </div>
+            <Button
+              color="primary"
+              className="h-10 min-w-[112px] sm:mb-[2px]"
+              onPress={() => copyText(inviteLink, '邀请链接已复制')}
+              startContent={<Copy className="w-4 h-4" />}
+            >
               复制链接
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-3 items-end">
-            <Input
-              label="邀请码"
-              value={inviterCode}
-              isReadOnly
-              description="也可以单独复制邀请码，好友注册时展开邀请码输入框填写即可。"
-            />
-            <Button variant="flat" color="primary" onPress={() => copyText(inviterCode, '邀请码已复制')} startContent={<Copy className="w-4 h-4" />}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="flex-1">
+              <Input
+                label="邀请码"
+                value={inviterCode}
+                isReadOnly
+                description="也可以单独复制邀请码，好友注册时展开邀请码输入框填写即可。"
+              />
+            </div>
+            <Button
+              variant="flat"
+              color="primary"
+              className="h-10 min-w-[112px] sm:mb-[2px]"
+              onPress={() => copyText(inviterCode, '邀请码已复制')}
+              startContent={<Copy className="w-4 h-4" />}
+            >
               复制邀请码
             </Button>
           </div>
 
           <Divider />
 
-          <div className="rounded-xl bg-primary/5 border border-primary/10 p-4 text-sm text-default-700 leading-7">
+          <div className="rounded-xl bg-primary/5 border border-primary/10 p-4 text-sm text-default-700 leading-7 space-y-2">
             <div className="flex items-center gap-2 font-semibold text-default-900 mb-2">
               <Info className="w-4 h-4 text-primary" />
               邀请说明
             </div>
             <div>1. 好友通过您的专属链接注册，或在注册时手动填写您的邀请码。</div>
-            <div>2. 好友支付成功后，系统会按您的邀请规则自动计算奖励。</div>
-            <div>3. 当前页面仅展示返时长相关数据；返现等其他后台配置暂不在前台显示。</div>
+            <div>2. 当前默认邀请奖励类型：<span className="font-medium text-default-900">{rewardModeText}</span>，奖励比例约为 <span className="font-medium text-default-900">{rewardRatioPercent}%</span>。</div>
+            <div>3. 好友支付成功后，系统会按您的邀请规则自动计算奖励；若部分套餐有单独规则，则以实际订单结算为准。</div>
+            <div>4. 当前页面仅展示返时长相关数据；返现等其他后台配置暂不在前台显示。</div>
+            {hasPackageSpecificRules && (
+              <div className="text-xs text-primary-700 bg-primary/8 rounded-lg px-3 py-2">
+                您当前存在套餐级单独邀请规则，不同套餐的实际奖励比例可能略有不同。
+              </div>
+            )}
           </div>
         </CardBody>
       </Card>

@@ -311,6 +311,12 @@ export const inviteUserApi = {
             withdraw_pending_amount: number;
             withdraw_done_amount: number;
         };
+        reward_policy_summary?: {
+            reward_mode: 'duration' | 'cash';
+            reward_ratio: number;
+            reward_ratio_percent: number;
+            has_package_specific_rules: boolean;
+        };
     }>> => {
         return createUserRequest(getUserApiUrl('/u/invite_overview'), {
             method: 'GET',
