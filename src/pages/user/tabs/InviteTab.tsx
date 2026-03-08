@@ -284,8 +284,7 @@ export const InviteTab: React.FC = () => {
             <div>4. 返时长奖励会按您当前可享受的最高套餐等级计算，且奖励等级不会超过被邀请人本次实际订阅的套餐等级。</div>
             <div>5. 若被邀请人订阅的套餐时长小于 <span className="font-medium text-default-900">{minRewardDurationDays} 天</span>，系统只会记录该订单，不发放返时长或返现奖励，且不占用前 N 笔奖励名额。</div>
             <div>6. 好友支付成功后，系统会按您的邀请规则自动计算奖励；若部分套餐有单独规则，则以实际订单结算为准。</div>
-            <div>7. 当前页面仅展示返时长相关数据；返现等其他后台配置暂不在前台显示。</div>
-            <div>8. 如有任何问题，请及时联系客服协助处理。</div>
+            <div>7. 如有任何问题，请及时联系客服协助处理。</div>
             {hasPackageSpecificRules && (
               <div className="text-xs text-primary-700 bg-primary/8 rounded-lg px-3 py-2">
                 您当前存在套餐级单独邀请规则，不同套餐的实际奖励比例可能略有不同。
