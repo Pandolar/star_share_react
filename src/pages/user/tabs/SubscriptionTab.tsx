@@ -209,8 +209,14 @@ export const SubscriptionTab: React.FC = () => {
 
   // 创建订单
   const createOrder = async (packageId: number) => {
+    let pendingPaymentWindow: Window | null = null;
+
     try {
       setOrderLoading(true);
+
+      if (isMobileDevice) {
+        pendingPaymentWindow = window.open('', '_blank');
+      }
 
       // 移动端添加 device 参数
       const requestData = isMobileDevice ? { device: "mobile" } : {};
@@ -225,19 +231,52 @@ export const SubscriptionTab: React.FC = () => {
 
         // 移动端直接打开支付URL
         if (isMobileDevice && response.data.payment_url) {
-          window.open(response.data.payment_url, '_blank');
+          if (pendingPaymentWindow && !pendingPaymentWindow.closed) {
+            pendingPaymentWindow.location.href = response.data.payment_url;
+            pendingPaymentWindow.focus();
+          } else {
+            const popupWindow = window.open(response.data.payment_url, '_blank');
+
+            if (!popupWindow) {
+              console.warn('支付窗口被拦截，用户可使用二维码兜底支付');
+            }
+          }
         }
 
         startPaymentStatusCheck(response.data.order_id);
         startQrCodeTimer();
       } else {
+        if (pendingPaymentWindow && !pendingPaymentWindow.closed) {
+          pendingPaymentWindow.close();
+        }
         alert(response.msg || '创建订单失败');
       }
     } catch (err) {
+      if (pendingPaymentWindow && !pendingPaymentWindow.closed) {
+        pendingPaymentWindow.close();
+      }
       alert(err instanceof Error ? err.message : '网络错误');
     } finally {
       setOrderLoading(false);
     }
+  };
+
+  const handleInlineQrCodeFallback = () => {
+    if (orderInfo?.qr_code) {
+      setShowInlineQRCode(true);
+      return;
+    }
+
+    if (orderInfo?.payment_url) {
+      const popupWindow = window.open(orderInfo.payment_url, '_blank');
+
+      if (!popupWindow) {
+        window.location.href = orderInfo.payment_url;
+      }
+      return;
+    }
+
+    alert('暂未获取到支付二维码，请稍后重试或联系客服');
   };
 
   // 开始二维码计时器
@@ -1077,7 +1116,13 @@ export const SubscriptionTab: React.FC = () => {
                           </div>
                           <div className="text-sm text-default-500 space-y-2">
                             <p>请在新窗口中完成支付。</p>
-                            <p className="text-primary font-medium">若没有自动弹出，可直接显示二维码并截图后再扫码支付。</p>
+                            <button
+                              type="button"
+                              onClick={handleInlineQrCodeFallback}
+                              className="text-primary font-medium hover:underline underline-offset-4"
+                            >
+                              支付页没自动弹出？点这里直接显示二维码支付，可截图后再扫码。
+                            </button>
                           </div>
 
                           <div className="flex flex-wrap gap-3 justify-center">
@@ -1087,7 +1132,11 @@ export const SubscriptionTab: React.FC = () => {
                                 variant="solid"
                                 onPress={() => {
                                   try {
-                                    window.location.href = orderInfo.payment_url as string;
+                                    const popupWindow = window.open(orderInfo.payment_url as string, '_blank');
+
+                                    if (!popupWindow) {
+                                      window.location.href = orderInfo.payment_url as string;
+                                    }
                                   } catch (e) {
                                     alert('无法打开支付页面，请稍后重试');
                                   }
@@ -1097,14 +1146,14 @@ export const SubscriptionTab: React.FC = () => {
                                 立刻支付
                               </Button>
                             )}
-                            {orderInfo?.qr_code && (
+                            {(orderInfo?.qr_code || orderInfo?.payment_url) && (
                               <Button
                                 color="secondary"
                                 variant="flat"
-                                onPress={() => setShowInlineQRCode((prev) => !prev)}
+                                onPress={handleInlineQrCodeFallback}
                                 className="min-w-40"
                               >
-                                {showInlineQRCode ? '收起支付二维码' : '没有弹出窗口？点我直接显示支付二维码'}
+                                {showInlineQRCode ? '二维码已显示，请直接扫码付款' : '没弹出支付页？点这里显示二维码支付'}
                               </Button>
                             )}
                             <Button
