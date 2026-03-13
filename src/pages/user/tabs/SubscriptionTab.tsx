@@ -207,6 +207,42 @@ export const SubscriptionTab: React.FC = () => {
     }
   }, [subscriptionCategories]);
 
+  const openPaymentWindow = (paymentUrl?: string | null, targetWindow?: Window | null) => {
+    if (!paymentUrl) {
+      return false;
+    }
+
+    if (targetWindow && !targetWindow.closed) {
+      targetWindow.location.href = paymentUrl;
+      targetWindow.focus();
+      return true;
+    }
+
+    const popupWindow = window.open(paymentUrl, '_blank');
+    return !!popupWindow;
+  };
+
+  const handleShowInlineQRCode = () => {
+    if (!orderInfo?.qr_code) {
+      alert('暂未获取到支付二维码，请稍后重试或联系客服');
+      return;
+    }
+
+    setShowInlineQRCode(true);
+  };
+
+  const handleOpenPaymentWindow = () => {
+    if (!orderInfo?.payment_url) {
+      alert('暂未获取到支付链接，请稍后重试或联系客服');
+      return;
+    }
+
+    const opened = openPaymentWindow(orderInfo.payment_url);
+    if (!opened) {
+      alert('当前设备未能弹出新窗口，请直接使用本页二维码支付');
+    }
+  };
+
   // 创建订单
   const createOrder = async (packageId: number) => {
     let pendingPaymentWindow: Window | null = null;
@@ -229,17 +265,11 @@ export const SubscriptionTab: React.FC = () => {
         setQrCodeExpired(false);
         setShowInlineQRCode(false);
 
-        // 移动端直接打开支付URL
         if (isMobileDevice && response.data.payment_url) {
-          if (pendingPaymentWindow && !pendingPaymentWindow.closed) {
-            pendingPaymentWindow.location.href = response.data.payment_url;
-            pendingPaymentWindow.focus();
-          } else {
-            const popupWindow = window.open(response.data.payment_url, '_blank');
+          const opened = openPaymentWindow(response.data.payment_url, pendingPaymentWindow);
 
-            if (!popupWindow) {
-              console.warn('支付窗口被拦截，用户可使用二维码兜底支付');
-            }
+          if (!opened) {
+            console.warn('支付窗口被拦截，用户可直接在本页显示二维码支付');
           }
         }
 
@@ -259,24 +289,6 @@ export const SubscriptionTab: React.FC = () => {
     } finally {
       setOrderLoading(false);
     }
-  };
-
-  const handleInlineQrCodeFallback = () => {
-    if (orderInfo?.qr_code) {
-      setShowInlineQRCode(true);
-      return;
-    }
-
-    if (orderInfo?.payment_url) {
-      const popupWindow = window.open(orderInfo.payment_url, '_blank');
-
-      if (!popupWindow) {
-        window.location.href = orderInfo.payment_url;
-      }
-      return;
-    }
-
-    alert('暂未获取到支付二维码，请稍后重试或联系客服');
   };
 
   // 开始二维码计时器
@@ -1111,42 +1123,32 @@ export const SubscriptionTab: React.FC = () => {
                           <div className="flex items-center justify-center gap-2">
                             <QrCode className="w-5 h-5 text-primary" />
                             <span className="text-base font-medium">
-                              支付页面已在新窗口打开
+                              可直接在本页扫码支付，也可新窗口打开支付页
                             </span>
                           </div>
                           <div className="text-sm text-default-500 space-y-2">
-                            <p>请在新窗口中完成支付。</p>
+                            <p>若当前设备无法弹出新窗口，请直接在本页显示二维码支付。</p>
                           </div>
 
                           <div className="flex flex-wrap gap-3 justify-center">
+                            {orderInfo?.qr_code && (
+                              <Button
+                                color="secondary"
+                                variant={showInlineQRCode ? 'solid' : 'flat'}
+                                onPress={handleShowInlineQRCode}
+                                className="min-w-40"
+                              >
+                                {showInlineQRCode ? '二维码已显示，请直接扫码付款' : '直接显示二维码'}
+                              </Button>
+                            )}
                             {orderInfo?.payment_url && (
                               <Button
                                 color="primary"
-                                variant="solid"
-                                onPress={() => {
-                                  try {
-                                    const popupWindow = window.open(orderInfo.payment_url as string, '_blank');
-
-                                    if (!popupWindow) {
-                                      window.location.href = orderInfo.payment_url as string;
-                                    }
-                                  } catch (e) {
-                                    alert('无法打开支付页面，请稍后重试');
-                                  }
-                                }}
-                                className="min-w-24"
-                              >
-                                立刻支付
-                              </Button>
-                            )}
-                            {(orderInfo?.qr_code || orderInfo?.payment_url) && (
-                              <Button
-                                color="secondary"
                                 variant="flat"
-                                onPress={handleInlineQrCodeFallback}
-                                className="min-w-40"
+                                onPress={handleOpenPaymentWindow}
+                                className="min-w-32"
                               >
-                                {showInlineQRCode ? '二维码已显示，请直接扫码付款' : '没弹出支付页？点这里显示二维码支付'}
+                                新窗口支付
                               </Button>
                             )}
                             <Button
