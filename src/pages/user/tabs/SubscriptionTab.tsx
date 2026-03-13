@@ -1116,13 +1116,6 @@ export const SubscriptionTab: React.FC = () => {
                           </div>
                           <div className="text-sm text-default-500 space-y-2">
                             <p>请在新窗口中完成支付。</p>
-                            <button
-                              type="button"
-                              onClick={handleInlineQrCodeFallback}
-                              className="text-primary font-medium hover:underline underline-offset-4"
-                            >
-                              支付页没自动弹出？点这里直接显示二维码支付，可截图后再扫码。
-                            </button>
                           </div>
 
                           <div className="flex flex-wrap gap-3 justify-center">
