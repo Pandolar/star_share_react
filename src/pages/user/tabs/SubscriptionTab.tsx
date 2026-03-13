@@ -207,6 +207,10 @@ export const SubscriptionTab: React.FC = () => {
     }
   }, [subscriptionCategories]);
 
+  const getQRCodeValue = (paymentInfo?: OrderInfo | null) => {
+    return paymentInfo?.qr_code || paymentInfo?.payment_url || '';
+  };
+
   const openPaymentWindow = (paymentUrl?: string | null, targetWindow?: Window | null) => {
     if (!paymentUrl) {
       return false;
@@ -223,7 +227,7 @@ export const SubscriptionTab: React.FC = () => {
   };
 
   const handleShowInlineQRCode = () => {
-    if (!orderInfo?.qr_code) {
+    if (!getQRCodeValue(orderInfo)) {
       alert('暂未获取到支付二维码，请稍后重试或联系客服');
       return;
     }
@@ -1131,7 +1135,7 @@ export const SubscriptionTab: React.FC = () => {
                           </div>
 
                           <div className="flex flex-wrap gap-3 justify-center">
-                            {orderInfo?.qr_code && (
+                            {getQRCodeValue(orderInfo) && (
                               <Button
                                 color="secondary"
                                 variant={showInlineQRCode ? 'solid' : 'flat'}
@@ -1174,12 +1178,12 @@ export const SubscriptionTab: React.FC = () => {
                             </Button>
                           </div>
 
-                          {showInlineQRCode && orderInfo?.qr_code && (
+                          {showInlineQRCode && getQRCodeValue(orderInfo) && (
                             <div className="rounded-2xl border border-primary/15 bg-default-50 px-4 py-5">
                               <div className="flex justify-center">
                                 <Card className="p-4 relative shadow-sm">
                                   <motion.img
-                                    src={generateQRCode(orderInfo.qr_code)}
+                                    src={generateQRCode(getQRCodeValue(orderInfo))}
                                     alt="支付二维码"
                                     className={`w-40 h-40 sm:w-48 sm:h-48 transition-all duration-500 ${qrCodeExpired ? 'opacity-30 grayscale' : ''}`}
                                     initial={{ opacity: 0, scale: 0.8 }}
@@ -1280,7 +1284,7 @@ export const SubscriptionTab: React.FC = () => {
                   <div className="flex justify-center px-2">
                     <Card className="p-4 sm:p-6 relative max-w-full">
                       <motion.img
-                        src={generateQRCode(orderInfo.qr_code)}
+                        src={generateQRCode(getQRCodeValue(orderInfo))}
                         alt="支付二维码"
                         className={`w-40 h-40 sm:w-48 sm:h-48 transition-all duration-500 max-w-full ${qrCodeExpired ? 'opacity-30 grayscale' : ''
                           }`}
