@@ -449,7 +449,7 @@ const UsersManagePage: React.FC = () => {
                             onQuickClearOpen();
                         }}
                     >
-                        一键加白
+                        一键解除限速
                     </Button>
                     <Button
                         className="admin-action-btn"
@@ -797,7 +797,7 @@ const UsersManagePage: React.FC = () => {
                 <ModalContent>
                     <ModalHeader className="flex gap-2 items-center">
                         <RefreshCw className="w-5 h-5" />
-                        一键加白
+                        一键解除限速
                     </ModalHeader>
                     <ModalBody>
                         <div className="space-y-4">

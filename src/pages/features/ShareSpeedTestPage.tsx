@@ -13,7 +13,7 @@ type SpeedTestResult = {
     isPrimary: boolean;
     success: boolean;
     durationMs: number;
-    status: 'pending' | 'success' | 'fail' | 'skipped';
+    status: 'pending' | 'success' | 'fail';
 };
 
 type TestResult = {
@@ -29,7 +29,6 @@ const SPEEDTEST_TIMEOUT_MS = 3000;
 
 const ShareSpeedTestPage: React.FC = () => {
     const [statusText, setStatusText] = useState<string>('正在获取可用节点...');
-    const [progressText, setProgressText] = useState<string>('');
     const [errorText, setErrorText] = useState<string>('');
     const [results, setResults] = useState<SpeedTestResult[]>([]);
     const [nodes, setNodes] = useState<NodeInfo[]>([]);
@@ -62,16 +61,9 @@ const ShareSpeedTestPage: React.FC = () => {
                 const backupNodes = fetchedNodes.filter((node) => !node.isPrimary);
                 const nodesToProbe = primaryNodes.length > 0 ? primaryNodes : fetchedNodes;
 
-                setStatusText(primaryNodes.length > 0 ? '正在测试主测速节点...' : '未检测到主测速节点，正在测试备用节点...');
+                setStatusText('正在并行测试节点速度...');
 
-                setResults(fetchedNodes.map((n) => ({
-                    node: n.url,
-                    weight: n.weight,
-                    isPrimary: n.isPrimary,
-                    success: false,
-                    durationMs: 0,
-                    status: 'pending'
-                })));
+                setResults(createPendingResults(nodesToProbe));
 
                 const testedNodes = new Set<string>();
 
@@ -89,21 +81,20 @@ const ShareSpeedTestPage: React.FC = () => {
                 const primarySuccessful = primaryResults.filter((result) => result.success);
 
                 let selectionPool = primarySuccessful;
-                let selectionSource: 'primary' | 'backup' = primaryNodes.length > 0 ? 'primary' : 'backup';
 
                 if (primarySuccessful.length === 0 && primaryNodes.length > 0 && backupNodes.length > 0) {
-                    setStatusText('主测速节点全部超时或不可用，正在测试备用节点...');
+                    setResults((prev) => ([
+                        ...prev,
+                        ...createPendingResults(backupNodes),
+                    ]));
 
                     const backupResults = await runTests(backupNodes);
                     const backupSuccessful = backupResults.filter((result) => result.success);
 
                     if (backupSuccessful.length > 0) {
                         selectionPool = backupSuccessful;
-                        selectionSource = 'backup';
                     }
                 }
-
-                setResults((prev) => finalizeUntestedNodes(prev, testedNodes));
 
                 if (selectionPool.length === 0) {
                     setErrorText('所有测速节点均不可用，正在随机尝试打开一个节点...');
@@ -124,9 +115,7 @@ const ShareSpeedTestPage: React.FC = () => {
                     if (!hasRedirectedRef.current) {
                         hasRedirectedRef.current = true;
                         const onlyIndex = fetchedNodes.findIndex((node) => node.url === selectionPool[0].node);
-                        const sourceText = selectionSource === 'backup' ? '备用节点' : '主测速节点';
                         setStatusText(`正在跳转至可用节点（节点${onlyIndex + 1}）...`);
-                        setProgressText(`已从${sourceText}中选出唯一可用节点`);
                         const nodeUrl = toHttpsUrl(selectionPool[0].node);
                         const fromUrl = `${nodeUrl}/home`;
                         window.location.replace(fromUrl);
@@ -144,8 +133,6 @@ const ShareSpeedTestPage: React.FC = () => {
                 const candidateCount = Math.max(1, Math.ceil(scoredNodes.length * 0.3));
                 const candidates = scoredNodes.slice(0, candidateCount);
                 const pick = candidates[Math.floor(Math.random() * candidates.length)];
-                const sourceText = selectionSource === 'backup' ? '备用节点' : '主测速节点';
-                setProgressText(`自动选择范围：${sourceText}中成功的 ${selectionPool.length} 个节点`);
 
                 setStatusText('测速完成，2秒后自动跳转至优选节点…');
 
@@ -181,7 +168,7 @@ const ShareSpeedTestPage: React.FC = () => {
                     <Spinner />
                     <h1 className="mt-4 text-xl font-semibold text-gray-900">优选最佳线路中</h1>
                     <p className="mt-2 text-sm text-gray-600">{statusText}</p>
-                    <p className="mt-1 text-xs text-gray-500">{progressText || (nodes.length > 0 ? `共 ${nodes.length} 个节点` : '')}</p>
+                    <p className="mt-1 text-xs text-gray-500">{nodes.length > 0 ? `共 ${nodes.length} 个节点` : ''}</p>
                     {errorText && (
                         <div className="mt-3 text-red-600 text-sm">{errorText}</div>
                     )}
@@ -193,17 +180,12 @@ const ShareSpeedTestPage: React.FC = () => {
                                     <li key={`${r.node}`} className="flex items-center justify-between px-3 py-2 bg-white">
                                         <div className="text-left">
                                             <div className="text-sm font-medium text-gray-900 truncate">{`节点${i + 1}`}</div>
-                                            <div className="text-xs text-gray-500">
-                                                {r.isPrimary ? '主测速节点' : '备用节点'}
-                                            </div>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <div className="text-xs tabular-nums text-gray-700 min-w-[88px] text-right">
-                                                {r.status === 'skipped'
-                                                    ? '备用节点'
-                                                    : (r.status === 'pending'
-                                                        ? '测试中…'
-                                                        : (r.success ? `${(r.durationMs / 1000).toFixed(3)} 秒` : 'wait'))}
+                                                {r.status === 'pending'
+                                                    ? '测试中…'
+                                                    : (r.success ? `${(r.durationMs / 1000).toFixed(3)} 秒` : 'wait')}
                                             </div>
                                             <button
                                                 className="px-2 py-1 text-xs rounded border border-gray-200 hover:bg-gray-50 text-blue-600 disabled:text-gray-400 disabled:border-gray-100"
@@ -251,7 +233,7 @@ function normalizeNodes(rawNodes: unknown[]): NodeInfo[] {
 
 function parseNodeInfo(item: unknown): NodeInfo | null {
     if (typeof item === 'string') {
-        return createNodeInfoFromRaw(item, undefined);
+        return createNodeInfoFromRaw(item);
     }
 
     if (!item || typeof item !== 'object') {
@@ -259,8 +241,12 @@ function parseNodeInfo(item: unknown): NodeInfo | null {
     }
 
     const record = item as Record<string, unknown>;
-    const rawUrl = typeof record.url === 'string' ? record.url : '';
-    const explicitWeight = parseNumericWeight(record.weight);
+    const rawUrl = typeof record.url === 'string'
+        ? record.url
+        : (typeof record.node === 'string'
+            ? record.node
+            : (typeof record.host === 'string' ? record.host : ''));
+    const explicitWeight = parseManualWeight(record);
 
     return createNodeInfoFromRaw(rawUrl, explicitWeight);
 }
@@ -278,14 +264,36 @@ function createNodeInfoFromRaw(rawUrl: string, explicitWeight?: number): NodeInf
     }
 
     const inlineWeight = parseNumericWeight(inlineWeightPart);
-    const weight = explicitWeight ?? inlineWeight ?? 0;
+    const hasExplicitInlineWeight = typeof inlineWeight === 'number';
+    const hasExplicitManualWeight = typeof explicitWeight === 'number';
+    const weight = hasExplicitInlineWeight ? inlineWeight : (hasExplicitManualWeight ? explicitWeight : 0);
 
     return {
         url: normalizedUrl,
         weight,
-        // 权重缺失或为 0 的节点视为备用节点，仅在主节点全部失败后才参与测速和自动选择。
-        isPrimary: weight > 0,
+        // 只有显式手动权重大于 0 的节点，才参与首轮测速。
+        isPrimary: (hasExplicitInlineWeight || hasExplicitManualWeight) && weight > 0,
     };
+}
+
+function parseManualWeight(record: Record<string, unknown>): number | undefined {
+    const manualWeightKeys = [
+        'manual_weight',
+        'manualWeight',
+        'priority_weight',
+        'priorityWeight',
+        'custom_weight',
+        'customWeight',
+    ];
+
+    for (const key of manualWeightKeys) {
+        const parsed = parseNumericWeight(record[key]);
+        if (typeof parsed === 'number') {
+            return parsed;
+        }
+    }
+
+    return undefined;
 }
 
 function parseNumericWeight(value: unknown): number | undefined {
@@ -303,6 +311,17 @@ function parseNumericWeight(value: unknown): number | undefined {
     return undefined;
 }
 
+function createPendingResults(nodes: NodeInfo[]): SpeedTestResult[] {
+    return nodes.map((node) => ({
+        node: node.url,
+        weight: node.weight,
+        isPrimary: node.isPrimary,
+        success: false,
+        durationMs: 0,
+        status: 'pending',
+    }));
+}
+
 function updateResultRow(previous: SpeedTestResult[], nodeUrl: string, result: TestResult): SpeedTestResult[] {
     return previous.map((item) => {
         if (item.node !== nodeUrl) {
@@ -318,17 +337,6 @@ function updateResultRow(previous: SpeedTestResult[], nodeUrl: string, result: T
             status: result.success ? 'success' : 'fail',
         };
     });
-}
-
-function finalizeUntestedNodes(previous: SpeedTestResult[], testedNodes: Set<string>): SpeedTestResult[] {
-    return previous.map((item) => (
-        testedNodes.has(item.node)
-            ? item
-            : {
-                ...item,
-                status: 'skipped',
-            }
-    ));
 }
 
 async function testNode(nodeInfo: NodeInfo): Promise<TestResult> {
