@@ -4,18 +4,22 @@ import SEOHead from '../../components/SEOHead';
 type NodeInfo = {
     url: string;
     weight: number;
+    isPrimary: boolean;
 };
 
 type SpeedTestResult = {
     node: string;
     weight: number;
+    isPrimary: boolean;
     success: boolean;
     durationMs: number;
-    status: 'pending' | 'success' | 'fail';
+    status: 'pending' | 'success' | 'fail' | 'skipped';
 };
 
 type TestResult = {
     node: string;
+    weight: number;
+    isPrimary: boolean;
     success: boolean;
     durationMs: number;
     status: 'pending' | 'success' | 'fail';
@@ -47,62 +51,62 @@ const ShareSpeedTestPage: React.FC = () => {
                     throw new Error(`获取节点失败: ${resp.status}`);
                 }
                 const data = await resp.json();
-                const fetchedNodes: NodeInfo[] = Array.isArray(data?.data) ? data.data : [];
+                const fetchedNodes = normalizeNodes(Array.isArray(data?.data) ? data.data : []);
 
                 if (fetchedNodes.length === 0) {
                     throw new Error('未获取到任何节点');
                 }
                 setNodes(fetchedNodes);
 
-                setStatusText('正在并行测试节点速度...');
+                const primaryNodes = fetchedNodes.filter((node) => node.isPrimary);
+                const backupNodes = fetchedNodes.filter((node) => !node.isPrimary);
+                const nodesToProbe = primaryNodes.length > 0 ? primaryNodes : fetchedNodes;
 
-                // 初始化 pending 结果以呈现"节点1~N"
+                setStatusText(primaryNodes.length > 0 ? '正在测试主测速节点...' : '未检测到主测速节点，正在测试备用节点...');
+
                 setResults(fetchedNodes.map((n) => ({
                     node: n.url,
                     weight: n.weight,
+                    isPrimary: n.isPrimary,
                     success: false,
                     durationMs: 0,
                     status: 'pending'
                 })));
 
-                // 并行测试并逐项更新 UI
-                const testPromises = fetchedNodes.map((nodeInfo, index) =>
-                    testNode(nodeInfo.url).then((r) => {
-                        setResults((prev) => {
-                            const copy = [...prev];
-                            copy[index] = {
-                                node: r.node,
-                                weight: nodeInfo.weight,
-                                success: r.success,
-                                durationMs: r.durationMs,
-                                status: r.success ? 'success' : 'fail'
-                            };
-                            return copy;
-                        });
-                        return { index, ...r, weight: nodeInfo.weight };
-                    })
+                const testedNodes = new Set<string>();
+
+                const runTests = async (targets: NodeInfo[]) => Promise.all(
+                    targets.map((nodeInfo) =>
+                        testNode(nodeInfo).then((result) => {
+                            testedNodes.add(nodeInfo.url);
+                            setResults((prev) => updateResultRow(prev, nodeInfo.url, result));
+                            return result;
+                        })
+                    )
                 );
 
-                const finished = await Promise.all(testPromises);
+                const primaryResults = await runTests(nodesToProbe);
+                const primarySuccessful = primaryResults.filter((result) => result.success);
 
-                const finalResults: SpeedTestResult[] = finished
-                    .sort((a, b) => a.index - b.index)
-                    .map(({ node, success, durationMs, weight }) => ({
-                        node,
-                        weight,
-                        success,
-                        durationMs,
-                        status: success ? 'success' : 'fail'
-                    }));
+                let selectionPool = primarySuccessful;
+                let selectionSource: 'primary' | 'backup' = primaryNodes.length > 0 ? 'primary' : 'backup';
 
-                //setProgressText(`共 ${fetchedNodes.length} 个节点，成功 ${finalResults.filter(v => v.success).length} 个`);
+                if (primarySuccessful.length === 0 && primaryNodes.length > 0 && backupNodes.length > 0) {
+                    setStatusText('主测速节点全部超时或不可用，正在测试备用节点...');
 
-                // 仅保留成功节点
-                const successful = finalResults.filter(r => r.success);
+                    const backupResults = await runTests(backupNodes);
+                    const backupSuccessful = backupResults.filter((result) => result.success);
 
-                if (successful.length === 0) {
-                    // 全部失败或超时：随机打开一个节点（新窗口）
-                    setErrorText('正在随机尝试打开一个节点...');
+                    if (backupSuccessful.length > 0) {
+                        selectionPool = backupSuccessful;
+                        selectionSource = 'backup';
+                    }
+                }
+
+                setResults((prev) => finalizeUntestedNodes(prev, testedNodes));
+
+                if (selectionPool.length === 0) {
+                    setErrorText('所有测速节点均不可用，正在随机尝试打开一个节点...');
 
                     if (!hasRedirectedRef.current && fetchedNodes.length > 0) {
                         hasRedirectedRef.current = true;
@@ -115,50 +119,42 @@ const ShareSpeedTestPage: React.FC = () => {
                     }
                     return;
                 }
-                // 只有一个可用节点：直接跳转
-                if (successful.length === 1) {
+
+                if (selectionPool.length === 1) {
                     if (!hasRedirectedRef.current) {
                         hasRedirectedRef.current = true;
-                        const onlyIndex = finalResults.findIndex(r => r.node === successful[0].node);
+                        const onlyIndex = fetchedNodes.findIndex((node) => node.url === selectionPool[0].node);
+                        const sourceText = selectionSource === 'backup' ? '备用节点' : '主测速节点';
                         setStatusText(`正在跳转至可用节点（节点${onlyIndex + 1}）...`);
-                        const nodeUrl = toHttpsUrl(successful[0].node);
+                        setProgressText(`已从${sourceText}中选出唯一可用节点`);
+                        const nodeUrl = toHttpsUrl(selectionPool[0].node);
                         const fromUrl = `${nodeUrl}/home`;
-                        const encodedFromUrl = encodeURIComponent(fromUrl);
-                        //const redirectUrl = `/login?fromurl=${encodedFromUrl}`;
                         window.location.replace(fromUrl);
                     }
                     return;
                 }
 
-                // 综合权重和延迟选择最佳节点
-                // 计算每个节点的综合评分：score = weight / durationMs
-                // 延迟越低、权重越高，score 越高
-                const scoredNodes = successful.map(r => ({
-                    ...r,
-                    score: r.weight / r.durationMs
+                const scoredNodes = selectionPool.map((result) => ({
+                    ...result,
+                    score: result.weight / Math.max(result.durationMs, 1)
                 }));
 
-                // 按评分排序（降序）
                 scoredNodes.sort((a, b) => b.score - a.score);
 
-                // 取前 30% 的高分节点作为候选池（至少1个）
                 const candidateCount = Math.max(1, Math.ceil(scoredNodes.length * 0.3));
                 const candidates = scoredNodes.slice(0, candidateCount);
-
-                // 从候选池中随机选择一个节点
                 const pick = candidates[Math.floor(Math.random() * candidates.length)];
+                const sourceText = selectionSource === 'backup' ? '备用节点' : '主测速节点';
+                setProgressText(`自动选择范围：${sourceText}中成功的 ${selectionPool.length} 个节点`);
 
-                // 展示完成提示，并在 2 秒后自动跳转（若期间用户未手动点击）
                 setStatusText('测速完成，2秒后自动跳转至优选节点…');
 
                 autoTimerRef.current = window.setTimeout(() => {
                     if (hasRedirectedRef.current) return;
-                    const pickIndex = finalResults.findIndex(r => r.node === pick.node);
+                    const pickIndex = fetchedNodes.findIndex((node) => node.url === pick.node);
                     setStatusText(`正在跳转至优选节点（节点${pickIndex + 1}）...`);
                     const nodeUrl = toHttpsUrl(pick.node);
                     const fromUrl = `${nodeUrl}/home`;
-                    const encodedFromUrl = encodeURIComponent(fromUrl);
-                    const redirectUrl = `/login?fromurl=${encodedFromUrl}`;
                     window.location.replace(fromUrl);
                 }, 2000);
 
@@ -197,10 +193,17 @@ const ShareSpeedTestPage: React.FC = () => {
                                     <li key={`${r.node}`} className="flex items-center justify-between px-3 py-2 bg-white">
                                         <div className="text-left">
                                             <div className="text-sm font-medium text-gray-900 truncate">{`节点${i + 1}`}</div>
+                                            <div className="text-xs text-gray-500">
+                                                {r.isPrimary ? '主测速节点' : '备用节点'}
+                                            </div>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <div className="text-xs tabular-nums text-gray-700 min-w-[88px] text-right">
-                                                {r.status === 'pending' ? '测试中…' : (r.success ? `${(r.durationMs / 1000).toFixed(3)} 秒` : 'wait')}
+                                                {r.status === 'skipped'
+                                                    ? '备用节点'
+                                                    : (r.status === 'pending'
+                                                        ? '测试中…'
+                                                        : (r.success ? `${(r.durationMs / 1000).toFixed(3)} 秒` : 'wait'))}
                                             </div>
                                             <button
                                                 className="px-2 py-1 text-xs rounded border border-gray-200 hover:bg-gray-50 text-blue-600 disabled:text-gray-400 disabled:border-gray-100"
@@ -235,13 +238,100 @@ const ShareSpeedTestPage: React.FC = () => {
 };
 
 function toHttpsUrl(node: string): string {
-    // 允许节点已包含协议，若无则补全 https://
     const hasProtocol = /^https?:\/\//i.test(node);
     const url = hasProtocol ? node : `https://${node}`;
     return url;
 }
 
-async function testNode(node: string): Promise<TestResult> {
+function normalizeNodes(rawNodes: unknown[]): NodeInfo[] {
+    return rawNodes
+        .map((item) => parseNodeInfo(item))
+        .filter((item): item is NodeInfo => Boolean(item?.url));
+}
+
+function parseNodeInfo(item: unknown): NodeInfo | null {
+    if (typeof item === 'string') {
+        return createNodeInfoFromRaw(item, undefined);
+    }
+
+    if (!item || typeof item !== 'object') {
+        return null;
+    }
+
+    const record = item as Record<string, unknown>;
+    const rawUrl = typeof record.url === 'string' ? record.url : '';
+    const explicitWeight = parseNumericWeight(record.weight);
+
+    return createNodeInfoFromRaw(rawUrl, explicitWeight);
+}
+
+function createNodeInfoFromRaw(rawUrl: string, explicitWeight?: number): NodeInfo | null {
+    const trimmed = rawUrl.trim();
+    if (!trimmed) {
+        return null;
+    }
+
+    const [urlPart, inlineWeightPart] = trimmed.split('|', 2);
+    const normalizedUrl = urlPart.trim();
+    if (!normalizedUrl) {
+        return null;
+    }
+
+    const inlineWeight = parseNumericWeight(inlineWeightPart);
+    const weight = explicitWeight ?? inlineWeight ?? 0;
+
+    return {
+        url: normalizedUrl,
+        weight,
+        // 权重缺失或为 0 的节点视为备用节点，仅在主节点全部失败后才参与测速和自动选择。
+        isPrimary: weight > 0,
+    };
+}
+
+function parseNumericWeight(value: unknown): number | undefined {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+
+    if (typeof value === 'string' && value.trim()) {
+        const parsed = Number(value.trim());
+        if (Number.isFinite(parsed)) {
+            return parsed;
+        }
+    }
+
+    return undefined;
+}
+
+function updateResultRow(previous: SpeedTestResult[], nodeUrl: string, result: TestResult): SpeedTestResult[] {
+    return previous.map((item) => {
+        if (item.node !== nodeUrl) {
+            return item;
+        }
+
+        return {
+            node: result.node,
+            weight: result.weight,
+            isPrimary: result.isPrimary,
+            success: result.success,
+            durationMs: result.durationMs,
+            status: result.success ? 'success' : 'fail',
+        };
+    });
+}
+
+function finalizeUntestedNodes(previous: SpeedTestResult[], testedNodes: Set<string>): SpeedTestResult[] {
+    return previous.map((item) => (
+        testedNodes.has(item.node)
+            ? item
+            : {
+                ...item,
+                status: 'skipped',
+            }
+    ));
+}
+
+async function testNode(nodeInfo: NodeInfo): Promise<TestResult> {
     const start = performance.now();
 
     const controller = new AbortController();
@@ -249,10 +339,8 @@ async function testNode(node: string): Promise<TestResult> {
 
     let success = false;
     try {
-        const base = toHttpsUrl(node);
+        const base = toHttpsUrl(nodeInfo.url);
         const url = `${base.replace(/\/$/, '')}/u/ping`;
-        //const url = `${base.replace(/\/$/, '')}/ces/v1/projects/oai/settings`;
-        //const url = `${base.replace(/\/$/, '')}/starping`;
         const resp = await fetch(url, {
             method: 'GET',
             signal: controller.signal,
@@ -261,7 +349,6 @@ async function testNode(node: string): Promise<TestResult> {
             }
         });
 
-        // ✅ 只要状态码是 200 就算成功
         success = resp.status === 200;
     } catch (_) {
         success = false;
@@ -271,7 +358,9 @@ async function testNode(node: string): Promise<TestResult> {
 
     const end = performance.now();
     return {
-        node,
+        node: nodeInfo.url,
+        weight: nodeInfo.weight,
+        isPrimary: nodeInfo.isPrimary,
         success,
         durationMs: end - start,
         status: success ? 'success' : 'fail'

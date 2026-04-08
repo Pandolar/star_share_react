@@ -68,8 +68,15 @@ const UsersManagePage: React.FC = () => {
     const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure();
     const { isOpen: isViewOpen, onOpen: onViewOpen, onClose: onViewClose } = useDisclosure();
     const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
+    const { isOpen: isQuickClearOpen, onOpen: onQuickClearOpen, onClose: onQuickClearClose } = useDisclosure();
+    const { isOpen: isClearLimitConfirmOpen, onOpen: onClearLimitConfirmOpen, onClose: onClearLimitConfirmClose } = useDisclosure();
 
     const [pageSize, setPageSize] = useState<number>(10);
+    const [clearLimitKeyword, setClearLimitKeyword] = useState('');
+    const [clearLimitCandidates, setClearLimitCandidates] = useState<User[]>([]);
+    const [clearLimitSearchLoading, setClearLimitSearchLoading] = useState(false);
+    const [clearLimitSubmitting, setClearLimitSubmitting] = useState(false);
+    const [pendingClearLimitUser, setPendingClearLimitUser] = useState<User | null>(null);
 
     // 状态选项
     const statusOptions = [
@@ -110,7 +117,6 @@ const UsersManagePage: React.FC = () => {
                 showToast(response.msg || '获取用户列表失败', 'error');
             }
         } catch (error) {
-            console.error('获取用户列表失败:', error);
             // 错误捕获：显示空表格
             setUsers([]);
             setTotal(0);
@@ -158,7 +164,6 @@ const UsersManagePage: React.FC = () => {
                 showToast(response.msg || '创建用户失败', 'error');
             }
         } catch (error) {
-            console.error('创建用户失败:', error);
             showToast('创建用户失败', 'error');
         }
     };
@@ -184,7 +189,6 @@ const UsersManagePage: React.FC = () => {
                 showToast(response.msg || '更新用户失败', 'error');
             }
         } catch (error) {
-            console.error('更新用户失败:', error);
             showToast('更新用户失败', 'error');
         }
     };
@@ -204,24 +208,89 @@ const UsersManagePage: React.FC = () => {
                 showToast(response.msg || '删除用户失败', 'error');
             }
         } catch (error) {
-            console.error('删除用户失败:', error);
             showToast('删除用户失败', 'error');
         }
     };
 
-    // 清除用户限速
-    const handleClearLimit = async (user: User) => {
+    // 统一通过确认弹窗执行解除限速，避免列表操作和批量搜索入口行为不一致。
+    const confirmClearLimit = async () => {
+        if (!pendingClearLimitUser) return;
+
+        setClearLimitSubmitting(true);
         try {
-            const response = await adminApiService.clearUserLimit(user.id);
+            const response = await adminApiService.clearUserLimit(pendingClearLimitUser.id);
             if (response.code === 20000) {
-                showToast('已清除该用户的限速', 'success');
+                showToast('已解除该用户的限速', 'success');
+                onClearLimitConfirmClose();
+                setPendingClearLimitUser(null);
             } else {
-                showToast(response.msg || '清除限速失败', 'error');
+                showToast(response.msg || '解除限速失败', 'error');
             }
         } catch (error) {
-            console.error('清除限速失败:', error);
-            showToast('清除限速失败', 'error');
+            showToast('解除限速失败', 'error');
+        } finally {
+            setClearLimitSubmitting(false);
         }
+    };
+
+    const openClearLimitConfirm = (user: User) => {
+        setPendingClearLimitUser(user);
+        onClearLimitConfirmOpen();
+    };
+
+    const handleQuickClearLimitSearch = async () => {
+        const keyword = clearLimitKeyword.trim();
+        if (!keyword) {
+            showToast('请输入邮箱、用户名或用户ID', 'warning');
+            return;
+        }
+
+        setClearLimitSearchLoading(true);
+        try {
+            const fuzzyResponse = await adminApiService.getUsers({
+                current_page: 1,
+                page_size: 10,
+                querystring: keyword,
+            });
+
+            if (fuzzyResponse.code !== 20000) {
+                throw new Error(fuzzyResponse.msg || '搜索用户失败');
+            }
+
+            let candidates = Array.isArray(fuzzyResponse.data) ? fuzzyResponse.data : [];
+
+            // 纯数字输入时额外补一次 ID 精确查询，兼容后端仅对 querystring 做用户名/邮箱匹配的情况。
+            if (/^\d+$/.test(keyword)) {
+                const exactIdResponse = await adminApiService.getUsers({
+                    current_page: 1,
+                    page_size: 1,
+                    id: Number(keyword),
+                });
+
+                if (exactIdResponse.code === 20000) {
+                    const exactUsers = Array.isArray(exactIdResponse.data) ? exactIdResponse.data : [];
+                    const mergedUsers = [...candidates, ...exactUsers];
+                    candidates = mergedUsers.filter((user, index, list) => list.findIndex((item) => item.id === user.id) === index);
+                }
+            }
+
+            setClearLimitCandidates(candidates);
+
+            if (candidates.length === 0) {
+                showToast('未找到匹配用户，请检查输入内容', 'warning');
+            }
+        } catch (error) {
+            showToast(error instanceof Error ? error.message : '搜索用户失败', 'error');
+            setClearLimitCandidates([]);
+        } finally {
+            setClearLimitSearchLoading(false);
+        }
+    };
+
+    const handleQuickClearLimitSelect = (user: User) => {
+        setPendingClearLimitUser(user);
+        onQuickClearClose();
+        onClearLimitConfirmOpen();
     };
 
     // 打开编辑Modal
@@ -282,7 +351,7 @@ const UsersManagePage: React.FC = () => {
                 <DropdownItem
                     key="clear-limit"
                     startContent={<RefreshCw className="w-4 h-4" />}
-                    onPress={() => handleClearLimit(user)}
+                    onPress={() => openClearLimitConfirm(user)}
                 >
                     清除限速
                 </DropdownItem>
@@ -325,7 +394,7 @@ const UsersManagePage: React.FC = () => {
                     <div className="flex flex-col sm:flex-row gap-4">
                         <Input
                             placeholder="搜索用户名或邮箱..."
-
+                            value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             startContent={<Search className="w-4 h-4 text-gray-400" />}
                             className="flex-1"
@@ -365,18 +434,32 @@ const UsersManagePage: React.FC = () => {
             </Card>
 
             {/* 操作区域 */}
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center gap-3 flex-wrap">
                 <div className="text-sm text-gray-600">
                     共 {total} 个用户
                 </div>
-                <Button
-                    className="admin-action-btn"
-                    color="primary"
-                    startContent={<Plus className="w-4 h-4" />}
-                    onPress={onCreateOpen}
-                >
-                    添加用户
-                </Button>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                        variant="bordered"
+                        color="primary"
+                        startContent={<RefreshCw className="w-4 h-4" />}
+                        onPress={() => {
+                            setClearLimitKeyword('');
+                            setClearLimitCandidates([]);
+                            onQuickClearOpen();
+                        }}
+                    >
+                        一键加白
+                    </Button>
+                    <Button
+                        className="admin-action-btn"
+                        color="primary"
+                        startContent={<Plus className="w-4 h-4" />}
+                        onPress={onCreateOpen}
+                    >
+                        添加用户
+                    </Button>
+                </div>
             </div>
 
             {/* 用户表格 */}
@@ -589,7 +672,8 @@ const UsersManagePage: React.FC = () => {
             <Modal
                 isOpen={isViewOpen}
                 onClose={onViewClose}
-                size="2xl"
+                size="4xl"
+                scrollBehavior="inside"
             >
                 <ModalContent>
                     <ModalHeader className="flex gap-2 items-center">
@@ -613,6 +697,10 @@ const UsersManagePage: React.FC = () => {
                                         <div className="font-medium">{selectedUser.email}</div>
                                     </div>
                                     <div>
+                                        <span className="text-sm text-gray-500">邀请人用户ID</span>
+                                        <div className="font-medium">{selectedUser.inviter_user ?? '-'}</div>
+                                    </div>
+                                    <div>
                                         <span className="text-sm text-gray-500">电话</span>
                                         <div className="font-medium">{selectedUser.tel || '-'}</div>
                                     </div>
@@ -631,26 +719,34 @@ const UsersManagePage: React.FC = () => {
                                         <div className="font-medium">{selectedUser.inviter_code || '-'}</div>
                                     </div>
                                     <div>
+                                        <span className="text-sm text-gray-500">邀请绑定时间</span>
+                                        <div className="font-medium">
+                                            {selectedUser.invite_bound_at ? dayjs(selectedUser.invite_bound_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-gray-500">XY UUID Token</span>
+                                        <div className="font-medium break-all">{selectedUser.xy_uuid_token || '-'}</div>
+                                    </div>
+                                    <div>
                                         <span className="text-sm text-gray-500">微信OpenID</span>
-                                        <div className="font-medium">{selectedUser.wechat_openid || '-'}</div>
+                                        <div className="font-medium break-all">{selectedUser.wechat_openid || '-'}</div>
                                     </div>
                                 </div>
-                                {selectedUser.remarks && (
-                                    <div>
-                                        <span className="text-sm text-gray-500">备注</span>
-                                        <div className="mt-1 p-3 bg-gray-50 rounded-lg text-sm">
-                                            {selectedUser.remarks}
-                                        </div>
+                                <div>
+                                    <span className="text-sm text-gray-500">备注</span>
+                                    <div className="mt-1 p-3 bg-gray-50 rounded-lg text-sm whitespace-pre-wrap break-words">
+                                        {selectedUser.remarks || '-'}
                                     </div>
-                                )}
-                                {selectedUser.preferences && (
-                                    <div>
-                                        <span className="text-sm text-gray-500">用户偏好</span>
-                                        <div className="mt-1 p-3 bg-gray-50 rounded-lg text-sm">
-                                            <pre>{JSON.stringify(selectedUser.preferences, null, 2)}</pre>
-                                        </div>
+                                </div>
+                                <div>
+                                    <span className="text-sm text-gray-500">用户偏好</span>
+                                    <div className="mt-1 p-3 bg-gray-50 rounded-lg text-sm overflow-x-auto">
+                                        <pre className="whitespace-pre-wrap break-words">
+                                            {selectedUser.preferences ? JSON.stringify(selectedUser.preferences, null, 2) : '-'}
+                                        </pre>
                                     </div>
-                                )}
+                                </div>
                             </div>
                         )}
                     </ModalBody>
@@ -687,6 +783,117 @@ const UsersManagePage: React.FC = () => {
                         </Button>
                         <Button color="danger" onPress={handleDelete}>
                             确认删除
+                        </Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
+
+            <Modal
+                isOpen={isQuickClearOpen}
+                onClose={onQuickClearClose}
+                size="3xl"
+                scrollBehavior="inside"
+            >
+                <ModalContent>
+                    <ModalHeader className="flex gap-2 items-center">
+                        <RefreshCw className="w-5 h-5" />
+                        一键加白
+                    </ModalHeader>
+                    <ModalBody>
+                        <div className="space-y-4">
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <Input
+                                    label="邮箱 / 用户名 / 用户ID"
+                                    placeholder="支持模糊搜索，例如输入 aaaaaaa"
+                                    value={clearLimitKeyword}
+                                    onChange={(e) => setClearLimitKeyword(e.target.value)}
+                                    onKeyPress={(e) => e.key === 'Enter' && handleQuickClearLimitSearch()}
+                                    className="flex-1"
+                                />
+                                <Button
+                                    color="primary"
+                                    className="sm:self-end"
+                                    onPress={handleQuickClearLimitSearch}
+                                    isLoading={clearLimitSearchLoading}
+                                >
+                                    搜索用户
+                                </Button>
+                            </div>
+
+                            <Divider />
+
+                            <div className="space-y-3">
+                                <div className="text-sm text-gray-600">
+                                    {clearLimitCandidates.length > 0 ? `找到 ${clearLimitCandidates.length} 个候选用户，请确认目标用户后再解除限速。` : '输入任意邮箱、用户名或用户 ID 后搜索。'}
+                                </div>
+                                <div className="space-y-2">
+                                    {clearLimitCandidates.map((user) => (
+                                        <div key={user.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-gray-200 p-3">
+                                            <div className="space-y-1">
+                                                <div className="font-medium text-gray-900">{user.username || '未设置用户名'}</div>
+                                                <div className="text-sm text-gray-600">{user.email}</div>
+                                                <div className="text-xs text-gray-500">
+                                                    ID: {user.id} · 状态: {user.status === 1 ? '正常' : '禁用'} · 创建时间: {dayjs(user.created_at).format('YYYY-MM-DD HH:mm:ss')}
+                                                </div>
+                                            </div>
+                                            <Button color="primary" variant="flat" onPress={() => handleQuickClearLimitSelect(user)}>
+                                                确认是此用户
+                                            </Button>
+                                        </div>
+                                    ))}
+                                    {!clearLimitSearchLoading && clearLimitCandidates.length === 0 && (
+                                        <div className="rounded-lg border border-dashed border-gray-200 p-6 text-center text-sm text-gray-500">
+                                            暂无候选用户
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </ModalBody>
+                    <ModalFooter>
+                        <Button variant="light" onPress={onQuickClearClose}>
+                            关闭
+                        </Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
+
+            <Modal
+                isOpen={isClearLimitConfirmOpen}
+                onClose={() => {
+                    setPendingClearLimitUser(null);
+                    onClearLimitConfirmClose();
+                }}
+                size="lg"
+            >
+                <ModalContent>
+                    <ModalHeader className="flex gap-2 items-center">
+                        <RefreshCw className="w-5 h-5 text-warning" />
+                        确认解除限速
+                    </ModalHeader>
+                    <ModalBody>
+                        <div className="space-y-3 text-sm text-gray-700">
+                            <p>请确认要为以下用户解除限速：</p>
+                            <div className="rounded-lg bg-gray-50 p-4 space-y-2">
+                                <div><span className="text-gray-500">用户ID：</span>{pendingClearLimitUser?.id ?? '-'}</div>
+                                <div><span className="text-gray-500">用户名：</span>{pendingClearLimitUser?.username || '-'}</div>
+                                <div><span className="text-gray-500">邮箱：</span>{pendingClearLimitUser?.email || '-'}</div>
+                            </div>
+                            <p className="text-warning-600">确认后将立即调用解除限速接口，请确保目标用户无误。</p>
+                        </div>
+                    </ModalBody>
+                    <ModalFooter>
+                        <Button
+                            variant="light"
+                            onPress={() => {
+                                setPendingClearLimitUser(null);
+                                onClearLimitConfirmClose();
+                            }}
+                        >
+                            取消
+                        </Button>
+                        <Button color="warning" onPress={confirmClearLimit} isLoading={clearLimitSubmitting}>
+                            确认解除限速
                         </Button>
                     </ModalFooter>
                 </ModalContent>

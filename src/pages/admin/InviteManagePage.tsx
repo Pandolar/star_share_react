@@ -11,6 +11,7 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
+  Pagination,
   Select,
   SelectItem,
   Spinner,
@@ -25,6 +26,7 @@ import {
   useDisclosure,
 } from '@heroui/react';
 import { Filter, Gift, RefreshCw, Save, Settings2, Ticket, Users, Wallet } from 'lucide-react';
+import dayjs from 'dayjs';
 import adminApiService from '../../services/adminApi';
 import { InvitePolicyConfig, InviteRewardRecord, User, WorkOrder } from '../../types/admin';
 import { showToast } from '../../components/Toast';
@@ -46,6 +48,8 @@ const createDefaultPolicyForm = (): InvitePolicyFormState => ({
   min_withdraw_amount: '100',
   package_rules: '{}',
 });
+
+const INVITER_PAGE_SIZE = 10;
 
 const buildPolicyPayload = (form: InvitePolicyFormState) => ({
   enabled: form.enabled,
@@ -98,6 +102,9 @@ const InviteManagePage: React.FC = () => {
   const [usersLoading, setUsersLoading] = useState(true);
   const [usersSearch, setUsersSearch] = useState('');
   const [inviterUsers, setInviterUsers] = useState<User[]>([]);
+  const [inviterUsersPage, setInviterUsersPage] = useState(1);
+  const [inviterUsersTotal, setInviterUsersTotal] = useState(0);
+  const [inviterUsersTotalPages, setInviterUsersTotalPages] = useState(1);
   const [selectedInviter, setSelectedInviter] = useState<User | null>(null);
   const [inviterPolicyForm, setInviterPolicyForm] = useState<InvitePolicyFormState>(createDefaultPolicyForm());
   const [savingInviterPolicy, setSavingInviterPolicy] = useState(false);
@@ -171,21 +178,27 @@ const InviteManagePage: React.FC = () => {
     setUsersLoading(true);
     try {
       const response = await adminApiService.getUsers({
-        current_page: 1,
-        page_size: 200,
+        current_page: inviterUsersPage,
+        page_size: INVITER_PAGE_SIZE,
         querystring: usersSearch.trim() || undefined,
       });
       if (response.code !== 20000) {
         throw new Error(response.msg || '获取用户列表失败');
       }
-      setInviterUsers(Array.isArray(response.data) ? response.data : []);
+      const list = Array.isArray(response.data) ? response.data : [];
+      const total = Number(response.total) || 0;
+      setInviterUsers(list);
+      setInviterUsersTotal(total);
+      setInviterUsersTotalPages(Math.max(1, Math.ceil(total / INVITER_PAGE_SIZE)));
     } catch (error) {
       showToast(error instanceof Error ? error.message : '获取用户列表失败', 'error');
       setInviterUsers([]);
+      setInviterUsersTotal(0);
+      setInviterUsersTotalPages(1);
     } finally {
       setUsersLoading(false);
     }
-  }, [usersSearch]);
+  }, [inviterUsersPage, usersSearch]);
 
   useEffect(() => { loadPolicy(); }, [loadPolicy]);
   useEffect(() => { loadRewards(); }, [loadRewards]);
@@ -383,7 +396,15 @@ const InviteManagePage: React.FC = () => {
         <CardHeader className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2"><Users className="w-4 h-4" /><span className="font-medium">邀请人专属规则</span></div>
           <div className="flex gap-2 flex-wrap">
-            <Input placeholder="搜索用户邮箱/用户名" value={usersSearch} onChange={(e) => setUsersSearch(e.target.value)} className="w-56" />
+            <Input
+              placeholder="搜索用户邮箱/用户名"
+              value={usersSearch}
+              onChange={(e) => {
+                setUsersSearch(e.target.value);
+                setInviterUsersPage(1);
+              }}
+              className="w-56"
+            />
             <Button variant="flat" color="primary" startContent={<RefreshCw className="w-4 h-4" />} onPress={loadUsers}>刷新</Button>
           </div>
         </CardHeader>
@@ -415,6 +436,18 @@ const InviteManagePage: React.FC = () => {
               ))}
             </TableBody>
           </Table>
+          <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="text-sm text-gray-600">
+              共 {inviterUsersTotal} 条，默认每页 {INVITER_PAGE_SIZE} 条
+            </div>
+            <Pagination
+              total={inviterUsersTotalPages}
+              page={inviterUsersPage}
+              onChange={setInviterUsersPage}
+              showControls
+              color="primary"
+            />
+          </div>
         </CardBody>
       </Card>
 
@@ -448,6 +481,7 @@ const InviteManagePage: React.FC = () => {
               <TableColumn>奖励模式</TableColumn>
               <TableColumn>奖励结果</TableColumn>
               <TableColumn>状态</TableColumn>
+              <TableColumn>时间</TableColumn>
             </TableHeader>
             <TableBody isLoading={rewardsLoading} loadingContent={<Spinner label="加载中..." />} emptyContent="暂无邀请奖励流水">
               {inviteRewards.map((item) => (
@@ -468,6 +502,12 @@ const InviteManagePage: React.FC = () => {
                       : `${Number(item.invite_reward_days || 0).toFixed(2)} 天`}
                   </TableCell>
                   <TableCell>{renderStatusChip(item.invite_reward_status)}</TableCell>
+                  <TableCell>
+                    <div className="text-xs text-gray-600 space-y-1 min-w-[160px]">
+                      <div>创建：{item.created_at ? dayjs(item.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}</div>
+                      <div>处理：{item.invite_reward_processed_at ? dayjs(item.invite_reward_processed_at).format('YYYY-MM-DD HH:mm:ss') : '-'}</div>
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

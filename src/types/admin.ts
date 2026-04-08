@@ -93,10 +93,11 @@ export interface User {
     created_at: string;
     status: 0 | 1;
     preferences?: Record<string, any>;
-    inviter_user?: number;
+    inviter_user?: number | string;
     inviter_code?: string;
     invite_bound_at?: string;
     remarks?: string;
+    xy_uuid_token?: string;
     wechat_openid?: string;
 }
 
