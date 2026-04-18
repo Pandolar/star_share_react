@@ -220,7 +220,16 @@ const UsersManagePage: React.FC = () => {
         try {
             const response = await adminApiService.clearUserLimit(pendingClearLimitUser.id);
             if (response.code === 20000) {
-                showToast('已解除该用户的限速', 'success');
+                // 构建操作摘要：限速清除 + 解封 + 加白
+                const d = response.data || {};
+                const parts: string[] = ['限速已清除'];
+                if (d.unban === 'done') parts.push('已解封');
+                else if (d.unban === 'skipped') parts.push('解封跳过(未封禁)');
+                else if (typeof d.unban === 'string' && d.unban.startsWith('failed')) parts.push('解封失败');
+                if (d.whitelist === 'done') parts.push('已加白');
+                else if (d.whitelist === 'skipped') parts.push('加白跳过(已在白名单)');
+                else if (typeof d.whitelist === 'string' && d.whitelist.startsWith('failed')) parts.push('加白失败');
+                showToast(parts.join(' | '), 'success');
                 onClearLimitConfirmClose();
                 setPendingClearLimitUser(null);
             } else {
@@ -873,13 +882,13 @@ const UsersManagePage: React.FC = () => {
                     </ModalHeader>
                     <ModalBody>
                         <div className="space-y-3 text-sm text-gray-700">
-                            <p>请确认要为以下用户解除限速：</p>
+                            <p>请确认要为以下用户执行一键操作（解除限速 + 解封 + 加白）：</p>
                             <div className="rounded-lg bg-gray-50 p-4 space-y-2">
                                 <div><span className="text-gray-500">用户ID：</span>{pendingClearLimitUser?.id ?? '-'}</div>
                                 <div><span className="text-gray-500">用户名：</span>{pendingClearLimitUser?.username || '-'}</div>
                                 <div><span className="text-gray-500">邮箱：</span>{pendingClearLimitUser?.email || '-'}</div>
                             </div>
-                            <p className="text-warning-600">确认后将立即调用解除限速接口，请确保目标用户无误。</p>
+                            <p className="text-warning-600">确认后将同步执行：清除限速、解封（如已封禁）、加白（如未在白名单），请确保目标用户无误。</p>
                         </div>
                     </ModalBody>
                     <ModalFooter>
