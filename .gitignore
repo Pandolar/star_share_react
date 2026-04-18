@@ -20,3 +20,4 @@ venv
 __pycache__
 .git
 data/
+重构说明.md

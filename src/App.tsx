@@ -1,42 +1,52 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
-import HomePage from './pages/HomePage';
-import UserCenter from './pages/user/UserCenter';
 import { ToastContainer } from './components/Toast';
-import GoPlusPage from './pages/features/GoPlusPage';
-import ShareSpeedTestPage from './pages/features/ShareSpeedTestPage';
-import JumpNsPage from './pages/features/JumpNsPage';
-import RedirectPage from './pages/features/RedirectPage';
-import LoginPage from './pages/auth/LoginPage';
-import RegisterPage from './pages/auth/RegisterPage';
-import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
-import NewApiPage from './pages/features/NewApiPage';
-import CustomerServicePage from './pages/features/CustomerServicePage';
-import { HeroUIProvider } from '@heroui/react';
 import ErrorBoundary from './components/ErrorBoundary';
 
-// Admin相关组件
-import AdminLoginPage from './pages/admin/AdminLoginPage';
-import AdminLayout from './components/admin/AdminLayout';
-import OverviewDashboardPage from './pages/admin/OverviewDashboardPage';
-import AdminProtectedRoute from './components/admin/AdminProtectedRoute';
-import UsersManagePage from './pages/admin/UsersManagePage';
-import PackagesManagePage from './pages/admin/PackagesManagePage';
-import SettingsManagePage from './pages/admin/SettingsManagePage';
-import OrdersManagePage from './pages/admin/OrdersManagePage';
-import CDKManagePage from './pages/admin/CDKManagePage';
-import UserPackagesManagePage from './pages/admin/UserPackagesManagePage';
-import InviteManagePage from './pages/admin/InviteManagePage';
+const HomePage = lazy(() => import('./pages/HomePage'));
+const UserCenter = lazy(() => import('./pages/user/UserCenter'));
+const GoPlusPage = lazy(() => import('./pages/features/GoPlusPage'));
+const ShareSpeedTestPage = lazy(() => import('./pages/features/ShareSpeedTestPage'));
+const JumpNsPage = lazy(() => import('./pages/features/JumpNsPage'));
+const RedirectPage = lazy(() => import('./pages/features/RedirectPage'));
+const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
+const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
+const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
+const NewApiPage = lazy(() => import('./pages/features/NewApiPage'));
+const CustomerServicePage = lazy(() => import('./pages/features/CustomerServicePage'));
+const AdminLoginPage = lazy(() => import('./pages/admin/AdminLoginPage'));
+const AdminLayout = lazy(() => import('./components/admin/AdminLayout'));
+const OverviewDashboardPage = lazy(() => import('./pages/admin/OverviewDashboardPage'));
+const AdminProtectedRoute = lazy(() => import('./components/admin/AdminProtectedRoute'));
+const UsersManagePage = lazy(() => import('./pages/admin/UsersManagePage'));
+const PackagesManagePage = lazy(() => import('./pages/admin/PackagesManagePage'));
+const SettingsManagePage = lazy(() => import('./pages/admin/SettingsManagePage'));
+const OrdersManagePage = lazy(() => import('./pages/admin/OrdersManagePage'));
+const CDKManagePage = lazy(() => import('./pages/admin/CDKManagePage'));
+const UserPackagesManagePage = lazy(() => import('./pages/admin/UserPackagesManagePage'));
+const InviteManagePage = lazy(() => import('./pages/admin/InviteManagePage'));
+
+const RouteLoadingFallback: React.FC = () => (
+  <div className="flex min-h-screen items-center justify-center bg-white px-4 text-sm text-gray-500">
+    页面加载中...
+  </div>
+);
+
+const AdminRouteShell: React.FC = () => (
+  <AdminProtectedRoute>
+    <AdminLayout />
+  </AdminProtectedRoute>
+);
 
 const App: React.FC = () => {
   return (
     <HelmetProvider>
-      <HeroUIProvider>
-        <Router>
-          <div className="App">
-            {/* 全局Toast通知容器 */}
-            <ToastContainer />
+      <Router>
+        <div className="App">
+          {/* 全局Toast通知容器 */}
+          <ToastContainer />
+          <Suspense fallback={<RouteLoadingFallback />}>
             <Routes>
               {/* 主页路由 */}
               <Route
@@ -66,11 +76,7 @@ const App: React.FC = () => {
 
               {/* Admin管理后台路由 */}
               <Route path="/star-admin/login" element={<AdminLoginPage />} />
-              <Route path="/star-admin" element={
-                <AdminProtectedRoute>
-                  <AdminLayout />
-                </AdminProtectedRoute>
-              }>
+              <Route path="/star-admin" element={<AdminRouteShell />}>
                 {/* Admin子路由 - 默认重定向到用户管理 */}
                 <Route index element={<Navigate to="/star-admin/overview" replace />} />
                 <Route path="overview" element={<OverviewDashboardPage />} />
@@ -83,9 +89,9 @@ const App: React.FC = () => {
                 <Route path="invites" element={<InviteManagePage />} />
               </Route>
             </Routes>
-          </div>
-        </Router>
-      </HeroUIProvider>
+          </Suspense>
+        </div>
+      </Router>
     </HelmetProvider>
   );
 };
