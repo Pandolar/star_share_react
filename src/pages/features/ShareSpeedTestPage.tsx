@@ -50,12 +50,13 @@ const ShareSpeedTestPage: React.FC = () => {
                     throw new Error(`获取节点失败: ${resp.status}`);
                 }
                 const data = await resp.json();
-                const fetchedNodes = normalizeNodes(Array.isArray(data?.data) ? data.data : []);
+                const fetchedNodes = normalizeNodes(extractRawNodes(data?.data));
 
                 if (fetchedNodes.length === 0) {
                     throw new Error('未获取到任何节点');
                 }
                 setNodes(fetchedNodes);
+                console.info('[ShareSpeedTest] normalized nodes:', fetchedNodes);
 
                 const primaryNodes = fetchedNodes.filter((node) => node.isPrimary);
                 const backupNodes = fetchedNodes.filter((node) => !node.isPrimary);
@@ -79,6 +80,7 @@ const ShareSpeedTestPage: React.FC = () => {
 
                 const primaryResults = await runTests(nodesToProbe);
                 const primarySuccessful = primaryResults.filter((result) => result.success);
+                console.info('[ShareSpeedTest] primary results:', primaryResults);
 
                 let selectionPool = primarySuccessful;
 
@@ -90,6 +92,7 @@ const ShareSpeedTestPage: React.FC = () => {
 
                     const backupResults = await runTests(backupNodes);
                     const backupSuccessful = backupResults.filter((result) => result.success);
+                    console.info('[ShareSpeedTest] backup results:', backupResults);
 
                     if (backupSuccessful.length > 0) {
                         selectionPool = backupSuccessful;
@@ -130,12 +133,20 @@ const ShareSpeedTestPage: React.FC = () => {
                 }));
 
                 const totalScore = scoredNodes.reduce((sum, n) => sum + n.score, 0);
+                console.info('[ShareSpeedTest] scored nodes:', scoredNodes.map((item) => ({
+                    node: item.node,
+                    weight: item.weight,
+                    durationMs: Number(item.durationMs.toFixed(2)),
+                    score: item.score,
+                    probability: totalScore > 0 ? item.score / totalScore : 0,
+                })));
                 let rand = Math.random() * totalScore;
                 let pick = scoredNodes[scoredNodes.length - 1];
                 for (const candidate of scoredNodes) {
                     rand -= candidate.score;
                     if (rand <= 0) { pick = candidate; break; }
                 }
+                console.info('[ShareSpeedTest] picked node:', pick);
 
                 setStatusText('测速完成，2秒后自动跳转至优选节点…');
 
@@ -232,6 +243,31 @@ function normalizeNodes(rawNodes: unknown[]): NodeInfo[] {
     return rawNodes
         .map((item) => parseNodeInfo(item))
         .filter((item): item is NodeInfo => Boolean(item?.url));
+}
+
+function extractRawNodes(rawData: unknown): unknown[] {
+    if (Array.isArray(rawData)) {
+        return rawData.flatMap((item) => splitRawNodeItem(item));
+    }
+
+    return splitRawNodeItem(rawData);
+}
+
+function splitRawNodeItem(item: unknown): unknown[] {
+    if (typeof item !== 'string') {
+        return item == null ? [] : [item];
+    }
+
+    const trimmed = item.trim();
+    if (!trimmed) {
+        return [];
+    }
+
+    // 兼容后端直接返回逗号/换行拼接的节点字符串。
+    return trimmed
+        .split(/[\n,，]+/)
+        .map((part) => part.trim())
+        .filter(Boolean);
 }
 
 function parseNodeInfo(item: unknown): NodeInfo | null {
