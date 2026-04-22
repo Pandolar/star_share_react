@@ -123,16 +123,19 @@ const ShareSpeedTestPage: React.FC = () => {
                     return;
                 }
 
+                // 按 weight/latency 加权随机：weight=0 的备用节点用 1/latency，保证备用池内也能按速度选
                 const scoredNodes = selectionPool.map((result) => ({
                     ...result,
-                    score: result.weight / Math.max(result.durationMs, 1)
+                    score: Math.max(result.weight, 1) / Math.max(result.durationMs, 1)
                 }));
 
-                scoredNodes.sort((a, b) => b.score - a.score);
-
-                const candidateCount = Math.max(1, Math.ceil(scoredNodes.length * 0.3));
-                const candidates = scoredNodes.slice(0, candidateCount);
-                const pick = candidates[Math.floor(Math.random() * candidates.length)];
+                const totalScore = scoredNodes.reduce((sum, n) => sum + n.score, 0);
+                let rand = Math.random() * totalScore;
+                let pick = scoredNodes[scoredNodes.length - 1];
+                for (const candidate of scoredNodes) {
+                    rand -= candidate.score;
+                    if (rand <= 0) { pick = candidate; break; }
+                }
 
                 setStatusText('测速完成，2秒后自动跳转至优选节点…');
 
