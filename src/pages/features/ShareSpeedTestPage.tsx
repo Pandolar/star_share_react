@@ -56,7 +56,6 @@ const ShareSpeedTestPage: React.FC = () => {
                     throw new Error('未获取到任何节点');
                 }
                 setNodes(fetchedNodes);
-                console.info('[ShareSpeedTest] normalized nodes:', fetchedNodes);
 
                 const primaryNodes = fetchedNodes.filter((node) => node.isPrimary);
                 const backupNodes = fetchedNodes.filter((node) => !node.isPrimary);
@@ -66,12 +65,9 @@ const ShareSpeedTestPage: React.FC = () => {
 
                 setResults(createPendingResults(nodesToProbe));
 
-                const testedNodes = new Set<string>();
-
                 const runTests = async (targets: NodeInfo[]) => Promise.all(
                     targets.map((nodeInfo) =>
                         testNode(nodeInfo).then((result) => {
-                            testedNodes.add(nodeInfo.url);
                             setResults((prev) => updateResultRow(prev, nodeInfo.url, result));
                             return result;
                         })
@@ -80,7 +76,6 @@ const ShareSpeedTestPage: React.FC = () => {
 
                 const primaryResults = await runTests(nodesToProbe);
                 const primarySuccessful = primaryResults.filter((result) => result.success);
-                console.info('[ShareSpeedTest] primary results:', primaryResults);
 
                 let selectionPool = primarySuccessful;
 
@@ -92,7 +87,6 @@ const ShareSpeedTestPage: React.FC = () => {
 
                     const backupResults = await runTests(backupNodes);
                     const backupSuccessful = backupResults.filter((result) => result.success);
-                    console.info('[ShareSpeedTest] backup results:', backupResults);
 
                     if (backupSuccessful.length > 0) {
                         selectionPool = backupSuccessful;
@@ -133,20 +127,12 @@ const ShareSpeedTestPage: React.FC = () => {
                 }));
 
                 const totalScore = scoredNodes.reduce((sum, n) => sum + n.score, 0);
-                console.info('[ShareSpeedTest] scored nodes:', scoredNodes.map((item) => ({
-                    node: item.node,
-                    weight: item.weight,
-                    durationMs: Number(item.durationMs.toFixed(2)),
-                    score: item.score,
-                    probability: totalScore > 0 ? item.score / totalScore : 0,
-                })));
                 let rand = Math.random() * totalScore;
                 let pick = scoredNodes[scoredNodes.length - 1];
                 for (const candidate of scoredNodes) {
                     rand -= candidate.score;
                     if (rand <= 0) { pick = candidate; break; }
                 }
-                console.info('[ShareSpeedTest] picked node:', pick);
 
                 setStatusText('测速完成，2秒后自动跳转至优选节点…');
 
@@ -285,12 +271,22 @@ function parseNodeInfo(item: unknown): NodeInfo | null {
         : (typeof record.node === 'string'
             ? record.node
             : (typeof record.host === 'string' ? record.host : ''));
-    const explicitWeight = parseManualWeight(record);
+    const explicitPrimary = parsePrimaryFlag(record);
+    const explicitWeight = parseNodeWeight(record, explicitPrimary);
 
-    return createNodeInfoFromRaw(rawUrl, explicitWeight);
+    return createNodeInfoFromRaw(rawUrl, {
+        explicitWeight,
+        explicitPrimary,
+    });
 }
 
-function createNodeInfoFromRaw(rawUrl: string, explicitWeight?: number): NodeInfo | null {
+function createNodeInfoFromRaw(
+    rawUrl: string,
+    options?: {
+        explicitWeight?: number;
+        explicitPrimary?: boolean;
+    }
+): NodeInfo | null {
     const trimmed = rawUrl.trim();
     if (!trimmed) {
         return null;
@@ -304,15 +300,32 @@ function createNodeInfoFromRaw(rawUrl: string, explicitWeight?: number): NodeInf
 
     const inlineWeight = parseNumericWeight(inlineWeightPart);
     const hasExplicitInlineWeight = typeof inlineWeight === 'number';
-    const hasExplicitManualWeight = typeof explicitWeight === 'number';
-    const weight = hasExplicitInlineWeight ? inlineWeight : (hasExplicitManualWeight ? explicitWeight : 0);
+    const hasExplicitObjectWeight = typeof options?.explicitWeight === 'number';
+    const weight = hasExplicitInlineWeight ? inlineWeight : (hasExplicitObjectWeight ? options!.explicitWeight! : 0);
+    const explicitPrimary = options?.explicitPrimary;
+    const isPrimary = typeof explicitPrimary === 'boolean'
+        ? explicitPrimary
+        : ((hasExplicitInlineWeight || hasExplicitObjectWeight) && weight > 0);
 
     return {
         url: normalizedUrl,
         weight,
-        // 只有显式手动权重大于 0 的节点，才参与首轮测速。
-        isPrimary: (hasExplicitInlineWeight || hasExplicitManualWeight) && weight > 0,
+        isPrimary,
     };
+}
+
+function parseNodeWeight(record: Record<string, unknown>, explicitPrimary?: boolean): number | undefined {
+    const manualWeight = parseManualWeight(record);
+    if (typeof manualWeight === 'number') {
+        return manualWeight;
+    }
+
+    // 后端统一协议：显式返回 is_primary 时，weight 才作为最终权重使用。
+    if (typeof explicitPrimary === 'boolean') {
+        return parseNumericWeight(record.weight);
+    }
+
+    return undefined;
 }
 
 function parseManualWeight(record: Record<string, unknown>): number | undefined {
@@ -329,6 +342,32 @@ function parseManualWeight(record: Record<string, unknown>): number | undefined 
         const parsed = parseNumericWeight(record[key]);
         if (typeof parsed === 'number') {
             return parsed;
+        }
+    }
+
+    return undefined;
+}
+
+function parsePrimaryFlag(record: Record<string, unknown>): boolean | undefined {
+    const candidates = [record.is_primary, record.isPrimary];
+
+    for (const value of candidates) {
+        if (typeof value === 'boolean') {
+            return value;
+        }
+
+        if (typeof value === 'number') {
+            return value !== 0;
+        }
+
+        if (typeof value === 'string') {
+            const normalized = value.trim().toLowerCase();
+            if (['true', '1', 'yes'].includes(normalized)) {
+                return true;
+            }
+            if (['false', '0', 'no'].includes(normalized)) {
+                return false;
+            }
         }
     }
 
