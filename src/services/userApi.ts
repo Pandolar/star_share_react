@@ -164,7 +164,11 @@ export const userInfoApi = {
             package_name: string;
             level: string;
             priority: string;
-            expiry_date: string;
+            expiry_date?: string | null;
+            status?: 'active' | 'frozen';
+            status_text?: string;
+            remaining_duration?: number | null;
+            remaining_text?: string;
         };
         status: number;
         inviter_user: string;
@@ -303,6 +307,10 @@ export const inviteUserApi = {
         inviter_id: number;
         inviter_code: string;
         invite_link: string;
+        invite_eligible: boolean;
+        history_package_value: number;
+        min_history_package_value: number;
+        invite_ineligible_reason: string;
         invitees_count: number;
         granted_orders_count: number;
         total_duration_days: number;
@@ -315,6 +323,8 @@ export const inviteUserApi = {
             reward_mode: 'duration' | 'cash';
             reward_ratio: number;
             reward_ratio_percent: number;
+            invitee_reward_ratio?: number;
+            invitee_reward_ratio_percent?: number;
             has_package_specific_rules: boolean;
             min_reward_duration_days: number;
         };

@@ -38,13 +38,13 @@ const defaultHomeInfo: HomeInfo = {
             {
                 name: '开放平台',
                 type: 'outline',
-                url: 'https://api.183ai.com/',
+                url: 'https://nicerouter.com/',
                 target: '_blank',
             },
             {
                 name: '开始对话',
                 type: 'solid',
-                url: 'https://share.183ai.com/',
+                url: 'https://node6.nice188.com/',
                 target: '_blank',
             },
         ]
@@ -60,10 +60,10 @@ const defaultHomeInfo: HomeInfo = {
                 image: 'https://niceaigc-cos.niceaigc.com/casdoor/resource/built-in/admin/Snipaste_2025-07-08_22-57-31.png',
                 gradient: 'from-purple-25 to-pink-25',
                 ctaText: '立即体验',
-                ctaUrl: 'https://share.183ai.com/',
+                ctaUrl: 'https://node6.nice188.com/',
                 ctaTarget: '_self',
                 learnMoreText: '了解更多',
-                learnMoreUrl: 'https://share.183ai.com/',
+                learnMoreUrl: 'https://node6.nice188.com/',
                 learnMoreTarget: '_self'
             },
             {
@@ -88,10 +88,10 @@ const defaultHomeInfo: HomeInfo = {
                 image: 'https://niceaigc-cos.niceaigc.com/casdoor/resource/built-in/admin/Snipaste_2025-07-08_23-02-23.png',
                 gradient: 'from-green-25 to-emerald-25',
                 ctaText: '立刻接入',
-                ctaUrl: 'https://api.183ai.com/',
+                ctaUrl: 'https://nicerouter.com/',
                 ctaTarget: '_self',
                 learnMoreText: '',
-                learnMoreUrl: 'https://api.183ai.com/',
+                learnMoreUrl: 'https://nicerouter.com/',
                 learnMoreTarget: '_self'
             }
         ]
@@ -110,7 +110,7 @@ const defaultHomeInfo: HomeInfo = {
                 hoverColor: 'hover:bg-purple-100',
                 badge: 'User System',
                 badgeColor: 'bg-purple-100 text-purple-700',
-                link: 'https://share.183ai.com/'
+                link: 'https://node6.nice188.com/'
             },
             {
                 id: 2,
@@ -122,7 +122,7 @@ const defaultHomeInfo: HomeInfo = {
                 hoverColor: 'hover:bg-blue-100',
                 badge: 'STABLE',
                 badgeColor: 'bg-blue-100 text-blue-700',
-                link: 'https://share.183ai.com/'
+                link: 'https://node6.nice188.com/'
             },
             {
                 id: 3,
@@ -146,7 +146,7 @@ const defaultHomeInfo: HomeInfo = {
                 hoverColor: 'hover:bg-orange-100',
                 badge: 'COMING',
                 badgeColor: 'bg-orange-100 text-orange-700',
-                link: 'https://api.183ai.com/'
+                link: 'https://nicerouter.com/'
             },
             {
                 id: 5,
@@ -158,7 +158,7 @@ const defaultHomeInfo: HomeInfo = {
                 hoverColor: 'hover:bg-red-100',
                 badge: 'COMING',
                 badgeColor: 'bg-red-100 text-red-700',
-                link: 'https://share.183ai.com/'
+                link: 'https://node6.nice188.com/'
             },
             {
                 id: 6,
@@ -170,7 +170,7 @@ const defaultHomeInfo: HomeInfo = {
                 hoverColor: 'hover:bg-purple-100',
                 badge: 'COMING',
                 badgeColor: 'bg-purple-100 text-purple-700',
-                link: 'https://share.183ai.com/'
+                link: 'https://node6.nice188.com/'
             },
         ]
     },

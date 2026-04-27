@@ -18,7 +18,11 @@ interface UserInfo {
     package_name: string;
     level: string;
     priority: string;
-    expiry_date: string;
+    expiry_date?: string | null;
+    status?: 'active' | 'frozen';
+    status_text?: string;
+    remaining_duration?: number | null;
+    remaining_text?: string;
   };
   status: number;
   inviter_user: string;
@@ -724,7 +728,7 @@ export const ProfileTab: React.FC = () => {
           </Card>
 
           {/* 当前套餐信息 */}
-          {userInfo.user_active_packages && (
+          {userInfo.user_active_packages && userInfo.user_active_packages.package_id && (
             <Card className="border-l-4 border-l-primary">
               <CardBody className="p-6">
                 <div className="flex items-start gap-4">
@@ -739,10 +743,10 @@ export const ProfileTab: React.FC = () => {
                       <h3 className="text-lg font-bold text-default-900">当前套餐</h3>
                       <Chip
                         size="sm"
-                        color={getPackageLevelStyle(userInfo.user_active_packages.level).color}
+                        color={userInfo.user_active_packages.status === 'frozen' ? 'warning' : getPackageLevelStyle(userInfo.user_active_packages.level).color}
                         variant="flat"
                       >
-                        {userInfo.user_active_packages.level}
+                        {userInfo.user_active_packages.status_text || userInfo.user_active_packages.level}
                       </Chip>
                     </div>
                     <p className="text-default-600 mb-4">
@@ -751,7 +755,11 @@ export const ProfileTab: React.FC = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                       <div className="flex items-center gap-2 text-default-600">
                         <Calendar size={16} />
-                        <span>到期时间：{userInfo.user_active_packages.expiry_date}</span>
+                        <span>
+                          {userInfo.user_active_packages.status === 'frozen'
+                            ? `冻结剩余：${userInfo.user_active_packages.remaining_text || '-'}`
+                            : `到期时间：${userInfo.user_active_packages.expiry_date || '-'}`}
+                        </span>
                       </div>
                       {/* <div className="flex items-center gap-2 text-default-600">
                         <Shield size={16} />
@@ -773,7 +781,7 @@ export const ProfileTab: React.FC = () => {
                     Object.keys(userInfo.user_active_packages).length > 0 &&
                     userInfo.user_active_packages.package_id ? '1' : '0'}
                 </div>
-                <div className="text-sm text-default-500">活跃套餐</div>
+                <div className="text-sm text-default-500">当前套餐</div>
               </CardBody>
             </Card>
             <Card>

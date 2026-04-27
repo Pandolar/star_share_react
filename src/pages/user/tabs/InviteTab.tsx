@@ -18,6 +18,10 @@ interface InviteOverviewData {
   inviter_id: number;
   inviter_code: string;
   invite_link: string;
+  invite_eligible: boolean;
+  history_package_value: number;
+  min_history_package_value: number;
+  invite_ineligible_reason: string;
   invitees_count: number;
   granted_orders_count: number;
   total_duration_days: number;
@@ -25,6 +29,8 @@ interface InviteOverviewData {
     reward_mode: 'duration' | 'cash';
     reward_ratio: number;
     reward_ratio_percent: number;
+    invitee_reward_ratio?: number;
+    invitee_reward_ratio_percent?: number;
     has_package_specific_rules: boolean;
     min_reward_duration_days: number;
   };
@@ -158,8 +164,12 @@ export const InviteTab: React.FC = () => {
   const inviterCode = overview?.inviter_code || '';
   const rewardModeText = overview?.reward_policy_summary?.reward_mode === 'cash' ? '返现' : '返时长';
   const rewardRatioPercent = overview?.reward_policy_summary?.reward_ratio_percent ?? 0;
+  const inviteeRewardRatioPercent = overview?.reward_policy_summary?.invitee_reward_ratio_percent ?? 5;
   const hasPackageSpecificRules = Boolean(overview?.reward_policy_summary?.has_package_specific_rules);
   const minRewardDurationDays = overview?.reward_policy_summary?.min_reward_duration_days ?? 7;
+  const inviteEligible = Boolean(overview?.invite_eligible);
+  const historyPackageValue = overview?.history_package_value ?? 0;
+  const minHistoryPackageValue = overview?.min_history_package_value ?? 45;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
@@ -227,49 +237,59 @@ export const InviteTab: React.FC = () => {
             分享给好友
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <div className="flex-1">
-              <Input
-                label="邀请链接"
-                value={inviteLink}
-                isReadOnly
-                description="推荐直接分享注册链接，好友打开后会自动带上您的邀请码。"
-              />
+          {!inviteEligible ? (
+            <div className="rounded-xl bg-warning/10 border border-warning/20 p-4 text-sm text-default-700 leading-7">
+              <div className="font-semibold text-default-900 mb-1">暂未开启邀请功能</div>
+              <div>{overview?.invite_ineligible_reason || `历史套餐价值满 ${minHistoryPackageValue} 元后才可邀请好友。`}</div>
+              <div>当前历史套餐价值：<span className="font-medium text-default-900">{historyPackageValue}</span> 元 / <span className="font-medium text-default-900">{minHistoryPackageValue}</span> 元</div>
             </div>
-            <div className="flex items-center sm:pt-7">
-              <Button
-                color="primary"
-                variant="solid"
-                className="h-10 min-w-[112px] bg-primary text-white"
-                onPress={() => copyText(inviteLink, '邀请链接已复制')}
-                startContent={<Copy className="w-4 h-4" />}
-              >
-                复制链接
-              </Button>
-            </div>
-          </div>
+          ) : (
+            <>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <div className="flex-1">
+                  <Input
+                    label="邀请链接"
+                    value={inviteLink}
+                    isReadOnly
+                    description="推荐直接分享注册链接，好友打开后会自动带上您的邀请码。"
+                  />
+                </div>
+                <div className="flex items-center sm:pt-7">
+                  <Button
+                    color="primary"
+                    variant="solid"
+                    className="h-10 min-w-[112px] bg-primary text-white"
+                    onPress={() => copyText(inviteLink, '邀请链接已复制')}
+                    startContent={<Copy className="w-4 h-4" />}
+                  >
+                    复制链接
+                  </Button>
+                </div>
+              </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <div className="flex-1">
-              <Input
-                label="邀请码"
-                value={inviterCode}
-                isReadOnly
-                description="也可以单独复制邀请码，好友注册时展开邀请码输入框填写即可。"
-              />
-            </div>
-            <div className="flex items-center sm:pt-7">
-              <Button
-                color="primary"
-                variant="solid"
-                className="h-10 min-w-[112px] bg-primary text-white"
-                onPress={() => copyText(inviterCode, '邀请码已复制')}
-                startContent={<Copy className="w-4 h-4" />}
-              >
-                复制邀请码
-              </Button>
-            </div>
-          </div>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <div className="flex-1">
+                  <Input
+                    label="邀请码"
+                    value={inviterCode}
+                    isReadOnly
+                    description="也可以单独复制邀请码，好友注册时展开邀请码输入框填写即可。"
+                  />
+                </div>
+                <div className="flex items-center sm:pt-7">
+                  <Button
+                    color="primary"
+                    variant="solid"
+                    className="h-10 min-w-[112px] bg-primary text-white"
+                    onPress={() => copyText(inviterCode, '邀请码已复制')}
+                    startContent={<Copy className="w-4 h-4" />}
+                  >
+                    复制邀请码
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
 
           <Divider />
 
@@ -278,12 +298,12 @@ export const InviteTab: React.FC = () => {
               <Info className="w-4 h-4 text-primary" />
               邀请说明
             </div>
-            <div>1. 好友通过您的专属链接注册，或在注册时手动填写您的邀请码。</div>
-            <div>2. 当前默认邀请奖励类型：<span className="font-medium text-default-900">{rewardModeText}</span>，奖励比例约为 <span className="font-medium text-default-900">{rewardRatioPercent}%</span>。</div>
+            <div>1. 历史套餐价值满 <span className="font-medium text-default-900">{minHistoryPackageValue} 元</span> 后，可通过专属链接或邀请码邀请好友。</div>
+            <div>2. 当前默认邀请奖励类型：<span className="font-medium text-default-900">{rewardModeText}</span>，邀请人奖励比例约为 <span className="font-medium text-default-900">{rewardRatioPercent}%</span>，被邀请人默认加赠 <span className="font-medium text-default-900">{inviteeRewardRatioPercent}%</span> 时长。</div>
             <div>3. 例如：如您邀请了用户张三订阅了年卡，您可获得 <span className="font-medium text-default-900">365×{rewardRatioPercent}%={Number((365 * rewardRatioPercent / 100).toFixed(2))}</span> 天的奖励。</div>
             <div>4. 返时长奖励会按您当前可享受的最高套餐等级计算，且奖励等级不会超过被邀请人本次实际订阅的套餐等级。</div>
             <div>5. 若被邀请人订阅的套餐时长小于 <span className="font-medium text-default-900">{minRewardDurationDays} 天</span>，系统只会记录该订单，不发放返时长或返现奖励，且不占用前 N 笔奖励名额。</div>
-            <div>6. 好友支付成功后，系统会按您的邀请规则自动计算奖励；若部分套餐有单独规则，则以实际订单结算为准。</div>
+            <div>6. 好友支付或使用 CDK 激活成功后，系统会按您的邀请规则自动计算奖励；若部分套餐有单独规则，则以实际订单结算为准。</div>
             <div>7. 如有任何问题，请及时联系客服协助处理。</div>
             {hasPackageSpecificRules && (
               <div className="text-xs text-primary-700 bg-primary/8 rounded-lg px-3 py-2">
