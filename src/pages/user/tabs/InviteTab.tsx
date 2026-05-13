@@ -245,7 +245,7 @@ export const InviteTab: React.FC = () => {
             </div>
           ) : (
             <>
-              <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
                 <div className="flex-1">
                   <Input
                     label="邀请链接"
@@ -254,11 +254,11 @@ export const InviteTab: React.FC = () => {
                     description="推荐直接分享注册链接，好友打开后会自动带上您的邀请码。"
                   />
                 </div>
-                <div className="flex items-center sm:pt-7">
+                <div className="flex items-center h-14 shrink-0">
                   <Button
                     color="primary"
                     variant="solid"
-                    className="h-10 min-w-[112px] bg-primary text-white"
+                    className="h-10 min-w-[112px]"
                     onPress={() => copyText(inviteLink, '邀请链接已复制')}
                     startContent={<Copy className="w-4 h-4" />}
                   >
@@ -267,7 +267,7 @@ export const InviteTab: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
                 <div className="flex-1">
                   <Input
                     label="邀请码"
@@ -276,11 +276,11 @@ export const InviteTab: React.FC = () => {
                     description="也可以单独复制邀请码，好友注册时展开邀请码输入框填写即可。"
                   />
                 </div>
-                <div className="flex items-center sm:pt-7">
+                <div className="flex items-center h-14 shrink-0">
                   <Button
                     color="primary"
                     variant="solid"
-                    className="h-10 min-w-[112px] bg-primary text-white"
+                    className="h-10 min-w-[112px]"
                     onPress={() => copyText(inviterCode, '邀请码已复制')}
                     startContent={<Copy className="w-4 h-4" />}
                   >

@@ -578,11 +578,7 @@ const CDKManagePage: React.FC = () => {
                                 selectedKeys={formData.package_id ? [String(formData.package_id)] : []}
                                 onChange={(e) => setFormData({ ...formData, package_id: Number(e.target.value) })}
                                 isRequired
-                                classNames={{
-                                    trigger: "bg-white",
-                                    value: "text-gray-900",
-                                    label: "text-gray-600",
-                                }}
+                                variant="bordered"
                             >
                                 {packages.map((pkg) => (
                                     <SelectItem key={pkg.id}>
