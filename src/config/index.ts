@@ -27,8 +27,8 @@ const config = {
     // 路由配置
     routes: {
         home: '/',
-        admin: '/admin',
-        adminLogin: '/admin/login',
+        admin: '/star-admin',
+        adminLogin: '/star-admin/login',
     },
 
     // 存储配置

@@ -4,7 +4,7 @@
  */
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { showMessage } from '../utils/toast';
+import { toast } from '../utils/toast';
 import { getCookie } from '../utils/cookies';
 
 interface AuthCheckOptions {
@@ -46,7 +46,7 @@ export const useAuthCheck = (options: AuthCheckOptions = {}) => {
             setCountdown(timeLeft);
 
             // 显示初始提示，持续时间设为倒计时时长，确保用户能看到完整提示
-            showMessage.warning(`${message}，${timeLeft}秒后将返回首页`);
+            toast.warning(`${message}，${timeLeft}秒后将返回首页`);
 
             const timer = setInterval(() => {
                 timeLeft -= 1;
@@ -61,7 +61,7 @@ export const useAuthCheck = (options: AuthCheckOptions = {}) => {
 
             return () => clearInterval(timer);
         } else {
-            showMessage.error(message);
+            toast.error(message);
             navigate('/', { replace: true });
         }
     }, [navigate, showCountdown, countdownSeconds]);

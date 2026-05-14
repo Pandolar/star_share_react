@@ -66,6 +66,9 @@ export const deleteCookie = (name: string, options: Omit<CookieOptions, 'days'> 
     }
 };
 
+/** 别名：兼容旧调用 */
+export const removeCookie = deleteCookie;
+
 /**
  * 清除所有认证相关的 Cookies
  */

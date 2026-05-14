@@ -24,7 +24,7 @@ import {
     Play,
 } from 'lucide-react';
 import QRCodeGenerator from 'qrcode-generator';
-import { showMessage } from '../../utils/toast';
+import { toast } from '../../utils/toast';
 
 
 // 导航链接接口
@@ -380,19 +380,19 @@ const GoPlusPage: React.FC = () => {
     const validateAndProceed = () => {
         // 先检查JSON格式是否有效
         if (!validationState.isJsonValid) {
-            showMessage.error(validationState.errorMessage || 'JSON格式不正确，请检查');
+            toast.error(validationState.errorMessage || 'JSON格式不正确，请检查');
             return;
         }
 
         // 再检查字段是否完整
         if (!validationState.hasAllFields) {
-            showMessage.error(validationState.errorMessage || 'JSON格式不正确，请检查并复制完整数据到输入框');
+            toast.error(validationState.errorMessage || 'JSON格式不正确，请检查并复制完整数据到输入框');
             return;
         }
 
         // 验证通过，进入下一步
         setCurrentStep(RechargeStep.JSON_VERIFY);
-        showMessage.success('JSON验证通过，包含所有必要字段');
+        toast.success('JSON验证通过，包含所有必要字段');
     };
 
 
@@ -425,10 +425,10 @@ const GoPlusPage: React.FC = () => {
 
                 startPaymentCheck(result.data.order_id);
             } else {
-                showMessage.error('创建订单失败，请重试');
+                toast.error('创建订单失败，请重试');
             }
         } catch (error) {
-            showMessage.error('创建订单失败: 网络错误，请重试');
+            toast.error('创建订单失败: 网络错误，请重试');
         } finally {
             setIsLoading(false);
         }
@@ -466,7 +466,7 @@ const GoPlusPage: React.FC = () => {
                     }
                 }
             } catch (error) {
-                showMessage.error('检查支付状态失败: 网络错误');
+                toast.error('检查支付状态失败: 网络错误');
                 // 继续检查
                 const timer = setTimeout(checkPayment, 2000);
                 setPaymentTimer(timer);
@@ -508,11 +508,11 @@ const GoPlusPage: React.FC = () => {
                 setRechargeStatus('success');
                 setRechargeMessage('充值成功！请返回ChatGPT官网刷新！如有任何问题请联系客服~');
                 setCurrentStep(RechargeStep.SUCCESS);
-                showMessage.success('充值成功！');
+                toast.success('充值成功！');
             } else {
                 setRechargeStatus('error');
                 setRechargeMessage('充值失败：请截图下方返回信息并联系在线客服处理，客服二维码联系方式在网站下方');
-                showMessage.error('充值失败，请查看弹窗信息并联系售后，客服二维码联系方式在网站下方');
+                toast.error('充值失败，请查看弹窗信息并联系售后，客服二维码联系方式在网站下方');
             }
         } catch (error: any) {
             setRechargeStatus('error');
@@ -521,7 +521,7 @@ const GoPlusPage: React.FC = () => {
                 error: 'network_error',
                 message: error?.message || '未知错误'
             });
-            showMessage.error('执行充值失败: 网络错误，请联系客服，客服二维码联系方式在网站下方');
+            toast.error('执行充值失败: 网络错误，请联系客服，客服二维码联系方式在网站下方');
         }
     };
 
@@ -530,13 +530,13 @@ const GoPlusPage: React.FC = () => {
     const performCdkRecharge = async () => {
         // 检查CDK输入是否为空
         if (!cdkInput.trim()) {
-            showMessage.error('请输入CDK兑换码');
+            toast.error('请输入CDK兑换码');
             return;
         }
 
         // 检查是否有有效的JSON数据
         if (!validatedData) {
-            showMessage.error('请先完成JSON数据验证');
+            toast.error('请先完成JSON数据验证');
             return;
         }
 
@@ -571,7 +571,7 @@ const GoPlusPage: React.FC = () => {
                 setRechargeStatus('success');
                 setRechargeMessage('CDK兑换成功！请返回ChatGPT官网刷新！如有任何问题请联系客服~');
                 setCurrentStep(RechargeStep.SUCCESS);
-                showMessage.success('CDK兑换成功！');
+                toast.success('CDK兑换成功！');
 
                 // 清空CDK输入
                 setCdkInput('');
@@ -579,7 +579,7 @@ const GoPlusPage: React.FC = () => {
                 // CDK兑换失败
                 setRechargeStatus('error');
                 setRechargeMessage('CDK兑换失败：请截图下方返回信息并联系在线客服处理，客服二维码联系方式在网站下方');
-                showMessage.error('CDK兑换失败，请查看弹窗信息，客服二维码联系方式在网站下方');
+                toast.error('CDK兑换失败，请查看弹窗信息，客服二维码联系方式在网站下方');
             }
         } catch (error: any) {
             setRechargeStatus('error');
@@ -588,7 +588,7 @@ const GoPlusPage: React.FC = () => {
                 error: 'network_error',
                 message: error?.message || '未知错误'
             });
-            showMessage.error('CDK兑换失败: 网络错误，请联系客服，客服二维码联系方式在网站下方');
+            toast.error('CDK兑换失败: 网络错误，请联系客服，客服二维码联系方式在网站下方');
         } finally {
             setIsCdkLoading(false);
         }

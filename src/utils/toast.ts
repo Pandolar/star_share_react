@@ -87,22 +87,3 @@ export const toast = {
     return emitter.subscribe(listener);
   }
 };
-
-// Toast消息工具 - 使用页面级别的美观提示替代浏览器弹窗
-export const showMessage = {
-  success: (message: string) => {
-    return toast.success(message);
-  },
-
-  error: (message: string) => {
-    return toast.error(message);
-  },
-
-  warning: (message: string) => {
-    return toast.warning(message);
-  },
-
-  info: (message: string) => {
-    return toast.info(message);
-  }
-};

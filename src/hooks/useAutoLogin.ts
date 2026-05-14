@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from 'react';
 import { checkToken } from '../services/authApi';
-import { getCookie, removeCookie } from '../utils/cookieUtils';
+import { getCookie, removeCookie } from '../utils/cookies';
 import { useRedirect } from './useRedirect';
 
 export const useAutoLogin = () => {

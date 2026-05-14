@@ -435,35 +435,3 @@ class AdminApiService {
 const adminApiService = new AdminApiService();
 
 export default adminApiService;
-
-// 导出具体的API方法供组件使用
-export const {
-    login,
-    checkToken,
-    logout,
-    createPackage,
-    getPackages,
-    updatePackage,
-    deletePackage,
-    createUser,
-    getUsers,
-    updateUser,
-    deleteUser,
-    clearUserLimit,
-    getUserPackages,
-    getCDKs,
-    createCDKs,
-    updateCDK,
-    deleteCDK,
-    getConfigs,
-    updateConfig,
-    getInvitePolicy,
-    updateInvitePolicy,
-    getInviteRewards,
-    getWorkorders,
-    updateWorkorder,
-    getOrders,
-    updateOrder,
-    deleteOrder,
-    getDashboard,
-} = adminApiService; 

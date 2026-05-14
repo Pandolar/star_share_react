@@ -1,7 +1,7 @@
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useCallback } from 'react';
-import { getCookie } from '../utils/cookieUtils';
+import { getCookie } from '../utils/cookies';
 
 export const useRedirect = () => {
     const navigate = useNavigate();

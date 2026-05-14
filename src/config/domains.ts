@@ -66,7 +66,7 @@ export const domainConfig: DomainConfig = {
     defaultRedirectPath: '/',
 
     // 登录页面路径
-    loginPath: '/admin/login',
+    loginPath: '/star-admin/login',
 
     // 回调处理路径
     callbackPath: '/handle_callback',
