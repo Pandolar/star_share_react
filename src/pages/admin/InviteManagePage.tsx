@@ -347,13 +347,13 @@ const InviteManagePage: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Gift className="w-6 h-6 text-blue-600" />
-        <h1 className="text-2xl font-bold text-gray-800">邀请管理</h1>
+        <h1 className="text-2xl font-bold text-default-800">邀请管理</h1>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card><CardBody><div className="text-sm text-gray-500">返时长奖励单</div><div className="text-2xl font-bold mt-1">{rewardStats.durationCount}</div></CardBody></Card>
-        <Card><CardBody><div className="text-sm text-gray-500">返现奖励单</div><div className="text-2xl font-bold mt-1">{rewardStats.cashCount}</div></CardBody></Card>
-        <Card><CardBody><div className="text-sm text-gray-500">提现处理中</div><div className="text-2xl font-bold mt-1">{rewardStats.withdrawPendingCount}</div></CardBody></Card>
+        <Card><CardBody><div className="text-sm text-default-500">返时长奖励单</div><div className="text-2xl font-bold mt-1">{rewardStats.durationCount}</div></CardBody></Card>
+        <Card><CardBody><div className="text-sm text-default-500">返现奖励单</div><div className="text-2xl font-bold mt-1">{rewardStats.cashCount}</div></CardBody></Card>
+        <Card><CardBody><div className="text-sm text-default-500">提现处理中</div><div className="text-2xl font-bold mt-1">{rewardStats.withdrawPendingCount}</div></CardBody></Card>
       </div>
 
       <Card>
@@ -424,7 +424,7 @@ const InviteManagePage: React.FC = () => {
                   <TableCell>
                     <div>
                       <div className="font-medium">{user.username || '未设置用户名'}</div>
-                      <div className="text-xs text-gray-500">{user.email}</div>
+                      <div className="text-xs text-default-500">{user.email}</div>
                     </div>
                   </TableCell>
                   <TableCell>{user.inviter_code || '-'}</TableCell>
@@ -437,7 +437,7 @@ const InviteManagePage: React.FC = () => {
             </TableBody>
           </Table>
           <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-default-600">
               共 {inviterUsersTotal} 条，默认每页 {INVITER_PAGE_SIZE} 条
             </div>
             <Pagination
@@ -492,7 +492,7 @@ const InviteManagePage: React.FC = () => {
                   <TableCell>
                     <div>
                       <div className="font-medium">{item.package_name}</div>
-                      <div className="text-xs text-gray-500">¥{item.package_price}</div>
+                      <div className="text-xs text-default-500">¥{item.package_price}</div>
                     </div>
                   </TableCell>
                   <TableCell>{renderRewardMode(item.invite_reward_mode)}</TableCell>
@@ -503,7 +503,7 @@ const InviteManagePage: React.FC = () => {
                   </TableCell>
                   <TableCell>{renderStatusChip(item.invite_reward_status)}</TableCell>
                   <TableCell>
-                    <div className="text-xs text-gray-600 space-y-1 min-w-[160px]">
+                    <div className="text-xs text-default-600 space-y-1 min-w-[160px]">
                       <div>创建：{item.created_at ? dayjs(item.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}</div>
                       <div>处理：{item.invite_reward_processed_at ? dayjs(item.invite_reward_processed_at).format('YYYY-MM-DD HH:mm:ss') : '-'}</div>
                     </div>
@@ -540,7 +540,7 @@ const InviteManagePage: React.FC = () => {
                   <TableCell>
                     <div className="text-sm">
                       <div>{item.extra_data?.withdraw_account?.channel || '-'}</div>
-                      <div className="text-xs text-gray-500 truncate max-w-48">{item.extra_data?.withdraw_account?.account_name || '-'}</div>
+                      <div className="text-xs text-default-500 truncate max-w-48">{item.extra_data?.withdraw_account?.account_name || '-'}</div>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -599,8 +599,8 @@ const InviteManagePage: React.FC = () => {
           <ModalBody>
             {selectedWorkorder && (
               <div className="space-y-4">
-                <div className="text-sm text-gray-600">工单 #{selectedWorkorder.id} · 用户 {selectedWorkorder.user_id}</div>
-                <div className="text-sm text-gray-600">申请金额：¥{Number(selectedWorkorder.amount || 0).toFixed(2)}</div>
+                <div className="text-sm text-default-600">工单 #{selectedWorkorder.id} · 用户 {selectedWorkorder.user_id}</div>
+                <div className="text-sm text-default-600">申请金额：¥{Number(selectedWorkorder.amount || 0).toFixed(2)}</div>
                 <Select label="工单状态" selectedKeys={[workorderStatus]} onChange={(e) => setWorkorderStatus(e.target.value)}>
                   <SelectItem key="pending">待处理</SelectItem>
                   <SelectItem key="processing">处理中</SelectItem>

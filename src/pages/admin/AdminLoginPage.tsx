@@ -68,7 +68,7 @@ const AdminLoginPage: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="min-h-screen bg-default-50 flex items-center justify-center p-4">
             <div className="w-full max-w-md">
                 <Card className="shadow-2xl border-0">
                     <CardHeader className="flex flex-col gap-3 pb-6">
@@ -76,8 +76,8 @@ const AdminLoginPage: React.FC = () => {
                             <Shield className="w-8 h-8 text-white" />
                         </div>
                         <div className="text-center">
-                            <h1 className="text-2xl font-bold text-gray-800">管理员登录</h1>
-                            <p className="text-gray-600 text-sm mt-1">欢迎使用Star Share管理后台</p>
+                            <h1 className="text-2xl font-bold text-default-800">管理员登录</h1>
+                            <p className="text-default-600 text-sm mt-1">欢迎使用Star Share管理后台</p>
                         </div>
                     </CardHeader>
 
@@ -91,7 +91,7 @@ const AdminLoginPage: React.FC = () => {
                                 placeholder="请输入用户名"
 
                                 onValueChange={handleInputChange('username')}
-                                startContent={<User className="w-4 h-4 text-gray-400" />}
+                                startContent={<User className="w-4 h-4 text-default-400" />}
                                 variant="bordered"
                                 isRequired
                                 className="w-full"
@@ -102,13 +102,13 @@ const AdminLoginPage: React.FC = () => {
                                 placeholder="请输入密码"
 
                                 onValueChange={handleInputChange('password')}
-                                startContent={<Shield className="w-4 h-4 text-gray-400" />}
+                                startContent={<Shield className="w-4 h-4 text-default-400" />}
                                 endContent={
                                     <button className="focus:outline-none" type="button" onClick={toggleVisibility}>
                                         {isVisible ? (
-                                            <EyeOff className="w-4 h-4 text-gray-400" />
+                                            <EyeOff className="w-4 h-4 text-default-400" />
                                         ) : (
-                                            <Eye className="w-4 h-4 text-gray-400" />
+                                            <Eye className="w-4 h-4 text-default-400" />
                                         )}
                                     </button>
                                 }
@@ -122,7 +122,7 @@ const AdminLoginPage: React.FC = () => {
                                 type="submit"
                                 color="primary"
                                 size="lg"
-                                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium"
+                                className="w-full font-medium"
                                 isDisabled={isLoading}
                             >
                                 {isLoading ? (
@@ -139,7 +139,7 @@ const AdminLoginPage: React.FC = () => {
                 </Card>
 
                 <div className="text-center mt-6">
-                    <p className="text-gray-500 text-sm">
+                    <p className="text-default-500 text-sm">
                         © 2024 Star Share. All rights reserved.
                     </p>
                 </div>

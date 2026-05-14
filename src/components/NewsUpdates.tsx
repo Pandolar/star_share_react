@@ -54,11 +54,11 @@ const NewsUpdates: React.FC = () => {
       '活动资讯': 'bg-purple-100 text-purple-700',
       '合作公告': 'bg-orange-100 text-orange-700'
     };
-    return colors[category as keyof typeof colors] || 'bg-gray-100 text-gray-700';
+    return colors[category as keyof typeof colors] || 'bg-default-100 text-default-700';
   };
 
   return (
-    <section className="py-20 bg-gray-50">
+    <section className="py-20 bg-default-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* 标题 */}
         <motion.div
@@ -68,10 +68,10 @@ const NewsUpdates: React.FC = () => {
           viewport={{ once: true }}
           className="text-center mb-16"
         >
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+          <h2 className="text-4xl md:text-5xl font-bold text-default-900 mb-4">
             新闻动态
           </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <p className="text-xl text-default-600 max-w-3xl mx-auto">
             了解最新产品发布、技术突破和行业动态
           </p>
         </motion.div>
@@ -108,15 +108,15 @@ const NewsUpdates: React.FC = () => {
 
                 {/* 特色新闻内容 */}
                 <div className="p-6">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-3 line-clamp-2">
+                  <h3 className="text-2xl font-bold text-default-900 mb-3 line-clamp-2">
                     {item.title}
                   </h3>
-                  <p className="text-gray-600 mb-4 line-clamp-3">
+                  <p className="text-default-600 mb-4 line-clamp-3">
                     {item.summary}
                   </p>
 
                   {/* 元信息 */}
-                  <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+                  <div className="flex items-center justify-between text-sm text-default-500 mb-4">
                     <div className="flex items-center space-x-4">
                       <div className="flex items-center space-x-1">
                         <Calendar className="w-4 h-4" />
@@ -171,22 +171,22 @@ const NewsUpdates: React.FC = () => {
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(item.category)}`}>
                         {item.category}
                       </span>
-                      <div className="flex items-center space-x-2 text-xs text-gray-500">
+                      <div className="flex items-center space-x-2 text-xs text-default-500">
                         <Calendar className="w-3 h-3" />
                         <span>{item.date}</span>
                       </div>
                     </div>
 
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
+                    <h3 className="text-lg font-semibold text-default-900 mb-2 line-clamp-2">
                       {item.title}
                     </h3>
 
-                    <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+                    <p className="text-default-600 text-sm mb-3 line-clamp-2">
                       {item.summary}
                     </p>
 
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-1 text-xs text-gray-500">
+                      <div className="flex items-center space-x-1 text-xs text-default-500">
                         <Clock className="w-3 h-3" />
                         <span>{item.readTime}</span>
                       </div>
@@ -217,7 +217,7 @@ const NewsUpdates: React.FC = () => {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="bg-gray-200 text-gray-700 px-8 py-3 rounded-lg font-medium hover:bg-gray-300 transition-colors duration-200 flex items-center space-x-2 mx-auto"
+            className="bg-default-200 text-default-700 px-8 py-3 rounded-lg font-medium hover:bg-default-300 transition-colors duration-200 flex items-center space-x-2 mx-auto"
           >
             <span>查看更多新闻</span>
             <ArrowRight className="w-4 h-4" />

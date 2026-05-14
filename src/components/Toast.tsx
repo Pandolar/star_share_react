@@ -57,9 +57,9 @@ const ToastItem: React.FC<ToastProps> = ({ toast: toastData, onClose }) => {
         };
       default:
         return {
-          bgColor: 'bg-gray-50 border-gray-200',
-          textColor: 'text-gray-800',
-          iconColor: 'text-gray-500',
+          bgColor: 'bg-default-50 border-default-200',
+          textColor: 'text-default-800',
+          iconColor: 'text-default-500',
           icon: Info
         };
     }

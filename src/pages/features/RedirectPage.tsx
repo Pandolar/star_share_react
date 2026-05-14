@@ -85,7 +85,7 @@ const RedirectPage: React.FC<RedirectPageProps> = () => {
       case 'error':
         return 'text-red-600';
       default:
-        return 'text-gray-600';
+        return 'text-default-600';
     }
   };
 
@@ -117,7 +117,7 @@ const RedirectPage: React.FC<RedirectPageProps> = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-default-50 flex items-center justify-center px-4">
       <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
         <div className="flex flex-col items-center space-y-4">
           {getIcon()}
@@ -126,12 +126,12 @@ const RedirectPage: React.FC<RedirectPageProps> = () => {
             {status === 'error' ? '跳转失败' : '正在跳转'}
           </h1>
 
-          <p className="text-gray-600 text-lg">
+          <p className="text-default-600 text-lg">
             {message}
           </p>
 
           {status === 'loading' && (
-            <div className="text-sm text-gray-500 mt-4">
+            <div className="text-sm text-default-500 mt-4">
               请稍候，正在处理您的请求...
             </div>
           )}

@@ -113,7 +113,7 @@ const AdminLayout: React.FC = () => {
     ];
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-default-50">
             {/* 顶部导航栏 */}
             <Navbar
                 isBordered
@@ -134,7 +134,7 @@ const AdminLayout: React.FC = () => {
                     <NavbarBrand>
                         <div className="flex items-center gap-2">
                             <Shield className="w-6 h-6 text-blue-600" />
-                            <span className="font-bold text-lg text-gray-800">
+                            <span className="font-bold text-lg text-default-800">
                                 Star Share 管理后台
                             </span>
                         </div>
@@ -148,7 +148,7 @@ const AdminLayout: React.FC = () => {
                             variant="light"
                             startContent={<Home className="w-4 h-4" />}
                             onPress={() => window.open('/', '_blank')}
-                            className="text-gray-600 hover:text-blue-600"
+                            className="text-default-600 hover:text-blue-600"
                         >
                             前台首页
                         </Button>
@@ -218,7 +218,7 @@ const AdminLayout: React.FC = () => {
                                 classNames={{
                                     tabList: "gap-2 p-3",
                                     tab: "justify-start h-10 px-3",
-                                    tabContent: "gap-2 text-gray-700 group-data-[selected=true]:text-blue-600",
+                                    tabContent: "gap-2 text-default-700 group-data-[selected=true]:text-blue-600",
                                     cursor: "bg-blue-100",
                                 }}
                             >

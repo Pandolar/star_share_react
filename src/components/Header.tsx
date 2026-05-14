@@ -18,20 +18,20 @@ const renderNavAction = (
   switch (action.type) {
     case 'text':
       className =
-        'text-gray-600 hover:text-gray-900 transition-colors duration-200 font-medium px-3 py-2 rounded-lg hover:bg-gray-50' +
+        'text-default-600 hover:text-default-900 transition-colors duration-200 font-medium px-3 py-2 rounded-lg hover:bg-default-50' +
         (isMobile ? ' py-3' : '');
       whileHover = isMobile ? {} : { y: -1 };
       whileTap = { scale: 0.98 };
       break;
     case 'outline':
       className =
-        'px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 flex items-center justify-center font-medium';
+        'px-4 py-2 text-default-700 border border-default-300 rounded-lg hover:bg-default-50 hover:border-default-400 transition-all duration-200 flex items-center justify-center font-medium';
       whileHover = { scale: 1.02 };
       whileTap = { scale: 0.98 };
       break;
     case 'solid':
       className =
-        'px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors duration-200 flex items-center justify-center font-medium';
+        'px-4 py-2 bg-default-900 text-white rounded-lg hover:bg-default-800 transition-colors duration-200 flex items-center justify-center font-medium';
       whileHover = { scale: 1.02 };
       whileTap = { scale: 0.98 };
       break;
@@ -64,13 +64,13 @@ const Header: React.FC = () => {
   // 如果还在加载中，显示默认的导航
   if (loading || !homeInfo?.siteInfo || !homeInfo?.navigation) {
     return (
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-default-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Loading skeleton */}
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gray-200 rounded animate-pulse"></div>
-              <div className="w-24 h-6 bg-gray-200 rounded animate-pulse"></div>
+              <div className="w-8 h-8 bg-default-200 rounded animate-pulse"></div>
+              <div className="w-24 h-6 bg-default-200 rounded animate-pulse"></div>
             </div>
           </div>
         </div>
@@ -86,7 +86,7 @@ const Header: React.FC = () => {
   const rightButtons = navActions.filter((item) => item.type !== 'text');
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-default-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
@@ -100,7 +100,7 @@ const Header: React.FC = () => {
               alt="Logo"
               className="w-8 h-8"
             />
-            <div className="text-2xl font-bold text-gray-900">
+            <div className="text-2xl font-bold text-default-900">
               {siteInfo.siteName}
             </div>
           </motion.div>
@@ -123,7 +123,7 @@ const Header: React.FC = () => {
           <div className="md:hidden">
             <motion.button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="p-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors duration-200"
+              className="p-2 rounded-lg text-default-700 hover:bg-default-100 transition-colors duration-200"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
@@ -139,7 +139,7 @@ const Header: React.FC = () => {
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.3 }}
-            className="md:hidden border-t border-gray-200 mt-4 pt-4 pb-6"
+            className="md:hidden border-t border-default-200 mt-4 pt-4 pb-6"
           >
             <nav className="flex flex-col space-y-4">
               {navItems.map((item, idx) =>

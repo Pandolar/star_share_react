@@ -275,7 +275,7 @@ const OrdersManagePage: React.FC = () => {
             {/* 页面标题 */}
             <div className="flex items-center gap-3">
                 <ShoppingCart className="w-6 h-6 text-blue-600" />
-                <h1 className="text-2xl font-bold text-gray-800">订单管理</h1>
+                <h1 className="text-2xl font-bold text-default-800">订单管理</h1>
             </div>
 
             {/* 搜索和筛选区域 */}
@@ -292,7 +292,7 @@ const OrdersManagePage: React.FC = () => {
                             placeholder="搜索订单号..."
 
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            startContent={<Search className="w-4 h-4 text-gray-400" />}
+                            startContent={<Search className="w-4 h-4 text-default-400" />}
                             className="flex-1"
                             onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                         />
@@ -310,7 +310,6 @@ const OrdersManagePage: React.FC = () => {
             </Select>
                         <div className="flex gap-2">
                             <Button
-                                className="admin-action-btn"
                                 color="primary"
                                 onPress={handleSearch}
                                 startContent={<Search className="w-4 h-4" />}
@@ -331,7 +330,7 @@ const OrdersManagePage: React.FC = () => {
 
             {/* 操作区域 */}
             <div className="flex justify-between items-center">
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-default-600">
                     共 {total} 个订单
                 </div>
             </div>
@@ -369,33 +368,33 @@ const OrdersManagePage: React.FC = () => {
                                         <div className="space-y-1">
                                             <div className="font-medium">{order.order_id}</div>
                                             {order.trade_no && (
-                                                <div className="text-xs text-gray-500">交易号: {order.trade_no}</div>
+                                                <div className="text-xs text-default-500">交易号: {order.trade_no}</div>
                                             )}
                                         </div>
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
-                                            <User className="w-4 h-4 text-gray-400" />
+                                            <User className="w-4 h-4 text-default-400" />
                                             <span className="text-sm">用户ID: {order.user_id}</span>
                                         </div>
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
-                                            <DollarSign className="w-4 h-4 text-gray-400" />
+                                            <DollarSign className="w-4 h-4 text-default-400" />
                                             <span className="text-sm">套餐ID: {order.package_id}</span>
                                         </div>
                                     </TableCell>
                                     <TableCell>{renderStatus(order.status)}</TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
-                                            <Calendar className="w-4 h-4 text-gray-400" />
+                                            <Calendar className="w-4 h-4 text-default-400" />
                                             <span className="text-sm">
                                                 {dayjs(order.created_at).format('YYYY-MM-DD HH:mm')}
                                             </span>
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="max-w-40 truncate text-sm text-gray-600">
+                                        <div className="max-w-40 truncate text-sm text-default-600">
                                             {order.remarks || '-'}
                                         </div>
                                     </TableCell>
@@ -410,7 +409,7 @@ const OrdersManagePage: React.FC = () => {
             {/* 分页 */}
             {totalPages > 0 && (
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <div className="flex items-center gap-2 text-sm text-default-600">
                         <span>每页</span>
                         <Select
                             aria-label="每页数量"
@@ -472,7 +471,7 @@ const OrdersManagePage: React.FC = () => {
                         <Button variant="light" onPress={onEditClose}>
                             取消
                         </Button>
-                        <Button className="admin-action-btn" color="primary" onPress={handleEdit}>
+                        <Button color="primary" onPress={handleEdit}>
                             保存
                         </Button>
                     </ModalFooter>
@@ -495,48 +494,48 @@ const OrdersManagePage: React.FC = () => {
                             <div className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <span className="text-sm text-gray-500">订单ID</span>
+                                        <span className="text-sm text-default-500">订单ID</span>
                                         <div className="font-medium">{selectedOrder.id}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">订单号</span>
+                                        <span className="text-sm text-default-500">订单号</span>
                                         <div className="font-medium">{selectedOrder.order_id}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">用户ID</span>
+                                        <span className="text-sm text-default-500">用户ID</span>
                                         <div className="font-medium">{selectedOrder.user_id}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">套餐ID</span>
+                                        <span className="text-sm text-default-500">套餐ID</span>
                                         <div className="font-medium">{selectedOrder.package_id}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">状态</span>
+                                        <span className="text-sm text-default-500">状态</span>
                                         <div>{renderStatus(selectedOrder.status)}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">创建时间</span>
+                                        <span className="text-sm text-default-500">创建时间</span>
                                         <div className="font-medium">
                                             {dayjs(selectedOrder.created_at).format('YYYY-MM-DD HH:mm:ss')}
                                         </div>
                                     </div>
                                     {selectedOrder.trade_no && (
                                         <div>
-                                            <span className="text-sm text-gray-500">交易号</span>
+                                            <span className="text-sm text-default-500">交易号</span>
                                             <div className="font-medium">{selectedOrder.trade_no}</div>
                                         </div>
                                     )}
                                     {selectedOrder.way && (
                                         <div>
-                                            <span className="text-sm text-gray-500">支付方式</span>
+                                            <span className="text-sm text-default-500">支付方式</span>
                                             <div className="font-medium">{selectedOrder.way}</div>
                                         </div>
                                     )}
                                 </div>
                                 {selectedOrder.remarks && (
                                     <div>
-                                        <span className="text-sm text-gray-500">备注</span>
-                                        <div className="mt-1 p-3 bg-gray-50 rounded-lg text-sm">
+                                        <span className="text-sm text-default-500">备注</span>
+                                        <div className="mt-1 p-3 bg-default-50 rounded-lg text-sm">
                                             {selectedOrder.remarks}
                                         </div>
                                     </div>
@@ -567,7 +566,7 @@ const OrdersManagePage: React.FC = () => {
                         <p>
                             确定要删除订单 <strong>{selectedOrder?.order_id}</strong> 吗？
                         </p>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-default-500">
                             删除后将无法恢复，请谨慎操作。
                         </p>
                     </ModalBody>

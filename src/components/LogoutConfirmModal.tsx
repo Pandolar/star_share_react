@@ -33,8 +33,8 @@ export const LogoutConfirmModal: React.FC<LogoutConfirmModalProps> = ({
       classNames={{
         backdrop: "bg-black/50 backdrop-blur-sm",
         base: "border-none shadow-2xl",
-        header: "border-b border-gray-200",
-        footer: "border-t border-gray-200",
+        header: "border-b border-default-200",
+        footer: "border-t border-default-200",
       }}
     >
       <ModalContent>
@@ -51,7 +51,7 @@ export const LogoutConfirmModal: React.FC<LogoutConfirmModalProps> = ({
                   <AlertTriangle className="w-6 h-6 text-orange-600" />
                 </div>
               </motion.div>
-              <h3 className="text-xl font-semibold text-gray-900">确认退出登录</h3>
+              <h3 className="text-xl font-semibold text-default-900">确认退出登录</h3>
             </ModalHeader>
             
             <ModalBody className="text-center">
@@ -60,10 +60,10 @@ export const LogoutConfirmModal: React.FC<LogoutConfirmModalProps> = ({
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.1 }}
               >
-                <p className="text-gray-600 mb-3">
+                <p className="text-default-600 mb-3">
                   您确定要退出登录吗？
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-default-500">
                   这将清除您的登录状态并跳转到主页
                 </p>
               </motion.div>

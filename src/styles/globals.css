@@ -96,13 +96,6 @@ a:hover {
   text-decoration: none;
 }
 
-/* 按钮重置 */
-button {
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-family: inherit;
-}
 
 /* 输入框重置 */
 input, textarea, select {
@@ -128,39 +121,6 @@ input, textarea, select {
   }
 }
 
-/* 文本工具类 */
-.text-primary {
-  color: var(--color-primary);
-}
-
-.text-success {
-  color: var(--color-success);
-}
-
-.text-warning {
-  color: var(--color-warning);
-}
-
-.text-danger {
-  color: var(--color-danger);
-}
-
-/* 背景工具类 */
-.bg-primary-50 {
-  background-color: var(--color-primary-50);
-}
-
-.bg-success-50 {
-  background-color: var(--color-success-50);
-}
-
-.bg-warning-50 {
-  background-color: var(--color-warning-50);
-}
-
-.bg-danger-50 {
-  background-color: var(--color-danger-50);
-}
 
 /* 动画工具类 */
 .transition-fast {
@@ -228,41 +188,6 @@ input, textarea, select {
   background: var(--color-default-400);
 }
 
-/* Focus样式重置 - 完全去除聚焦边框 */
-*:focus,
-*:focus-visible,
-input:focus,
-textarea:focus,
-select:focus,
-button:focus,
-[data-focus="true"],
-[data-focused="true"],
-[data-focus-visible="true"] {
-  outline: none !important;
-  box-shadow: none !important;
-  border-color: inherit !important;
-}
-
-/* HeroUI 组件聚焦样式完全重置 */
-.heroui-input,
-.heroui-input input,
-.heroui-textarea,
-.heroui-textarea textarea,
-.heroui-select,
-.heroui-select select,
-.heroui-button,
-.heroui-button:focus,
-[class*="heroui-"]:focus,
-[class*="heroui-"] *:focus {
-  outline: none !important;
-  box-shadow: none !important;
-  border-color: inherit !important;
-}
-
-.focus-visible:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
-}
 
 /* 页面过渡动画 */
 .page-enter {
@@ -334,19 +259,6 @@ button:focus,
   animation: skeleton-loading 1.5s infinite;
 }
 
-/* Admin 特定操作按钮样式（仅用于搜索/新增等关键动作，不影响全局） */
-.admin-action-btn {
-  background-color: #006FEE !important;
-  color: #ffffff !important;
-  border: 1px solid #006FEE !important;
-}
-.admin-action-btn:hover {
-  background-color: #005BC4 !important;
-  border-color: #005BC4 !important;
-}
-.admin-action-btn svg {
-  color: #ffffff !important;
-}
 
 /* 允许表格内文本选择与拖动复制（覆盖组件默认的禁选中行为） */
 table, table *,

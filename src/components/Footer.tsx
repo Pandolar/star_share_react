@@ -11,27 +11,27 @@ const Footer: React.FC = () => {
   // 如果正在加载，显示加载状态
   if (loading) {
     return (
-      <footer className="bg-gray-900 text-white">
+      <footer className="bg-default-900 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* 主要内容区域加载状态 */}
           <div className="py-16">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-8">
               {/* 公司信息加载状态 */}
               <div className="lg:col-span-2">
-                <div className="w-32 h-8 bg-gray-700 rounded mb-4 animate-pulse"></div>
-                <div className="w-full h-16 bg-gray-700 rounded mb-6 animate-pulse"></div>
+                <div className="w-32 h-8 bg-default-700 rounded mb-4 animate-pulse"></div>
+                <div className="w-full h-16 bg-default-700 rounded mb-6 animate-pulse"></div>
                 <div className="space-y-3">
-                  <div className="w-48 h-5 bg-gray-700 rounded animate-pulse"></div>
+                  <div className="w-48 h-5 bg-default-700 rounded animate-pulse"></div>
                 </div>
               </div>
 
               {/* 链接区域加载状态 */}
               {[...Array(3)].map((_, index) => (
                 <div key={index}>
-                  <div className="w-16 h-6 bg-gray-700 rounded mb-4 animate-pulse"></div>
+                  <div className="w-16 h-6 bg-default-700 rounded mb-4 animate-pulse"></div>
                   <div className="space-y-3">
                     {[...Array(4)].map((_, i) => (
-                      <div key={i} className="w-20 h-4 bg-gray-700 rounded animate-pulse"></div>
+                      <div key={i} className="w-20 h-4 bg-default-700 rounded animate-pulse"></div>
                     ))}
                   </div>
                 </div>
@@ -40,12 +40,12 @@ const Footer: React.FC = () => {
           </div>
 
           {/* 底部信息加载状态 */}
-          <div className="border-t border-gray-800 py-8">
+          <div className="border-t border-default-800 py-8">
             <div className="flex justify-between items-center">
-              <div className="w-48 h-4 bg-gray-700 rounded animate-pulse"></div>
+              <div className="w-48 h-4 bg-default-700 rounded animate-pulse"></div>
               <div className="flex space-x-4">
                 {[...Array(3)].map((_, i) => (
-                  <div key={i} className="w-10 h-10 bg-gray-700 rounded-full animate-pulse"></div>
+                  <div key={i} className="w-10 h-10 bg-default-700 rounded-full animate-pulse"></div>
                 ))}
               </div>
             </div>
@@ -58,7 +58,7 @@ const Footer: React.FC = () => {
   const { siteInfo, footer } = homeInfo;
 
   return (
-    <footer className="bg-gray-900 text-white">
+    <footer className="bg-default-900 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* 主要内容区域 */}
         <div className="py-16">
@@ -74,7 +74,7 @@ const Footer: React.FC = () => {
                 <div className="text-2xl font-bold text-blue-600 mb-4">
                   {siteInfo.siteName}
                 </div>
-                <p className="text-gray-400 mb-6 leading-relaxed">
+                <p className="text-default-400 mb-6 leading-relaxed">
                   {siteInfo.description}
                 </p>
 
@@ -83,19 +83,19 @@ const Footer: React.FC = () => {
                   {siteInfo.contactInfo.email && (
                     <div className="flex items-center space-x-3">
                       <Mail className="w-5 h-5 text-blue-400" />
-                      <span className="text-gray-400">{siteInfo.contactInfo.email}</span>
+                      <span className="text-default-400">{siteInfo.contactInfo.email}</span>
                     </div>
                   )}
                   {siteInfo.contactInfo.phone && (
                     <div className="flex items-center space-x-3">
                       <Phone className="w-5 h-5 text-blue-400" />
-                      <span className="text-gray-400">{siteInfo.contactInfo.phone}</span>
+                      <span className="text-default-400">{siteInfo.contactInfo.phone}</span>
                     </div>
                   )}
                   {siteInfo.contactInfo.address && (
                     <div className="flex items-center space-x-3">
                       <MapPin className="w-5 h-5 text-blue-400" />
-                      <span className="text-gray-400">{siteInfo.contactInfo.address}</span>
+                      <span className="text-default-400">{siteInfo.contactInfo.address}</span>
                     </div>
                   )}
                 </div>
@@ -117,7 +117,7 @@ const Footer: React.FC = () => {
                     <li key={link.name}>
                       <motion.a
                         href={link.href}
-                        className="text-gray-400 hover:text-white transition-colors duration-200 no-underline"
+                        className="text-default-400 hover:text-white transition-colors duration-200 no-underline"
                         style={{ textDecoration: 'none' }}
                         whileHover={{ x: 5 }}
                       >
@@ -132,7 +132,7 @@ const Footer: React.FC = () => {
         </div>
 
         {/* 分割线 */}
-        <div className="border-t border-gray-800" />
+        <div className="border-t border-default-800" />
 
         {/* 底部信息 */}
         <div className="py-8">
@@ -143,7 +143,7 @@ const Footer: React.FC = () => {
               whileInView={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.6 }}
               viewport={{ once: true }}
-              className="flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-6 text-gray-400 text-sm"
+              className="flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-6 text-default-400 text-sm"
             >
               <span>© {siteInfo.copyrightYear} {siteInfo.companyName}. 保留所有权利.</span>
             </motion.div>
@@ -161,7 +161,7 @@ const Footer: React.FC = () => {
                   <motion.a
                     key={social.label}
                     href={social.href}
-                    className="bg-gray-800 p-3 rounded-full text-gray-400 hover:text-white hover:bg-gray-700 transition-all duration-200"
+                    className="bg-default-800 p-3 rounded-full text-default-400 hover:text-white hover:bg-default-700 transition-all duration-200"
                     whileHover={{ scale: 1.1, y: -2 }}
                     whileTap={{ scale: 0.9 }}
                     initial={{ opacity: 0, y: 20 }}
@@ -187,14 +187,14 @@ const Footer: React.FC = () => {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
               viewport={{ once: true }}
-              className="mt-6 pt-6 border-t border-gray-800 text-center text-gray-500 text-sm"
+              className="mt-6 pt-6 border-t border-default-800 text-center text-default-500 text-sm"
             >
               <p>
                 <a
                   href="https://beian.miit.gov.cn/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-gray-300 text-gray-500 no-underline transition-colors duration-200"
+                  className="hover:text-default-300 text-default-500 no-underline transition-colors duration-200"
                   style={{ textDecoration: 'none' }}
                 >
                   {siteInfo.icpNumber}

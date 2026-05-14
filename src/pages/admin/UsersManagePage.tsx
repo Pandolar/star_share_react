@@ -388,7 +388,7 @@ const UsersManagePage: React.FC = () => {
             {/* 页面标题 */}
             <div className="flex items-center gap-3">
                 <Users className="w-6 h-6 text-blue-600" />
-                <h1 className="text-2xl font-bold text-gray-800">用户管理</h1>
+                <h1 className="text-2xl font-bold text-default-800">用户管理</h1>
             </div>
 
             {/* 搜索和筛选区域 */}
@@ -405,7 +405,7 @@ const UsersManagePage: React.FC = () => {
                             placeholder="搜索用户名或邮箱..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            startContent={<Search className="w-4 h-4 text-gray-400" />}
+                            startContent={<Search className="w-4 h-4 text-default-400" />}
                             className="flex-1"
                             onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                         />
@@ -423,7 +423,6 @@ const UsersManagePage: React.FC = () => {
                         </Select>
                         <div className="flex gap-2">
                             <Button
-                                className="admin-action-btn"
                                 color="primary"
                                 onPress={handleSearch}
                                 startContent={<Search className="w-4 h-4" />}
@@ -444,7 +443,7 @@ const UsersManagePage: React.FC = () => {
 
             {/* 操作区域 */}
             <div className="flex justify-between items-center gap-3 flex-wrap">
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-default-600">
                     共 {total} 个用户
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -461,7 +460,6 @@ const UsersManagePage: React.FC = () => {
                         一键解除限速
                     </Button>
                     <Button
-                        className="admin-action-btn"
                         color="primary"
                         startContent={<Plus className="w-4 h-4" />}
                         onPress={onCreateOpen}
@@ -508,7 +506,7 @@ const UsersManagePage: React.FC = () => {
                                         <div className="space-y-1">
                                             <div className="text-sm">{user.email}</div>
                                             {user.tel && (
-                                                <div className="text-xs text-gray-500">{user.tel}</div>
+                                                <div className="text-xs text-default-500">{user.tel}</div>
                                             )}
                                         </div>
                                     </TableCell>
@@ -517,7 +515,7 @@ const UsersManagePage: React.FC = () => {
                                         {dayjs(user.created_at).format('YYYY-MM-DD HH:mm')}
                                     </TableCell>
                                     <TableCell>
-                                        <div className="max-w-40 truncate text-sm text-gray-600">
+                                        <div className="max-w-40 truncate text-sm text-default-600">
                                             {user.remarks || '-'}
                                         </div>
                                     </TableCell>
@@ -532,7 +530,7 @@ const UsersManagePage: React.FC = () => {
             {/* 分页 */}
             {totalPages > 0 && (
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <div className="flex items-center gap-2 text-sm text-default-600">
                         <span>每页</span>
                         <Select
                             aria-label="每页数量"
@@ -615,7 +613,7 @@ const UsersManagePage: React.FC = () => {
                         <Button variant="light" onPress={onCreateClose}>
                             取消
                         </Button>
-                        <Button className="admin-action-btn" color="primary" onPress={handleCreate}>
+                        <Button color="primary" onPress={handleCreate}>
                             创建
                         </Button>
                     </ModalFooter>
@@ -670,7 +668,7 @@ const UsersManagePage: React.FC = () => {
                         <Button variant="light" onPress={onEditClose}>
                             取消
                         </Button>
-                        <Button className="admin-action-btn" color="primary" onPress={handleEdit}>
+                        <Button color="primary" onPress={handleEdit}>
                             保存
                         </Button>
                     </ModalFooter>
@@ -694,63 +692,63 @@ const UsersManagePage: React.FC = () => {
                             <div className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <span className="text-sm text-gray-500">用户ID</span>
+                                        <span className="text-sm text-default-500">用户ID</span>
                                         <div className="font-medium">{selectedUser.id}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">用户名</span>
+                                        <span className="text-sm text-default-500">用户名</span>
                                         <div className="font-medium">{selectedUser.username || '-'}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">邮箱</span>
+                                        <span className="text-sm text-default-500">邮箱</span>
                                         <div className="font-medium">{selectedUser.email}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">邀请人用户ID</span>
+                                        <span className="text-sm text-default-500">邀请人用户ID</span>
                                         <div className="font-medium">{selectedUser.inviter_user ?? '-'}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">电话</span>
+                                        <span className="text-sm text-default-500">电话</span>
                                         <div className="font-medium">{selectedUser.tel || '-'}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">状态</span>
+                                        <span className="text-sm text-default-500">状态</span>
                                         <div>{renderStatus(selectedUser.status)}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">创建时间</span>
+                                        <span className="text-sm text-default-500">创建时间</span>
                                         <div className="font-medium">
                                             {dayjs(selectedUser.created_at).format('YYYY-MM-DD HH:mm:ss')}
                                         </div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">邀请码</span>
+                                        <span className="text-sm text-default-500">邀请码</span>
                                         <div className="font-medium">{selectedUser.inviter_code || '-'}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">邀请绑定时间</span>
+                                        <span className="text-sm text-default-500">邀请绑定时间</span>
                                         <div className="font-medium">
                                             {selectedUser.invite_bound_at ? dayjs(selectedUser.invite_bound_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
                                         </div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">XY UUID Token</span>
+                                        <span className="text-sm text-default-500">XY UUID Token</span>
                                         <div className="font-medium break-all">{selectedUser.xy_uuid_token || '-'}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">微信OpenID</span>
+                                        <span className="text-sm text-default-500">微信OpenID</span>
                                         <div className="font-medium break-all">{selectedUser.wechat_openid || '-'}</div>
                                     </div>
                                 </div>
                                 <div>
-                                    <span className="text-sm text-gray-500">备注</span>
-                                    <div className="mt-1 p-3 bg-gray-50 rounded-lg text-sm whitespace-pre-wrap break-words">
+                                    <span className="text-sm text-default-500">备注</span>
+                                    <div className="mt-1 p-3 bg-default-50 rounded-lg text-sm whitespace-pre-wrap break-words">
                                         {selectedUser.remarks || '-'}
                                     </div>
                                 </div>
                                 <div>
-                                    <span className="text-sm text-gray-500">用户偏好</span>
-                                    <div className="mt-1 p-3 bg-gray-50 rounded-lg text-sm overflow-x-auto">
+                                    <span className="text-sm text-default-500">用户偏好</span>
+                                    <div className="mt-1 p-3 bg-default-50 rounded-lg text-sm overflow-x-auto">
                                         <pre className="whitespace-pre-wrap break-words">
                                             {selectedUser.preferences ? JSON.stringify(selectedUser.preferences, null, 2) : '-'}
                                         </pre>
@@ -782,7 +780,7 @@ const UsersManagePage: React.FC = () => {
                         <p>
                             确定要删除用户 <strong>{selectedUser?.username || selectedUser?.email}</strong> 吗？
                         </p>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-default-500">
                             删除后将无法恢复，请谨慎操作。
                         </p>
                     </ModalBody>
@@ -832,16 +830,16 @@ const UsersManagePage: React.FC = () => {
                             <Divider />
 
                             <div className="space-y-3">
-                                <div className="text-sm text-gray-600">
+                                <div className="text-sm text-default-600">
                                     {clearLimitCandidates.length > 0 ? `找到 ${clearLimitCandidates.length} 个候选用户，请确认目标用户后再解除限速。` : '输入任意邮箱、用户名或用户 ID 后搜索。'}
                                 </div>
                                 <div className="space-y-2">
                                     {clearLimitCandidates.map((user) => (
-                                        <div key={user.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-gray-200 p-3">
+                                        <div key={user.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-default-200 p-3">
                                             <div className="space-y-1">
-                                                <div className="font-medium text-gray-900">{user.username || '未设置用户名'}</div>
-                                                <div className="text-sm text-gray-600">{user.email}</div>
-                                                <div className="text-xs text-gray-500">
+                                                <div className="font-medium text-default-900">{user.username || '未设置用户名'}</div>
+                                                <div className="text-sm text-default-600">{user.email}</div>
+                                                <div className="text-xs text-default-500">
                                                     ID: {user.id} · 状态: {user.status === 1 ? '正常' : '禁用'} · 创建时间: {dayjs(user.created_at).format('YYYY-MM-DD HH:mm:ss')}
                                                 </div>
                                             </div>
@@ -851,7 +849,7 @@ const UsersManagePage: React.FC = () => {
                                         </div>
                                     ))}
                                     {!clearLimitSearchLoading && clearLimitCandidates.length === 0 && (
-                                        <div className="rounded-lg border border-dashed border-gray-200 p-6 text-center text-sm text-gray-500">
+                                        <div className="rounded-lg border border-dashed border-default-200 p-6 text-center text-sm text-default-500">
                                             暂无候选用户
                                         </div>
                                     )}
@@ -881,12 +879,12 @@ const UsersManagePage: React.FC = () => {
                         确认解除限速
                     </ModalHeader>
                     <ModalBody>
-                        <div className="space-y-3 text-sm text-gray-700">
+                        <div className="space-y-3 text-sm text-default-700">
                             <p>请确认要为以下用户执行一键操作（解除限速 + 解封 + 加白）：</p>
-                            <div className="rounded-lg bg-gray-50 p-4 space-y-2">
-                                <div><span className="text-gray-500">用户ID：</span>{pendingClearLimitUser?.id ?? '-'}</div>
-                                <div><span className="text-gray-500">用户名：</span>{pendingClearLimitUser?.username || '-'}</div>
-                                <div><span className="text-gray-500">邮箱：</span>{pendingClearLimitUser?.email || '-'}</div>
+                            <div className="rounded-lg bg-default-50 p-4 space-y-2">
+                                <div><span className="text-default-500">用户ID：</span>{pendingClearLimitUser?.id ?? '-'}</div>
+                                <div><span className="text-default-500">用户名：</span>{pendingClearLimitUser?.username || '-'}</div>
+                                <div><span className="text-default-500">邮箱：</span>{pendingClearLimitUser?.email || '-'}</div>
                             </div>
                             <p className="text-warning-600">确认后将同步执行：清除限速、解封（如已封禁）、加白（如未在白名单），请确保目标用户无误。</p>
                         </div>

@@ -628,7 +628,7 @@ const GoPlusPage: React.FC = () => {
 
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-default-50">
             {/* 导航栏 */}
             <nav className="bg-white shadow-sm border-b">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -644,9 +644,9 @@ const GoPlusPage: React.FC = () => {
                                         (e.target as HTMLImageElement).src = '/logo.svg';
                                     }}
                                 />
-                                <span className="font-semibold text-lg text-gray-900">{config.brandName}</span>
+                                <span className="font-semibold text-lg text-default-900">{config.brandName}</span>
                             </div>
-                            <div className="hidden sm:flex items-center space-x-2 text-gray-500">
+                            <div className="hidden sm:flex items-center space-x-2 text-default-500">
                                 <span>×</span>
                                 <img
                                     src={config.partnerLogo}
@@ -702,10 +702,10 @@ const GoPlusPage: React.FC = () => {
                     animate={{ opacity: 1, y: 0 }}
                     className="text-center mb-12"
                 >
-                    <h1 className="text-4xl font-bold text-gray-900 mb-4">
+                    <h1 className="text-4xl font-bold text-default-900 mb-4">
                         ChatGPT Plus 个人自助充值
                     </h1>
-                    <p className="text-xl text-gray-600">
+                    <p className="text-xl text-default-600">
                         安全快速，专业可靠的ChatGPT Plus充值服务
                     </p>
                 </motion.div>
@@ -718,7 +718,7 @@ const GoPlusPage: React.FC = () => {
                     transition={{ delay: 0.1 }}
                     className="mb-12"
                 >
-                    <h2 className="text-2xl font-semibold text-gray-900 text-center mb-8">为什么选择我们</h2>
+                    <h2 className="text-2xl font-semibold text-default-900 text-center mb-8">为什么选择我们</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         {features.map((feature, index) => (
                             <motion.div
@@ -733,7 +733,7 @@ const GoPlusPage: React.FC = () => {
                                             {feature.icon}
                                         </div>
                                         <h3 className="font-semibold text-lg mb-2">{feature.title}</h3>
-                                        <p className="text-gray-600 text-sm">{feature.description}</p>
+                                        <p className="text-default-600 text-sm">{feature.description}</p>
                                     </CardBody>
                                 </Card>
                             </motion.div>
@@ -753,12 +753,12 @@ const GoPlusPage: React.FC = () => {
                         <CardBody className="p-6">
                             <div className="flex items-center space-x-3 mb-4">
                                 <Zap className="w-8 h-8 text-primary" />
-                                <h2 className="text-2xl font-semibold text-gray-900">无需账密，极简步骤，一分钟搞定！</h2>
+                                <h2 className="text-2xl font-semibold text-default-900">无需账密，极简步骤，一分钟搞定！</h2>
                             </div>
-                            <div className="text-lg text-gray-700 space-y-2">
+                            <div className="text-lg text-default-700 space-y-2">
                                 <p><span className="font-semibold text-primary">第一步.</span> 登录ChatGPT官网后，复制JSON到本页面</p>
                                 <p><span className="font-semibold text-primary">第二步.</span> 支付完成并充值到账</p>
-                                <div className="border-t border-dashed border-gray-300 my-4"></div>
+                                <div className="border-t border-dashed border-default-300 my-4"></div>
                                 <p>
                                     <span className="font-semibold text-primary">价格说明：</span>
                                     由于汇率和风控等因素，价格会动态浮动，当前价格区间为 <span className="font-semibold text-primary">95~140元</span>左右，请以实际支付页面为准。
@@ -779,7 +779,7 @@ const GoPlusPage: React.FC = () => {
                     <Card className="shadow-lg">
                         <CardBody className="p-8">
                             <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-2xl font-semibold text-gray-900">开始充值</h2>
+                                <h2 className="text-2xl font-semibold text-default-900">开始充值</h2>
                                 <Button
                                     onPress={openVideoModal}
                                     className="group relative overflow-hidden px-7 py-2 rounded-full border-0 shadow-lg font-bold text-lg flex items-center gap-2 bg-blue-600 hover:bg-blue-700 transition-all duration-200"
@@ -913,11 +913,11 @@ const GoPlusPage: React.FC = () => {
                                                     subtitle="点击展开查看完整的JSON示例"
                                                 >
                                                     <div className="space-y-3">
-                                                        <p className="text-gray-600">
+                                                        <p className="text-default-600">
                                                             以下是ChatGPT Session JSON的标准格式示例（即使收缩到一行也可以）：
                                                         </p>
-                                                        <div className="bg-gray-50 p-4 rounded-lg">
-                                                            <pre className="text-xs text-gray-800 overflow-x-auto">
+                                                        <div className="bg-default-50 p-4 rounded-lg">
+                                                            <pre className="text-xs text-default-800 overflow-x-auto">
                                                                 <code>
                                                                     {`{
   "user": {
@@ -976,25 +976,25 @@ const GoPlusPage: React.FC = () => {
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                             {/* <div>
-                                                <label className="font-medium text-gray-700">用户ID:</label>
-                                                <p className="text-gray-900 mt-1">{validatedData?.user?.id}</p>
+                                                <label className="font-medium text-default-700">用户ID:</label>
+                                                <p className="text-default-900 mt-1">{validatedData?.user?.id}</p>
                                             </div> */}
-                                            <div className="flex items-center space-x-3 bg-white border border-gray-200 rounded-lg p-4 shadow-sm col-span-1 md:col-span-2 w-full">
+                                            <div className="flex items-center space-x-3 bg-white border border-default-200 rounded-lg p-4 shadow-sm col-span-1 md:col-span-2 w-full">
                                                 <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100">
                                                     <Mail className="w-5 h-5 text-blue-500" />
                                                 </span>
                                                 <div>
-                                                    <label className="block text-gray-600 font-semibold">邮箱</label>
-                                                    <span className="text-gray-900 text-base font-medium">{validatedData?.user?.email}</span>
+                                                    <label className="block text-default-600 font-semibold">邮箱</label>
+                                                    <span className="text-default-900 text-base font-medium">{validatedData?.user?.email}</span>
                                                 </div>
                                             </div>
                                             {/* <div>
-                                                <label className="font-medium text-gray-700">账户类型:</label>
-                                                <p className="text-gray-900 mt-1">{validatedData?.account?.planType}</p>
+                                                <label className="font-medium text-default-700">账户类型:</label>
+                                                <p className="text-default-900 mt-1">{validatedData?.account?.planType}</p>
                                             </div>
                                             <div>
-                                                <label className="font-medium text-gray-700">账户ID:</label>
-                                                <p className="text-gray-900 mt-1">{validatedData?.account?.id}</p>
+                                                <label className="font-medium text-default-700">账户ID:</label>
+                                                <p className="text-default-900 mt-1">{validatedData?.account?.id}</p>
                                             </div> */}
                                         </div>
 
@@ -1029,8 +1029,8 @@ const GoPlusPage: React.FC = () => {
                                     >
                                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
                                         <div>
-                                            <h3 className="text-lg font-semibold text-gray-900 mb-2">正在处理充值</h3>
-                                            <p className="text-gray-600">请稍候，我们正在为您的账户充值...</p>
+                                            <h3 className="text-lg font-semibold text-default-900 mb-2">正在处理充值</h3>
+                                            <p className="text-default-600">请稍候，我们正在为您的账户充值...</p>
                                         </div>
                                     </motion.div>
                                 )}
@@ -1048,8 +1048,8 @@ const GoPlusPage: React.FC = () => {
                                             <CheckCircle className="w-8 h-8 text-green-600" />
                                         </div>
                                         <div>
-                                            <h3 className="text-lg font-semibold text-gray-900 mb-2">充值成功！</h3>
-                                            <p className="text-gray-600 mb-4">
+                                            <h3 className="text-lg font-semibold text-default-900 mb-2">充值成功！</h3>
+                                            <p className="text-default-600 mb-4">
                                                 您的ChatGPT Plus已成功充值，请返回ChatGPT官网查看
                                             </p>
                                             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -1085,36 +1085,36 @@ const GoPlusPage: React.FC = () => {
                     transition={{ delay: 0.75 }}
                     className="mb-12"
                 >
-                    <h2 className="text-2xl font-semibold text-gray-900 text-center mb-8">
+                    <h2 className="text-2xl font-semibold text-default-900 text-center mb-8">
                         充值方式对比
                     </h2>
 
                     <Card shadow="sm">
                         <CardBody className="overflow-x-auto p-0">
-                            <table className="min-w-full divide-y divide-gray-200 text-sm">
-                                <thead className="bg-gray-50">
+                            <table className="min-w-full divide-y divide-default-200 text-sm">
+                                <thead className="bg-default-50">
                                     <tr>
-                                        <th className="px-6 py-4 font-semibold text-left text-gray-700 w-40">
+                                        <th className="px-6 py-4 font-semibold text-left text-default-700 w-40">
                                             {/* 对比维度 */}
                                         </th>
                                         <th className="px-6 py-4 font-semibold text-center text-primary">
                                             本站自助充值
                                         </th>
-                                        <th className="px-6 py-4 font-semibold text-center text-gray-600">
+                                        <th className="px-6 py-4 font-semibold text-center text-default-600">
                                             虚拟卡充值
                                         </th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-100 bg-white">
+                                <tbody className="divide-y divide-default-100 bg-white">
                                     {compareRows.map((row, idx) => (
-                                        <tr key={idx} className="hover:bg-gray-50">
-                                            <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-800">
+                                        <tr key={idx} className="hover:bg-default-50">
+                                            <td className="px-6 py-4 whitespace-nowrap font-medium text-default-800">
                                                 {row.label}
                                             </td>
-                                            <td className="px-6 py-4 text-gray-900">
+                                            <td className="px-6 py-4 text-default-900">
                                                 {row.ours}
                                             </td>
-                                            <td className="px-6 py-4 text-gray-700">
+                                            <td className="px-6 py-4 text-default-700">
                                                 {row.card}
                                             </td>
                                         </tr>
@@ -1133,7 +1133,7 @@ const GoPlusPage: React.FC = () => {
                     transition={{ delay: 0.8 }}
                     className="mb-8"
                 >
-                    <h2 className="text-2xl font-semibold text-gray-900 text-center mb-8">帮助中心</h2>
+                    <h2 className="text-2xl font-semibold text-default-900 text-center mb-8">帮助中心</h2>
                     <div className="space-y-4">
                         {/* 视频教程 */}
                         {/* <Card>
@@ -1147,7 +1147,7 @@ const GoPlusPage: React.FC = () => {
                                         subtitle="观看详细的操作视频，了解完整的充值流程"
                                     >
                                         <div className="space-y-4">
-                                            <p className="text-gray-600">
+                                            <p className="text-default-600">
                                                 我们为您准备了详细的视频教程，包含完整的ChatGPT Plus充值流程演示。
                                             </p>
                                             <Button
@@ -1180,7 +1180,7 @@ const GoPlusPage: React.FC = () => {
                                             startContent={<HelpCircle className="w-5 h-5 text-primary" />}
                                             title={faq.question}
                                         >
-                                            <div className="text-gray-600 whitespace-pre-line">
+                                            <div className="text-default-600 whitespace-pre-line">
                                                 {faq.answer}
                                             </div>
                                         </AccordionItem>
@@ -1202,7 +1202,7 @@ const GoPlusPage: React.FC = () => {
                                         subtitle="如有其他问题，请联系我们的客服团队"
                                     >
                                         <div className="space-y-4">
-                                            <p className="text-gray-600">
+                                            <p className="text-default-600">
                                                 我们提供24小时在线客服支持，如果您在使用过程中遇到任何问题，请随时联系我们。<br />
                                                 您可以通过扫描下方二维码添加客服微信：
                                             </p>
@@ -1210,9 +1210,9 @@ const GoPlusPage: React.FC = () => {
                                                 <img
                                                     src="https://niceaigc-cos.niceaigc.com/article-picture/20250921220151886.jpg"
                                                     alt="客服微信二维码"
-                                                    className="w-40 h-40 rounded-lg border border-gray-200 shadow"
+                                                    className="w-40 h-40 rounded-lg border border-default-200 shadow"
                                                 />
-                                                <span className="text-xs text-gray-500">扫一扫，添加客服</span>
+                                                <span className="text-xs text-default-500">扫一扫，添加客服</span>
                                             </div>
                                         </div>
                                     </AccordionItem>
@@ -1242,7 +1242,7 @@ const GoPlusPage: React.FC = () => {
                                 {orderInfo && (
                                     <div className="space-y-6">
                                         {/* 二维码区域 - 带过期覆盖层 */}
-                                        <div className="relative bg-gray-50 p-6 rounded-lg inline-block mx-auto">
+                                        <div className="relative bg-default-50 p-6 rounded-lg inline-block mx-auto">
                                             <img
                                                 src={generateQRCode(orderInfo.qr_code)}
                                                 alt="支付二维码"
@@ -1256,7 +1256,7 @@ const GoPlusPage: React.FC = () => {
                                                     <div className="text-center p-4">
                                                         <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-2" />
                                                         <h3 className="text-lg font-semibold text-red-700 mb-1">二维码已过期</h3>
-                                                        <p className="text-sm text-gray-600">请刷新页面重新获取</p>
+                                                        <p className="text-sm text-default-600">请刷新页面重新获取</p>
                                                     </div>
                                                 </div>
                                             )}
@@ -1274,10 +1274,10 @@ const GoPlusPage: React.FC = () => {
 
 
                                         {/* 现代化订单信息卡片 */}
-                                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                                        <div className="bg-white rounded-xl shadow-sm border border-default-100 overflow-hidden">
                                             <div className="p-5 space-y-4">
-                                                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                                                    <div className="flex items-center text-gray-700">
+                                                <div className="flex items-center justify-between pb-3 border-b border-default-100">
+                                                    <div className="flex items-center text-default-700">
                                                         <Tag className="w-4 h-4 mr-2 text-primary" />
                                                         <span>订单信息</span>
                                                     </div>
@@ -1295,18 +1295,18 @@ const GoPlusPage: React.FC = () => {
 
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div className="flex flex-col items-start">
-                                                        <span className="text-xs text-gray-500 mb-1">订单号</span>
-                                                        <span className="text-sm font-medium text-gray-900 truncate max-w-[150px]">
+                                                        <span className="text-xs text-default-500 mb-1">订单号</span>
+                                                        <span className="text-sm font-medium text-default-900 truncate max-w-[150px]">
                                                             {orderInfo.order_id}
                                                         </span>
                                                     </div>
                                                     <div className="flex flex-col items-start">
-                                                        <span className="text-xs text-gray-500 mb-1">套餐名称</span>
-                                                        <span className="text-sm font-medium text-gray-900">{orderInfo.package_name}</span>
+                                                        <span className="text-xs text-default-500 mb-1">套餐名称</span>
+                                                        <span className="text-sm font-medium text-default-900">{orderInfo.package_name}</span>
                                                     </div>
                                                     <div className="flex flex-col items-start col-span-2 pt-2">
-                                                        <span className="text-xs text-gray-500 mb-1">订单金额</span>
-                                                        <span className="text-xl font-bold text-gray-900">{orderInfo.price}元</span>
+                                                        <span className="text-xs text-default-500 mb-1">订单金额</span>
+                                                        <span className="text-xl font-bold text-default-900">{orderInfo.price}元</span>
                                                     </div>
                                                 </div>
 
@@ -1412,8 +1412,8 @@ const GoPlusPage: React.FC = () => {
                                 {rechargeStatus === 'waiting' && (
                                     <div className="text-center space-y-4">
                                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-                                        <p className="text-gray-800 font-medium">{rechargeMessage}</p>
-                                        <p className="text-gray-500 text-sm">通常耗时约 10 ~ 60 秒，请耐心等待...</p>
+                                        <p className="text-default-800 font-medium">{rechargeMessage}</p>
+                                        <p className="text-default-500 text-sm">通常耗时约 10 ~ 60 秒，请耐心等待...</p>
                                     </div>
                                 )}
 
@@ -1422,7 +1422,7 @@ const GoPlusPage: React.FC = () => {
                                         <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
                                             <CheckCircle className="w-8 h-8 text-green-600" />
                                         </div>
-                                        <p className="text-gray-800 font-medium">{rechargeMessage}</p>
+                                        <p className="text-default-800 font-medium">{rechargeMessage}</p>
                                     </div>
                                 )}
 
@@ -1431,10 +1431,10 @@ const GoPlusPage: React.FC = () => {
                                         <div className="text-center">
                                             <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-2" />
                                             <p className="text-red-700 font-semibold">{rechargeMessage}</p>
-                                            <p className="text-gray-500 text-sm">请截图下方返回信息并发送给客服协助处理。</p>
+                                            <p className="text-default-500 text-sm">请截图下方返回信息并发送给客服协助处理。</p>
                                         </div>
-                                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-72 overflow-auto">
-                                            <pre className="text-xs text-gray-800 break-all whitespace-pre-wrap">
+                                        <div className="bg-default-50 border border-default-200 rounded-lg p-3 max-h-72 overflow-auto">
+                                            <pre className="text-xs text-default-800 break-all whitespace-pre-wrap">
                                                 {JSON.stringify(rechargeRaw, null, 2)}
                                             </pre>
                                         </div>
@@ -1524,7 +1524,7 @@ const GoPlusPage: React.FC = () => {
                             </ModalHeader>
                             <ModalBody className="pb-6">
                                 <div
-                                    className="w-full relative bg-gray-100 rounded-lg overflow-hidden"
+                                    className="w-full relative bg-default-100 rounded-lg overflow-hidden"
                                     style={{
                                         aspectRatio: '16/9', // 适配移动端更常见的比例
                                         minHeight: '220px',

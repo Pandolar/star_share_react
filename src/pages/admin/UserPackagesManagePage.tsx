@@ -175,7 +175,7 @@ const UserPackagesManagePage: React.FC = () => {
             {/* 页面标题 */}
             <div className="flex items-center gap-3">
                 <UserCheck className="w-6 h-6 text-blue-600" />
-                <h1 className="text-2xl font-bold text-gray-800">用户套餐记录</h1>
+                <h1 className="text-2xl font-bold text-default-800">用户套餐记录</h1>
             </div>
 
             {/* 搜索和筛选区域 */}
@@ -192,7 +192,7 @@ const UserPackagesManagePage: React.FC = () => {
                             placeholder="搜索用户ID、套餐ID或订单号..."
 
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            startContent={<Search className="w-4 h-4 text-gray-400" />}
+                            startContent={<Search className="w-4 h-4 text-default-400" />}
                             className="flex-1"
                             onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                         />
@@ -210,7 +210,6 @@ const UserPackagesManagePage: React.FC = () => {
           </Select>
                         <div className="flex gap-2">
                             <Button
-                                className="admin-action-btn"
                                 color="primary"
                                 onPress={handleSearch}
                                 startContent={<Search className="w-4 h-4" />}
@@ -231,7 +230,7 @@ const UserPackagesManagePage: React.FC = () => {
 
             {/* 统计信息 */}
             <div className="flex justify-between items-center">
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-default-600">
                     共 {total} 条记录
                 </div>
             </div>
@@ -274,13 +273,13 @@ const UserPackagesManagePage: React.FC = () => {
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
-                                            <User className="w-4 h-4 text-gray-400" />
+                                            <User className="w-4 h-4 text-default-400" />
                                             <span className="text-sm">用户ID: {userPackage.user_id}</span>
                                         </div>
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
-                                            <Package className="w-4 h-4 text-gray-400" />
+                                            <Package className="w-4 h-4 text-default-400" />
                                             <span className="text-sm">套餐ID: {userPackage.package_id}</span>
                                         </div>
                                     </TableCell>
@@ -292,7 +291,7 @@ const UserPackagesManagePage: React.FC = () => {
                                     <TableCell>{renderStatus(userPackage.status)}</TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
-                                            <Clock className="w-4 h-4 text-gray-400" />
+                                            <Clock className="w-4 h-4 text-default-400" />
                                             <span className="text-sm">
                                                 {formatRemainingDuration(userPackage.remaining_duration)}
                                             </span>
@@ -300,14 +299,14 @@ const UserPackagesManagePage: React.FC = () => {
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
-                                            <Calendar className="w-4 h-4 text-gray-400" />
+                                            <Calendar className="w-4 h-4 text-default-400" />
                                             <span className="text-sm">
                                                 {dayjs(userPackage.created_at).format('YYYY-MM-DD HH:mm')}
                                             </span>
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="max-w-40 truncate text-sm text-gray-600">
+                                        <div className="max-w-40 truncate text-sm text-default-600">
                                             {userPackage.remarks || '-'}
                                         </div>
                                     </TableCell>
@@ -331,7 +330,7 @@ const UserPackagesManagePage: React.FC = () => {
             {/* 分页 */}
             {totalPages > 0 && (
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <div className="flex items-center gap-2 text-sm text-default-600">
                         <span>每页</span>
                         <Select
                             aria-label="每页数量"
@@ -373,37 +372,37 @@ const UserPackagesManagePage: React.FC = () => {
                             <div className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <span className="text-sm text-gray-500">记录ID</span>
+                                        <span className="text-sm text-default-500">记录ID</span>
                                         <div className="font-medium">{selectedUserPackage.id}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">用户ID</span>
+                                        <span className="text-sm text-default-500">用户ID</span>
                                         <div className="font-medium">{selectedUserPackage.user_id}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">套餐ID</span>
+                                        <span className="text-sm text-default-500">套餐ID</span>
                                         <div className="font-medium">{selectedUserPackage.package_id}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">订单号</span>
+                                        <span className="text-sm text-default-500">订单号</span>
                                         <div className="font-medium">{selectedUserPackage.order_id || '-'}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">状态</span>
+                                        <span className="text-sm text-default-500">状态</span>
                                         <div>{renderStatus(selectedUserPackage.status)}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">获取方式</span>
+                                        <span className="text-sm text-default-500">获取方式</span>
                                         <div className="font-medium">{selectedUserPackage.way || '-'}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">剩余时长</span>
+                                        <span className="text-sm text-default-500">剩余时长</span>
                                         <div className="font-medium">
                                             {formatRemainingDuration(selectedUserPackage.remaining_duration)}
                                         </div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">创建时间</span>
+                                        <span className="text-sm text-default-500">创建时间</span>
                                         <div className="font-medium">
                                             {dayjs(selectedUserPackage.created_at).format('YYYY-MM-DD HH:mm:ss')}
                                         </div>
@@ -411,8 +410,8 @@ const UserPackagesManagePage: React.FC = () => {
                                 </div>
                                 {selectedUserPackage.remarks && (
                                     <div>
-                                        <span className="text-sm text-gray-500">备注</span>
-                                        <div className="mt-1 p-3 bg-gray-50 rounded-lg text-sm">
+                                        <span className="text-sm text-default-500">备注</span>
+                                        <div className="mt-1 p-3 bg-default-50 rounded-lg text-sm">
                                             {selectedUserPackage.remarks}
                                         </div>
                                     </div>

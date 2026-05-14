@@ -46,9 +46,9 @@ export const PostMessageDemo: React.FC = () => {
                     <h3 className="text-lg font-semibold mb-4">PostMessage 功能演示</h3>
 
                     {/* 当前配置显示 */}
-                    <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                    <div className="mb-6 p-4 bg-default-50 rounded-lg">
                         <h4 className="font-medium mb-2">当前配置 (简化版):</h4>
-                        <pre className="text-sm text-gray-600">
+                        <pre className="text-sm text-default-600">
                             {JSON.stringify(currentConfig, null, 2)}
                         </pre>
                     </div>

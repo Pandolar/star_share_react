@@ -1246,10 +1246,10 @@ export const ProfileTab: React.FC = () => {
 
               <div className="flex justify-center">
                 {wechatQrStatus === 'loading' ? (
-                  <div className="w-48 h-48 flex items-center justify-center bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg">
+                  <div className="w-48 h-48 flex items-center justify-center bg-default-50 border-2 border-dashed border-default-300 rounded-lg">
                     <div className="text-center">
                       <Spinner size="lg" />
-                      <p className="text-sm text-gray-500 mt-2">生成二维码中...</p>
+                      <p className="text-sm text-default-500 mt-2">生成二维码中...</p>
                     </div>
                   </div>
                 ) : wechatQrStatus === 'active' ? (
@@ -1308,14 +1308,14 @@ export const ProfileTab: React.FC = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="w-48 h-48 flex items-center justify-center bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg">
+                  <div className="w-48 h-48 flex items-center justify-center bg-default-50 border-2 border-dashed border-default-300 rounded-lg">
                     <div className="text-center">
-                      <div className="w-12 h-12 bg-gray-400 rounded-full flex items-center justify-center mx-auto mb-2">
+                      <div className="w-12 h-12 bg-default-400 rounded-full flex items-center justify-center mx-auto mb-2">
                         <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                         </svg>
                       </div>
-                      <p className="text-sm text-gray-500 mb-2">二维码已过期</p>
+                      <p className="text-sm text-default-500 mb-2">二维码已过期</p>
                       <button
                         onClick={fetchWechatQR}
                         style={{
@@ -1337,10 +1337,10 @@ export const ProfileTab: React.FC = () => {
               </div>
 
               <div className="text-center space-y-2">
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-default-400">
                   使用手机微信扫描二维码
                 </p>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-default-400">
                   注意：如果被绑定的微信号之前注册过本平台，绑定后，之前微信注册的账号将无法登录！
                 </p>
               </div>

@@ -355,7 +355,7 @@ const CDKManagePage: React.FC = () => {
             {/* 页面标题 */}
             <div className="flex items-center gap-3">
                 <CreditCard className="w-6 h-6 text-blue-600" />
-                <h1 className="text-2xl font-bold text-gray-800">CDK管理</h1>
+                <h1 className="text-2xl font-bold text-default-800">CDK管理</h1>
             </div>
 
             {/* 搜索和筛选区域 */}
@@ -372,7 +372,7 @@ const CDKManagePage: React.FC = () => {
                             placeholder="搜索CDK..."
 
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            startContent={<Search className="w-4 h-4 text-gray-400" />}
+                            startContent={<Search className="w-4 h-4 text-default-400" />}
                             className="flex-1"
                             onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                         />
@@ -390,7 +390,6 @@ const CDKManagePage: React.FC = () => {
             </Select>
                         <div className="flex gap-2">
                             <Button
-                                className="admin-action-btn"
                                 color="primary"
                                 onPress={handleSearch}
                                 startContent={<Search className="w-4 h-4" />}
@@ -411,11 +410,10 @@ const CDKManagePage: React.FC = () => {
 
             {/* 操作区域 */}
             <div className="flex justify-between items-center">
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-default-600">
                     共 {total} 个CDK
                 </div>
                 <Button
-                    className="admin-action-btn"
                     color="primary"
                     startContent={<Plus className="w-4 h-4" />}
                     onPress={onCreateOpen}
@@ -474,14 +472,14 @@ const CDKManagePage: React.FC = () => {
                                     <TableCell>{cdk.id}</TableCell>
                                     <TableCell>
                                         <div className="space-y-1">
-                                            <div className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
+                                            <div className="font-mono text-sm bg-default-100 px-2 py-1 rounded">
                                                 {cdk.cdk}
                                             </div>
                                         </div>
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
-                                            <Package className="w-4 h-4 text-gray-400" />
+                                            <Package className="w-4 h-4 text-default-400" />
                                             <span className="text-sm">
                                                 {(() => {
                                                     const pkg = packages.find(p => p.id === cdk.package_id);
@@ -497,12 +495,12 @@ const CDKManagePage: React.FC = () => {
                                                 <div className="text-sm">用户ID: {cdk.user_id}</div>
                                             )}
                                             {cdk.used_at && (
-                                                <div className="text-xs text-gray-500">
+                                                <div className="text-xs text-default-500">
                                                     使用时间: {dayjs(cdk.used_at).format('MM-DD HH:mm')}
                                                 </div>
                                             )}
                                             {!cdk.user_id && !cdk.used_at && (
-                                                <div className="text-xs text-gray-400">-</div>
+                                                <div className="text-xs text-default-400">-</div>
                                             )}
                                         </div>
                                     </TableCell>
@@ -510,7 +508,7 @@ const CDKManagePage: React.FC = () => {
                                         {dayjs(cdk.created_at).format('YYYY-MM-DD HH:mm')}
                                     </TableCell>
                                     <TableCell>
-                                        <div className="max-w-40 truncate text-sm text-gray-600">
+                                        <div className="max-w-40 truncate text-sm text-default-600">
                                             {cdk.remarks || '-'}
                                         </div>
                                     </TableCell>
@@ -525,7 +523,7 @@ const CDKManagePage: React.FC = () => {
             {/* 分页 */}
             {totalPages > 0 && (
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <div className="flex items-center gap-2 text-sm text-default-600">
                         <span>每页</span>
                         <Select
                             aria-label="每页数量"
@@ -599,7 +597,7 @@ const CDKManagePage: React.FC = () => {
                         <Button variant="light" onPress={onCreateClose}>
                             取消
                         </Button>
-                        <Button className="admin-action-btn" color="primary" onPress={handleCreate}>
+                        <Button color="primary" onPress={handleCreate}>
                             生成
                         </Button>
                     </ModalFooter>
@@ -642,7 +640,7 @@ const CDKManagePage: React.FC = () => {
                         <Button variant="light" onPress={onEditClose}>
                             取消
                         </Button>
-                        <Button className="admin-action-btn" color="primary" onPress={handleEdit}>
+                        <Button color="primary" onPress={handleEdit}>
                             保存
                         </Button>
                     </ModalFooter>
@@ -665,32 +663,32 @@ const CDKManagePage: React.FC = () => {
                             <div className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <span className="text-sm text-gray-500">CDK ID</span>
+                                        <span className="text-sm text-default-500">CDK ID</span>
                                         <div className="font-medium">{selectedCDK.id}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">CDK码</span>
-                                        <div className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
+                                        <span className="text-sm text-default-500">CDK码</span>
+                                        <div className="font-mono text-sm bg-default-100 px-2 py-1 rounded">
                                             {selectedCDK.cdk}
                                         </div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">关联套餐ID</span>
+                                        <span className="text-sm text-default-500">关联套餐ID</span>
                                         <div className="font-medium">{selectedCDK.package_id}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">状态</span>
+                                        <span className="text-sm text-default-500">状态</span>
                                         <div>{renderStatus(selectedCDK.status)}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">创建时间</span>
+                                        <span className="text-sm text-default-500">创建时间</span>
                                         <div className="font-medium">
                                             {dayjs(selectedCDK.created_at).format('YYYY-MM-DD HH:mm:ss')}
                                         </div>
                                     </div>
                                     {selectedCDK.used_at && (
                                         <div>
-                                            <span className="text-sm text-gray-500">使用时间</span>
+                                            <span className="text-sm text-default-500">使用时间</span>
                                             <div className="font-medium">
                                                 {dayjs(selectedCDK.used_at).format('YYYY-MM-DD HH:mm:ss')}
                                             </div>
@@ -698,15 +696,15 @@ const CDKManagePage: React.FC = () => {
                                     )}
                                     {selectedCDK.user_id && (
                                         <div>
-                                            <span className="text-sm text-gray-500">使用用户ID</span>
+                                            <span className="text-sm text-default-500">使用用户ID</span>
                                             <div className="font-medium">{selectedCDK.user_id}</div>
                                         </div>
                                     )}
                                 </div>
                                 {selectedCDK.remarks && (
                                     <div>
-                                        <span className="text-sm text-gray-500">备注</span>
-                                        <div className="mt-1 p-3 bg-gray-50 rounded-lg text-sm">
+                                        <span className="text-sm text-default-500">备注</span>
+                                        <div className="mt-1 p-3 bg-default-50 rounded-lg text-sm">
                                             {selectedCDK.remarks}
                                         </div>
                                     </div>
@@ -737,7 +735,7 @@ const CDKManagePage: React.FC = () => {
                         <p>
                             确定要删除CDK <strong>{selectedCDK?.cdk}</strong> 吗？
                         </p>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-default-500">
                             删除后将无法恢复，请谨慎操作。
                         </p>
                     </ModalBody>

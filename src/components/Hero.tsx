@@ -282,22 +282,22 @@ const Hero: React.FC = () => {
   if (loading || !homeInfo?.hero) {
     return (
       <div className="w-full pt-20 pb-8 px-4 sm:px-6 lg:px-8">
-        <section className="relative group min-h-[600px] lg:h-[600px] max-w-7xl mx-auto overflow-hidden rounded-3xl shadow-2xl border border-gray-100 bg-gray-100 animate-pulse">
+        <section className="relative group min-h-[600px] lg:h-[600px] max-w-7xl mx-auto overflow-hidden rounded-3xl shadow-2xl border border-default-100 bg-default-100 animate-pulse">
           <div className="absolute inset-0 bg-white"></div>
           <div className="relative z-10 h-full flex items-center py-8 lg:py-0">
             <div className="w-full px-8 sm:px-12 lg:px-16">
               <div className="grid grid-cols-1 lg:grid-cols-7 gap-6 lg:items-center">
-                <div className="text-gray-900 lg:col-span-3 order-2 lg:order-1 text-left">
-                  <div className="w-20 h-8 bg-gray-200 rounded-full mb-6 animate-pulse"></div>
-                  <div className="w-3/4 h-12 bg-gray-200 rounded mb-4 animate-pulse"></div>
-                  <div className="w-full h-6 bg-gray-200 rounded mb-6 animate-pulse"></div>
+                <div className="text-default-900 lg:col-span-3 order-2 lg:order-1 text-left">
+                  <div className="w-20 h-8 bg-default-200 rounded-full mb-6 animate-pulse"></div>
+                  <div className="w-3/4 h-12 bg-default-200 rounded mb-4 animate-pulse"></div>
+                  <div className="w-full h-6 bg-default-200 rounded mb-6 animate-pulse"></div>
                   <div className="flex space-x-4">
-                    <div className="w-32 h-12 bg-gray-200 rounded animate-pulse"></div>
-                    <div className="w-32 h-12 bg-gray-200 rounded animate-pulse"></div>
+                    <div className="w-32 h-12 bg-default-200 rounded animate-pulse"></div>
+                    <div className="w-32 h-12 bg-default-200 rounded animate-pulse"></div>
                   </div>
                 </div>
                 <div className="lg:col-span-4 lg:pl-8 order-1 lg:order-2">
-                  <div className="aspect-[4/3] w-full max-w-sm sm:max-w-md lg:max-w-lg bg-gray-200 rounded-xl animate-pulse mx-auto lg:mx-0"></div>
+                  <div className="aspect-[4/3] w-full max-w-sm sm:max-w-md lg:max-w-lg bg-default-200 rounded-xl animate-pulse mx-auto lg:mx-0"></div>
                 </div>
               </div>
             </div>
@@ -310,7 +310,7 @@ const Hero: React.FC = () => {
   return (
     <div className="w-full pt-20 pb-8 px-4 sm:px-6 lg:px-8">
       <section
-        className="relative group min-h-[600px] lg:h-[600px] max-w-7xl mx-auto overflow-hidden rounded-3xl shadow-2xl border border-gray-100"
+        className="relative group min-h-[600px] lg:h-[600px] max-w-7xl mx-auto overflow-hidden rounded-3xl shadow-2xl border border-default-100"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         aria-label="产品轮播展示"
@@ -324,7 +324,7 @@ const Hero: React.FC = () => {
           <div className="w-full px-8 sm:px-12 lg:px-16">
             <div className="grid grid-cols-1 lg:grid-cols-7 gap-6 lg:items-center">
               {/* 左侧文本内容 */}
-              <div className="text-gray-900 lg:col-span-3 order-2 lg:order-1 text-left">
+              <div className="text-default-900 lg:col-span-3 order-2 lg:order-1 text-left">
                 <AnimatePresence custom={direction} mode="wait">
                   <motion.div
                     key={`content-${currentSlide}`}
@@ -344,7 +344,7 @@ const Hero: React.FC = () => {
                       initial={{ opacity: 0, y: 15 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.05, duration: 0.3, ease: ANIMATION_CONFIG.ease }}
-                      className="inline-block px-4 py-2 bg-gray-900/10 backdrop-blur-sm rounded-full text-sm font-medium mb-6"
+                      className="inline-block px-4 py-2 bg-default-900/10 backdrop-blur-sm rounded-full text-sm font-medium mb-6"
                     >
                       {currentSlideData.subtitle}
                     </motion.div>
@@ -364,7 +364,7 @@ const Hero: React.FC = () => {
                       initial={{ opacity: 0, y: 15 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.12, duration: 0.3, ease: ANIMATION_CONFIG.ease }}
-                      className="text-lg mb-6 text-gray-700 max-w-lg"
+                      className="text-lg mb-6 text-default-700 max-w-lg"
                     >
                       {currentSlideData.description}
                     </motion.p>
@@ -379,7 +379,7 @@ const Hero: React.FC = () => {
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        className="bg-gray-900 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-800 transition-colors duration-200 flex items-center justify-center space-x-2"
+                        className="bg-default-900 text-white px-6 py-3 rounded-lg font-semibold hover:bg-default-800 transition-colors duration-200 flex items-center justify-center space-x-2"
                         aria-label={`${currentSlideData.ctaText} - ${currentSlideData.title}`}
                         onClick={() => window.open(currentSlideData.ctaUrl, '_blank')}
                       >
@@ -391,7 +391,7 @@ const Hero: React.FC = () => {
                         <motion.button
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
-                          className="border-2 border-gray-900 text-gray-900 px-6 py-3 rounded-lg font-semibold hover:bg-gray-900/5 transition-colors duration-200 flex items-center justify-center space-x-2"
+                          className="border-2 border-default-900 text-default-900 px-6 py-3 rounded-lg font-semibold hover:bg-default-900/5 transition-colors duration-200 flex items-center justify-center space-x-2"
                           aria-label={`${currentSlideData.learnMoreText} - ${currentSlideData.title}`}
                           onClick={() => window.open(currentSlideData.learnMoreUrl, '_blank')}
                         >
@@ -469,14 +469,14 @@ const Hero: React.FC = () => {
           <button
             onClick={prevSlide}
             aria-label="上一张幻灯片"
-            className="carousel-nav-button pointer-events-auto w-10 h-10 flex items-center justify-center rounded-full bg-white/60 backdrop-blur-sm shadow-md text-gray-800 hover:bg-white/80 transition-all duration-300 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0"
+            className="carousel-nav-button pointer-events-auto w-10 h-10 flex items-center justify-center rounded-full bg-white/60 backdrop-blur-sm shadow-md text-default-800 hover:bg-white/80 transition-all duration-300 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0"
           >
             <ChevronLeft className="w-6 h-6" />
           </button>
           <button
             onClick={nextSlide}
             aria-label="下一张幻灯片"
-            className="carousel-nav-button pointer-events-auto w-10 h-10 flex items-center justify-center rounded-full bg-white/60 backdrop-blur-sm shadow-md text-gray-800 hover:bg-white/80 transition-all duration-300 opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0"
+            className="carousel-nav-button pointer-events-auto w-10 h-10 flex items-center justify-center rounded-full bg-white/60 backdrop-blur-sm shadow-md text-default-800 hover:bg-white/80 transition-all duration-300 opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0"
           >
             <ChevronRight className="w-6 h-6" />
           </button>
@@ -490,8 +490,8 @@ const Hero: React.FC = () => {
               onClick={() => goToSlide(index)}
               aria-label={`转到第 ${index + 1} 张幻灯片`}
               className={`rounded-full transition-all duration-400 ease-out ${index === currentSlide
-                  ? 'w-6 h-2 bg-gray-900 shadow-lg'
-                  : 'w-2 h-2 bg-gray-600/60 hover:bg-gray-700/80'
+                  ? 'w-6 h-2 bg-default-900 shadow-lg'
+                  : 'w-2 h-2 bg-default-600/60 hover:bg-default-700/80'
                 }`}
             />
           ))}

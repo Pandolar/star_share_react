@@ -203,7 +203,7 @@ const UserCenter: React.FC = () => {
           w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all duration-200
           ${isActive
             ? 'bg-blue-600 text-white shadow-md'
-            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+            : 'text-default-600 hover:bg-default-100 hover:text-default-900'
           }
         `}
         whileHover={{ x: isActive ? 0 : 4 }}
@@ -218,11 +218,11 @@ const UserCenter: React.FC = () => {
   // 如果正在检查认证状态，显示加载状态
   if (isChecking) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-default-50 flex items-center justify-center">
         <Card>
           <CardBody className="p-8 text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">检查登录状态中...</p>
+            <p className="text-default-600">检查登录状态中...</p>
           </CardBody>
         </Card>
       </div>
@@ -232,14 +232,14 @@ const UserCenter: React.FC = () => {
   // 如果认证失败且正在倒计时，显示倒计时页面
   if (!isAuthenticated && countdown > 0) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-default-50 flex items-center justify-center">
         <Card>
           <CardBody className="p-8 text-center">
             <div className="text-red-500 text-6xl mb-4">⚠️</div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">登录状态异常</h2>
-            <p className="text-gray-600 mb-4">系统检测到您的登录状态已过期</p>
+            <h2 className="text-xl font-semibold text-default-900 mb-2">登录状态异常</h2>
+            <p className="text-default-600 mb-4">系统检测到您的登录状态已过期</p>
             <div className="text-2xl font-bold text-red-500 mb-2">{countdown}</div>
-            <p className="text-sm text-gray-500">秒后将自动返回首页，请重新登录</p>
+            <p className="text-sm text-default-500">秒后将自动返回首页，请重新登录</p>
           </CardBody>
         </Card>
       </div>
@@ -247,7 +247,7 @@ const UserCenter: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-default-50">
 
       {/* 移动端菜单按钮 */}
       <div className="lg:hidden fixed top-4 left-4 z-30">
@@ -262,8 +262,8 @@ const UserCenter: React.FC = () => {
       </div>
 
       {/* 移动端顶部标签栏（便于发现可切换） */}
-      <div className="lg:hidden sticky top-0 z-20 bg-gray-50/95 backdrop-blur supports-[backdrop-filter]:bg-gray-50/80">
-        <div className="px-4 pt-16 pb-3 border-b border-gray-200">
+      <div className="lg:hidden sticky top-0 z-20 bg-default-50/95 backdrop-blur supports-[backdrop-filter]:bg-default-50/80">
+        <div className="px-4 pt-16 pb-3 border-b border-default-200">
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
             {tabConfigs.map(tab => {
               const isActive = activeTab === tab.key;
@@ -273,7 +273,7 @@ const UserCenter: React.FC = () => {
                   onClick={() => switchTab(tab.key)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-full whitespace-nowrap transition-colors text-sm ${isActive
                     ? 'bg-blue-600 text-white shadow'
-                    : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+                    : 'bg-white text-default-700 border border-default-200 hover:bg-default-50'
                     }`}
                   aria-pressed={isActive}
                 >
@@ -297,13 +297,13 @@ const UserCenter: React.FC = () => {
           >
             <Card className="sticky top-6">
               <CardBody className="p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">导航菜单</h2>
+                <h2 className="text-lg font-semibold text-default-900 mb-4">导航菜单</h2>
                 <nav className="space-y-2">
                   {tabConfigs.map(tab => renderTabItem(tab))}
                 </nav>
 
                 {/* 分隔线 */}
-                <div className="my-6 border-t border-gray-200"></div>
+                <div className="my-6 border-t border-default-200"></div>
 
                 {/* 返回首页 */}
                 <motion.button
@@ -359,7 +359,7 @@ const UserCenter: React.FC = () => {
                 className="fixed left-0 top-0 bottom-0 w-80 bg-white z-50 lg:hidden shadow-xl"
               >
                 {/* 移动端头部 */}
-                <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200 bg-blue-600">
+                <div className="h-16 flex items-center justify-between px-4 border-b border-default-200 bg-blue-600">
                   <h2 className="text-lg font-semibold text-white">用户中心</h2>
                   <Button
                     isIconOnly
@@ -376,7 +376,7 @@ const UserCenter: React.FC = () => {
                   {tabConfigs.map(tab => renderTabItem(tab, true))}
 
                   {/* 分隔线 */}
-                  {/* <div className="my-6 border-t border-gray-200"></div> */}
+                  {/* <div className="my-6 border-t border-default-200"></div> */}
 
                   {/* 返回首页 */}
                   <motion.button

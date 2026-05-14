@@ -22,10 +22,10 @@ const AdminProtectedRoute: React.FC<AdminProtectedRouteProps> = ({ children }) =
 
     if (isLoading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="min-h-screen flex items-center justify-center bg-default-50">
                 <div className="text-center">
                     <Spinner size="lg" color="primary" />
-                    <p className="mt-4 text-gray-600">验证身份中...</p>
+                    <p className="mt-4 text-default-600">验证身份中...</p>
                 </div>
             </div>
         );

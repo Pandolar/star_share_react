@@ -106,9 +106,9 @@ export const ChatwootFloatingButton: React.FC<ChatwootFloatingButtonProps> = ({
         {/* 提示文字（可选） */}
         {!isOpen && (
           <div className="absolute bottom-full right-0 mb-2 opacity-0 hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-            <div className="bg-gray-900 text-white text-sm px-3 py-1.5 rounded-lg whitespace-nowrap shadow-lg">
+            <div className="bg-default-900 text-white text-sm px-3 py-1.5 rounded-lg whitespace-nowrap shadow-lg">
               需要帮助？联系客服
-              <div className="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+              <div className="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-default-900"></div>
             </div>
           </div>
         )}

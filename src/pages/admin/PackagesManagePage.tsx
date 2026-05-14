@@ -326,7 +326,7 @@ const PackagesManagePage: React.FC = () => {
             {/* 页面标题 */}
             <div className="flex items-center gap-3">
                 <Package className="w-6 h-6 text-blue-600" />
-                <h1 className="text-2xl font-bold text-gray-800">套餐管理</h1>
+                <h1 className="text-2xl font-bold text-default-800">套餐管理</h1>
             </div>
 
             {/* 搜索和筛选区域 */}
@@ -343,7 +343,7 @@ const PackagesManagePage: React.FC = () => {
                             placeholder="搜索套餐名称..."
 
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            startContent={<Search className="w-4 h-4 text-gray-400" />}
+                            startContent={<Search className="w-4 h-4 text-default-400" />}
                             className="flex-1"
                             onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                         />
@@ -361,7 +361,6 @@ const PackagesManagePage: React.FC = () => {
                         </Select>
                         <div className="flex gap-2">
                             <Button
-                                className="admin-action-btn"
                                 color="primary"
                                 onPress={handleSearch}
                                 startContent={<Search className="w-4 h-4" />}
@@ -382,11 +381,10 @@ const PackagesManagePage: React.FC = () => {
 
             {/* 操作区域 */}
             <div className="flex justify-between items-center">
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-default-600">
                     共 {total} 个套餐
                 </div>
                 <Button
-                    className="admin-action-btn"
                     color="primary"
                     startContent={<Plus className="w-4 h-4" />}
                     onPress={onCreateOpen}
@@ -428,7 +426,7 @@ const PackagesManagePage: React.FC = () => {
                                     <TableCell>
                                         <div className="space-y-1">
                                             <div className="font-medium">{pkg.package_name}</div>
-                                            <div className="text-sm text-gray-500">{pkg.category}</div>
+                                            <div className="text-sm text-default-500">{pkg.category}</div>
                                         </div>
                                     </TableCell>
                                     <TableCell>
@@ -438,7 +436,7 @@ const PackagesManagePage: React.FC = () => {
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="flex items-center gap-1 text-xs text-gray-500">
+                                        <div className="flex items-center gap-1 text-xs text-default-500">
                                             <Clock className="w-3 h-3" />
                                             {pkg.duration}天
                                         </div>
@@ -451,7 +449,7 @@ const PackagesManagePage: React.FC = () => {
                                     </TableCell>
                                     <TableCell>{renderStatus(pkg.status)}</TableCell>
                                     <TableCell>
-                                        <div className="max-w-40 truncate text-sm text-gray-600">
+                                        <div className="max-w-40 truncate text-sm text-default-600">
                                             {pkg.remarks || '-'}
                                         </div>
                                     </TableCell>
@@ -466,7 +464,7 @@ const PackagesManagePage: React.FC = () => {
             {/* 分页 */}
             {totalPages > 0 && (
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <div className="flex items-center gap-2 text-sm text-default-600">
                         <span>每页</span>
                         <Select
                             aria-label="每页数量"
@@ -595,7 +593,7 @@ const PackagesManagePage: React.FC = () => {
                         <Button variant="light" onPress={onCreateClose}>
                             取消
                         </Button>
-                        <Button className="admin-action-btn" color="primary" onPress={handleCreate}>
+                        <Button color="primary" onPress={handleCreate}>
                             创建
                         </Button>
                     </ModalFooter>
@@ -690,7 +688,7 @@ const PackagesManagePage: React.FC = () => {
                         <Button variant="light" onPress={onEditClose}>
                             取消
                         </Button>
-                        <Button className="admin-action-btn" color="primary" onPress={handleEdit}>
+                        <Button color="primary" onPress={handleEdit}>
                             保存
                         </Button>
                     </ModalFooter>
@@ -713,40 +711,40 @@ const PackagesManagePage: React.FC = () => {
                             <div className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <span className="text-sm text-gray-500">套餐ID</span>
+                                        <span className="text-sm text-default-500">套餐ID</span>
                                         <div className="font-medium">{selectedPackage.id}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">套餐名称</span>
+                                        <span className="text-sm text-default-500">套餐名称</span>
                                         <div className="font-medium">{selectedPackage.package_name}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">套餐类型</span>
+                                        <span className="text-sm text-default-500">套餐类型</span>
                                         <div className="font-medium">{selectedPackage.category}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">价格</span>
+                                        <span className="text-sm text-default-500">价格</span>
                                         <div className="font-medium text-green-600">¥{selectedPackage.price}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">时长</span>
+                                        <span className="text-sm text-default-500">时长</span>
                                         <div className="font-medium">{selectedPackage.duration}天</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">等级</span>
+                                        <span className="text-sm text-default-500">等级</span>
                                         <div>{renderLevel(selectedPackage.level)}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">优先级</span>
+                                        <span className="text-sm text-default-500">优先级</span>
                                         <div className="font-medium">{selectedPackage.priority}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-gray-500">状态</span>
+                                        <span className="text-sm text-default-500">状态</span>
                                         <div>{renderStatus(selectedPackage.status)}</div>
                                     </div>
                                     {selectedPackage.created_at && (
                                         <div>
-                                            <span className="text-sm text-gray-500">创建时间</span>
+                                            <span className="text-sm text-default-500">创建时间</span>
                                             <div className="font-medium">
                                                 {dayjs(selectedPackage.created_at).format('YYYY-MM-DD HH:mm:ss')}
                                             </div>
@@ -754,7 +752,7 @@ const PackagesManagePage: React.FC = () => {
                                     )}
                                     {selectedPackage.updated_at && (
                                         <div>
-                                            <span className="text-sm text-gray-500">更新时间</span>
+                                            <span className="text-sm text-default-500">更新时间</span>
                                             <div className="font-medium">
                                                 {dayjs(selectedPackage.updated_at).format('YYYY-MM-DD HH:mm:ss')}
                                             </div>
@@ -763,16 +761,16 @@ const PackagesManagePage: React.FC = () => {
                                 </div>
                                 {selectedPackage.introduce && (
                                     <div>
-                                        <span className="text-sm text-gray-500">套餐介绍</span>
-                                        <div className="mt-1 p-3 bg-gray-50 rounded-lg text-sm">
+                                        <span className="text-sm text-default-500">套餐介绍</span>
+                                        <div className="mt-1 p-3 bg-default-50 rounded-lg text-sm">
                                             {selectedPackage.introduce}
                                         </div>
                                     </div>
                                 )}
                                 {selectedPackage.remarks && (
                                     <div>
-                                        <span className="text-sm text-gray-500">备注</span>
-                                        <div className="mt-1 p-3 bg-gray-50 rounded-lg text-sm">
+                                        <span className="text-sm text-default-500">备注</span>
+                                        <div className="mt-1 p-3 bg-default-50 rounded-lg text-sm">
                                             {selectedPackage.remarks}
                                         </div>
                                     </div>
@@ -803,7 +801,7 @@ const PackagesManagePage: React.FC = () => {
                         <p>
                             确定要删除套餐 <strong>{selectedPackage?.package_name}</strong> 吗？
                         </p>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-default-500">
                             删除后将无法恢复，请谨慎操作。
                         </p>
                     </ModalBody>

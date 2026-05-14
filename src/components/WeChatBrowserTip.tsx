@@ -50,7 +50,7 @@ const WeChatBrowserTip: React.FC<WeChatBrowserTipProps> = ({
                     {/* 关闭按钮 */}
                     <button
                         onClick={onHide}
-                        className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                        className="absolute top-4 right-4 text-default-400 hover:text-default-600 transition-colors"
                         aria-label="关闭提示"
                     >
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -69,12 +69,12 @@ const WeChatBrowserTip: React.FC<WeChatBrowserTipProps> = ({
                     </div>
 
                     {/* 标题 */}
-                    <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
+                    <h3 className="text-lg font-semibold text-default-900 text-center mb-2">
                         在浏览器中打开
                     </h3>
 
                     {/* 提示文案 */}
-                    <p className="text-gray-600 text-center mb-6 text-sm">
+                    <p className="text-default-600 text-center mb-6 text-sm">
                         {defaultMessage}
                     </p>
 
@@ -91,14 +91,14 @@ const WeChatBrowserTip: React.FC<WeChatBrowserTipProps> = ({
                         {/* 继续浏览按钮 */}
                         <button
                             onClick={onHide}
-                            className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                            className="w-full bg-default-100 text-default-700 py-3 px-4 rounded-lg hover:bg-default-200 transition-colors font-medium"
                         >
                             继续当前浏览
                         </button>
                     </div>
 
                     {/* 说明文字 */}
-                    <p className="text-xs text-gray-500 text-center mt-4">
+                    <p className="text-xs text-default-500 text-center mt-4">
                         点击右上角"..."选择"在浏览器中打开"
                     </p>
                 </div>

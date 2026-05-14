@@ -65,26 +65,26 @@ class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       if (this.state.isReloading) {
         return (
-          <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="min-h-screen flex items-center justify-center bg-default-50">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">页面正在恢复中...</h2>
-              <p className="text-gray-600">正在重新加载页面，请稍候</p>
+              <h2 className="text-xl font-bold text-default-900 mb-2">页面正在恢复中...</h2>
+              <p className="text-default-600">正在重新加载页面，请稍候</p>
             </div>
           </div>
         );
       }
 
       return this.props.fallback || (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="min-h-screen flex items-center justify-center bg-default-50">
           <div className="text-center p-8">
             <div className="text-red-500 mb-4">
               <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">页面加载出现问题</h2>
-            <p className="text-gray-600 mb-6">抱歉给您带来不便，页面遇到了一些技术问题</p>
+            <h2 className="text-2xl font-bold text-default-900 mb-4">页面加载出现问题</h2>
+            <p className="text-default-600 mb-6">抱歉给您带来不便，页面遇到了一些技术问题</p>
             <div className="space-x-4">
               <button 
                 onClick={this.handleManualReload} 
@@ -94,7 +94,7 @@ class ErrorBoundary extends Component<Props, State> {
               </button>
               <button 
                 onClick={() => window.location.href = '/'} 
-                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-6 py-3 border border-default-300 text-default-700 rounded-lg hover:bg-default-50 transition-colors"
               >
                 返回首页
               </button>

@@ -506,18 +506,18 @@ const LoginPage: React.FC = () => {
   return (
     <AuthLayout title="登录您的账户">
       {isLoggedIn ? (
-        <div className="text-center text-gray-600">
+        <div className="text-center text-default-600">
           <p>您已登录，正在跳转...</p>
         </div>
       ) : (
         <div className="space-y-6">
           {/* 登录方式选择 */}
-          <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+          <div className="flex space-x-1 bg-default-100 p-1 rounded-lg">
             <button
               onClick={() => handleLoginMethodChange('wechat')}
               className={`flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-md text-sm font-medium transition-colors ${loginMethod === 'wechat'
                 ? 'bg-white text-primary-600 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
+                : 'text-default-500 hover:text-default-700'
                 }`}
             >
               <Smartphone size={16} />
@@ -527,7 +527,7 @@ const LoginPage: React.FC = () => {
               onClick={() => handleLoginMethodChange('email')}
               className={`flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-md text-sm font-medium transition-colors ${loginMethod === 'email'
                 ? 'bg-white text-primary-600 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
+                : 'text-default-500 hover:text-default-700'
                 }`}
             >
               <Mail size={16} />
@@ -539,24 +539,24 @@ const LoginPage: React.FC = () => {
           {loginMethod === 'wechat' && (
             <Card className="w-full">
               <CardBody className="flex flex-col items-center space-y-4 p-8">
-                <h3 className="text-lg font-semibold text-gray-800">微信扫码登录</h3>
-                <p className="text-sm text-gray-500 text-center">
+                <h3 className="text-lg font-semibold text-default-800">微信扫码登录</h3>
+                <p className="text-sm text-default-500 text-center">
                   使用微信扫描下方二维码即可快速登录
                 </p>
 
                 <div className="relative">
                   {!hasAgreedUserAgreement ? (
-                    <div className="w-48 h-48 flex items-center justify-center bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg">
+                    <div className="w-48 h-48 flex items-center justify-center bg-default-50 border-2 border-dashed border-default-300 rounded-lg">
                       <div className="text-center px-4">
-                        <p className="text-sm text-gray-600">请先勾选同意《用户协议》</p>
-                        <p className="text-xs text-gray-400 mt-2">勾选后将自动生成二维码</p>
+                        <p className="text-sm text-default-600">请先勾选同意《用户协议》</p>
+                        <p className="text-xs text-default-400 mt-2">勾选后将自动生成二维码</p>
                       </div>
                     </div>
                   ) : qrStatus === 'loading' || isLoadingQR ? (
-                    <div className="w-48 h-48 flex items-center justify-center bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg">
+                    <div className="w-48 h-48 flex items-center justify-center bg-default-50 border-2 border-dashed border-default-300 rounded-lg">
                       <div className="text-center">
                         <Spinner size="lg" />
-                        <p className="text-sm text-gray-500 mt-2">生成二维码中...</p>
+                        <p className="text-sm text-default-500 mt-2">生成二维码中...</p>
                       </div>
                     </div>
                   ) : qrStatus === 'active' ? (
@@ -588,12 +588,12 @@ const LoginPage: React.FC = () => {
                       </div>
                     </div>
                   ) : (
-                    <div className="w-48 h-48 flex items-center justify-center bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg">
+                    <div className="w-48 h-48 flex items-center justify-center bg-default-50 border-2 border-dashed border-default-300 rounded-lg">
                       <div className="text-center">
-                        <div className="w-12 h-12 bg-gray-400 rounded-full flex items-center justify-center mx-auto mb-2">
+                        <div className="w-12 h-12 bg-default-400 rounded-full flex items-center justify-center mx-auto mb-2">
                           <RotateCcw className="w-6 h-6 text-white" />
                         </div>
-                        <p className="text-sm text-gray-500 mb-2">二维码已过期</p>
+                        <p className="text-sm text-default-500 mb-2">二维码已过期</p>
                         <Button
                           size="sm"
                           color="primary"
@@ -610,7 +610,7 @@ const LoginPage: React.FC = () => {
 
                 <div className="text-center space-y-2">
                   <div className="space-y-1">
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-default-400">
                       若二维码过期或扫码后无反应请刷新！
                     </p>
                   </div>
@@ -626,13 +626,13 @@ const LoginPage: React.FC = () => {
                   </Button>
                 </div>
 
-                <div className="w-full flex items-start gap-2 text-sm text-gray-600">
+                <div className="w-full flex items-start gap-2 text-sm text-default-600">
                   <input
                     id="login-user-agreement-wechat"
                     type="checkbox"
                     checked={hasAgreedUserAgreement}
                     onChange={(e) => setHasAgreedUserAgreement(e.target.checked)}
-                    className="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    className="mt-1 h-4 w-4 rounded border-default-300 text-primary-600 focus:ring-primary-500"
                   />
                   <div className="leading-5">
                     <label htmlFor="login-user-agreement-wechat" className="select-none">
@@ -683,21 +683,21 @@ const LoginPage: React.FC = () => {
                           className="focus:outline-none"
                         >
                           {showPassword ? (
-                            <EyeOff className="h-5 w-5 text-gray-400" />
+                            <EyeOff className="h-5 w-5 text-default-400" />
                           ) : (
-                            <Eye className="h-5 w-5 text-gray-400" />
+                            <Eye className="h-5 w-5 text-default-400" />
                           )}
                         </button>
                       }
                     />
                   </div>
-                  <div className="flex items-start gap-2 text-sm text-gray-600">
+                  <div className="flex items-start gap-2 text-sm text-default-600">
                     <input
                       id="login-user-agreement-email"
                       type="checkbox"
                       checked={hasAgreedUserAgreement}
                       onChange={(e) => setHasAgreedUserAgreement(e.target.checked)}
-                      className="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      className="mt-1 h-4 w-4 rounded border-default-300 text-primary-600 focus:ring-primary-500"
                     />
                     <div className="leading-5">
                       <label htmlFor="login-user-agreement-email" className="select-none">
@@ -718,7 +718,7 @@ const LoginPage: React.FC = () => {
                     color="primary"
                     fullWidth
                     disabled={isLoggingIn || !hasAgreedUserAgreement}
-                    className="!mt-6 bg-primary-500 text-white hover:bg-primary-600 disabled:bg-gray-300"
+                    className="!mt-6"
                   >
                     {isLoggingIn ? <Spinner size="sm" color="white" /> : '登录'}
                   </Button>
@@ -729,7 +729,7 @@ const LoginPage: React.FC = () => {
                   <div className="flex flex-col items-center space-y-2">
                     <Link
                       to={`/forgot-password${location.search}`}
-                      className="text-xs text-gray-400 hover:text-primary-500 transition-colors"
+                      className="text-xs text-default-400 hover:text-primary-500 transition-colors"
                     >
                       找回密码
                     </Link>

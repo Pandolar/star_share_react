@@ -166,29 +166,29 @@ const ShareSpeedTestPage: React.FC = () => {
             <div className="w-full max-w-md">
                 <div className="flex flex-col items-center text-center">
                     <Spinner />
-                    <h1 className="mt-4 text-xl font-semibold text-gray-900">优选最佳线路中</h1>
-                    <p className="mt-2 text-sm text-gray-600">{statusText}</p>
-                    <p className="mt-1 text-xs text-gray-500">{nodes.length > 0 ? `共 ${nodes.length} 个节点` : ''}</p>
+                    <h1 className="mt-4 text-xl font-semibold text-default-900">优选最佳线路中</h1>
+                    <p className="mt-2 text-sm text-default-600">{statusText}</p>
+                    <p className="mt-1 text-xs text-default-500">{nodes.length > 0 ? `共 ${nodes.length} 个节点` : ''}</p>
                     {errorText && (
                         <div className="mt-3 text-red-600 text-sm">{errorText}</div>
                     )}
 
                     {results.length > 0 && (
                         <div className="mt-6 w-full">
-                            <ul className="divide-y divide-gray-100 rounded-lg border border-gray-100 overflow-hidden">
+                            <ul className="divide-y divide-default-100 rounded-lg border border-default-100 overflow-hidden">
                                 {results.map((r, i) => (
                                     <li key={`${r.node}`} className="flex items-center justify-between px-3 py-2 bg-white">
                                         <div className="text-left">
-                                            <div className="text-sm font-medium text-gray-900 truncate">{`节点${i + 1}`}</div>
+                                            <div className="text-sm font-medium text-default-900 truncate">{`节点${i + 1}`}</div>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <div className="text-xs tabular-nums text-gray-700 min-w-[88px] text-right">
+                                            <div className="text-xs tabular-nums text-default-700 min-w-[88px] text-right">
                                                 {r.status === 'pending'
                                                     ? '测试中…'
                                                     : (r.success ? `${(r.durationMs / 1000).toFixed(3)} 秒` : 'wait')}
                                             </div>
                                             <button
-                                                className="px-2 py-1 text-xs rounded border border-gray-200 hover:bg-gray-50 text-blue-600 disabled:text-gray-400 disabled:border-gray-100"
+                                                className="px-2 py-1 text-xs rounded border border-default-200 hover:bg-default-50 text-blue-600 disabled:text-default-400 disabled:border-default-100"
                                                 onClick={() => {
                                                     if (hasRedirectedRef.current) return;
                                                     // 用户手动点击则立即跳转并取消自动跳转
@@ -210,7 +210,7 @@ const ShareSpeedTestPage: React.FC = () => {
                                     </li>
                                 ))}
                             </ul>
-                            <p className="mt-3 text-xs text-gray-500">即将自动跳转至优选节点</p>
+                            <p className="mt-3 text-xs text-default-500">即将自动跳转至优选节点</p>
                         </div>
                     )}
                 </div>
@@ -454,7 +454,7 @@ async function testNode(nodeInfo: NodeInfo): Promise<TestResult> {
 }
 
 const Spinner: React.FC = () => (
-    <div className="h-10 w-10 animate-spin rounded-full border-2 border-gray-200 border-t-blue-500" aria-label="loading" />
+    <div className="h-10 w-10 animate-spin rounded-full border-2 border-default-200 border-t-blue-500" aria-label="loading" />
 );
 
 export default ShareSpeedTestPage;

@@ -28,7 +28,7 @@ const UserPackagesManagePage = lazy(() => import('./pages/admin/UserPackagesMana
 const InviteManagePage = lazy(() => import('./pages/admin/InviteManagePage'));
 
 const RouteLoadingFallback: React.FC = () => (
-  <div className="flex min-h-screen items-center justify-center bg-white px-4 text-sm text-gray-500">
+  <div className="flex min-h-screen items-center justify-center bg-white px-4 text-sm text-default-500">
     页面加载中...
   </div>
 );

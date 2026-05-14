@@ -51,10 +51,10 @@ const NativeApplications: React.FC = () => {
           viewport={{ once: true }}
           className="text-center mb-16"
         >
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+          <h2 className="text-4xl md:text-5xl font-bold text-default-900 mb-4">
             原生应用
           </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <p className="text-xl text-default-600 max-w-3xl mx-auto">
             跨平台支持，为不同设备和使用场景提供最佳体验
           </p>
         </motion.div>
@@ -71,7 +71,7 @@ const NativeApplications: React.FC = () => {
                 transition={{ duration: 0.6, delay: index * 0.1 }}
                 viewport={{ once: true }}
                 whileHover={{ scale: 1.02 }}
-                className="bg-gray-50 rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300"
+                className="bg-default-50 rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300"
               >
                 {/* 应用图片 */}
                 <div className="h-48 bg-blue-600 relative overflow-hidden">
@@ -88,15 +88,15 @@ const NativeApplications: React.FC = () => {
                 {/* 应用信息 */}
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-xl font-bold text-gray-900">{app.name}</h3>
+                    <h3 className="text-xl font-bold text-default-900">{app.name}</h3>
                     <div className="flex items-center space-x-1">
                       <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                      <span className="text-sm text-gray-600">{app.rating}</span>
+                      <span className="text-sm text-default-600">{app.rating}</span>
                     </div>
                   </div>
 
                   <p className="text-blue-600 font-medium mb-3">{app.platform}</p>
-                  <p className="text-gray-600 mb-4">{app.description}</p>
+                  <p className="text-default-600 mb-4">{app.description}</p>
 
                   {/* 特性标签 */}
                   <div className="flex flex-wrap gap-2 mb-4">
@@ -113,8 +113,8 @@ const NativeApplications: React.FC = () => {
                   {/* 下载信息 */}
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center space-x-2">
-                      <Users className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-600">{app.downloads} 下载</span>
+                      <Users className="w-4 h-4 text-default-400" />
+                      <span className="text-sm text-default-600">{app.downloads} 下载</span>
                     </div>
                   </div>
 

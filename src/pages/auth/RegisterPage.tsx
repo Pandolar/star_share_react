@@ -142,7 +142,7 @@ const RegisterPage: React.FC = () => {
   return (
     <AuthLayout title="创建新账户">
       {isLoggedIn ? (
-        <div className="text-center text-gray-600">
+        <div className="text-center text-default-600">
           <p>您已登录，正在跳转...</p>
         </div>
       ) : (
@@ -178,7 +178,7 @@ const RegisterPage: React.FC = () => {
                 color="primary"
                 onClick={handleSendCode}
                 disabled={!!emailError || !email || isSendingCode || countdown > 0}
-                className="h-10 shrink-0 bg-primary-500 text-white hover:bg-primary-600 disabled:bg-gray-300"
+                className="h-10 shrink-0"
               >
                 {isSendingCode ? <Spinner size="sm" /> : (countdown > 0 ? `${countdown}s` : '发送验证码')}
               </Button>
@@ -195,7 +195,7 @@ const RegisterPage: React.FC = () => {
               required
               endContent={
                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="focus:outline-none">
-                  {showPassword ? <EyeOff className="h-5 w-5 text-gray-400" /> : <Eye className="h-5 w-5 text-gray-400" />}
+                  {showPassword ? <EyeOff className="h-5 w-5 text-default-400" /> : <Eye className="h-5 w-5 text-default-400" />}
                 </button>
               }
             />
@@ -234,13 +234,13 @@ const RegisterPage: React.FC = () => {
             )}
           </div>
 
-          <div className="flex items-start gap-2 text-sm text-gray-600">
+          <div className="flex items-start gap-2 text-sm text-default-600">
             <input
               id="register-user-agreement"
               type="checkbox"
               checked={hasAgreedUserAgreement}
               onChange={(e) => setHasAgreedUserAgreement(e.target.checked)}
-              className="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              className="mt-1 h-4 w-4 rounded border-default-300 text-primary-600 focus:ring-primary-500"
             />
             <div className="leading-5">
               <label htmlFor="register-user-agreement" className="select-none">
@@ -261,7 +261,7 @@ const RegisterPage: React.FC = () => {
             color="primary"
             fullWidth
             disabled={isRegistering || !hasAgreedUserAgreement}
-            className="!mt-8 bg-primary-500 text-white hover:bg-primary-600 disabled:bg-gray-300"
+            className="!mt-8"
           >
             {isRegistering ? <Spinner size="sm" color="white" /> : '注册'}
           </Button>

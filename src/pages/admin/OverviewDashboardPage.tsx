@@ -52,11 +52,11 @@ const HBarList: React.FC<{ data: Array<{ name: string; value: number }>; color?:
     <div className="space-y-2">
       {data.map((d, i) => (
         <div key={i} className="space-y-1">
-          <div className="flex justify-between text-xs text-gray-600">
+          <div className="flex justify-between text-xs text-default-600">
             <span className="truncate mr-2" title={d.name}>{d.name}</span>
             <span>{d.value}</span>
           </div>
-          <div className="h-2 bg-gray-100 rounded">
+          <div className="h-2 bg-default-100 rounded">
             <div className="h-2 rounded" style={{ width: `${(d.value / max) * 100}%`, backgroundColor: color }} />
           </div>
         </div>
@@ -74,9 +74,9 @@ const KPICard: React.FC<{ icon: React.ReactNode; label: string; value: string; s
           {icon}
         </div>
         <div>
-          <div className="text-sm text-gray-500">{label}</div>
+          <div className="text-sm text-default-500">{label}</div>
           <div className="text-xl font-semibold">{value}</div>
-          {sub && (<div className="text-xs text-gray-500 mt-0.5">{sub}</div>)}
+          {sub && (<div className="text-xs text-default-500 mt-0.5">{sub}</div>)}
         </div>
       </div>
     </CardBody>
@@ -129,7 +129,7 @@ const OverviewDashboardPage: React.FC = () => {
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <BarChart3 className="w-6 h-6 text-blue-600" />
-          <h1 className="text-2xl font-bold text-gray-800">系统总览</h1>
+          <h1 className="text-2xl font-bold text-default-800">系统总览</h1>
         </div>
         {data?.meta?.generated_at && (
           <Chip size="sm" variant="flat" color="default">更新于 {dayjs(data.meta.generated_at).format('YYYY-MM-DD HH:mm')}</Chip>
@@ -173,7 +173,7 @@ const OverviewDashboardPage: React.FC = () => {
             <div className="flex items-center gap-2"><Package className="w-4 h-4" /><span className="font-medium">热销套餐（按销量）</span></div>
           </CardHeader>
           <CardBody>
-            {topSales.length === 0 ? <div className="text-sm text-gray-500">暂无数据</div> : <HBarList data={topSales} color="#6366f1" />}
+            {topSales.length === 0 ? <div className="text-sm text-default-500">暂无数据</div> : <HBarList data={topSales} color="#6366f1" />}
           </CardBody>
         </Card>
         <Card>
@@ -181,7 +181,7 @@ const OverviewDashboardPage: React.FC = () => {
             <div className="flex items-center gap-2"><DollarSign className="w-4 h-4" /><span className="font-medium">热销套餐（按收入）</span></div>
           </CardHeader>
           <CardBody>
-            {topRevenue.length === 0 ? <div className="text-sm text-gray-500">暂无数据</div> : <HBarList data={topRevenue} color="#10b981" />}
+            {topRevenue.length === 0 ? <div className="text-sm text-default-500">暂无数据</div> : <HBarList data={topRevenue} color="#10b981" />}
           </CardBody>
         </Card>
       </div>
@@ -207,7 +207,7 @@ const OverviewDashboardPage: React.FC = () => {
                 <div className="text-lg font-semibold">{data?.packages?.expired_count ?? 0}</div>
               </div>
             </div>
-            <div className="mt-4 text-sm text-gray-600">近似获取来源（共 {waysTotal}）</div>
+            <div className="mt-4 text-sm text-default-600">近似获取来源（共 {waysTotal}）</div>
             <div className="mt-2 space-y-2">
               {['purchase','exchange','other'].map((k) => {
                 const map: any = { purchase: '购买', exchange: '兑换', other: '其他' };
@@ -215,8 +215,8 @@ const OverviewDashboardPage: React.FC = () => {
                 const p = waysTotal ? Math.round((v / waysTotal) * 100) : 0;
                 return (
                   <div key={k} className="space-y-1">
-                    <div className="flex justify-between text-xs text-gray-600"><span>{map[k]}</span><span>{v}（{p}%）</span></div>
-                    <div className="h-2 bg-gray-100 rounded"><div className="h-2 bg-blue-500 rounded" style={{ width: `${p}%` }} /></div>
+                    <div className="flex justify-between text-xs text-default-600"><span>{map[k]}</span><span>{v}（{p}%）</span></div>
+                    <div className="h-2 bg-default-100 rounded"><div className="h-2 bg-blue-500 rounded" style={{ width: `${p}%` }} /></div>
                   </div>
                 );
               })}
@@ -241,7 +241,7 @@ const OverviewDashboardPage: React.FC = () => {
                 <div className="text-xs">已停用</div>
                 <div className="text-lg font-semibold">{data?.cdk?.disabled ?? 0}</div>
               </div>
-              <div className="p-3 rounded bg-gray-100 text-gray-600">
+              <div className="p-3 rounded bg-default-100 text-default-600">
                 <div className="text-xs">今日使用 / 7天</div>
                 <div className="text-lg font-semibold">{data?.cdk?.used_today ?? 0} / {data?.cdk?.used_7d ?? 0}</div>
               </div>

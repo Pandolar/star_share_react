@@ -119,8 +119,8 @@ const JumpNsPage: React.FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white">
-      <div className="text-center text-gray-700">
-        <div className="h-10 w-10 mx-auto animate-spin rounded-full border-2 border-gray-200 border-t-blue-500" />
+      <div className="text-center text-default-700">
+        <div className="h-10 w-10 mx-auto animate-spin rounded-full border-2 border-default-200 border-t-blue-500" />
         <p className="mt-4 text-sm">正在校验您的登录状态，请稍候...</p>
       </div>
     </div>

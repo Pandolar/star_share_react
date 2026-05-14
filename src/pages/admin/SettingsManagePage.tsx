@@ -212,7 +212,7 @@ const SettingsManagePage: React.FC = () => {
                 <div className="flex items-center justify-between">
                     <div className="flex-1">
                         <div className="font-medium">{config.description}</div>
-                        <div className="text-sm text-gray-500">配置键: {config.key}</div>
+                        <div className="text-sm text-default-500">配置键: {config.key}</div>
                     </div>
                     <Switch
                         isSelected={value === 'true'}
@@ -229,7 +229,7 @@ const SettingsManagePage: React.FC = () => {
                 <div className="flex items-center justify-between">
                     <div>
                         <div className="font-medium">{config.description}</div>
-                        <div className="text-sm text-gray-500">配置键: {config.key}</div>
+                        <div className="text-sm text-default-500">配置键: {config.key}</div>
                     </div>
                     {config.editable && isChanged && (
                         <div className="flex items-center gap-2">
@@ -238,7 +238,6 @@ const SettingsManagePage: React.FC = () => {
                                 color="primary"
                                 variant="flat"
                                 startContent={<Save className="w-3 h-3" />}
-                                className="admin-action-btn"
                                 isDisabled={!isJsonValid}
                                 onPress={() => {
                                     if (!isJsonValid) {
@@ -313,7 +312,7 @@ const SettingsManagePage: React.FC = () => {
                 )}
 
                 {config.required && (
-                    <div className="text-xs text-gray-500">* 此配置为必填项</div>
+                    <div className="text-xs text-default-500">* 此配置为必填项</div>
                 )}
             </div>
         );
@@ -340,7 +339,7 @@ const SettingsManagePage: React.FC = () => {
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <Settings className="w-6 h-6 text-blue-600" />
-                    <h1 className="text-2xl font-bold text-gray-800">系统配置</h1>
+                    <h1 className="text-2xl font-bold text-default-800">系统配置</h1>
                 </div>
 
                 <div className="flex gap-2">
@@ -352,7 +351,6 @@ const SettingsManagePage: React.FC = () => {
                         重置
                     </Button>
                     <Button
-                        className="admin-action-btn"
                         color="primary"
                         onPress={saveAllConfigs}
                         isLoading={saving}
@@ -367,7 +365,7 @@ const SettingsManagePage: React.FC = () => {
             {/* 配置说明 */}
             <Card>
                 <CardBody>
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm text-default-600">
                         <p>🔧 这里是系统的核心配置管理，请谨慎修改。</p>
                         <p>💡 标记为黄色边框的配置表示已修改但未保存。</p>
                         <p>🔒 灰色背景的配置表示不可编辑。</p>
@@ -397,7 +395,7 @@ const SettingsManagePage: React.FC = () => {
                                     <div className="flex items-center gap-2">
                                         {getGroupIcon(group)}
                                         <span>{group}</span>
-                                        <span className="text-sm text-gray-500">({groupedConfigs[group]?.length || 0})</span>
+                                        <span className="text-sm text-default-500">({groupedConfigs[group]?.length || 0})</span>
                                     </div>
                                 }
                             />
@@ -440,10 +438,10 @@ const SettingsManagePage: React.FC = () => {
                                 <span>确认提交配置</span>
                             </ModalHeader>
                             <ModalBody>
-                                <div className="text-sm text-gray-700 space-y-1">
+                                <div className="text-sm text-default-700 space-y-1">
                                     <div>即将提交以下配置项：</div>
                                     <div className="font-medium">{pendingConfig?.description}</div>
-                                    <div className="text-gray-500">键：{pendingConfig?.key}</div>
+                                    <div className="text-default-500">键：{pendingConfig?.key}</div>
                                     <div className="break-all">新值：{pendingConfig?.value}</div>
                                 </div>
                             </ModalBody>
@@ -451,7 +449,6 @@ const SettingsManagePage: React.FC = () => {
                                 <Button variant="light" onPress={onClose}>取消</Button>
                                 <Button
                                     color="primary"
-                                    className="admin-action-btn"
                                     isLoading={saving}
                                     onPress={async () => {
                                         if (pendingConfig) {

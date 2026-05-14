@@ -113,7 +113,7 @@ const ForgotPasswordPage: React.FC = () => {
     return (
         <AuthLayout title="找回密码">
             {isLoggedIn ? (
-                <div className="text-center text-gray-600">
+                <div className="text-center text-default-600">
                     <p>您已登录，正在跳转...</p>
                 </div>
             ) : (
@@ -152,7 +152,7 @@ const ForgotPasswordPage: React.FC = () => {
                                 color="primary"
                                 onClick={handleSendCode}
                                 disabled={!!emailError || !email || isSendingCode || countdown > 0}
-                                className="h-10 shrink-0 bg-primary-500 text-white hover:bg-primary-600 disabled:bg-gray-300"
+                                className="h-10 shrink-0"
                             >
                                 {isSendingCode ? <Spinner size="sm" /> : (countdown > 0 ? `${countdown}s` : '发送验证码')}
                             </Button>
@@ -171,7 +171,7 @@ const ForgotPasswordPage: React.FC = () => {
                             required
                             endContent={
                                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="focus:outline-none">
-                                    {showPassword ? <EyeOff className="h-5 w-5 text-gray-400" /> : <Eye className="h-5 w-5 text-gray-400" />}
+                                    {showPassword ? <EyeOff className="h-5 w-5 text-default-400" /> : <Eye className="h-5 w-5 text-default-400" />}
                                 </button>
                             }
                         />
@@ -183,7 +183,7 @@ const ForgotPasswordPage: React.FC = () => {
                         color="primary"
                         fullWidth
                         disabled={isResetting}
-                        className="!mt-8 bg-primary-500 text-white hover:bg-primary-600 disabled:bg-gray-300"
+                        className="!mt-8"
                     >
                         {isResetting ? <Spinner size="sm" color="white" /> : '重置密码'}
                     </Button>

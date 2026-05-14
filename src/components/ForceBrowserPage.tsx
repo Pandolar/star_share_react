@@ -51,7 +51,7 @@ const ForceBrowserPage: React.FC<ForceBrowserPageProps> = ({
     const description = customDescription || `为了提供最佳的用户体验和功能支持，${siteName}暂不支持在微信内置浏览器中访问。请您使用手机浏览器打开本页面。`;
 
     return (
-        <div className="force-browser-page min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="force-browser-page min-h-screen bg-default-50 flex items-center justify-center p-4">
             <div className="max-w-md w-full">
                 {/* 主卡片 */}
                 <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
@@ -70,21 +70,21 @@ const ForceBrowserPage: React.FC<ForceBrowserPageProps> = ({
                     </div>
 
                     {/* 标题 */}
-                    <h1 className="text-2xl font-bold text-gray-900 mb-4">
+                    <h1 className="text-2xl font-bold text-default-900 mb-4">
                         {title}
                     </h1>
 
                     {/* 说明文字 */}
-                    <p className="text-gray-600 mb-8 leading-relaxed">
+                    <p className="text-default-600 mb-8 leading-relaxed">
                         {description}
                     </p>
 
                     {/* URL显示和复制区域 */}
                     {showCurrentUrl && currentUrl && (
                         <div className="mb-8">
-                            <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                                <p className="text-sm text-gray-500 mb-2">页面地址：</p>
-                                <p className="text-sm text-gray-800 break-all font-mono">
+                            <div className="bg-default-50 rounded-lg p-4 mb-4">
+                                <p className="text-sm text-default-500 mb-2">页面地址：</p>
+                                <p className="text-sm text-default-800 break-all font-mono">
                                     {currentUrl}
                                 </p>
                             </div>
@@ -120,11 +120,11 @@ const ForceBrowserPage: React.FC<ForceBrowserPageProps> = ({
                     {/* 操作指引 */}
                     <div className="space-y-4">
                         <div className="text-left">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                            <h3 className="text-lg font-semibold text-default-900 mb-3">
                                 如何在浏览器中打开：
                             </h3>
 
-                            <div className="space-y-3 text-sm text-gray-700">
+                            <div className="space-y-3 text-sm text-default-700">
                                 <div className="flex items-start">
                                     <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold mr-3 mt-0.5">
                                         1
@@ -150,9 +150,9 @@ const ForceBrowserPage: React.FC<ForceBrowserPageProps> = ({
                     </div>
 
                     {/* 支持的浏览器 */}
-                    <div className="mt-8 pt-6 border-t border-gray-100">
-                        <p className="text-xs text-gray-500 mb-3">推荐使用以下浏览器：</p>
-                        <div className="flex justify-center space-x-4 text-xs text-gray-400">
+                    <div className="mt-8 pt-6 border-t border-default-100">
+                        <p className="text-xs text-default-500 mb-3">推荐使用以下浏览器：</p>
+                        <div className="flex justify-center space-x-4 text-xs text-default-400">
                             <span>Safari</span>
                             <span>•</span>
                             <span>Chrome</span>
@@ -166,7 +166,7 @@ const ForceBrowserPage: React.FC<ForceBrowserPageProps> = ({
 
                 {/* 底部提示 */}
                 <div className="mt-6 text-center">
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-default-500">
                         感谢您的理解与配合
                     </p>
                 </div>

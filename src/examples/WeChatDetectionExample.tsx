@@ -100,7 +100,7 @@ const WeChatDetectionExample: React.FC = () => {
             <span className="text-red-600 font-medium">强制模式（禁止在微信中访问）</span>
           </label>
         </div>
-        <p className="text-sm text-gray-600 mt-2">
+        <p className="text-sm text-default-600 mt-2">
           {demoMode === 'force' 
             ? '⚠️ 强制模式：在微信中将完全无法访问页面内容，强制跳转到浏览器打开提示页面'
             : '💡 普通模式：在微信中会显示提示，但用户可以选择继续浏览'
@@ -109,7 +109,7 @@ const WeChatDetectionExample: React.FC = () => {
       </div>
 
       {/* 当前环境信息显示 */}
-      <div className="mb-8 p-4 bg-gray-50 rounded-lg">
+      <div className="mb-8 p-4 bg-default-50 rounded-lg">
         <h2 className="text-lg font-semibold mb-3">当前环境信息</h2>
         <div className="space-y-2 text-sm">
           <p><strong>演示模式:</strong> <span className={demoMode === 'force' ? 'text-red-600 font-medium' : 'text-green-600'}>{demoMode === 'force' ? '强制模式' : '普通模式'}</span></p>
@@ -129,7 +129,7 @@ const WeChatDetectionExample: React.FC = () => {
                     {/* 方法1: Hook方式 */}
                     <div className="p-4 border rounded-lg">
                         <h3 className="font-medium mb-2">方法1: 使用Hook（推荐）</h3>
-                        <pre className="bg-gray-100 p-3 rounded text-sm overflow-x-auto">
+                        <pre className="bg-default-100 p-3 rounded text-sm overflow-x-auto">
                             {`// 1. 导入Hook和组件
 import { useWeChatDetection } from '../hooks/useWeChatDetection';
 import WeChatBrowserTip from '../components/WeChatBrowserTip';
@@ -157,7 +157,7 @@ const YourComponent = () => {
                     {/* 方法2: 直接使用工具函数 */}
                     <div className="p-4 border rounded-lg">
                         <h3 className="font-medium mb-2">方法2: 直接使用工具函数</h3>
-                        <pre className="bg-gray-100 p-3 rounded text-sm overflow-x-auto">
+                        <pre className="bg-default-100 p-3 rounded text-sm overflow-x-auto">
                             {`// 1. 导入工具函数
 import { 
   isWeChatBrowser, 
