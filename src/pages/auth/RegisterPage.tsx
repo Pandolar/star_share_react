@@ -209,7 +209,7 @@ const RegisterPage: React.FC = () => {
             >
               <div className="flex items-center gap-2">
                 <Gift className="w-4 h-4 text-primary" />
-                <span className="text-sm font-medium text-default-800">有邀请码？点击填写</span>
+                <span className="text-sm font-medium text-default-800">（可选）有邀请码？点击填写</span>
               </div>
               <ChevronDown className={`w-4 h-4 text-default-500 transition-transform ${showInviteField ? 'rotate-180' : ''}`} />
             </button>

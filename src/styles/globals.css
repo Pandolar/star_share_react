@@ -48,6 +48,20 @@ a {
   box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
 
+/* 自定义 .container：固定最大宽度 1200px，覆盖 Tailwind 默认行为
+   注意：UserCenter 等页面依赖此规则把内容居中限宽。 */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+@media (min-width: 640px) {
+  .container { padding: 0 24px; }
+}
+@media (min-width: 1024px) {
+  .container { padding: 0 32px; }
+}
+
 /* 表格内文本可选中（覆盖组件默认 user-select: none） */
 table, table *,
 [role="grid"], [role="grid"] *,
