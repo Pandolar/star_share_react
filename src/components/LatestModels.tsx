@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useHomeInfo } from '../contexts/HomeInfoContext';
-import { DynamicIcon } from '../utils/iconUtils';
+import { DynamicIcon } from './DynamicIcon';
 
 // 最新模型展示区域组件
 const LatestModels: React.FC = () => {

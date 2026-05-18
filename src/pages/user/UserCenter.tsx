@@ -71,18 +71,6 @@ const tabConfigs: TabConfig[] = [
     icon: <MessageCircle size={20} />,
     component: InviteTab
   },
-  // { // 临时注释
-  //   key: 'tutorial',
-  //   label: '使用教程',
-  //   icon: <Book size={20} />,
-  //   component: TutorialTab
-  // },
-  // {
-  //   key: 'contact',
-  //   label: '联系我们',
-  //   icon: <MessageCircle size={20} />,
-  //   component: ContactTab
-  // }
 ];
 
 const UserCenter: React.FC = () => {

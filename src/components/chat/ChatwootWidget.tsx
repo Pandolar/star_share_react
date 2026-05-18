@@ -5,7 +5,7 @@
 /// <reference path="../../types/chatwoot.d.ts" />
 
 import { useEffect, useRef } from 'react';
-import { CHATWOOT_BASE_URL, CHATWOOT_WEBSITE_TOKEN } from '../../config/chatwoot';
+import { CHATWOOT_BASE_URL, CHATWOOT_WEBSITE_TOKEN } from '../../config';
 import { getChatwootGuestSignature, getChatwootUserSignature } from '../../services/chatwootApi';
 import { getCookie } from '../../utils/cookies';
 

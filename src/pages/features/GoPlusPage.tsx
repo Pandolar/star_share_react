@@ -3,7 +3,7 @@
 * 提供简单现代化的ChatGPT Plus充值服务
 */
 import React, { useState, useEffect } from 'react';
-import { Card, CardBody, Button, Textarea, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure, Accordion, AccordionItem } from '@heroui/react';
+import { Card, CardBody, Button, Textarea, useDisclosure, Accordion, AccordionItem } from '@heroui/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Zap,
@@ -19,13 +19,19 @@ import {
     Menu,
     MessageCircle,
     Mail,
-    Clock8,
-    Tag,
     Play,
 } from 'lucide-react';
-import QRCodeGenerator from 'qrcode-generator';
 import { toast } from '../../utils/toast';
-
+import { PaymentModal } from './goPlus/PaymentModal';
+import { RechargeStatusModal } from './goPlus/RechargeStatusModal';
+import { VideoTutorialModal } from './goPlus/VideoTutorialModal';
+import {
+    OrderInfo,
+    OrderStatus,
+    RechargeStep,
+    RechargeStepType,
+    JsonValidationState,
+} from './goPlus/types';
 
 // 导航链接接口
 interface NavLink {
@@ -33,7 +39,6 @@ interface NavLink {
     href: string;
     external?: boolean;
 }
-
 
 // 页面配置接口
 interface PageConfig {
@@ -46,7 +51,6 @@ interface PageConfig {
     supportContact: string;
 }
 
-
 // 默认配置
 const defaultConfig: PageConfig = {
     brandName: 'NiceAIGC',
@@ -55,54 +59,10 @@ const defaultConfig: PageConfig = {
     partnerLogo: '/img/oai.svg',
     navLinks: [
         { label: '首页', href: '/', external: true },
-        // { label: '关于我们', href: '/about', external: false }
     ],
     videoTutorialUrl: 'https://niceaigc-cos.niceaigc.com/myvideo/%E8%87%AA%E5%8A%A9%E5%85%85%E5%80%BC%E8%A7%86%E9%A2%91.mp4',
     supportContact: 'https://niceaigc-cos.niceaigc.com/myimg/NiceAIGC-kefu.jpg'
 };
-
-
-// 充值步骤类型
-type RechargeStepType = 'json_input' | 'json_verify' | 'payment' | 'processing' | 'success';
-
-
-// 充值步骤常量
-const RechargeStep = {
-    JSON_INPUT: 'json_input' as const,
-    JSON_VERIFY: 'json_verify' as const,
-    PAYMENT: 'payment' as const,
-    PROCESSING: 'processing' as const,
-    SUCCESS: 'success' as const
-};
-
-
-// 订单信息接口
-interface OrderInfo {
-    trade_no: string;
-    order_id: string;
-    payment_url: string | null;
-    qr_code: string;
-    channel: string;
-    pay_type: string;
-    price: number;
-    package_name: string;
-}
-
-
-// 订单状态接口
-interface OrderStatus {
-    status: string;
-    order_id: string;
-    message: string;
-}
-
-
-// JSON验证状态接口
-interface JsonValidationState {
-    isJsonValid: boolean;      // JSON格式是否有效
-    hasAllFields: boolean;     // 是否包含所有必要字段
-    errorMessage?: string;     // 错误信息
-}
 
 
 const GoPlusPage: React.FC = () => {
@@ -300,15 +260,6 @@ const GoPlusPage: React.FC = () => {
             if (timer) clearInterval(timer);
         };
     }, [qrCodeExpiryTime, isQrCodeExpired, paymentTimer]);
-
-
-    // 生成二维码
-    const generateQRCode = (text: string): string => {
-        const qr = QRCodeGenerator(0, 'M');
-        qr.addData(text);
-        qr.make();
-        return qr.createDataURL(8, 4);
-    };
 
 
     // 验证JSON输入（先验证格式，再验证字段）
@@ -616,14 +567,6 @@ const GoPlusPage: React.FC = () => {
             clearTimeout(paymentTimer);
             setPaymentTimer(null);
         }
-    };
-
-
-    // 格式化剩余时间为分:秒格式
-    const formatRemainingTime = (seconds: number): string => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
 
 
@@ -1223,339 +1166,46 @@ const GoPlusPage: React.FC = () => {
                 </motion.div>
             </div>
 
-
-            {/* 支付Modal */}
-            <Modal
+            {/* 支付弹窗 */}
+            <PaymentModal
                 isOpen={isPaymentModalOpen}
                 onOpenChange={onPaymentModalChange}
-                size="lg"
-                hideCloseButton
-                isDismissable={false}
-            >
-                <ModalContent>
-                    {(onClose) => (
-                        <>
-                            <ModalHeader className="flex flex-col gap-1">
-                                扫码支付
-                            </ModalHeader>
-                            <ModalBody className="text-center">
-                                {orderInfo && (
-                                    <div className="space-y-6">
-                                        {/* 二维码区域 - 带过期覆盖层 */}
-                                        <div className="relative bg-default-50 p-6 rounded-lg inline-block mx-auto">
-                                            <img
-                                                src={generateQRCode(orderInfo.qr_code)}
-                                                alt="支付二维码"
-                                                className={`w-48 h-48 mx-auto transition-opacity duration-300 ${isQrCodeExpired ? 'opacity-50' : 'opacity-100'
-                                                    }`}
-                                            />
+                orderInfo={orderInfo}
+                isQrCodeExpired={isQrCodeExpired}
+                remainingTime={remainingTime}
+                cdkInput={cdkInput}
+                isCdkLoading={isCdkLoading}
+                onCdkInputChange={setCdkInput}
+                onPerformCdkRecharge={performCdkRecharge}
+                onCancel={() => {
+                    if (paymentTimer) clearTimeout(paymentTimer);
+                    resetProcess();
+                    closePaymentModal();
+                }}
+                onRefreshPage={() => {
+                    if (paymentTimer) clearTimeout(paymentTimer);
+                    resetProcess();
+                    closePaymentModal();
+                    window.location.reload();
+                }}
+            />
 
-                                            {/* 过期覆盖层 */}
-                                            {isQrCodeExpired && (
-                                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white bg-opacity-80 rounded-lg">
-                                                    <div className="text-center p-4">
-                                                        <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-2" />
-                                                        <h3 className="text-lg font-semibold text-red-700 mb-1">二维码已过期</h3>
-                                                        <p className="text-sm text-default-600">请刷新页面重新获取</p>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* 倒计时提示 */}
-                                            {!isQrCodeExpired && (
-                                                <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-yellow-900 text-xs px-4 py-1.5 rounded-full flex items-center shadow-lg border border-yellow-300 font-semibold transition-all duration-300">
-                                                    <Clock8 className="w-4 h-4 mr-2 text-yellow-700" />
-                                                    <span>
-                                                        剩余时间：<span className="font-bold">{formatRemainingTime(remainingTime)}</span>
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-
-
-                                        {/* 现代化订单信息卡片 */}
-                                        <div className="bg-white rounded-xl shadow-sm border border-default-100 overflow-hidden">
-                                            <div className="p-5 space-y-4">
-                                                <div className="flex items-center justify-between pb-3 border-b border-default-100">
-                                                    <div className="flex items-center text-default-700">
-                                                        <Tag className="w-4 h-4 mr-2 text-primary" />
-                                                        <span>订单信息</span>
-                                                    </div>
-                                                    <span
-                                                        className={`text-base font-semibold px-4 py-2 rounded-full
-                                                            ${orderInfo.pay_type === 'wxpay'
-                                                                ? 'bg-green-100 text-green-700'
-                                                                : 'bg-blue-100 text-blue-700'
-                                                            }`
-                                                        }
-                                                    >
-                                                        {orderInfo.pay_type === 'wxpay' ? '微信支付' : '支付宝'}
-                                                    </span>
-                                                </div>
-
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div className="flex flex-col items-start">
-                                                        <span className="text-xs text-default-500 mb-1">订单号</span>
-                                                        <span className="text-sm font-medium text-default-900 truncate max-w-[150px]">
-                                                            {orderInfo.order_id}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex flex-col items-start">
-                                                        <span className="text-xs text-default-500 mb-1">套餐名称</span>
-                                                        <span className="text-sm font-medium text-default-900">{orderInfo.package_name}</span>
-                                                    </div>
-                                                    <div className="flex flex-col items-start col-span-2 pt-2">
-                                                        <span className="text-xs text-default-500 mb-1">订单金额</span>
-                                                        <span className="text-xl font-bold text-default-900">{orderInfo.price}元</span>
-                                                    </div>
-                                                </div>
-
-                                                <div className={`p-3 rounded-lg text-sm ${isQrCodeExpired
-                                                    ? 'bg-red-50 text-red-600'
-                                                    : 'bg-blue-50 text-blue-800'
-                                                    }`}>
-                                                    {isQrCodeExpired
-                                                        ? '二维码已过期，请刷新页面重新创建订单'
-                                                        : `请使用${orderInfo.pay_type === 'wxpay' ? '微信' : '支付宝'}扫码支付，支付完成后会自动跳转`
-                                                    }
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* **新增：CDK兑换码表单** */}
-                                        <div className="bg-orange-50 rounded-xl shadow-sm border border-orange-200 overflow-hidden">
-                                            <div className="p-5 space-y-4">
-                                                <div className="space-y-3">
-                                                    <Textarea
-                                                        label="CDK兑换码"
-                                                        placeholder="如果您已购买了CDK兑换码，可直接进行兑换"
-                                                        value={cdkInput}
-                                                        onChange={(e) => setCdkInput(e.target.value)}
-                                                        minRows={1}
-                                                        maxRows={2}
-                                                        className="w-full"
-                                                        variant="bordered"
-                                                        isDisabled={isCdkLoading}
-                                                    />
-
-                                                    <Button
-                                                        color="warning"
-                                                        onPress={performCdkRecharge}
-                                                        isLoading={isCdkLoading}
-                                                        className="w-full !bg-orange-600 !text-white hover:!bg-orange-700"
-                                                        isDisabled={!cdkInput.trim() || isCdkLoading}
-                                                    >
-                                                        {isCdkLoading ? 'CDK兑换中...' : '使用CDK兑换码'}
-                                                    </Button>
-
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </ModalBody>
-                            <ModalFooter>
-                                <Button
-                                    color="danger"
-                                    variant="bordered"
-                                    onPress={() => {
-                                        if (paymentTimer) {
-                                            clearTimeout(paymentTimer);
-                                        }
-                                        resetProcess();
-                                        closePaymentModal();
-                                    }}
-                                >
-                                    取消支付
-                                </Button>
-
-                                {/* 二维码过期时显示刷新按钮 */}
-                                {isQrCodeExpired && (
-                                    <Button
-                                        color="primary"
-                                        onPress={() => {
-                                            if (paymentTimer) {
-                                                clearTimeout(paymentTimer);
-                                            }
-                                            resetProcess();
-                                            onClose();
-                                            // 可以在这里添加刷新当前页面的逻辑
-                                            window.location.reload();
-                                        }}
-                                    >
-                                        刷新页面
-                                    </Button>
-                                )}
-                            </ModalFooter>
-                        </>
-                    )}
-                </ModalContent>
-            </Modal>
-
-            {/* **新增：充值等待/结果 Modal** */}
-            <Modal
+            {/* 充值状态弹窗 */}
+            <RechargeStatusModal
                 isOpen={isRechargeModalOpen}
                 onOpenChange={onRechargeModalChange}
-                size="md"
-                hideCloseButton
-                isDismissable={false}
-            >
-                <ModalContent>
-                    {(onClose) => (
-                        <>
-                            <ModalHeader className="flex items-center gap-2">
-                                {rechargeStatus === 'waiting' && '正在充值'}
-                                {rechargeStatus === 'success' && '充值成功'}
-                                {rechargeStatus === 'error' && '充值失败'}
-                            </ModalHeader>
-                            <ModalBody>
-                                {rechargeStatus === 'waiting' && (
-                                    <div className="text-center space-y-4">
-                                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-                                        <p className="text-default-800 font-medium">{rechargeMessage}</p>
-                                        <p className="text-default-500 text-sm">通常耗时约 10 ~ 60 秒，请耐心等待...</p>
-                                    </div>
-                                )}
+                status={rechargeStatus}
+                message={rechargeMessage}
+                raw={rechargeRaw}
+                supportContact={config.supportContact}
+            />
 
-                                {rechargeStatus === 'success' && (
-                                    <div className="text-center space-y-4">
-                                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-                                            <CheckCircle className="w-8 h-8 text-green-600" />
-                                        </div>
-                                        <p className="text-default-800 font-medium">{rechargeMessage}</p>
-                                    </div>
-                                )}
-
-                                {rechargeStatus === 'error' && (
-                                    <div className="space-y-4">
-                                        <div className="text-center">
-                                            <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-2" />
-                                            <p className="text-red-700 font-semibold">{rechargeMessage}</p>
-                                            <p className="text-default-500 text-sm">请截图下方返回信息并发送给客服协助处理。</p>
-                                        </div>
-                                        <div className="bg-default-50 border border-default-200 rounded-lg p-3 max-h-72 overflow-auto">
-                                            <pre className="text-xs text-default-800 break-all whitespace-pre-wrap">
-                                                {JSON.stringify(rechargeRaw, null, 2)}
-                                            </pre>
-                                        </div>
-                                    </div>
-                                )}
-                            </ModalBody>
-                            <ModalFooter>
-                                {rechargeStatus === 'success' && (
-                                    <>
-                                        <Button
-                                            color="primary"
-                                            as="a"
-                                            href="https://chatgpt.com/"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            startContent={<ExternalLink className="w-4 h-4" />}
-                                        >
-                                            返回ChatGPT官网
-                                        </Button>
-                                        <Button
-                                            variant="bordered"
-                                            onPress={() => {
-                                                onClose();
-                                            }}
-                                        >
-                                            关闭
-                                        </Button>
-                                    </>
-                                )}
-
-                                {rechargeStatus === 'waiting' && (
-                                    <Button variant="bordered" isDisabled>
-                                        正在充值...
-                                    </Button>
-                                )}
-
-                                {rechargeStatus === 'error' && (
-                                    <>
-                                        <Button
-                                            variant="flat"
-                                            as="a"
-                                            href={config.supportContact}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            startContent={<MessageCircle className="w-4 h-4" />}
-                                        >
-                                            联系客服
-                                        </Button>
-                                        <Button
-                                            color="primary"
-                                            onPress={() => {
-                                                onClose();
-                                            }}
-                                        >
-                                            我已截图，关闭
-                                        </Button>
-                                    </>
-                                )}
-                            </ModalFooter>
-                        </>
-                    )}
-                </ModalContent>
-            </Modal>
-
-            {/* **新增：视频教程 Modal** */}
-            <Modal
+            {/* 视频教程弹窗 */}
+            <VideoTutorialModal
                 isOpen={isVideoModalOpen}
                 onOpenChange={onVideoModalChange}
-                size="5xl"
-                hideCloseButton={false}
-                isDismissable={true}
-            >
-                <ModalContent
-                    style={{
-                        maxWidth: '1200px',
-                        width: '98vw',
-                        minWidth: '0',
-                        padding: 0,
-                        // 让内容自适应移动端
-                    }}
-                >
-                    {(onClose) => (
-                        <>
-                            <ModalHeader className="flex items-center gap-2">
-                                <Play className="w-6 h-6 text-primary" />
-                                视频教程
-                            </ModalHeader>
-                            <ModalBody className="pb-6">
-                                <div
-                                    className="w-full relative bg-default-100 rounded-lg overflow-hidden"
-                                    style={{
-                                        aspectRatio: '16/9', // 适配移动端更常见的比例
-                                        minHeight: '220px',
-                                        maxHeight: '60vw',
-                                        height: 'auto',
-                                    }}
-                                >
-                                    <iframe
-                                        src={config.videoTutorialUrl}
-                                        title="ChatGPT Plus 充值教程"
-                                        className="absolute top-0 left-0 w-full h-full"
-                                        style={{
-                                            minHeight: '220px',
-                                            border: 0,
-                                        }}
-                                        frameBorder="0"
-                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                        allowFullScreen
-                                    />
-                                </div>
-                                <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                                    <p className="text-sm text-blue-800">
-                                        <strong>提示：</strong>观看完整视频教程，了解详细的充值操作流程，确保充值成功。
-                                    </p>
-                                </div>
-                            </ModalBody>
-                            {/* 不再显示关闭按钮 */}
-                        </>
-                    )}
-                </ModalContent>
-            </Modal>
+                videoUrl={config.videoTutorialUrl}
+            />
         </div>
     );
 };

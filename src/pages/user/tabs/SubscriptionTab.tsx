@@ -2,201 +2,86 @@
  * 订阅套餐Tab页面
  * 显示用户当前订阅和可用套餐
  */
-import React, { useState, useEffect, useMemo } from 'react';
-import {
-  Card,
-  CardBody,
-  Button,
-  Chip,
-  Spinner,
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  Tab,
-  Tabs,
-  Input
-} from '@heroui/react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Card, CardBody, Button, Chip, Spinner, Tab, Tabs } from '@heroui/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Package, Star, Crown, AlertCircle, CheckCircle, QrCode, Calendar, Timer, ChevronDown, Info } from 'lucide-react';
-import { packageUserApi, orderUserApi, exchangeUserApi } from '../../../services/userApi';
-import QRCodeGenerator from 'qrcode-generator';
+import { Package, Star, Crown, AlertCircle, Calendar, Timer, ChevronDown, Info } from 'lucide-react';
+import { packageUserApi, orderUserApi } from '../../../services/userApi';
 import { useIsMobile } from '../../../hooks/useIsMobile';
-
-interface PackageInfo {
-  id: number;
-  package_name: string;
-  category: string;
-  price: number;
-  duration: number;
-  introduce: string;
-  level: string;
-  priority: number;
-  remarks: string;
-  status: number;
-}
-
-interface OrderInfo {
-  success: boolean;
-  trade_no: string;
-  order_id: string;
-  payment_url: string | null;
-  qr_code: string;
-  channel: string;
-  pay_type: string;
-}
-
-type SubscriptionType = 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'more';
-
-interface SubscriptionCategory {
-  key: SubscriptionType;
-  label: string;
-  icon: React.ReactNode;
-  description: string;
-}
+import { PaymentModal } from './subscription/PaymentModal';
+import { CdkRedeemModal } from './subscription/CdkRedeemModal';
+import {
+  PackageInfo,
+  OrderInfo,
+  SubscriptionType,
+  SubscriptionCategory,
+  categorizePackage,
+  getDurationText,
+  calculateMonthlyPrice,
+  shouldShowMonthlyPrice,
+} from './subscription/types';
 
 export const SubscriptionTab: React.FC = () => {
   const [packages, setPackages] = useState<PackageInfo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState('');
   const [selectedPackage, setSelectedPackage] = useState<PackageInfo | null>(null);
   const [orderInfo, setOrderInfo] = useState<OrderInfo | null>(null);
   const [orderLoading, setOrderLoading] = useState(false);
-  const [paymentModal, setPaymentModal] = useState(false);
-  const [paymentStatus, setPaymentStatus] = useState<'pending' | 'checking' | 'success' | 'failed'>('pending');
-  const [checkInterval, setCheckInterval] = useState<NodeJS.Timeout | null>(null);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<SubscriptionType>('yearly');
-  const [qrCodeExpired, setQrCodeExpired] = useState(false);
-  const [qrCodeTimer, setQrCodeTimer] = useState<NodeJS.Timeout | null>(null);
-  const [manualCheckLoading, setManualCheckLoading] = useState(false);
   const [showSubscriptionGuide, setShowSubscriptionGuide] = useState(false);
-  const [showInlineQRCode, setShowInlineQRCode] = useState(false);
+  const [redeemModalOpen, setRedeemModalOpen] = useState(false);
 
-  // 使用现有的移动端检测 hook
   const isMobileDevice = useIsMobile();
 
-  // 兑换CDK弹窗与状态
-  const [redeemModal, setRedeemModal] = useState(false);
-  const [cdkValue, setCdkValue] = useState('');
-  const [redeemLoading, setRedeemLoading] = useState(false);
-  const [redeemStatus, setRedeemStatus] = useState<'idle' | 'success' | 'failed'>('idle');
-  const [redeemMessage, setRedeemMessage] = useState<string>('');
+  const subscriptionCategories: SubscriptionCategory[] = useMemo(
+    () => [
+      { key: 'yearly', label: '年订阅', icon: <Crown className="w-6 h-6" />, description: '365天超值' },
+      { key: 'quarterly', label: '季订阅', icon: <Star className="w-6 h-6" />, description: '90天优惠' },
+      { key: 'monthly', label: '月订阅', icon: <Package className="w-6 h-6" />, description: '30天经济' },
+      { key: 'weekly', label: '周订阅', icon: <Calendar className="w-6 h-6" />, description: '7天体验' },
+      { key: 'more', label: '更多', icon: <Timer className="w-6 h-6" />, description: '其他时长' },
+    ],
+    []
+  );
 
-  // 套餐分类配置
-  const subscriptionCategories: SubscriptionCategory[] = useMemo(() => [
-    {
-      key: 'yearly',
-      label: '年订阅',
-      icon: <Crown className="w-6 h-6" />,
-      description: '365天超值'
-    },
-    {
-      key: 'quarterly',
-      label: '季订阅',
-      icon: <Star className="w-6 h-6" />,
-      description: '90天优惠'
-    },
-    {
-      key: 'monthly',
-      label: '月订阅',
-      icon: <Package className="w-6 h-6" />,
-      description: '30天经济'
-    },
-    {
-      key: 'weekly',
-      label: '周订阅',
-      icon: <Calendar className="w-6 h-6" />,
-      description: '7天体验'
-    },
-    {
-      key: 'more',
-      label: '更多',
-      icon: <Timer className="w-6 h-6" />,
-      description: '其他时长'
-    }
-  ], []);
-
-  // 根据时长分类套餐
-  const categorizePackage = (duration: number): SubscriptionType => {
-    if (duration === 7) return 'weekly';
-    if (duration >= 30 && duration <= 31) return 'monthly';
-    if (duration >= 90 && duration <= 93) return 'quarterly';
-    if (duration >= 364 && duration <= 366) return 'yearly';
-    return 'more';
-  };
-
-  // 分组套餐
   const groupedPackages = useMemo(() => {
     const groups: Record<SubscriptionType, PackageInfo[]> = {
       weekly: [],
       monthly: [],
       quarterly: [],
       yearly: [],
-      more: []
+      more: [],
     };
-
-    packages.forEach(pkg => {
-      const category = categorizePackage(pkg.duration);
-      groups[category].push(pkg);
+    packages.forEach((pkg) => {
+      groups[categorizePackage(pkg.duration)].push(pkg);
     });
-
-    Object.keys(groups).forEach(key => {
+    Object.keys(groups).forEach((key) => {
       groups[key as SubscriptionType].sort((a, b) => a.priority - b.priority);
     });
-
     return groups;
   }, [packages]);
 
-  // 移动端：获取所有套餐（按优先级排序）
-  const allPackages = useMemo(() => {
-    return [...packages].sort((a, b) => a.priority - b.priority);
-  }, [packages]);
+  const allPackages = useMemo(() => [...packages].sort((a, b) => a.priority - b.priority), [packages]);
 
-  // 可用的分类
-  const availableCategories = useMemo(() => {
-    return subscriptionCategories.filter(category =>
-      groupedPackages[category.key].length > 0
-    );
-  }, [groupedPackages, subscriptionCategories]);
+  const availableCategories = useMemo(
+    () => subscriptionCategories.filter((c) => groupedPackages[c.key].length > 0),
+    [groupedPackages, subscriptionCategories]
+  );
 
-  // 计算日均价格（保留1位小数，四舍五入）
-  const calculateDailyPrice = (price: number, duration: number): string => {
-    if (duration <= 0) return '0.0';
-    const dailyPrice = price / duration;
-    return (Math.round(dailyPrice * 10) / 10).toString();
-  };
-
-  // 计算月均价格（保留1位小数，四舍五入）
-  const calculateMonthlyPrice = (price: number, duration: number): string => {
-    if (duration <= 0) return '0.0';
-    const monthlyPrice = price / duration * 30;
-    return (Math.round(monthlyPrice * 10) / 10).toString();
-  };
-
-  // 判断是否需要显示月均价格
-  const shouldShowMonthlyPrice = (duration: number): boolean => {
-    // 年卡和季卡显示月均价格
-    return (duration >= 90 && duration <= 93) || (duration >= 364 && duration <= 366);
-  };
-
-  // 获取套餐列表
   const fetchPackages = React.useCallback(async () => {
     try {
       setLoading(true);
       setError('');
       const response = await packageUserApi.getPackages();
-
       if (response.code === 20000) {
         const sortedPackages = (response.data || []).sort((a, b) => a.priority - b.priority);
         setPackages(sortedPackages);
-
-        const firstAvailableCategory = subscriptionCategories.find(category =>
-          sortedPackages.some(pkg => categorizePackage(pkg.duration) === category.key)
+        const firstAvailableCategory = subscriptionCategories.find((c) =>
+          sortedPackages.some((p) => categorizePackage(p.duration) === c.key)
         );
-        if (firstAvailableCategory) {
-          setSelectedCategory(firstAvailableCategory.key);
-        }
+        if (firstAvailableCategory) setSelectedCategory(firstAvailableCategory.key);
       } else {
         setError(response.msg || '获取套餐列表失败');
       }
@@ -207,285 +92,52 @@ export const SubscriptionTab: React.FC = () => {
     }
   }, [subscriptionCategories]);
 
-  const getQRCodeValue = (paymentInfo?: OrderInfo | null) => {
-    return paymentInfo?.qr_code || paymentInfo?.payment_url || '';
-  };
-
-  const openPaymentWindow = (paymentUrl?: string | null, targetWindow?: Window | null) => {
-    if (!paymentUrl) {
-      return false;
-    }
-
-    if (targetWindow && !targetWindow.closed) {
-      targetWindow.location.href = paymentUrl;
-      targetWindow.focus();
-      return true;
-    }
-
-    const popupWindow = window.open(paymentUrl, '_blank');
-    return !!popupWindow;
-  };
-
-  const handleShowInlineQRCode = () => {
-    if (!getQRCodeValue(orderInfo)) {
-      alert('暂未获取到支付二维码，请稍后重试或联系客服');
-      return;
-    }
-
-    setShowInlineQRCode(true);
-  };
-
-  const handleOpenPaymentWindow = () => {
-    if (!orderInfo?.payment_url) {
-      alert('暂未获取到支付链接，请稍后重试或联系客服');
-      return;
-    }
-
-    const opened = openPaymentWindow(orderInfo.payment_url);
-    if (!opened) {
-      alert('当前设备未能弹出新窗口，请直接使用本页二维码支付');
-    }
-  };
+  useEffect(() => {
+    fetchPackages();
+  }, [fetchPackages]);
 
   // 创建订单
-  const createOrder = async (packageId: number) => {
+  const createOrder = async (pkg: PackageInfo) => {
     let pendingPaymentWindow: Window | null = null;
-
     try {
       setOrderLoading(true);
+      setSelectedPackage(pkg);
 
       if (isMobileDevice) {
         pendingPaymentWindow = window.open('', '_blank');
       }
-
-      // 移动端添加 device 参数
-      const requestData = isMobileDevice ? { device: "mobile" } : {};
-      const response = await orderUserApi.createOrder(packageId, requestData);
+      const requestData = isMobileDevice ? { device: 'mobile' } : {};
+      const response = await orderUserApi.createOrder(pkg.id, requestData);
 
       if (response.code === 20000) {
         setOrderInfo(response.data);
-        setPaymentModal(true);
-        setPaymentStatus('pending');
-        setQrCodeExpired(false);
-        setShowInlineQRCode(false);
+        setPaymentModalOpen(true);
 
         if (isMobileDevice && response.data.payment_url) {
-          const opened = openPaymentWindow(response.data.payment_url, pendingPaymentWindow);
-
-          if (!opened) {
-            console.warn('支付窗口被拦截，用户可直接在本页显示二维码支付');
+          if (pendingPaymentWindow && !pendingPaymentWindow.closed) {
+            pendingPaymentWindow.location.href = response.data.payment_url;
+            pendingPaymentWindow.focus();
+          } else {
+            window.open(response.data.payment_url, '_blank');
           }
         }
-
-        startPaymentStatusCheck(response.data.order_id);
-        startQrCodeTimer();
       } else {
-        if (pendingPaymentWindow && !pendingPaymentWindow.closed) {
-          pendingPaymentWindow.close();
-        }
+        if (pendingPaymentWindow && !pendingPaymentWindow.closed) pendingPaymentWindow.close();
         alert(response.msg || '创建订单失败');
       }
     } catch (err) {
-      if (pendingPaymentWindow && !pendingPaymentWindow.closed) {
-        pendingPaymentWindow.close();
-      }
+      if (pendingPaymentWindow && !pendingPaymentWindow.closed) pendingPaymentWindow.close();
       alert(err instanceof Error ? err.message : '网络错误');
     } finally {
       setOrderLoading(false);
     }
   };
 
-  // 开始二维码计时器
-  const startQrCodeTimer = () => {
-    if (qrCodeTimer) {
-      clearTimeout(qrCodeTimer);
-    }
-    const timer = setTimeout(() => {
-      setQrCodeExpired(true);
-      // 二维码过期时停止支付状态检查
-      if (checkInterval) {
-        clearInterval(checkInterval);
-        setCheckInterval(null);
-      }
-    }, 5 * 60 * 1000);
-    setQrCodeTimer(timer);
-  };
-
-  // 开始检查支付状态
-  const startPaymentStatusCheck = (orderId: string) => {
-    if (checkInterval) {
-      clearInterval(checkInterval);
-    }
-
-    const interval = setInterval(async () => {
-      try {
-        const response = await orderUserApi.getPayStatus(orderId);
-
-        // 只判断 data.success 是否为 true
-        if (response.data && (response.data as { success?: boolean }).success === true) {
-          setPaymentStatus('success');
-          clearInterval(interval);
-          if (qrCodeTimer) {
-            clearTimeout(qrCodeTimer);
-          }
-          setTimeout(() => {
-            window.location.reload();
-          }, 2000);
-        } else if (response.data && (response.data as { success?: boolean }).success === false) {
-          // 继续检查，什么都不做
-        } else {
-          setPaymentStatus('failed');
-          clearInterval(interval);
-        }
-      } catch (err) {
-      }
-    }, 1500);
-
-    setCheckInterval(interval);
-  };
-
-  // 生成二维码
-  const generateQRCode = (text: string): string => {
-    const qr = QRCodeGenerator(0, 'M');
-    qr.addData(text);
-    qr.make();
-    return qr.createDataURL(8, 4);
-  };
-
-  // 手动检查支付状态
-  const handleManualPaymentCheck = async () => {
-    if (!orderInfo?.order_id) return;
-
-    try {
-      setManualCheckLoading(true);
-      const response = await orderUserApi.forceGetPayStatus(orderInfo.order_id);
-
-      // 使用与自动检查相同的判断逻辑
-      if (response.data && (response.data as { success?: boolean }).success === true) {
-        setPaymentStatus('success');
-        if (checkInterval) {
-          clearInterval(checkInterval);
-          setCheckInterval(null);
-        }
-        if (qrCodeTimer) {
-          clearTimeout(qrCodeTimer);
-        }
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-      } else {
-        // 支付检查失败，显示提示信息
-        alert('请确认是否已支付，若确认支付但仍无反应，请联系客服，我们会加急处理您的问题');
-      }
-    } catch (err) {
-      alert('请确认是否已支付，若确认支付但仍无反应，请联系客服，我们会加急处理您的问题');
-    } finally {
-      setManualCheckLoading(false);
-    }
-  };
-
-  // 获取时长描述
-  const getDurationText = (duration: number) => {
-    if (duration === 7) return '1周';
-    if (duration >= 30 && duration <= 31) return '1个月';
-    if (duration >= 90 && duration <= 93) return '1季度';
-    if (duration >= 364 && duration <= 366) return '1年';
-    return `${duration}天`;
-  };
-
-  // 关闭支付弹窗
-  const closePaymentModal = () => {
-    if (checkInterval) {
-      clearInterval(checkInterval);
-      setCheckInterval(null);
-    }
-    if (qrCodeTimer) {
-      clearTimeout(qrCodeTimer);
-      setQrCodeTimer(null);
-    }
-    setPaymentModal(false);
-    setOrderInfo(null);
-    setPaymentStatus('pending');
-    setQrCodeExpired(false);
-    setManualCheckLoading(false);
-    setShowInlineQRCode(false);
-  };
-
-  // 计算最受欢迎的套餐
   const getMostPopularPackage = (categoryPackages: PackageInfo[]) => {
     if (categoryPackages.length <= 1) return null;
     const sortedByPrice = [...categoryPackages].sort((a, b) => a.price - b.price);
-    const middleIndex = Math.floor(sortedByPrice.length / 2);
-    return sortedByPrice[middleIndex];
+    return sortedByPrice[Math.floor(sortedByPrice.length / 2)];
   };
-
-  // 打开兑换弹窗
-  const openRedeemModal = () => {
-    setRedeemModal(true);
-    setCdkValue('');
-    setRedeemStatus('idle');
-    setRedeemMessage('');
-  };
-
-  // 关闭兑换弹窗
-  const closeRedeemModal = () => {
-    setRedeemModal(false);
-    setCdkValue('');
-    setRedeemLoading(false);
-    setRedeemStatus('idle');
-    setRedeemMessage('');
-  };
-
-  // 提交兑换CDK
-  const handleRedeemCdk = async () => {
-    const cdk = cdkValue.trim();
-    if (!cdk) {
-      setRedeemStatus('failed');
-      setRedeemMessage('请输入有效的CDK');
-      return;
-    }
-    try {
-      setRedeemLoading(true);
-      setRedeemStatus('idle');
-      setRedeemMessage('');
-
-      // 调用兑换接口，接口头部将自动携带 xuserid 与 xtoken
-      const res = await exchangeUserApi.exchangeCdk(cdk);
-
-      if (res.code === 20000) {
-        setRedeemStatus('success');
-        setRedeemMessage('兑换成功，正在刷新页面...');
-        // 成功后短暂提示并刷新
-        setTimeout(() => {
-          window.location.reload();
-        }, 1500);
-      } else {
-        // 按照约定：非20000为失败，提示msg
-        setRedeemStatus('failed');
-        setRedeemMessage(res.msg || '兑换失败');
-      }
-    } catch (err) {
-      // 当后端返回非20000时，底层会抛出异常，err.message包含msg
-      const msg = err instanceof Error ? err.message : '兑换失败，请稍后重试';
-      setRedeemStatus('failed');
-      setRedeemMessage(msg);
-    } finally {
-      setRedeemLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchPackages();
-
-    return () => {
-      if (checkInterval) {
-        clearInterval(checkInterval);
-      }
-      if (qrCodeTimer) {
-        clearTimeout(qrCodeTimer);
-      }
-    };
-  }, [checkInterval, fetchPackages, qrCodeTimer]);
 
   return (
     <div
@@ -495,15 +147,12 @@ export const SubscriptionTab: React.FC = () => {
         fontFamily: 'inherit',
         lineHeight: 'inherit',
         fontSize: 'inherit',
-        color: 'inherit'
+        color: 'inherit',
       }}
     >
       {/* 内部样式重置和隔离 */}
       <style>{`
-        .subscription-tab-wrapper * {
-          box-sizing: border-box;
-        }
-        
+        .subscription-tab-wrapper * { box-sizing: border-box; }
         .subscription-tab-wrapper .subscription-card {
           all: unset;
           display: flex;
@@ -516,28 +165,22 @@ export const SubscriptionTab: React.FC = () => {
           overflow: hidden;
           height: 100%;
         }
-        
         .subscription-tab-wrapper .subscription-card:hover {
           transform: translateY(-2px);
           box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
           border-color: #3b82f6;
         }
-        
         .subscription-tab-wrapper .subscription-card.popular {
           border: 1px solid #3b82f6;
           position: relative;
         }
-        
         .subscription-tab-wrapper .subscription-card.popular::before {
           content: '';
           position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
+          top: 0; left: 0; right: 0;
           height: 4px;
-                                background: #3b82f6;
+          background: #3b82f6;
         }
-        
         .subscription-tab-wrapper .popular-badge {
           position: absolute;
           top: 0;
@@ -553,7 +196,6 @@ export const SubscriptionTab: React.FC = () => {
           z-index: 10;
           box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
         }
-        
         .subscription-tab-wrapper .card-body {
           padding: 24px;
           display: flex;
@@ -561,12 +203,7 @@ export const SubscriptionTab: React.FC = () => {
           height: 100%;
           min-height: 420px;
         }
-        
-        .subscription-tab-wrapper .package-header {
-          text-align: center;
-          margin-bottom: 20px;
-        }
-        
+        .subscription-tab-wrapper .package-header { text-align: center; margin-bottom: 20px; }
         .subscription-tab-wrapper .package-title {
           font-size: 20px;
           font-weight: 700;
@@ -574,155 +211,72 @@ export const SubscriptionTab: React.FC = () => {
           color: #1f2937;
           line-height: 1.2;
         }
-        
         .subscription-tab-wrapper .package-badges {
-          display: flex;
-          justify-content: center;
-          gap: 8px;
-          flex-wrap: wrap;
+          display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;
         }
-        
         .subscription-tab-wrapper .package-price {
-          text-align: center;
-          margin: 20px 0;
-          padding: 16px;
-          background: #f8fafc;
-          border-radius: 8px;
+          text-align: center; margin: 20px 0; padding: 16px;
+          background: #f8fafc; border-radius: 8px;
         }
-        
         .subscription-tab-wrapper .price-main {
-          display: flex;
-          align-items: baseline;
-          justify-content: center;
-          gap: 4px;
-          margin-bottom: 8px;
+          display: flex; align-items: baseline; justify-content: center; gap: 4px; margin-bottom: 8px;
         }
-        
         .subscription-tab-wrapper .price-amount {
-          font-size: 32px;
-          font-weight: 800;
-          color: #3b82f6;
-          line-height: 1;
+          font-size: 32px; font-weight: 800; color: #3b82f6; line-height: 1;
         }
-        
-        .subscription-tab-wrapper .price-unit {
-          font-size: 14px;
-          color: #6b7280;
-          font-weight: 500;
-        }
-        
-        .subscription-tab-wrapper .price-daily {
-          font-size: 13px;
-          color: #9ca3af;
-          margin: 0;
-          font-weight: 400;
-        }
-        
-        .subscription-tab-wrapper .package-description {
-          flex: 1;
-          margin: 16px 0 24px 0;
-        }
-        
+        .subscription-tab-wrapper .price-unit { font-size: 14px; color: #6b7280; font-weight: 500; }
+        .subscription-tab-wrapper .price-daily { font-size: 13px; color: #9ca3af; margin: 0; font-weight: 400; }
+        .subscription-tab-wrapper .package-description { flex: 1; margin: 16px 0 24px 0; }
         .subscription-tab-wrapper .description-box {
-          background: #f9fafb;
-          border: 1px solid #e5e7eb;
-          border-radius: 8px;
-          padding: 16px;
-          min-height: 80px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px;
+          padding: 16px; min-height: 80px;
+          display: flex; align-items: center; justify-content: center;
         }
-        
         .subscription-tab-wrapper .description-text {
-          font-size: 14px;
-          color: #4b5563;
-          line-height: 1.5;
-          text-align: center;
-          margin: 0;
+          font-size: 14px; color: #4b5563; line-height: 1.5; text-align: center; margin: 0;
         }
-        
-        .subscription-tab-wrapper .subscribe-button {
-          margin-top: auto;
-        }
-        
+        .subscription-tab-wrapper .subscribe-button { margin-top: auto; }
         .subscription-tab-wrapper .hero-button {
-          width: 100%;
-          height: 44px;
-          border-radius: 8px;
-          font-weight: 600;
-          font-size: 14px;
+          width: 100%; height: 44px; border-radius: 8px;
+          font-weight: 600; font-size: 14px;
           transition: all 0.2s ease;
-          border: none;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
+          border: none; cursor: pointer;
+          display: flex; align-items: center; justify-content: center; gap: 8px;
         }
-        
-        .subscription-tab-wrapper .hero-button.primary {
-          background: #3b82f6;
-          color: white;
-        }
-        
+        .subscription-tab-wrapper .hero-button.primary { background: #3b82f6; color: white; }
         .subscription-tab-wrapper .hero-button.primary:hover {
-          background: #2563eb;
-          transform: translateY(-1px);
+          background: #2563eb; transform: translateY(-1px);
           box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
         }
-        
         .subscription-tab-wrapper .hero-button.secondary {
-          background: white;
-          color: #374151;
-          border: 1px solid #d1d5db;
+          background: white; color: #374151; border: 1px solid #d1d5db;
         }
-        
         .subscription-tab-wrapper .hero-button.secondary:hover {
-          background: #f9fafb;
-          border-color: #9ca3af;
+          background: #f9fafb; border-color: #9ca3af;
         }
-        
         .subscription-tab-wrapper .hero-button:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-          transform: none !important;
+          opacity: 0.5; cursor: not-allowed; transform: none !important;
         }
-        
         .subscription-tab-wrapper .loading-spinner {
-          width: 16px;
-          height: 16px;
+          width: 16px; height: 16px;
           border: 2px solid transparent;
           border-top: 2px solid currentColor;
           border-radius: 50%;
           animation: spin 1s linear infinite;
         }
-        
-        @keyframes spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-        
+        @keyframes spin { to { transform: rotate(360deg); } }
         .subscription-tab-wrapper .divider {
-          height: 1px;
-          background: #e5e7eb;
-          margin: 16px 0;
-          border: none;
+          height: 1px; background: #e5e7eb; margin: 16px 0; border: none;
         }
-        
-        /* 分类标签页优化样式 */
         .subscription-tab-wrapper [data-slot="tabList"] {
           backdrop-filter: blur(8px);
           background: rgba(255, 255, 255, 0.95);
         }
-        
         .subscription-tab-wrapper [data-slot="tab"]:not([data-selected="true"]):hover {
           background: rgba(59, 130, 246, 0.08);
           transform: translateY(-1px);
           box-shadow: 0 2px 8px rgba(30, 104, 224, 0.15);
         }
-        
         .subscription-tab-wrapper [data-slot="cursor"] {
           background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(59, 130, 246, 0.12) 100%);
           border: 1px solid rgba(29, 89, 185, 0.15);
@@ -730,14 +284,14 @@ export const SubscriptionTab: React.FC = () => {
         }
       `}</style>
 
-      {/* 页面标题 + 操作入口（右侧文字按钮） */}
+      {/* 页面标题 + 操作入口 */}
       <div className="flex items-center justify-between mb-8 gap-4 flex-wrap">
         <div className="text-left">
           <h1 className="text-3xl font-bold text-foreground mb-2">订阅套餐</h1>
           <p className="text-default-500 max-w-md">选择适合您的订阅方案，享受优质服务</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button color="primary" variant="flat" onPress={openRedeemModal}>
+          <Button color="primary" variant="flat" onPress={() => setRedeemModalOpen(true)}>
             兑换激活码
           </Button>
         </div>
@@ -747,7 +301,7 @@ export const SubscriptionTab: React.FC = () => {
         <CardBody className="p-4 sm:p-5">
           <button
             type="button"
-            onClick={() => setShowSubscriptionGuide((prev) => !prev)}
+            onClick={() => setShowSubscriptionGuide((p) => !p)}
             className="w-full flex items-center justify-between gap-4 text-left"
           >
             <div className="flex items-center gap-3">
@@ -761,7 +315,6 @@ export const SubscriptionTab: React.FC = () => {
             </div>
             <ChevronDown className={`w-4 h-4 text-default-500 transition-transform ${showSubscriptionGuide ? 'rotate-180' : ''}`} />
           </button>
-
           {showSubscriptionGuide && (
             <div className="mt-4 rounded-xl bg-white/80 border border-default-100 px-4 py-3 text-sm text-default-700 leading-7">
               <div>1. 若您已有订阅套餐，不可再次订阅<strong className="font-semibold text-default-900">更低</strong>等级套餐。</div>
@@ -773,7 +326,6 @@ export const SubscriptionTab: React.FC = () => {
         </CardBody>
       </Card>
 
-      {/* 加载状态 */}
       {loading && (
         <div className="flex flex-col items-center justify-center py-16">
           <Spinner size="lg" color="primary" />
@@ -781,7 +333,6 @@ export const SubscriptionTab: React.FC = () => {
         </div>
       )}
 
-      {/* 错误状态 */}
       {error && (
         <div className="max-w-md mx-auto">
           <Card>
@@ -797,7 +348,7 @@ export const SubscriptionTab: React.FC = () => {
         </div>
       )}
 
-      {/* 分类标签页 - 仅桌面端显示 */}
+      {/* 桌面端 Tabs */}
       {!loading && !error && availableCategories.length > 0 && !isMobileDevice && (
         <div className="mb-8">
           <Tabs
@@ -807,11 +358,11 @@ export const SubscriptionTab: React.FC = () => {
             color="primary"
             size="lg"
             classNames={{
-              base: "w-full",
-              tabList: "gap-4 w-full justify-center bg-content1 rounded-xl p-2 shadow-sm border border-divider/20",
-              cursor: "w-full bg-primary/10 rounded-lg border border-primary/20 shadow-sm",
-              tab: "px-4 py-3 h-auto min-h-0 data-[selected=true]:bg-transparent data-[hover-unselected=true]:bg-primary/5 rounded-lg transition-all duration-200",
-              tabContent: "group-data-[selected=true]:text-primary font-medium"
+              base: 'w-full',
+              tabList: 'gap-4 w-full justify-center bg-content1 rounded-xl p-2 shadow-sm border border-divider/20',
+              cursor: 'w-full bg-primary/10 rounded-lg border border-primary/20 shadow-sm',
+              tab: 'px-4 py-3 h-auto min-h-0 data-[selected=true]:bg-transparent data-[hover-unselected=true]:bg-primary/5 rounded-lg transition-all duration-200',
+              tabContent: 'group-data-[selected=true]:text-primary font-medium',
             }}
           >
             {availableCategories.map((category) => (
@@ -836,7 +387,7 @@ export const SubscriptionTab: React.FC = () => {
         </div>
       )}
 
-      {/* 套餐列表 - 桌面端版本 */}
+      {/* 桌面端套餐列表 */}
       {!loading && !error && availableCategories.length > 0 && !isMobileDevice && (
         <AnimatePresence mode="wait">
           <motion.div
@@ -850,7 +401,6 @@ export const SubscriptionTab: React.FC = () => {
             {groupedPackages[selectedCategory].map((pkg, index) => {
               const mostPopular = getMostPopularPackage(groupedPackages[selectedCategory]);
               const isPopular = mostPopular?.id === pkg.id;
-              const dailyPrice = calculateDailyPrice(pkg.price, pkg.duration);
               const monthlyPrice = calculateMonthlyPrice(pkg.price, pkg.duration);
               const showMonthlyPrice = shouldShowMonthlyPrice(pkg.duration);
 
@@ -863,40 +413,18 @@ export const SubscriptionTab: React.FC = () => {
                   className="relative h-full"
                 >
                   <div className={`subscription-card ${isPopular ? 'popular' : ''}`}>
-                    {/* 推荐标签 */}
-                    {isPopular && (
-                      <div className="popular-badge">
-                        最受欢迎
-                      </div>
-                    )}
-
+                    {isPopular && <div className="popular-badge">最受欢迎</div>}
                     <div className="card-body">
-                      {/* 套餐标题 */}
                       <div className="package-header">
-                        <h3 className="package-title">
-                          {pkg.package_name}
-                        </h3>
+                        <h3 className="package-title">{pkg.package_name}</h3>
                         <div className="package-badges">
-                          <Chip
-                            size="sm"
-                            color="default"
-                            variant="flat"
-                          >
-                            {pkg.level}
-                          </Chip>
-                          <Chip
-                            size="sm"
-                            variant="bordered"
-                            startContent={<Timer className="w-3 h-3" />}
-                          >
+                          <Chip size="sm" color="default" variant="flat">{pkg.level}</Chip>
+                          <Chip size="sm" variant="bordered" startContent={<Timer className="w-3 h-3" />}>
                             {getDurationText(pkg.duration)}
                           </Chip>
                         </div>
                       </div>
-
                       <div className="divider" />
-
-                      {/* 价格信息 */}
                       <div className="package-price">
                         {showMonthlyPrice ? (
                           <>
@@ -904,9 +432,7 @@ export const SubscriptionTab: React.FC = () => {
                               <span className="price-amount">≈¥{monthlyPrice}</span>
                               <span className="price-unit">/ 月</span>
                             </div>
-                            <p className="price-daily">
-                              共 ¥{pkg.price} / {getDurationText(pkg.duration)}
-                            </p>
+                            <p className="price-daily">共 ¥{pkg.price} / {getDurationText(pkg.duration)}</p>
                           </>
                         ) : (
                           <div className="price-main">
@@ -915,25 +441,16 @@ export const SubscriptionTab: React.FC = () => {
                           </div>
                         )}
                       </div>
-
-                      {/* 套餐描述 */}
                       <div className="package-description">
                         <div className="description-box">
-                          <p className="description-text">
-                            {pkg.introduce || '暂无详细描述'}
-                          </p>
+                          <p className="description-text">{pkg.introduce || '暂无详细描述'}</p>
                         </div>
                       </div>
-
-                      {/* 订阅按钮 */}
                       <div className="subscribe-button">
                         <button
                           className={`hero-button ${isPopular ? 'primary' : 'secondary'}`}
                           disabled={pkg.status !== 1 || (orderLoading && selectedPackage?.id === pkg.id)}
-                          onClick={() => {
-                            setSelectedPackage(pkg);
-                            createOrder(pkg.id);
-                          }}
+                          onClick={() => createOrder(pkg)}
                         >
                           {orderLoading && selectedPackage?.id === pkg.id ? (
                             <>
@@ -954,7 +471,7 @@ export const SubscriptionTab: React.FC = () => {
         </AnimatePresence>
       )}
 
-      {/* 套餐列表 - 移动端版本 */}
+      {/* 移动端套餐列表 */}
       {!loading && !error && packages.length > 0 && isMobileDevice && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -963,10 +480,8 @@ export const SubscriptionTab: React.FC = () => {
           className="grid gap-4 grid-cols-1 max-w-2xl mx-auto"
         >
           {allPackages.map((pkg, index) => {
-            const dailyPrice = calculateDailyPrice(pkg.price, pkg.duration);
             const monthlyPrice = calculateMonthlyPrice(pkg.price, pkg.duration);
             const showMonthlyPrice = shouldShowMonthlyPrice(pkg.duration);
-
             return (
               <motion.div
                 key={pkg.id}
@@ -977,30 +492,17 @@ export const SubscriptionTab: React.FC = () => {
               >
                 <div className="subscription-card">
                   <div className="card-body" style={{ minHeight: 'auto', padding: '20px' }}>
-                    {/* 套餐标题 */}
                     <div className="package-header" style={{ marginBottom: '16px' }}>
                       <h3 className="package-title" style={{ fontSize: '18px', marginBottom: '8px' }}>
                         {pkg.package_name}
                       </h3>
                       <div className="package-badges" style={{ gap: '6px' }}>
-                        <Chip
-                          size="sm"
-                          color="default"
-                          variant="flat"
-                        >
-                          {pkg.level}
-                        </Chip>
-                        <Chip
-                          size="sm"
-                          variant="bordered"
-                          startContent={<Timer className="w-3 h-3" />}
-                        >
+                        <Chip size="sm" color="default" variant="flat">{pkg.level}</Chip>
+                        <Chip size="sm" variant="bordered" startContent={<Timer className="w-3 h-3" />}>
                           {getDurationText(pkg.duration)}
                         </Chip>
                       </div>
                     </div>
-
-                    {/* 价格信息 */}
                     <div className="package-price" style={{ margin: '16px 0' }}>
                       {showMonthlyPrice ? (
                         <>
@@ -1008,9 +510,7 @@ export const SubscriptionTab: React.FC = () => {
                             <span className="price-amount" style={{ fontSize: '28px' }}>≈¥{monthlyPrice}</span>
                             <span className="price-unit">/ 月</span>
                           </div>
-                          <p className="price-daily">
-                            共 ¥{pkg.price} / {getDurationText(pkg.duration)}
-                          </p>
+                          <p className="price-daily">共 ¥{pkg.price} / {getDurationText(pkg.duration)}</p>
                         </>
                       ) : (
                         <div className="price-main">
@@ -1019,8 +519,6 @@ export const SubscriptionTab: React.FC = () => {
                         </div>
                       )}
                     </div>
-
-                    {/* 套餐描述 */}
                     <div className="package-description" style={{ margin: '12px 0 20px 0' }}>
                       <div className="description-box" style={{ minHeight: '60px', padding: '12px' }}>
                         <p className="description-text" style={{ fontSize: '13px' }}>
@@ -1028,16 +526,11 @@ export const SubscriptionTab: React.FC = () => {
                         </p>
                       </div>
                     </div>
-
-                    {/* 订阅按钮 */}
                     <div className="subscribe-button">
                       <button
                         className="hero-button primary"
                         disabled={pkg.status !== 1 || (orderLoading && selectedPackage?.id === pkg.id)}
-                        onClick={() => {
-                          setSelectedPackage(pkg);
-                          createOrder(pkg.id);
-                        }}
+                        onClick={() => createOrder(pkg)}
                         style={{ height: '40px', fontSize: '14px' }}
                       >
                         {orderLoading && selectedPackage?.id === pkg.id ? (
@@ -1067,334 +560,18 @@ export const SubscriptionTab: React.FC = () => {
         </div>
       )}
 
-      {/* 支付弹窗 */}
-      <Modal
-        isOpen={paymentModal}
-        onClose={closePaymentModal}
-        size="lg"
-        scrollBehavior="inside"
-        hideCloseButton={paymentStatus === 'success'}
-        classNames={{
-          base: "max-h-[92vh] mx-2 sm:mx-0",
-          body: "py-4 sm:py-6 overflow-y-auto",
-          footer: "border-t border-divider bg-background sticky bottom-0",
+      <PaymentModal
+        isOpen={paymentModalOpen}
+        selectedPackage={selectedPackage}
+        orderInfo={orderInfo}
+        onClose={() => {
+          setPaymentModalOpen(false);
+          setOrderInfo(null);
+          setSelectedPackage(null);
         }}
-      >
-        <ModalContent>
-          <ModalHeader>
-            <div>
-              <h2 className="text-xl font-bold">完成支付</h2>
-              {selectedPackage && (
-                <p className="text-sm text-default-500 mt-1">{selectedPackage.package_name}</p>
-              )}
-            </div>
-          </ModalHeader>
+      />
 
-          <ModalBody>
-            {orderInfo && (
-              <div className="space-y-6">
-                {/* 订单摘要 */}
-                <Card>
-                  <CardBody className="p-4">
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-default-500">订单号</span>
-                        <code className="text-xs bg-default-100 px-2 py-1 rounded font-mono">
-                          {orderInfo.order_id}
-                        </code>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-default-500">支付金额</span>
-                        <span className="text-2xl font-bold text-primary">¥{selectedPackage?.price}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-default-500">套餐时长</span>
-                        <span className="font-medium">
-                          {selectedPackage ? getDurationText(selectedPackage.duration) : ''}
-                        </span>
-                      </div>
-                    </div>
-                  </CardBody>
-                </Card>
-
-                {/* 支付状态 */}
-                <div className="text-center">
-                  {paymentStatus === 'pending' && (
-                    <div className="space-y-3">
-                      {isMobileDevice ? (
-                        // 移动端支付提示
-                        <div className="space-y-4">
-                          <div className="flex items-center justify-center gap-2">
-                            <QrCode className="w-5 h-5 text-primary" />
-                            <span className="text-base font-medium">
-                              可直接在本页扫码支付，也可新窗口打开支付页
-                            </span>
-                          </div>
-                          <div className="text-sm text-default-500 space-y-2">
-                            <p>若当前设备无法弹出新窗口，请直接在本页显示二维码支付。</p>
-                          </div>
-
-                          <div className="flex flex-wrap gap-3 justify-center">
-                            {getQRCodeValue(orderInfo) && (
-                              <Button
-                                color="secondary"
-                                variant={showInlineQRCode ? 'solid' : 'flat'}
-                                onPress={handleShowInlineQRCode}
-                                className="min-w-40"
-                              >
-                                {showInlineQRCode ? '二维码已显示，请直接扫码付款' : '直接显示二维码'}
-                              </Button>
-                            )}
-                            {orderInfo?.payment_url && (
-                              <Button
-                                color="primary"
-                                variant="flat"
-                                onPress={handleOpenPaymentWindow}
-                                className="min-w-32"
-                              >
-                                新窗口支付
-                              </Button>
-                            )}
-                            <Button
-                              color="success"
-                              variant="flat"
-                              onPress={() => {
-                                setPaymentStatus('success');
-                                setTimeout(() => {
-                                  window.location.reload();
-                                }, 1000);
-                              }}
-                              className="min-w-20"
-                            >
-                              已支付
-                            </Button>
-                            <Button
-                              color="default"
-                              variant="light"
-                              onPress={closePaymentModal}
-                              className="min-w-20"
-                            >
-                              未支付
-                            </Button>
-                          </div>
-
-                          {showInlineQRCode && getQRCodeValue(orderInfo) && (
-                            <div className="rounded-2xl border border-primary/15 bg-default-50 px-4 py-5">
-                              <div className="flex justify-center">
-                                <Card className="p-4 relative shadow-sm">
-                                  <motion.img
-                                    src={generateQRCode(getQRCodeValue(orderInfo))}
-                                    alt="支付二维码"
-                                    className={`w-40 h-40 sm:w-48 sm:h-48 transition-all duration-500 ${qrCodeExpired ? 'opacity-30 grayscale' : ''}`}
-                                    initial={{ opacity: 0, scale: 0.8 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ delay: 0.2 }}
-                                  />
-                                  {qrCodeExpired && (
-                                    <motion.div
-                                      className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 rounded-lg"
-                                      initial={{ opacity: 0 }}
-                                      animate={{ opacity: 1 }}
-                                      transition={{ duration: 0.3 }}
-                                    >
-                                      <Chip color="danger" variant="solid" className="shadow-lg">
-                                        已过期
-                                      </Chip>
-                                    </motion.div>
-                                  )}
-                                </Card>
-                              </div>
-                              <p className="mt-3 text-xs leading-6 text-default-500 text-center">
-                                当前设备若无法直接拉起支付页面，可截图保存该二维码后，在微信或支付宝内识别扫码支付。
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        // 桌面端二维码支付
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-center gap-2">
-                            <QrCode className="w-5 h-5 text-primary" />
-                            <span className="text-base font-medium">
-                              {orderInfo.pay_type === 'wxpay' ? '请使用微信扫码支付' : '请扫码支付'}
-                            </span>
-                          </div>
-                          <div className="text-sm text-default-500">
-                            <p className="mb-1">二维码5分钟内有效</p>
-                            {qrCodeExpired && (
-                              <p className="text-danger font-medium">二维码已过期，请重新创建订单</p>
-                            )}
-                          </div>
-
-                          {/* 手动检查支付状态按钮 */}
-                          <div className="mt-3">
-                            <Button
-                              size="sm"
-                              variant="light"
-                              color="primary"
-                              onPress={handleManualPaymentCheck}
-                              isLoading={manualCheckLoading}
-                              isDisabled={qrCodeExpired}
-                              className="text-xs h-8"
-                            >
-                              付款后没有反应？请点这里
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {paymentStatus === 'checking' && (
-                    <div className="space-y-4">
-                      <Spinner size="lg" color="primary" />
-                      <p className="text-default-600">正在确认支付结果...</p>
-                    </div>
-                  )}
-
-                  {paymentStatus === 'success' && (
-                    <div className="space-y-6">
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: "spring", duration: 0.6 }}
-                      >
-                        <CheckCircle className="w-20 h-20 mx-auto text-success" />
-                      </motion.div>
-                      <div>
-                        <h3 className="text-2xl font-bold text-success mb-2">支付成功！</h3>
-                        <p className="text-default-500">页面即将刷新，请稍等...</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {paymentStatus === 'failed' && (
-                    <div className="space-y-4">
-                      <AlertCircle className="w-12 h-12 mx-auto text-danger" />
-                      <div>
-                        <h3 className="text-lg font-semibold text-danger mb-2">支付失败</h3>
-                        <p className="text-default-500 text-sm">请重试或联系客服</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* 二维码 - 仅桌面端显示 */}
-                {orderInfo.qr_code && paymentStatus === 'pending' && !isMobileDevice && (
-                  <div className="flex justify-center px-2">
-                    <Card className="p-4 sm:p-6 relative max-w-full">
-                      <motion.img
-                        src={generateQRCode(getQRCodeValue(orderInfo))}
-                        alt="支付二维码"
-                        className={`w-40 h-40 sm:w-48 sm:h-48 transition-all duration-500 max-w-full ${qrCodeExpired ? 'opacity-30 grayscale' : ''
-                          }`}
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.2 }}
-                      />
-                      {qrCodeExpired && (
-                        <motion.div
-                          className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 rounded-lg"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ duration: 0.3 }}
-                        >
-                          <Chip color="danger" variant="solid" className="shadow-lg">
-                            已过期
-                          </Chip>
-                        </motion.div>
-                      )}
-                    </Card>
-                  </div>
-                )}
-              </div>
-            )}
-          </ModalBody>
-
-          <ModalFooter>
-            {paymentStatus !== 'success' && (
-              <Button
-                color="danger"
-                variant="light"
-                onPress={closePaymentModal}
-              >
-                取消支付
-              </Button>
-            )}
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-
-      {/* 兑换激活码弹窗 */}
-      <Modal
-        isOpen={redeemModal}
-        onClose={closeRedeemModal}
-        size="md"
-        scrollBehavior="inside"
-        classNames={{
-          base: 'max-h-[80vh]',
-          body: 'py-6',
-          footer: 'sticky bottom-0 bg-background border-t border-divider'
-        }}
-      >
-        <ModalContent>
-          <ModalHeader>
-            <div>
-              <h2 className="text-xl font-bold">兑换激活码 CDK</h2>
-              <p className="text-sm text-default-500 mt-1">输入您获得的 CDK 激活码，兑换相应权益</p>
-            </div>
-          </ModalHeader>
-          <ModalBody>
-            {redeemStatus === 'success' ? (
-              <div className="text-center space-y-4 py-4">
-                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', duration: 0.6 }}>
-                  <CheckCircle className="w-16 h-16 mx-auto text-success" />
-                </motion.div>
-                <p className="text-success font-semibold">{redeemMessage || '兑换成功'}</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <Input
-                  label="激活码"
-                  placeholder="请输入CDK，例如：XXXX-XXXX-XXXX"
-                  value={cdkValue}
-                  onValueChange={setCdkValue}
-                  isDisabled={redeemLoading}
-                  isRequired
-                />
-                {redeemStatus === 'failed' && (
-                  <div className="flex items-center gap-2 text-danger text-sm">
-                    <AlertCircle className="w-4 h-4" />
-                    <span>{redeemMessage}</span>
-                  </div>
-                )}
-                {/* 备用确认按钮：在小屏或极端场景仍可点击提交 */}
-                <div className="flex md:hidden justify-end">
-                  <Button variant="light" size="sm" onPress={handleRedeemCdk} isLoading={redeemLoading}>
-                    确认兑换
-                  </Button>
-                </div>
-              </div>
-            )}
-          </ModalBody>
-          <ModalFooter>
-            {redeemStatus !== 'success' ? (
-              <>
-                <Button variant="light" onPress={closeRedeemModal} isDisabled={redeemLoading}>
-                  取消
-                </Button>
-                <Button variant="light" onPress={handleRedeemCdk} isLoading={redeemLoading}>
-                  确认兑换
-                </Button>
-              </>
-            ) : (
-              <Button color="primary" onPress={closeRedeemModal}>
-                关闭
-              </Button>
-            )}
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+      <CdkRedeemModal isOpen={redeemModalOpen} onClose={() => setRedeemModalOpen(false)} />
     </div>
   );
 };

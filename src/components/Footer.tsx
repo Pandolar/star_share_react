@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Phone, MapPin } from 'lucide-react';
 import { useHomeInfo } from '../contexts/HomeInfoContext';
-import { DynamicIcon } from '../utils/iconUtils';
+import { DynamicIcon } from './DynamicIcon';
 
 // Footer组件 - 包含版权信息和链接
 const Footer: React.FC = () => {

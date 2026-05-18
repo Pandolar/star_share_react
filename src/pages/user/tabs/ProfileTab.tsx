@@ -2,92 +2,48 @@
  * 个人主页Tab页面
  * 显示用户个人信息和账户设置
  */
-import React, { useState, useEffect, useRef } from 'react';
-import { Card, CardBody, Avatar, Chip, Spinner, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Tabs, Tab } from '@heroui/react';
+import React, { useEffect, useState } from 'react';
+import { Card, CardBody, Avatar, Chip, Spinner } from '@heroui/react';
 import { motion } from 'framer-motion';
-import { User, Mail, Calendar, Shield, AlertCircle, Package, Crown, Edit3, Send, Eye, EyeOff, MessageCircle } from 'lucide-react';
+import { User, Mail, Calendar, Shield, AlertCircle, Package, Crown, Edit3, MessageCircle } from 'lucide-react';
 import { userInfoApi } from '../../../services/userApi';
-import { getWechatQRCode, checkWechatLoginStatus, sendEmailCode as sendAuthEmailCode, resetPassword } from '../../../services/authApi';
-import { getCookie, setAuthCookies } from '../../../utils/cookies';
+import { EditProfileModal } from './profile/EditProfileModal';
+import { WechatBindModal } from './profile/WechatBindModal';
+import type { UserInfo, EditTabKey } from './profile/types';
 
-interface UserInfo {
-  username: string;
-  email: string;
-  user_active_packages: {
-    package_id: string;
-    package_name: string;
-    level: string;
-    priority: string;
-    expiry_date?: string | null;
-    status?: 'active' | 'frozen';
-    status_text?: string;
-    remaining_duration?: number | null;
-    remaining_text?: string;
-  };
-  status: number;
-  inviter_user: string;
-  created_at: string;
-  wechat_openid?: string;
-}
+const getStatusChip = (status: number) =>
+  status === 1
+    ? <Chip size="sm" color="success" variant="flat">活跃</Chip>
+    : <Chip size="sm" color="danger" variant="flat">停用</Chip>;
+
+const getPackageLevelStyle = (level?: string) => {
+  if (!level) return { icon: Package, color: 'default' as const, bgColor: 'bg-default/10' };
+  switch (level.toLowerCase()) {
+    case 'base':
+      return { icon: Package, color: 'default' as const, bgColor: 'bg-default/10' };
+    case 'plus':
+      return { icon: Shield, color: 'primary' as const, bgColor: 'bg-primary/10' };
+    case 'pro':
+    case 'premium':
+      return { icon: Crown, color: 'warning' as const, bgColor: 'bg-warning/10' };
+    default:
+      return { icon: Package, color: 'default' as const, bgColor: 'bg-default/10' };
+  }
+};
 
 export const ProfileTab: React.FC = () => {
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState('');
 
-  // 编辑弹窗状态
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'username' | 'email' | 'password'>('username');
-  const [editLoading, setEditLoading] = useState(false);
-  const [editError, setEditError] = useState<string>('');
+  const [editModal, setEditModal] = useState<{ open: boolean; tab: EditTabKey }>({ open: false, tab: 'username' });
+  const [wechatModalOpen, setWechatModalOpen] = useState(false);
 
-  // 表单状态
-  const [newUsername, setNewUsername] = useState('');
-  const [newEmail, setNewEmail] = useState('');
-  const [emailCode, setEmailCode] = useState('');
-  const [emailCodeSent, setEmailCodeSent] = useState(false);
-  const [emailCodeSending, setEmailCodeSending] = useState(false);
-  const [countdown, setCountdown] = useState(0);
-  const [showEmailCode, setShowEmailCode] = useState(false);
-  // 首次绑定邮箱时设置密码
-  const [bindPassword, setBindPassword] = useState('');
-  const [showBindPassword, setShowBindPassword] = useState(false);
-
-  // 修改密码Tab
-  const [oldPassword, setOldPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showOldPassword, setShowOldPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  // 密码重置验证码相关
-  const [pwdEmailCode, setPwdEmailCode] = useState('');
-  const [pwdCodeSent, setPwdCodeSent] = useState(false);
-  const [pwdCodeSending, setPwdCodeSending] = useState(false);
-  const [pwdCountdown, setPwdCountdown] = useState(0);
-  const [showPwdEmailCode, setShowPwdEmailCode] = useState(false);
-
-  // 微信绑定相关状态
-  const [wechatQrUrl, setWechatQrUrl] = useState('');
-  const [wechatTicket, setWechatTicket] = useState('');
-  const [wechatQrStatus, setWechatQrStatus] = useState<'loading' | 'active' | 'expired' | 'scanned' | 'registered'>('loading');
-  const [wechatBinding, setWechatBinding] = useState(false);
-  const [showWechatQr, setShowWechatQr] = useState(false);
-  const [showRegisteredConfirm, setShowRegisteredConfirm] = useState(false);
-  const [pendingWechatToken, setPendingWechatToken] = useState('');
-
-  // 轮询引用
-  const wechatPollingRef = useRef<NodeJS.Timeout | null>(null);
-  const wechatTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // 获取用户信息
   const fetchUserInfo = async () => {
     try {
       setLoading(true);
       setError('');
       const response = await userInfoApi.getUserInfo();
-
       if (response.code === 20000) {
         setUserInfo(response.data);
       } else {
@@ -102,461 +58,13 @@ export const ProfileTab: React.FC = () => {
 
   useEffect(() => {
     fetchUserInfo();
-
-    // 清理定时器
-    return () => {
-      if (wechatPollingRef.current) {
-        clearInterval(wechatPollingRef.current);
-      }
-      if (wechatTimeoutRef.current) {
-        clearTimeout(wechatTimeoutRef.current);
-      }
-    };
   }, []);
 
-  // 倒计时效果
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (countdown > 0) {
-      timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-    }
-    return () => clearTimeout(timer);
-  }, [countdown]);
-
-  // 密码验证码倒计时
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (pwdCountdown > 0) {
-      timer = setTimeout(() => setPwdCountdown(pwdCountdown - 1), 1000);
-    }
-    return () => clearTimeout(timer);
-  }, [pwdCountdown]);
-
-  // 打开编辑弹窗
-  const openEditModal = (type?: 'username' | 'email' | 'password') => {
-    if (type) {
-      setActiveTab(type);
-    }
-    setEditError('');
-    setEmailCodeSent(false);
-    setEmailCode('');
-    setCountdown(0);
-    setNewUsername(userInfo?.username || '');
-    setNewEmail(userInfo?.email || '');
-    setBindPassword('');
-    setOldPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-    // 重置密码验证码相关
-    setPwdEmailCode('');
-    setPwdCodeSent(false);
-    setPwdCodeSending(false);
-    setPwdCountdown(0);
-    setShowPwdEmailCode(false);
-    setIsEditModalOpen(true);
-  };
-
-  // 关闭编辑弹窗
-  const closeEditModal = () => {
-    setIsEditModalOpen(false);
-    setEditError('');
-    setNewUsername('');
-    setNewEmail('');
-    setEmailCode('');
-    setEmailCodeSent(false);
-    setCountdown(0);
-    setBindPassword('');
-    setOldPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-    setPwdEmailCode('');
-    setPwdCodeSent(false);
-    setPwdCodeSending(false);
-    setPwdCountdown(0);
-    setShowPwdEmailCode(false);
-  };
-
-  // 发送邮箱验证码
-  const sendEmailCode = async () => {
-    // 清空之前的错误
-    setEditError('');
-
-    // 验证邮箱是否为空
-    if (!newEmail.trim()) {
-      setEditError('请输入新邮箱地址');
-      return;
-    }
-
-    // 验证邮箱格式
-    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    if (!emailRegex.test(newEmail.trim())) {
-      setEditError('邮箱格式不正确，请检查后重新输入');
-      return;
-    }
-
-    setEmailCodeSending(true);
-
-    try {
-      const response = await userInfoApi.sendEmailCode(newEmail.trim());
-      if (response.code === 20000) {
-        setEmailCodeSent(true);
-        setCountdown(60);
-      } else {
-        setEditError(response.msg || '发送验证码失败，请稍后重试');
-      }
-    } catch (err) {
-      setEditError(err instanceof Error ? err.message : '发送验证码失败，请检查网络后重试');
-    } finally {
-      setEmailCodeSending(false);
-    }
-  };
-
-  // 发送重置密码的邮箱验证码（当前绑定邮箱）
-  const sendPwdResetCode = async () => {
-    if (!userInfo?.email || userInfo.email.endsWith('@default.com')) {
-      setEditError('请先绑定非默认邮箱再重置密码');
-      return;
-    }
-    setPwdCodeSending(true);
-    setEditError('');
-    try {
-      await sendAuthEmailCode(userInfo.email, 'back_password');
-      setPwdCodeSent(true);
-      setPwdCountdown(60);
-    } catch (err) {
-      setEditError(err instanceof Error ? err.message : '发送验证码失败');
-    } finally {
-      setPwdCodeSending(false);
-    }
-  };
-
-  // 获取微信二维码
-  const fetchWechatQR = async () => {
-    setWechatQrStatus('loading');
-
-    // 清除之前的定时器
-    if (wechatPollingRef.current) {
-      clearInterval(wechatPollingRef.current);
-      wechatPollingRef.current = null;
-    }
-    if (wechatTimeoutRef.current) {
-      clearTimeout(wechatTimeoutRef.current);
-      wechatTimeoutRef.current = null;
-    }
-
-    try {
-      const data = await getWechatQRCode('bind');
-      console.log('[微信绑定] 二维码生成成功:', data);
-      setWechatQrUrl(data.qr_code_url);
-      setWechatTicket(data.ticket);
-      setWechatQrStatus('active');
-      startWechatPolling(data.ticket);
-
-      // 设置2分钟后自动过期
-      wechatTimeoutRef.current = setTimeout(() => {
-        setWechatQrStatus('expired');
-        if (wechatPollingRef.current) {
-          clearInterval(wechatPollingRef.current);
-          wechatPollingRef.current = null;
-        }
-      }, 2 * 60 * 1000);
-    } catch (error) {
-      console.error('[微信绑定] 获取微信二维码失败:', error);
-      setWechatQrStatus('expired');
-      setEditError('获取微信二维码失败，请重试');
-    }
-  };
-
-  // 开始轮询检查微信二维码状态
-  const startWechatPolling = (ticket: string) => {
-    if (wechatPollingRef.current) {
-      clearInterval(wechatPollingRef.current);
-    }
-
-    wechatPollingRef.current = setInterval(async () => {
-      if (wechatBinding) return;
-
-      try {
-        console.log('[微信绑定] 开始检查二维码状态，ticket:', ticket);
-        const statusData = await checkWechatLoginStatus(ticket);
-        console.log('[微信绑定] 收到状态数据:', statusData);
-
-        if (statusData?.wechat_temp_token) {
-          console.log('[微信绑定] 检测到新用户绑定，wechat_temp_token:', statusData.wechat_temp_token);
-          setWechatQrStatus('scanned');
-
-          // 清除轮询
-          if (wechatPollingRef.current) {
-            clearInterval(wechatPollingRef.current);
-            wechatPollingRef.current = null;
-          }
-          if (wechatTimeoutRef.current) {
-            clearTimeout(wechatTimeoutRef.current);
-            wechatTimeoutRef.current = null;
-          }
-
-          // 绑定模式：若该微信已注册过，先弹二次确认
-          if (statusData.registered) {
-            console.log('[微信绑定] 该微信已注册，弹出确认框');
-            setPendingWechatToken(statusData.wechat_temp_token);
-            setShowRegisteredConfirm(true);
-          } else {
-            // 进行微信绑定
-            await handleWechatBind(statusData.wechat_temp_token);
-          }
-        } else if (statusData?.xtoken && statusData?.xuserid && !statusData?.wechat_temp_token) {
-          // 微信已注册，无法绑定
-          console.log('[微信绑定] 检测到已注册微信，xtoken:', statusData.xtoken, 'xuserid:', statusData.xuserid);
-          setWechatQrStatus('registered');
-          setEditError('该微信已注册，无法绑定');
-
-          // 清除轮询
-          if (wechatPollingRef.current) {
-            clearInterval(wechatPollingRef.current);
-            wechatPollingRef.current = null;
-          }
-          if (wechatTimeoutRef.current) {
-            clearTimeout(wechatTimeoutRef.current);
-            wechatTimeoutRef.current = null;
-          }
-        } else if (statusData === null) {
-          console.log('[微信绑定] 用户尚未扫码，继续轮询');
-        } else {
-          console.log('[微信绑定] 未知状态数据，继续轮询. statusData:', statusData);
-        }
-      } catch (error: any) {
-        console.log('[微信绑定] 检查状态时发生错误:', error);
-        if (error.message?.includes('二维码已过期')) {
-          console.log('[微信绑定] 二维码已过期');
-          setWechatQrStatus('expired');
-          if (wechatPollingRef.current) {
-            clearInterval(wechatPollingRef.current);
-            wechatPollingRef.current = null;
-          }
-        }
-      }
-    }, 2000);
-  };
-
-  // 处理微信绑定
-  const handleWechatBind = async (wechatTempToken: string) => {
-    setWechatBinding(true);
-    try {
-      // 获取当前用户信息
-      const xuserid = getCookie('xuserid');
-      const xtoken = getCookie('xtoken');
-
-      if (!xuserid || !xtoken) {
-        throw new Error('用户信息获取失败');
-      }
-
-      const response = await userInfoApi.wechatBind({
-        is_bind: true,
-        wechat_temp_token: wechatTempToken,
-        xuserid: parseInt(xuserid),
-        xtoken: xtoken
-      });
-      console.log('[微信绑定] 绑定接口响应:', response);
-      if (response.code === 20000) {
-        // 绑定成功，更新用户信息
-        await fetchUserInfo();
-        setShowWechatQr(false);
-        setEditError('');
-      } else {
-        setEditError(response.msg || '微信绑定失败');
-      }
-    } catch (err) {
-      console.error('[微信绑定] 绑定失败:', err);
-      setEditError(err instanceof Error ? err.message : '微信绑定失败');
-    } finally {
-      setWechatBinding(false);
-    }
-  };
-
-  // 开始微信绑定流程
-  const startWechatBind = () => {
-    setShowWechatQr(true);
-    setEditError('');
-    console.log('[微信绑定] 开始绑定流程，准备请求二维码');
-    fetchWechatQR();
-  };
-
-  // 提交修改
-  const handleSubmitEdit = async () => {
-    setEditLoading(true);
-    setEditError('');
-
-    try {
-      if (activeTab === 'username') {
-        // 修改用户名
-        if (!newUsername.trim()) {
-          setEditError('用户名不能为空');
-          return;
-        }
-
-        const response = await userInfoApi.changeUserInfo({
-          change_type: 'username',
-          username: newUsername.trim()
-        });
-
-        if (response.code === 20000) {
-          // 更新本地用户信息
-          if (userInfo) {
-            setUserInfo({ ...userInfo, username: newUsername.trim() });
-          }
-          closeEditModal();
-        } else {
-          setEditError(response.msg || '修改用户名失败');
-        }
-      } else if (activeTab === 'email') {
-        // 修改邮箱
-        if (!userInfo?.email.endsWith('@default.com')) {
-          setEditError('当前邮箱不是@default.com结尾，无法修改');
-          return;
-        }
-
-        if (!newEmail.trim()) {
-          setEditError('请输入新邮箱地址');
-          return;
-        }
-
-        // 验证邮箱格式
-        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-        if (!emailRegex.test(newEmail.trim())) {
-          setEditError('邮箱格式不正确，请检查后重新输入');
-          return;
-        }
-
-        if (!emailCode.trim()) {
-          setEditError('请输入邮箱验证码');
-          return;
-        }
-
-        // 验证验证码格式（只能是数字）
-        if (!/^\d+$/.test(emailCode.trim())) {
-          setEditError('验证码只能是数字，请重新输入');
-          return;
-        }
-
-        // 如果设置了密码，校验长度
-        if (bindPassword && bindPassword.trim().length > 0 && bindPassword.trim().length < 8) {
-          setEditError('密码长度至少为8位');
-          return;
-        }
-
-        const payload: any = {
-          change_type: 'email',
-          email: newEmail.trim(),
-          email_code: emailCode.trim()
-        };
-        if (bindPassword && bindPassword.trim()) {
-          payload.password = btoa(bindPassword.trim());
-        }
-        const response = await userInfoApi.changeUserInfo(payload);
-
-        if (response.code === 20000) {
-          // 更新本地用户信息
-          if (userInfo) {
-            setUserInfo({ ...userInfo, email: newEmail.trim() });
-          }
-          closeEditModal();
-        } else {
-          setEditError(response.msg || '修改邮箱失败，请重试');
-        }
-      } else if (activeTab === 'password') {
-        // 通过邮箱验证码重置密码
-        if (!userInfo?.email || userInfo.email.endsWith('@default.com')) {
-          setEditError('请先绑定非默认邮箱再重置密码');
-          return;
-        }
-
-        if (!pwdEmailCode.trim()) {
-          setEditError('请输入邮箱验证码');
-          return;
-        }
-
-        // 验证验证码格式（只能是数字）
-        if (!/^\d+$/.test(pwdEmailCode.trim())) {
-          setEditError('验证码只能是数字，请重新输入');
-          return;
-        }
-
-        if (!newPassword.trim()) {
-          setEditError('请输入新密码');
-          return;
-        }
-
-        if (newPassword.trim().length < 8) {
-          setEditError('密码长度至少为8位');
-          return;
-        }
-
-        if (!confirmPassword.trim()) {
-          setEditError('请再次输入密码进行确认');
-          return;
-        }
-
-        if (newPassword !== confirmPassword) {
-          setEditError('两次输入的密码不一致，请重新输入');
-          return;
-        }
-
-        try {
-          const ret: any = await resetPassword(userInfo.email, pwdEmailCode.trim(), newPassword.trim());
-          // resetPassword 在后端会生成新的xtoken，若返回则更新cookie
-          if (ret && ret.xtoken && ret.xuserid) {
-            setAuthCookies({ xuserid: String(ret.xuserid), xtoken: String(ret.xtoken) });
-          }
-          // 清空输入
-          setPwdEmailCode('');
-          setNewPassword('');
-          setConfirmPassword('');
-          setEditError('');
-          closeEditModal();
-        } catch (e) {
-          // 错误已被拦截器提示
-        }
-      }
-    } catch (err) {
-      setEditError(err instanceof Error ? err.message : '操作失败');
-    } finally {
-      setEditLoading(false);
-    }
-  };
-
-  // 获取状态样式
-  const getStatusChip = (status: number) => {
-    return status === 1 ? (
-      <Chip size="sm" color="success" variant="flat">活跃</Chip>
-    ) : (
-      <Chip size="sm" color="danger" variant="flat">停用</Chip>
-    );
-  };
-
-  // 获取套餐等级图标和颜色
-  const getPackageLevelStyle = (level?: string) => {
-    if (!level) {
-      return { icon: Package, color: 'default' as const, bgColor: 'bg-default/10' };
-    }
-    switch (level.toLowerCase()) {
-      case 'base':
-        return { icon: Package, color: 'default' as const, bgColor: 'bg-default/10' };
-      case 'plus':
-        return { icon: Shield, color: 'primary' as const, bgColor: 'bg-primary/10' };
-      case 'pro':
-      case 'premium':
-        return { icon: Crown, color: 'warning' as const, bgColor: 'bg-warning/10' };
-      default:
-        return { icon: Package, color: 'default' as const, bgColor: 'bg-default/10' };
-    }
-  };
+  const openEditModal = (tab: EditTabKey = 'username') => setEditModal({ open: true, tab });
+  const closeEditModal = () => setEditModal((s) => ({ ...s, open: false }));
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="space-y-6"
-    >
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       {/* 页面标题 */}
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
@@ -568,7 +76,6 @@ export const ProfileTab: React.FC = () => {
         </div>
       </div>
 
-      {/* 加载状态 */}
       {loading && (
         <Card>
           <CardBody className="p-6">
@@ -580,7 +87,6 @@ export const ProfileTab: React.FC = () => {
         </Card>
       )}
 
-      {/* 错误状态 */}
       {error && (
         <Card>
           <CardBody className="p-6">
@@ -600,7 +106,7 @@ export const ProfileTab: React.FC = () => {
                     fontSize: '14px',
                     fontWeight: '500',
                     cursor: 'pointer',
-                    marginTop: '12px'
+                    marginTop: '12px',
                   }}
                 >
                   重试
@@ -611,14 +117,12 @@ export const ProfileTab: React.FC = () => {
         </Card>
       )}
 
-      {/* 用户信息展示 */}
       {userInfo && (
         <>
           {/* 用户基本信息卡片 */}
           <Card className="overflow-visible">
             <CardBody className="p-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-                {/* 用户头像 */}
                 <div className="relative flex flex-col items-center gap-3">
                   <Avatar
                     size="lg"
@@ -641,7 +145,7 @@ export const ProfileTab: React.FC = () => {
                       alignItems: 'center',
                       gap: '4px',
                       cursor: 'pointer',
-                      minHeight: '24px'
+                      minHeight: '24px',
                     }}
                   >
                     <Edit3 size={12} />
@@ -662,7 +166,7 @@ export const ProfileTab: React.FC = () => {
                       gap: '4px',
                       cursor: 'pointer',
                       minHeight: '24px',
-                      marginTop: '6px'
+                      marginTop: '6px',
                     }}
                   >
                     <Shield size={12} />
@@ -670,13 +174,10 @@ export const ProfileTab: React.FC = () => {
                   </button>
                 </div>
 
-                {/* 用户基本信息 */}
                 <div className="flex-1 space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                     <h2 className="text-xl font-bold text-default-900">{userInfo.username}</h2>
-                    <div className="flex items-center gap-2">
-                      {getStatusChip(userInfo.status)}
-                    </div>
+                    <div className="flex items-center gap-2">{getStatusChip(userInfo.status)}</div>
                   </div>
 
                   <div className="space-y-2 text-sm">
@@ -702,7 +203,7 @@ export const ProfileTab: React.FC = () => {
                           <>
                             <span className="text-warning">未绑定微信</span>
                             <button
-                              onClick={startWechatBind}
+                              onClick={() => setWechatModalOpen(true)}
                               style={{
                                 backgroundColor: '#09C46A',
                                 color: '#ffffff',
@@ -712,7 +213,7 @@ export const ProfileTab: React.FC = () => {
                                 fontSize: '10px',
                                 fontWeight: '500',
                                 cursor: 'pointer',
-                                marginLeft: '8px'
+                                marginLeft: '8px',
                               }}
                             >
                               绑定
@@ -735,7 +236,7 @@ export const ProfileTab: React.FC = () => {
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center ${getPackageLevelStyle(userInfo.user_active_packages.level).bgColor}`}>
                     {React.createElement(getPackageLevelStyle(userInfo.user_active_packages.level).icon, {
                       size: 24,
-                      className: `text-${getPackageLevelStyle(userInfo.user_active_packages.level).color}`
+                      className: `text-${getPackageLevelStyle(userInfo.user_active_packages.level).color}`,
                     })}
                   </div>
                   <div className="flex-1">
@@ -749,9 +250,7 @@ export const ProfileTab: React.FC = () => {
                         {userInfo.user_active_packages.status_text || userInfo.user_active_packages.level}
                       </Chip>
                     </div>
-                    <p className="text-default-600 mb-4">
-                      {userInfo.user_active_packages.package_name}
-                    </p>
+                    <p className="text-default-600 mb-4">{userInfo.user_active_packages.package_name}</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                       <div className="flex items-center gap-2 text-default-600">
                         <Calendar size={16} />
@@ -761,10 +260,6 @@ export const ProfileTab: React.FC = () => {
                             : `到期时间：${userInfo.user_active_packages.expiry_date || '-'}`}
                         </span>
                       </div>
-                      {/* <div className="flex items-center gap-2 text-default-600">
-                        <Shield size={16} />
-                        <span>优先级：{userInfo.user_active_packages.priority}</span>
-                      </div> */}
                     </div>
                   </div>
                 </div>
@@ -778,33 +273,29 @@ export const ProfileTab: React.FC = () => {
               <CardBody className="p-4 text-center">
                 <div className="text-2xl font-bold text-primary mb-1">
                   {userInfo.user_active_packages &&
-                    Object.keys(userInfo.user_active_packages).length > 0 &&
-                    userInfo.user_active_packages.package_id ? '1' : '0'}
+                  Object.keys(userInfo.user_active_packages).length > 0 &&
+                  userInfo.user_active_packages.package_id
+                    ? '1'
+                    : '0'}
                 </div>
                 <div className="text-sm text-default-500">当前套餐</div>
               </CardBody>
             </Card>
             <Card>
               <CardBody className="p-4 text-center">
-                <div className="text-2xl font-bold text-success mb-1">
-                  {userInfo.status === 1 ? '正常' : '停用'}
-                </div>
+                <div className="text-2xl font-bold text-success mb-1">{userInfo.status === 1 ? '正常' : '停用'}</div>
                 <div className="text-sm text-default-500">账户状态</div>
               </CardBody>
             </Card>
             <Card>
               <CardBody className="p-4 text-center">
-                <div className="text-2xl font-bold text-warning mb-1">
-                  {userInfo.user_active_packages?.level || 'Free'}
-                </div>
+                <div className="text-2xl font-bold text-warning mb-1">{userInfo.user_active_packages?.level || 'Free'}</div>
                 <div className="text-sm text-default-500">会员等级</div>
               </CardBody>
             </Card>
             <Card>
               <CardBody className="p-4 text-center">
-                <div className="text-2xl font-bold text-default-900 mb-1">
-                  {new Date(userInfo.created_at).getFullYear()}
-                </div>
+                <div className="text-2xl font-bold text-default-900 mb-1">{new Date(userInfo.created_at).getFullYear()}</div>
                 <div className="text-sm text-default-500">注册年份</div>
               </CardBody>
             </Card>
@@ -812,635 +303,19 @@ export const ProfileTab: React.FC = () => {
         </>
       )}
 
-      {/* 编辑资料弹窗 */}
-      <Modal
-        isOpen={isEditModalOpen}
+      <EditProfileModal
+        isOpen={editModal.open}
+        initialTab={editModal.tab}
+        userInfo={userInfo}
         onClose={closeEditModal}
-        placement="center"
-        size="lg"
-      >
-        <ModalContent>
-          <ModalHeader className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <Edit3 size={20} className="text-primary" />
-              <span>修改资料</span>
-            </div>
-          </ModalHeader>
-          <ModalBody>
-            <Tabs
-              selectedKey={activeTab}
-              onSelectionChange={(key) => {
-                setActiveTab(key as 'username' | 'email' | 'password');
-                setEditError('');
-                setEmailCodeSent(false);
-                setEmailCode('');
-                setCountdown(0);
-              }}
-              className="w-full"
-            >
-              <Tab
-                key="username"
-                title={
-                  <div className="flex items-center space-x-2">
-                    <User size={16} />
-                    <span>用户名</span>
-                  </div>
-                }
-              >
-                <div className="space-y-4 mt-4">
-                  <div>
-                    <label className="block text-sm font-medium text-default-700 mb-2">
-                      当前用户名
-                    </label>
-                    <Input
-                      value={userInfo?.username || ''}
-                      isReadOnly
-                      variant="flat"
-                      className="bg-default-100"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-default-700 mb-2">
-                      新用户名 <span className="text-danger">*</span>
-                    </label>
-                    <Input
-                      value={newUsername}
-                      onChange={(e) => setNewUsername(e.target.value)}
-                      placeholder="请输入新用户名"
-                      variant="bordered"
-                      isInvalid={!!editError && !newUsername.trim()}
-                    />
-                  </div>
-                </div>
-              </Tab>
+        onUserInfoChange={(next) => setUserInfo((prev) => (prev ? { ...prev, ...next } : prev))}
+      />
 
-              <Tab
-                key="email"
-                title={
-                  <div className="flex items-center space-x-2">
-                    <Mail size={16} />
-                    <span>邮箱</span>
-                  </div>
-                }
-              >
-                <div className="space-y-4 mt-4">
-                  <div>
-                    <label className="block text-sm font-medium text-default-700 mb-2">
-                      当前邮箱
-                    </label>
-                    <Input
-                      value={userInfo?.email || ''}
-                      isReadOnly
-                      variant="flat"
-                      className="bg-default-100"
-                    />
-                    {userInfo?.email && !userInfo.email.endsWith('@default.com') && (
-                      <p className="text-xs text-warning mt-1">
-                        非微信新用户，无法修改邮箱
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-default-700 mb-2">
-                      新邮箱地址 <span className="text-danger">*</span>
-                    </label>
-                    <div className="flex gap-2">
-                      <Input
-                        value={newEmail}
-                        onChange={(e) => setNewEmail(e.target.value)}
-                        placeholder="请输入新邮箱地址"
-                        variant="bordered"
-                        isInvalid={!!editError && !newEmail.trim()}
-                        className="flex-1"
-                        type="email"
-                      />
-                      <button
-                        onClick={sendEmailCode}
-                        disabled={emailCodeSending || countdown > 0 || !newEmail.trim() || Boolean(userInfo?.email && !userInfo.email.endsWith('@default.com'))}
-                        style={{
-                          backgroundColor: emailCodeSending || countdown > 0 || !newEmail.trim() || Boolean(userInfo?.email && !userInfo.email.endsWith('@default.com')) ? '#d1d5db' : '#006FEE',
-                          color: '#ffffff',
-                          border: '1px solid #006FEE',
-                          borderRadius: '6px',
-                          padding: '8px 12px',
-                          fontSize: '12px',
-                          fontWeight: '500',
-                          cursor: emailCodeSending || countdown > 0 || !newEmail.trim() || Boolean(userInfo?.email && !userInfo.email.endsWith('@default.com')) ? 'not-allowed' : 'pointer',
-                          minWidth: '100px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        {emailCodeSending ? (
-                          <Spinner size="sm" color="white" />
-                        ) : (
-                          <>
-                            {!countdown && <Send size={14} />}
-                            {countdown > 0 ? `${countdown}s` : '发送验证码'}
-                          </>
-                        )}
-                      </button>
-                    </div>
-                    {emailCodeSent && (
-                      <p className="text-xs text-success mt-1">
-                        ✓ 验证码已发送至您的邮箱，请查收
-                      </p>
-                    )}
-                    <p className="text-xs text-default-400 mt-1">
-                      验证码为纯数字。未收到验证码？请检查垃圾箱或确认邮箱地址是否正确
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-default-700 mb-2">
-                      邮箱验证码 <span className="text-danger">*</span>
-                    </label>
-                    <Input
-                      value={emailCode}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // 只允许输入数字
-                        if (value === '' || /^\d+$/.test(value)) {
-                          setEmailCode(value);
-                        }
-                      }}
-                      placeholder="请输入数字验证码"
-                      variant="bordered"
-                      type={showEmailCode ? "text" : "password"}
-                      isInvalid={!!editError && !emailCode.trim()}
-                      endContent={
-                        <button
-                          className="focus:outline-none"
-                          type="button"
-                          onClick={() => setShowEmailCode(!showEmailCode)}
-                        >
-                          {showEmailCode ? (
-                            <EyeOff size={16} className="text-default-400" />
-                          ) : (
-                            <Eye size={16} className="text-default-400" />
-                          )}
-                        </button>
-                      }
-                    />
-                  </div>
-
-                  {/* 首次绑定邮箱时，同步设置密码 */}
-                  {userInfo?.email && userInfo.email.endsWith('@default.com') && (
-                    <div>
-                      <label className="block text-sm font-medium text-default-700 mb-2">
-                        设置登录密码（可选，至少8位）
-                      </label>
-                      <Input
-                        value={bindPassword}
-                        onChange={(e) => setBindPassword(e.target.value)}
-                        placeholder="请输入新密码"
-                        variant="bordered"
-                        type={showBindPassword ? 'text' : 'password'}
-                        endContent={
-                          <button className="focus:outline-none" type="button" onClick={() => setShowBindPassword(!showBindPassword)}>
-                            {showBindPassword ? (
-                              <EyeOff size={16} className="text-default-400" />
-                            ) : (
-                              <Eye size={16} className="text-default-400" />
-                            )}
-                          </button>
-                        }
-                      />
-                      <p className="text-xs text-default-400 mt-1">建议同时设置密码，便于邮箱+密码登录</p>
-                    </div>
-                  )}
-                </div>
-              </Tab>
-
-              <Tab
-                key="password"
-                title={
-                  <div className="flex items-center space-x-2">
-                    <Shield size={16} />
-                    <span>密码</span>
-                  </div>
-                }
-              >
-                <div className="space-y-4 mt-4">
-                  <div>
-                    <label className="block text-sm font-medium text-default-700 mb-2">当前邮箱</label>
-                    <Input value={userInfo?.email || ''} isReadOnly variant="flat" className="bg-default-100" />
-                    {userInfo?.email && userInfo.email.endsWith('@default.com') && (
-                      <p className="text-xs text-warning mt-1">请先在“邮箱”页绑定真实邮箱后再重置密码</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-default-700 mb-2">邮箱验证码 <span className="text-danger">*</span></label>
-                    <div className="flex gap-2">
-                      <Input
-                        value={pwdEmailCode}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          // 只允许输入数字
-                          if (value === '' || /^\d+$/.test(value)) {
-                            setPwdEmailCode(value);
-                          }
-                        }}
-                        placeholder="请输入数字验证码"
-                        variant="bordered"
-                        type={showPwdEmailCode ? 'text' : 'password'}
-                        isInvalid={!!editError && !pwdEmailCode.trim()}
-                        className="flex-1"
-                        endContent={
-                          <button className="focus:outline-none" type="button" onClick={() => setShowPwdEmailCode(!showPwdEmailCode)}>
-                            {showPwdEmailCode ? (
-                              <EyeOff size={16} className="text-default-400" />
-                            ) : (
-                              <Eye size={16} className="text-default-400" />
-                            )}
-                          </button>
-                        }
-                      />
-                      <button
-                        onClick={sendPwdResetCode}
-                        disabled={pwdCodeSending || pwdCountdown > 0 || !userInfo?.email || userInfo.email.endsWith('@default.com')}
-                        style={{
-                          backgroundColor: pwdCodeSending || pwdCountdown > 0 || !userInfo?.email || userInfo.email.endsWith('@default.com') ? '#d1d5db' : '#006FEE',
-                          color: '#ffffff',
-                          border: '1px solid #006FEE',
-                          borderRadius: '6px',
-                          padding: '8px 12px',
-                          fontSize: '12px',
-                          fontWeight: '500',
-                          cursor: pwdCodeSending || pwdCountdown > 0 || !userInfo?.email || userInfo.email.endsWith('@default.com') ? 'not-allowed' : 'pointer',
-                          minWidth: '100px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        {pwdCodeSending ? (
-                          <Spinner size="sm" color="white" />
-                        ) : (
-                          <>
-                            {!pwdCountdown && <Send size={14} />}
-                            {pwdCountdown > 0 ? `${pwdCountdown}s` : '发送验证码'}
-                          </>
-                        )}
-                      </button>
-                    </div>
-                    {pwdCodeSent && (
-                      <p className="text-xs text-success mt-1">
-                        ✓ 验证码已发送至您的邮箱，请查收
-                      </p>
-                    )}
-                    <p className="text-xs text-default-400 mt-1">
-                      验证码为纯数字。未收到验证码？请检查垃圾箱或确认邮箱地址是否正确
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-default-700 mb-2">新密码 <span className="text-danger">*</span></label>
-                    <Input
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="请输入新密码，至少8位"
-                      variant="bordered"
-                      type={showNewPassword ? 'text' : 'password'}
-                      endContent={
-                        <button className="focus:outline-none" type="button" onClick={() => setShowNewPassword(!showNewPassword)}>
-                          {showNewPassword ? (
-                            <EyeOff size={16} className="text-default-400" />
-                          ) : (
-                            <Eye size={16} className="text-default-400" />
-                          )}
-                        </button>
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-default-700 mb-2">确认新密码 <span className="text-danger">*</span></label>
-                    <Input
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="请再次输入新密码"
-                      variant="bordered"
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      endContent={
-                        <button className="focus:outline-none" type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
-                          {showConfirmPassword ? (
-                            <EyeOff size={16} className="text-default-400" />
-                          ) : (
-                            <Eye size={16} className="text-default-400" />
-                          )}
-                        </button>
-                      }
-                    />
-                  </div>
-                  <p className="text-xs text-default-400">密码重置将通过邮箱验证码完成，发送至当前绑定邮箱</p>
-                </div>
-              </Tab>
-            </Tabs>
-
-            {/* 错误提示 */}
-            {editError && (
-              <div className="p-3 bg-danger/10 border border-danger/20 rounded-lg mt-4">
-                <div className="flex items-start gap-2">
-                  <AlertCircle size={16} className="text-danger flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-danger">{editError}</p>
-                </div>
-              </div>
-            )}
-          </ModalBody>
-          <ModalFooter>
-            <button
-              onClick={closeEditModal}
-              disabled={editLoading}
-              style={{
-                backgroundColor: '#ffffff',
-                color: '#404040',
-                border: '1px solid #d4d4d8',
-                borderRadius: '6px',
-                padding: '8px 16px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: editLoading ? 'not-allowed' : 'pointer'
-              }}
-            >
-              取消
-            </button>
-            <button
-              onClick={handleSubmitEdit}
-              disabled={editLoading || (
-                activeTab === 'username'
-                  ? !newUsername.trim()
-                  : activeTab === 'email'
-                    ? (!newEmail.trim() || !emailCode.trim() || Boolean(userInfo?.email && !userInfo.email.endsWith('@default.com')) || (bindPassword.trim().length > 0 && bindPassword.trim().length < 8))
-                    : (
-                      !userInfo?.email || userInfo.email.endsWith('@default.com') || !pwdEmailCode.trim() || !newPassword.trim() || !confirmPassword.trim() || newPassword !== confirmPassword || newPassword.length < 8
-                    )
-              )}
-              style={{
-                backgroundColor: editLoading || (
-                  activeTab === 'username'
-                    ? !newUsername.trim()
-                    : activeTab === 'email'
-                      ? (!newEmail.trim() || !emailCode.trim() || Boolean(userInfo?.email && !userInfo.email.endsWith('@default.com')) || (bindPassword.trim().length > 0 && bindPassword.trim().length < 8))
-                      : (!userInfo?.email || userInfo.email.endsWith('@default.com') || !pwdEmailCode.trim() || !newPassword.trim() || !confirmPassword.trim() || newPassword !== confirmPassword || newPassword.length < 8)
-                ) ? '#d1d5db' : '#006FEE',
-                color: '#ffffff',
-                border: '1px solid #006FEE',
-                borderRadius: '6px',
-                padding: '8px 16px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: editLoading || (
-                  activeTab === 'username'
-                    ? !newUsername.trim()
-                    : activeTab === 'email'
-                      ? (!newEmail.trim() || !emailCode.trim() || Boolean(userInfo?.email && !userInfo.email.endsWith('@default.com')) || (bindPassword.trim().length > 0 && bindPassword.trim().length < 8))
-                      : (!userInfo?.email || userInfo.email.endsWith('@default.com') || !pwdEmailCode.trim() || !newPassword.trim() || !confirmPassword.trim() || newPassword !== confirmPassword || newPassword.length < 8)
-                ) ? 'not-allowed' : 'pointer'
-              }}
-            >
-              {editLoading ? '保存中...' : '保存修改'}
-            </button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-
-      {/* 微信绑定二维码弹窗 */}
-      <Modal
-        isOpen={showWechatQr}
-        onClose={() => {
-          setShowWechatQr(false);
-          if (wechatPollingRef.current) {
-            clearInterval(wechatPollingRef.current);
-            wechatPollingRef.current = null;
-          }
-          if (wechatTimeoutRef.current) {
-            clearTimeout(wechatTimeoutRef.current);
-            wechatTimeoutRef.current = null;
-          }
-        }}
-        placement="center"
-        size="md"
-      >
-        <ModalContent>
-          <ModalHeader className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <MessageCircle size={20} className="text-success" />
-              <span>微信绑定</span>
-            </div>
-          </ModalHeader>
-          <ModalBody className="text-center">
-            <div className="space-y-4">
-              <p className="text-sm text-default-600">
-                使用微信扫描下方二维码完成绑定
-              </p>
-              {editError && (
-                <div className="p-2 bg-danger/10 border border-danger/20 rounded text-left">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle size={14} className="text-danger flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-danger">{editError}</p>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex justify-center">
-                {wechatQrStatus === 'loading' ? (
-                  <div className="w-48 h-48 flex items-center justify-center bg-default-50 border-2 border-dashed border-default-300 rounded-lg">
-                    <div className="text-center">
-                      <Spinner size="lg" />
-                      <p className="text-sm text-default-500 mt-2">生成二维码中...</p>
-                    </div>
-                  </div>
-                ) : wechatQrStatus === 'active' ? (
-                  <div className="relative">
-                    <img
-                      src={wechatQrUrl}
-                      alt="微信绑定二维码"
-                      className="w-48 h-48 border rounded-lg"
-                    />
-                    {wechatBinding && (
-                      <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-lg">
-                        <div className="text-center text-white">
-                          <Spinner size="lg" color="white" />
-                          <p className="text-sm mt-2">绑定中...</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : wechatQrStatus === 'scanned' ? (
-                  <div className="w-48 h-48 flex items-center justify-center bg-green-50 border-2 border-green-300 rounded-lg">
-                    <div className="text-center">
-                      <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-2">
-                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                        </svg>
-                      </div>
-                      <p className="text-sm text-green-600">扫码成功</p>
-                      <p className="text-xs text-green-500">{showRegisteredConfirm ? '等待确认...' : '正在绑定中...'}</p>
-                    </div>
-                  </div>
-                ) : wechatQrStatus === 'registered' ? (
-                  <div className="w-48 h-48 flex items-center justify-center bg-warning-50 border-2 border-warning-300 rounded-lg">
-                    <div className="text-center">
-                      <div className="w-12 h-12 bg-warning-500 rounded-full flex items-center justify-center mx-auto mb-2">
-                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.232 15.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                        </svg>
-                      </div>
-                      <p className="text-sm text-warning-600 mb-2">该微信已注册</p>
-                      <p className="text-xs text-warning-500 mb-3">此微信号已绑定其他账户，无法重复绑定</p>
-                      <button
-                        onClick={fetchWechatQR}
-                        style={{
-                          backgroundColor: '#006FEE',
-                          color: '#ffffff',
-                          border: '1px solid #006FEE',
-                          borderRadius: '6px',
-                          padding: '6px 12px',
-                          fontSize: '12px',
-                          fontWeight: '500',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        重新获取二维码
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="w-48 h-48 flex items-center justify-center bg-default-50 border-2 border-dashed border-default-300 rounded-lg">
-                    <div className="text-center">
-                      <div className="w-12 h-12 bg-default-400 rounded-full flex items-center justify-center mx-auto mb-2">
-                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                        </svg>
-                      </div>
-                      <p className="text-sm text-default-500 mb-2">二维码已过期</p>
-                      <button
-                        onClick={fetchWechatQR}
-                        style={{
-                          backgroundColor: '#006FEE',
-                          color: '#ffffff',
-                          border: '1px solid #006FEE',
-                          borderRadius: '6px',
-                          padding: '6px 12px',
-                          fontSize: '12px',
-                          fontWeight: '500',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        刷新二维码
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="text-center space-y-2">
-                <p className="text-xs text-default-400">
-                  使用手机微信扫描二维码
-                </p>
-                <p className="text-xs text-default-400">
-                  注意：如果被绑定的微信号之前注册过本平台，绑定后，之前微信注册的账号将无法登录！
-                </p>
-              </div>
-            </div>
-          </ModalBody>
-          <ModalFooter>
-            <button
-              onClick={() => {
-                setShowWechatQr(false);
-                if (wechatPollingRef.current) {
-                  clearInterval(wechatPollingRef.current);
-                  wechatPollingRef.current = null;
-                }
-                if (wechatTimeoutRef.current) {
-                  clearTimeout(wechatTimeoutRef.current);
-                  wechatTimeoutRef.current = null;
-                }
-              }}
-              style={{
-                backgroundColor: '#ffffff',
-                color: '#404040',
-                border: '1px solid #d4d4d8',
-                borderRadius: '6px',
-                padding: '8px 16px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer'
-              }}
-            >
-              取消
-            </button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-
-      {/* 已注册微信二次确认弹窗 */}
-      <Modal
-        isOpen={showRegisteredConfirm}
-        onClose={() => setShowRegisteredConfirm(false)}
-        placement="center"
-        size="md"
-      >
-        <ModalContent>
-          <ModalHeader className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <AlertCircle size={20} className="text-warning" />
-              <span>确认绑定已注册微信</span>
-            </div>
-          </ModalHeader>
-          <ModalBody>
-            <div className="space-y-2 text-sm text-default-700">
-              <p>检测到该微信号已在本平台注册并绑定过其他账户。</p>
-              <p className="text-warning-600">继续绑定后：</p>
-              <ul className="list-disc pl-5 space-y-1">
-                <li>该微信将与当前登录的邮箱账户绑定。</li>
-                <li>之前绑定该微信的账户将无法再使用微信登录。</li>
-              </ul>
-              <p>请确认是否继续操作。</p>
-            </div>
-          </ModalBody>
-          <ModalFooter>
-            <button
-              onClick={() => setShowRegisteredConfirm(false)}
-              style={{
-                backgroundColor: '#ffffff',
-                color: '#404040',
-                border: '1px solid #d4d4d8',
-                borderRadius: '6px',
-                padding: '8px 16px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer'
-              }}
-            >
-              取消
-            </button>
-            <button
-              onClick={async () => {
-                const token = pendingWechatToken;
-                setShowRegisteredConfirm(false);
-                if (token) {
-                  await handleWechatBind(token);
-                }
-              }}
-              style={{
-                backgroundColor: '#b45309',
-                color: '#ffffff',
-                border: '1px solid #b45309',
-                borderRadius: '6px',
-                padding: '8px 16px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer'
-              }}
-            >
-              继续绑定
-            </button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+      <WechatBindModal
+        isOpen={wechatModalOpen}
+        onClose={() => setWechatModalOpen(false)}
+        onBindSuccess={fetchUserInfo}
+      />
     </motion.div>
   );
 };
