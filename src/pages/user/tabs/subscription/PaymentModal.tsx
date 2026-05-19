@@ -12,9 +12,8 @@ import {
   Spinner,
 } from '@heroui/react';
 import { motion } from 'framer-motion';
-import { CheckCircle, AlertCircle, QrCode } from 'lucide-react';
+import { CheckCircle, AlertCircle, QrCode, ExternalLink } from 'lucide-react';
 import { orderUserApi } from '../../../../services/userApi';
-import { useIsMobile } from '../../../../hooks/useIsMobile';
 import { generateQRCodeDataUrl } from './qrCode';
 import { getDurationText, PackageInfo, OrderInfo } from './types';
 
@@ -33,11 +32,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   orderInfo,
   onClose,
 }) => {
-  const isMobileDevice = useIsMobile();
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('pending');
   const [qrCodeExpired, setQrCodeExpired] = useState(false);
   const [manualCheckLoading, setManualCheckLoading] = useState(false);
-  const [showInlineQRCode, setShowInlineQRCode] = useState(false);
 
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const qrTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -58,15 +55,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     }
   };
 
-  // 弹窗打开 + 有订单时，启动状态检查 + 二维码 5 分钟过期计时
   useEffect(() => {
     if (!isOpen || !orderInfo?.order_id) return;
 
     setPaymentStatus('pending');
     setQrCodeExpired(false);
-    setShowInlineQRCode(false);
 
-    // 5 分钟二维码过期
     qrTimerRef.current = setTimeout(() => {
       setQrCodeExpired(true);
       if (checkIntervalRef.current) {
@@ -75,30 +69,17 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       }
     }, 5 * 60 * 1000);
 
-    // 轮询支付状态
     checkIntervalRef.current = setInterval(async () => {
       try {
         const response = await orderUserApi.getPayStatus(orderInfo.order_id);
         const data = response.data as { success?: boolean } | undefined;
         if (data && data.success === true) {
           setPaymentStatus('success');
-          if (checkIntervalRef.current) {
-            clearInterval(checkIntervalRef.current);
-            checkIntervalRef.current = null;
-          }
-          if (qrTimerRef.current) clearTimeout(qrTimerRef.current);
+          cleanup();
           setTimeout(() => window.location.reload(), 2000);
-        } else if (data && data.success === false) {
-          // 继续轮询
-        } else {
-          setPaymentStatus('failed');
-          if (checkIntervalRef.current) {
-            clearInterval(checkIntervalRef.current);
-            checkIntervalRef.current = null;
-          }
         }
       } catch {
-        // 忽略，继续下次轮询
+        // 网络异常时继续轮询
       }
     }, 1500);
 
@@ -110,6 +91,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     if (!orderInfo?.order_id) return;
     try {
       setManualCheckLoading(true);
+      setPaymentStatus('checking');
       const response = await orderUserApi.forceGetPayStatus(orderInfo.order_id);
       const data = response.data as { success?: boolean } | undefined;
       if (data && data.success === true) {
@@ -117,10 +99,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         cleanup();
         setTimeout(() => window.location.reload(), 2000);
       } else {
-        alert('请确认是否已支付，若确认支付但仍无反应，请联系客服，我们会加急处理您的问题');
+        setPaymentStatus('pending');
+        alert('未检测到支付成功，请确认是否已完成付款。若已支付但仍无反应，请联系客服处理。');
       }
     } catch {
-      alert('请确认是否已支付，若确认支付但仍无反应，请联系客服，我们会加急处理您的问题');
+      setPaymentStatus('pending');
+      alert('查询失败，请稍后重试或联系客服。');
     } finally {
       setManualCheckLoading(false);
     }
@@ -130,15 +114,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     cleanup();
     setPaymentStatus('pending');
     setQrCodeExpired(false);
-    setShowInlineQRCode(false);
     setManualCheckLoading(false);
     onClose();
   };
 
-  const handleOpenPaymentWindow = () => {
-    if (!orderInfo?.payment_url) return;
-    window.open(orderInfo.payment_url, '_blank');
-  };
+  const qrCodeValue = getQRCodeValue(orderInfo);
 
   return (
     <Modal
@@ -190,116 +170,75 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </CardBody>
               </Card>
 
-              {/* 支付状态 */}
+              {/* 支付区域 */}
               <div className="text-center">
-                {paymentStatus === 'pending' && (
-                  <div className="space-y-3">
-                    {isMobileDevice ? (
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-center gap-2">
-                          <QrCode className="w-5 h-5 text-primary" />
-                          <span className="text-base font-medium">
-                            可直接在本页扫码支付，也可新窗口打开支付页
-                          </span>
-                        </div>
-                        <div className="text-sm text-default-500 space-y-2">
-                          <p>若当前设备无法弹出新窗口，请直接在本页显示二维码支付。</p>
-                        </div>
+                {paymentStatus === 'pending' && !qrCodeExpired && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-center gap-2">
+                      <QrCode className="w-5 h-5 text-primary" />
+                      <span className="text-base font-medium">
+                        {orderInfo.pay_type === 'wxpay' ? '请使用微信扫码支付' : '请扫码支付'}
+                      </span>
+                    </div>
+                    <p className="text-sm text-default-500">二维码 5 分钟内有效，请尽快完成支付</p>
 
-                        <div className="flex flex-wrap gap-3 justify-center">
-                          {getQRCodeValue(orderInfo) && (
-                            <Button
-                              color="secondary"
-                              variant={showInlineQRCode ? 'solid' : 'flat'}
-                              onPress={() => setShowInlineQRCode((s) => !s)}
-                              className="min-w-40"
-                            >
-                              {showInlineQRCode ? '二维码已显示，请直接扫码付款' : '直接显示二维码'}
-                            </Button>
-                          )}
-                          {orderInfo?.payment_url && (
-                            <Button color="primary" variant="flat" onPress={handleOpenPaymentWindow} className="min-w-32">
-                              新窗口支付
-                            </Button>
-                          )}
-                          <Button
-                            color="success"
-                            variant="flat"
-                            onPress={() => {
-                              setPaymentStatus('success');
-                              setTimeout(() => window.location.reload(), 1000);
-                            }}
-                            className="min-w-20"
-                          >
-                            已支付
-                          </Button>
-                          <Button color="default" variant="light" onPress={handleClose} className="min-w-20">
-                            未支付
-                          </Button>
-                        </div>
-
-                        {showInlineQRCode && getQRCodeValue(orderInfo) && (
-                          <div className="rounded-2xl border border-primary/15 bg-default-50 px-4 py-5">
-                            <div className="flex justify-center">
-                              <Card className="p-4 relative shadow-sm">
-                                <motion.img
-                                  src={generateQRCodeDataUrl(getQRCodeValue(orderInfo))}
-                                  alt="支付二维码"
-                                  className={`w-40 h-40 sm:w-48 sm:h-48 transition-all duration-500 ${qrCodeExpired ? 'opacity-30 grayscale' : ''}`}
-                                  initial={{ opacity: 0, scale: 0.8 }}
-                                  animate={{ opacity: 1, scale: 1 }}
-                                  transition={{ delay: 0.2 }}
-                                />
-                                {qrCodeExpired && (
-                                  <motion.div
-                                    className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 rounded-lg"
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    transition={{ duration: 0.3 }}
-                                  >
-                                    <Chip color="danger" variant="solid" className="shadow-lg">
-                                      已过期
-                                    </Chip>
-                                  </motion.div>
-                                )}
-                              </Card>
-                            </div>
-                            <p className="mt-3 text-xs leading-6 text-default-500 text-center">
-                              当前设备若无法直接拉起支付页面，可截图保存该二维码后，在微信或支付宝内识别扫码支付。
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-center gap-2">
-                          <QrCode className="w-5 h-5 text-primary" />
-                          <span className="text-base font-medium">
-                            {orderInfo.pay_type === 'wxpay' ? '请使用微信扫码支付' : '请扫码支付'}
-                          </span>
-                        </div>
-                        <div className="text-sm text-default-500">
-                          <p className="mb-1">二维码5分钟内有效</p>
-                          {qrCodeExpired && (
-                            <p className="text-danger font-medium">二维码已过期，请重新创建订单</p>
-                          )}
-                        </div>
-
-                        <div className="mt-3">
-                          <Button
-                            size="sm"
-                            variant="light"
-                            color="primary"
-                            onPress={handleManualCheck}
-                            isLoading={manualCheckLoading}
-                            isDisabled={qrCodeExpired}
-                            className="text-xs h-8"
-                          >
-                            付款后没有反应？请点这里
-                          </Button>
-                        </div>
+                    {/* 二维码 */}
+                    {qrCodeValue && (
+                      <div className="flex justify-center">
+                        <Card className="p-4 sm:p-6 relative shadow-sm">
+                          <motion.img
+                            src={generateQRCodeDataUrl(qrCodeValue)}
+                            alt="支付二维码"
+                            className="w-44 h-44 sm:w-52 sm:h-52"
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: 0.2 }}
+                          />
+                        </Card>
                       </div>
                     )}
+
+                    <p className="text-xs text-default-400">
+                      请使用微信或支付宝扫描上方二维码完成支付
+                    </p>
+
+                    {/* 备选：跳转支付页链接 */}
+                    {orderInfo.payment_url && (
+                      <a
+                        href={orderInfo.payment_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                      >
+                        <ExternalLink size={14} />
+                        无法扫码？点击跳转支付页面
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                {paymentStatus === 'pending' && qrCodeExpired && (
+                  <div className="space-y-4">
+                    <div className="flex justify-center">
+                      <Card className="p-4 sm:p-6 relative shadow-sm">
+                        {qrCodeValue && (
+                          <img
+                            src={generateQRCodeDataUrl(qrCodeValue)}
+                            alt="支付二维码（已过期）"
+                            className="w-44 h-44 sm:w-52 sm:h-52 opacity-20 grayscale"
+                          />
+                        )}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <Chip color="danger" variant="solid" size="lg" className="shadow-lg">
+                            已过期
+                          </Chip>
+                        </div>
+                      </Card>
+                    </div>
+                    <p className="text-danger font-medium">二维码已过期</p>
+                    <Button color="primary" onPress={handleClose}>
+                      重新下单
+                    </Button>
                   </div>
                 )}
 
@@ -326,49 +265,33 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   <div className="space-y-4">
                     <AlertCircle className="w-12 h-12 mx-auto text-danger" />
                     <div>
-                      <h3 className="text-lg font-semibold text-danger mb-2">支付失败</h3>
-                      <p className="text-default-500 text-sm">请重试或联系客服</p>
+                      <h3 className="text-lg font-semibold text-danger mb-2">支付异常</h3>
+                      <p className="text-default-500 text-sm">请联系客服处理</p>
                     </div>
+                    <Button color="primary" variant="flat" onPress={handleClose}>
+                      关闭
+                    </Button>
                   </div>
                 )}
               </div>
-
-              {/* 二维码 - 仅桌面端显示 */}
-              {orderInfo.qr_code && paymentStatus === 'pending' && !isMobileDevice && (
-                <div className="flex justify-center px-2">
-                  <Card className="p-4 sm:p-6 relative max-w-full">
-                    <motion.img
-                      src={generateQRCodeDataUrl(getQRCodeValue(orderInfo))}
-                      alt="支付二维码"
-                      className={`w-40 h-40 sm:w-48 sm:h-48 transition-all duration-500 max-w-full ${qrCodeExpired ? 'opacity-30 grayscale' : ''}`}
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: 0.2 }}
-                    />
-                    {qrCodeExpired && (
-                      <motion.div
-                        className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 rounded-lg"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ duration: 0.3 }}
-                      >
-                        <Chip color="danger" variant="solid" className="shadow-lg">
-                          已过期
-                        </Chip>
-                      </motion.div>
-                    )}
-                  </Card>
-                </div>
-              )}
             </div>
           )}
         </ModalBody>
 
         <ModalFooter>
-          {paymentStatus !== 'success' && (
-            <Button color="danger" variant="light" onPress={handleClose}>
-              取消支付
-            </Button>
+          {paymentStatus === 'pending' && !qrCodeExpired && (
+            <div className="flex w-full justify-between items-center">
+              <Button color="default" variant="light" onPress={handleClose}>
+                取消支付
+              </Button>
+              <Button
+                color="success"
+                onPress={handleManualCheck}
+                isLoading={manualCheckLoading}
+              >
+                我已完成支付
+              </Button>
+            </div>
           )}
         </ModalFooter>
       </ModalContent>

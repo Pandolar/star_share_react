@@ -1,11 +1,7 @@
-/**
- * 个人主页Tab页面
- * 显示用户个人信息和账户设置
- */
 import React, { useEffect, useState } from 'react';
-import { Card, CardBody, Avatar, Chip, Spinner } from '@heroui/react';
+import { Card, CardBody, Avatar, Chip, Spinner, Button } from '@heroui/react';
 import { motion } from 'framer-motion';
-import { User, Mail, Calendar, Shield, AlertCircle, Package, Crown, Edit3, MessageCircle } from 'lucide-react';
+import { User, Mail, Calendar, Shield, AlertCircle, Package, Crown, Edit3, MessageCircle, Clock } from 'lucide-react';
 import { userInfoApi } from '../../../services/userApi';
 import { EditProfileModal } from './profile/EditProfileModal';
 import { WechatBindModal } from './profile/WechatBindModal';
@@ -95,22 +91,9 @@ export const ProfileTab: React.FC = () => {
               <div>
                 <h3 className="font-semibold text-danger mb-2">加载失败</h3>
                 <p className="text-default-600 text-sm">{error}</p>
-                <button
-                  onClick={fetchUserInfo}
-                  style={{
-                    backgroundColor: '#006FEE',
-                    color: '#ffffff',
-                    border: '1px solid #006FEE',
-                    borderRadius: '6px',
-                    padding: '6px 12px',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    marginTop: '12px',
-                  }}
-                >
+                <Button size="sm" color="primary" className="mt-3" onPress={fetchUserInfo}>
                   重试
-                </button>
+                </Button>
               </div>
             </div>
           </CardBody>
@@ -122,57 +105,14 @@ export const ProfileTab: React.FC = () => {
           {/* 用户基本信息卡片 */}
           <Card className="overflow-visible">
             <CardBody className="p-6">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-                <div className="relative flex flex-col items-center gap-3">
-                  <Avatar
-                    size="lg"
-                    className="w-20 h-20"
-                    name={userInfo.username}
-                    showFallback
-                    fallback={<User size={32} />}
-                  />
-                  <button
-                    onClick={() => openEditModal()}
-                    style={{
-                      backgroundColor: '#006FEE',
-                      color: '#ffffff',
-                      border: '1px solid #006FEE',
-                      borderRadius: '8px',
-                      padding: '4px 8px',
-                      fontSize: '12px',
-                      fontWeight: '500',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      cursor: 'pointer',
-                      minHeight: '24px',
-                    }}
-                  >
-                    <Edit3 size={12} />
-                    修改资料
-                  </button>
-                  <button
-                    onClick={() => openEditModal('password')}
-                    style={{
-                      backgroundColor: '#ffffff',
-                      color: '#006FEE',
-                      border: '1px solid #006FEE',
-                      borderRadius: '8px',
-                      padding: '4px 8px',
-                      fontSize: '12px',
-                      fontWeight: '500',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      cursor: 'pointer',
-                      minHeight: '24px',
-                      marginTop: '6px',
-                    }}
-                  >
-                    <Shield size={12} />
-                    修改密码
-                  </button>
-                </div>
+              <div className="flex flex-col sm:flex-row items-start gap-6">
+                <Avatar
+                  size="lg"
+                  className="w-20 h-20 flex-shrink-0"
+                  name={userInfo.username}
+                  showFallback
+                  fallback={<User size={32} />}
+                />
 
                 <div className="flex-1 space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -202,27 +142,40 @@ export const ProfileTab: React.FC = () => {
                         ) : (
                           <>
                             <span className="text-warning">未绑定微信</span>
-                            <button
-                              onClick={() => setWechatModalOpen(true)}
-                              style={{
-                                backgroundColor: '#09C46A',
-                                color: '#ffffff',
-                                border: '1px solid #09C46A',
-                                borderRadius: '4px',
-                                padding: '2px 6px',
-                                fontSize: '10px',
-                                fontWeight: '500',
-                                cursor: 'pointer',
-                                marginLeft: '8px',
-                              }}
+                            <Button
+                              size="sm"
+                              color="success"
+                              variant="flat"
+                              className="ml-2 h-6 min-w-0 px-2 text-xs"
+                              onPress={() => setWechatModalOpen(true)}
                             >
                               绑定
-                            </button>
+                            </Button>
                           </>
                         )}
                       </span>
                     </div>
                   </div>
+
+                  {/* 操作按钮 - 移动端显示在信息下方 */}
+                  <div className="flex items-center gap-2 pt-2 sm:hidden">
+                    <Button size="sm" color="primary" startContent={<Edit3 size={14} />} onPress={() => openEditModal()}>
+                      修改资料
+                    </Button>
+                    <Button size="sm" color="primary" variant="bordered" startContent={<Shield size={14} />} onPress={() => openEditModal('password')}>
+                      修改密码
+                    </Button>
+                  </div>
+                </div>
+
+                {/* 操作按钮 - 桌面端显示在右侧 */}
+                <div className="hidden sm:flex flex-col gap-2 flex-shrink-0">
+                  <Button size="sm" color="primary" startContent={<Edit3 size={14} />} onPress={() => openEditModal()}>
+                    修改资料
+                  </Button>
+                  <Button size="sm" color="primary" variant="bordered" startContent={<Shield size={14} />} onPress={() => openEditModal('password')}>
+                    修改密码
+                  </Button>
                 </div>
               </div>
             </CardBody>
@@ -272,13 +225,9 @@ export const ProfileTab: React.FC = () => {
             <Card>
               <CardBody className="p-4 text-center">
                 <div className="text-2xl font-bold text-primary mb-1">
-                  {userInfo.user_active_packages &&
-                  Object.keys(userInfo.user_active_packages).length > 0 &&
-                  userInfo.user_active_packages.package_id
-                    ? '1'
-                    : '0'}
+                  {userInfo.user_active_packages?.level || 'Free'}
                 </div>
-                <div className="text-sm text-default-500">当前套餐</div>
+                <div className="text-sm text-default-500">会员等级</div>
               </CardBody>
             </Card>
             <Card>
@@ -289,14 +238,27 @@ export const ProfileTab: React.FC = () => {
             </Card>
             <Card>
               <CardBody className="p-4 text-center">
-                <div className="text-2xl font-bold text-warning mb-1">{userInfo.user_active_packages?.level || 'Free'}</div>
-                <div className="text-sm text-default-500">会员等级</div>
+                <div className="flex items-center justify-center gap-1 text-lg font-bold text-warning mb-1">
+                  <Clock size={18} />
+                  <span>
+                    {userInfo.user_active_packages?.expiry_date
+                      ? userInfo.user_active_packages.status === 'frozen'
+                        ? userInfo.user_active_packages.remaining_text || '冻结中'
+                        : userInfo.user_active_packages.expiry_date
+                      : '-'}
+                  </span>
+                </div>
+                <div className="text-sm text-default-500">
+                  {userInfo.user_active_packages?.status === 'frozen' ? '冻结剩余' : '套餐到期'}
+                </div>
               </CardBody>
             </Card>
             <Card>
               <CardBody className="p-4 text-center">
-                <div className="text-2xl font-bold text-default-900 mb-1">{new Date(userInfo.created_at).getFullYear()}</div>
-                <div className="text-sm text-default-500">注册年份</div>
+                <div className="text-2xl font-bold text-default-900 mb-1">
+                  {Math.floor((Date.now() - new Date(userInfo.created_at).getTime()) / (1000 * 60 * 60 * 24))}
+                </div>
+                <div className="text-sm text-default-500">已注册天数</div>
               </CardBody>
             </Card>
           </div>

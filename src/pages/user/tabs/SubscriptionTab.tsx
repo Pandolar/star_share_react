@@ -98,14 +98,11 @@ export const SubscriptionTab: React.FC = () => {
 
   // 创建订单
   const createOrder = async (pkg: PackageInfo) => {
-    let pendingPaymentWindow: Window | null = null;
     try {
       setOrderLoading(true);
       setSelectedPackage(pkg);
 
-      if (isMobileDevice) {
-        pendingPaymentWindow = window.open('', '_blank');
-      }
+      const isAndroid = /android/i.test(navigator.userAgent);
       const requestData = isMobileDevice ? { device: 'mobile' } : {};
       const response = await orderUserApi.createOrder(pkg.id, requestData);
 
@@ -113,20 +110,14 @@ export const SubscriptionTab: React.FC = () => {
         setOrderInfo(response.data);
         setPaymentModalOpen(true);
 
-        if (isMobileDevice && response.data.payment_url) {
-          if (pendingPaymentWindow && !pendingPaymentWindow.closed) {
-            pendingPaymentWindow.location.href = response.data.payment_url;
-            pendingPaymentWindow.focus();
-          } else {
-            window.open(response.data.payment_url, '_blank');
-          }
+        // 仅 Android 尝试弹出支付页（Android 浏览器通常不拦截）
+        if (isAndroid && response.data.payment_url) {
+          window.open(response.data.payment_url, '_blank');
         }
       } else {
-        if (pendingPaymentWindow && !pendingPaymentWindow.closed) pendingPaymentWindow.close();
         alert(response.msg || '创建订单失败');
       }
     } catch (err) {
-      if (pendingPaymentWindow && !pendingPaymentWindow.closed) pendingPaymentWindow.close();
       alert(err instanceof Error ? err.message : '网络错误');
     } finally {
       setOrderLoading(false);
