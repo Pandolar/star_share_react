@@ -14,6 +14,7 @@ import {
 import { motion } from 'framer-motion';
 import { CheckCircle, AlertCircle, QrCode, ExternalLink } from 'lucide-react';
 import { orderUserApi } from '../../../../services/userApi';
+import { toast } from '../../../../utils/toast';
 import { generateQRCodeDataUrl } from './qrCode';
 import { getDurationText, PackageInfo, OrderInfo } from './types';
 
@@ -100,11 +101,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         setTimeout(() => window.location.reload(), 2000);
       } else {
         setPaymentStatus('pending');
-        alert('未检测到支付成功，请确认是否已完成付款。若已支付但仍无反应，请联系客服处理。');
+        toast.warning('未检测到支付成功，请确认是否已完成付款。若已支付但仍无反应，请联系客服处理。');
       }
     } catch {
       setPaymentStatus('pending');
-      alert('查询失败，请稍后重试或联系客服。');
+      toast.error('查询失败，请稍后重试或联系客服。');
     } finally {
       setManualCheckLoading(false);
     }

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardBody, Avatar, Chip, Spinner, Button } from '@heroui/react';
 import { motion } from 'framer-motion';
-import { User, Mail, Calendar, Shield, AlertCircle, Package, Crown, Edit3, MessageCircle, Clock } from 'lucide-react';
+import { User, Mail, Calendar, Shield, AlertCircle, Package, Crown, Edit3, MessageCircle, ArrowUpCircle } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { userInfoApi } from '../../../services/userApi';
 import { EditProfileModal } from './profile/EditProfileModal';
 import { WechatBindModal } from './profile/WechatBindModal';
@@ -31,6 +32,7 @@ export const ProfileTab: React.FC = () => {
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [, setSearchParams] = useSearchParams();
 
   const [editModal, setEditModal] = useState<{ open: boolean; tab: EditTabKey }>({ open: false, tab: 'username' });
   const [wechatModalOpen, setWechatModalOpen] = useState(false);
@@ -182,46 +184,73 @@ export const ProfileTab: React.FC = () => {
           </Card>
 
           {/* 当前套餐信息 */}
-          {userInfo.user_active_packages && userInfo.user_active_packages.package_id && (
-            <Card className="border-l-4 border-l-primary">
-              <CardBody className="p-6">
-                <div className="flex items-start gap-4">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${getPackageLevelStyle(userInfo.user_active_packages.level).bgColor}`}>
-                    {React.createElement(getPackageLevelStyle(userInfo.user_active_packages.level).icon, {
-                      size: 24,
-                      className: `text-${getPackageLevelStyle(userInfo.user_active_packages.level).color}`,
-                    })}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3">
-                      <h3 className="text-lg font-bold text-default-900">当前套餐</h3>
-                      <Chip
-                        size="sm"
-                        color={userInfo.user_active_packages.status === 'frozen' ? 'warning' : getPackageLevelStyle(userInfo.user_active_packages.level).color}
-                        variant="flat"
-                      >
-                        {userInfo.user_active_packages.status_text || userInfo.user_active_packages.level}
-                      </Chip>
+          {(() => {
+            const hasPackage = userInfo.user_active_packages && userInfo.user_active_packages.package_id;
+            const levelStyle = hasPackage
+              ? getPackageLevelStyle(userInfo.user_active_packages!.level)
+              : { icon: Package, color: 'default' as const, bgColor: 'bg-default/10' };
+
+            return (
+              <Card className={`border-l-4 ${hasPackage ? 'border-l-primary' : 'border-l-default-300'}`}>
+                <CardBody className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${levelStyle.bgColor}`}>
+                      {React.createElement(levelStyle.icon, {
+                        size: 24,
+                        className: `text-${levelStyle.color}`,
+                      })}
                     </div>
-                    <p className="text-default-600 mb-4">{userInfo.user_active_packages.package_name}</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                      <div className="flex items-center gap-2 text-default-600">
-                        <Calendar size={16} />
-                        <span>
-                          {userInfo.user_active_packages.status === 'frozen'
-                            ? `冻结剩余：${userInfo.user_active_packages.remaining_text || '-'}`
-                            : `到期时间：${userInfo.user_active_packages.expiry_date || '-'}`}
-                        </span>
-                      </div>
+                    <div className="flex-1">
+                      {hasPackage ? (
+                        <>
+                          <div className="flex items-center gap-3 mb-3">
+                            <h3 className="text-lg font-bold text-default-900">当前套餐</h3>
+                            <Chip
+                              size="sm"
+                              color={userInfo.user_active_packages!.status === 'frozen' ? 'warning' : levelStyle.color}
+                              variant="flat"
+                            >
+                              {userInfo.user_active_packages!.status_text || userInfo.user_active_packages!.level}
+                            </Chip>
+                          </div>
+                          <p className="text-default-600 mb-4">{userInfo.user_active_packages!.package_name}</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                            <div className="flex items-center gap-2 text-default-600">
+                              <Calendar size={16} />
+                              <span>
+                                {userInfo.user_active_packages!.status === 'frozen'
+                                  ? `冻结剩余：${userInfo.user_active_packages!.remaining_text || '-'}`
+                                  : `到期时间：${userInfo.user_active_packages!.expiry_date || '-'}`}
+                              </span>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="text-lg font-bold text-default-900">当前套餐</h3>
+                            <Chip size="sm" color="default" variant="flat">免费版</Chip>
+                          </div>
+                          <p className="text-default-500 mb-4">您当前为免费用户，升级套餐可享受更多功能</p>
+                          <Button
+                            size="sm"
+                            color="primary"
+                            startContent={<ArrowUpCircle size={14} />}
+                            onPress={() => setSearchParams({ tab: 'subscription' })}
+                          >
+                            升级套餐
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
-                </div>
-              </CardBody>
-            </Card>
-          )}
+                </CardBody>
+              </Card>
+            );
+          })()}
 
           {/* 账户统计 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Card>
               <CardBody className="p-4 text-center">
                 <div className="text-2xl font-bold text-primary mb-1">
@@ -234,23 +263,6 @@ export const ProfileTab: React.FC = () => {
               <CardBody className="p-4 text-center">
                 <div className="text-2xl font-bold text-success mb-1">{userInfo.status === 1 ? '正常' : '停用'}</div>
                 <div className="text-sm text-default-500">账户状态</div>
-              </CardBody>
-            </Card>
-            <Card>
-              <CardBody className="p-4 text-center">
-                <div className="flex items-center justify-center gap-1 text-base font-bold text-warning mb-1">
-                  <Clock size={16} />
-                  <span>
-                    {userInfo.user_active_packages?.expiry_date
-                      ? userInfo.user_active_packages.status === 'frozen'
-                        ? userInfo.user_active_packages.remaining_text || '冻结中'
-                        : userInfo.user_active_packages.expiry_date.split(' ')[0]
-                      : '-'}
-                  </span>
-                </div>
-                <div className="text-sm text-default-500">
-                  {userInfo.user_active_packages?.status === 'frozen' ? '冻结剩余' : '套餐到期'}
-                </div>
               </CardBody>
             </Card>
             <Card>

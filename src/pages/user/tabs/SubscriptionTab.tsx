@@ -7,6 +7,7 @@ import { Card, CardBody, Button, Chip, Spinner, Tab, Tabs } from '@heroui/react'
 import { motion, AnimatePresence } from 'framer-motion';
 import { Package, Star, Crown, AlertCircle, Calendar, Timer, ChevronDown, Info } from 'lucide-react';
 import { packageUserApi, orderUserApi } from '../../../services/userApi';
+import { toast } from '../../../utils/toast';
 import { useIsMobile } from '../../../hooks/useIsMobile';
 import { PaymentModal } from './subscription/PaymentModal';
 import { CdkRedeemModal } from './subscription/CdkRedeemModal';
@@ -115,10 +116,10 @@ export const SubscriptionTab: React.FC = () => {
           window.open(response.data.payment_url, '_blank');
         }
       } else {
-        alert(response.msg || '创建订单失败');
+        toast.error(response.msg || '创建订单失败');
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : '网络错误');
+      toast.error(err instanceof Error ? err.message : '网络错误');
     } finally {
       setOrderLoading(false);
     }
@@ -301,7 +302,7 @@ export const SubscriptionTab: React.FC = () => {
               </div>
               <div>
                 <div className="font-semibold text-default-900">订阅说明</div>
-                <div className="text-sm text-default-500">购买前可先展开查看套餐升降级与延期规则</div>
+                <div className="text-sm text-default-500">购买前展开查看套餐购买相关规则(必读)</div>
               </div>
             </div>
             <ChevronDown className={`w-4 h-4 text-default-500 transition-transform ${showSubscriptionGuide ? 'rotate-180' : ''}`} />
@@ -312,6 +313,7 @@ export const SubscriptionTab: React.FC = () => {
               <div>2. 订阅同等级套餐将直接<strong className="font-semibold text-default-900">叠加延期</strong>。</div>
               <div>3. 订阅更高等级套餐后将<strong className="font-semibold text-default-900">自动冻结低等级套餐</strong>，待高等级套餐过期后将自动解冻。</div>
               <div>4. 如果您有激活码/CDK/兑换码，可直接在右上角【兑换激活码】直接兑换。</div>
+              <div>5. 单笔订单金额超100元可联系客服进行开发票，支持高校或企业抬头。</div>
             </div>
           )}
         </CardBody>
