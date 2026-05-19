@@ -198,9 +198,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                       </div>
                     )}
 
-                    <p className="text-xs text-default-400">
-                      请使用微信或支付宝扫描上方二维码完成支付
-                    </p>
 
                     {/* 备选：跳转支付页链接 */}
                     {orderInfo.payment_url && (

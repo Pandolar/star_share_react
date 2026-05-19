@@ -238,13 +238,13 @@ export const ProfileTab: React.FC = () => {
             </Card>
             <Card>
               <CardBody className="p-4 text-center">
-                <div className="flex items-center justify-center gap-1 text-lg font-bold text-warning mb-1">
-                  <Clock size={18} />
+                <div className="flex items-center justify-center gap-1 text-base font-bold text-warning mb-1">
+                  <Clock size={16} />
                   <span>
                     {userInfo.user_active_packages?.expiry_date
                       ? userInfo.user_active_packages.status === 'frozen'
                         ? userInfo.user_active_packages.remaining_text || '冻结中'
-                        : userInfo.user_active_packages.expiry_date
+                        : userInfo.user_active_packages.expiry_date.split(' ')[0]
                       : '-'}
                   </span>
                 </div>
