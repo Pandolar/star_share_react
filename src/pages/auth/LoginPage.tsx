@@ -546,12 +546,9 @@ const LoginPage: React.FC = () => {
                 <div className="w-full flex items-start gap-2 p-3 bg-warning/10 border border-warning/30 rounded-lg">
                   <AlertCircle size={16} className="text-warning flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-warning-700 leading-5">
-                    如果你之前用邮箱注册过本站，请直接用<span className="font-semibold">邮箱登录</span>，避免创建重复账号。
+                    如果你用邮箱注册过本站，请直接用<span className="font-semibold">邮箱登录</span>，避免创建重复账号。
                   </p>
                 </div>
-                <p className="text-sm text-default-500 text-center">
-                  使用微信扫描下方二维码即可快速登录
-                </p>
 
                 <div className="relative">
                   {!hasAgreedUserAgreement ? (

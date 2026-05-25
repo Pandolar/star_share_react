@@ -109,30 +109,6 @@ export const ProfileTab: React.FC = () => {
 
       {userInfo && (
         <>
-          {/* 占位邮箱用户：常驻提醒横幅 */}
-          {userInfo.email && userInfo.email.endsWith('@default.com') && (
-            <Card className="border border-danger/30 bg-danger/5">
-              <CardBody className="p-4">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                  <div className="flex items-start gap-3 flex-1">
-                    <AlertCircle size={20} className="text-danger flex-shrink-0 mt-0.5" />
-                    <p className="text-sm text-danger-700 leading-5">
-                      你的账号尚未绑定真实邮箱。为了您的账户安全，请尽快绑定邮箱。
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    color="danger"
-                    className="self-start sm:self-auto flex-shrink-0"
-                    onPress={() => openEditModal('email')}
-                  >
-                    立即绑定
-                  </Button>
-                </div>
-              </CardBody>
-            </Card>
-          )}
-
           {/* 用户基本信息卡片 */}
           <Card className="overflow-visible">
             <CardBody className="p-6">
