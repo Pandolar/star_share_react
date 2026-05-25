@@ -16,6 +16,7 @@ import {
   X,
   LogOut,
   Home,
+  AlertCircle,
 } from 'lucide-react';
 
 // Tab页面组件导入
@@ -30,6 +31,7 @@ import { LogoutConfirmModal } from '../../components/LogoutConfirmModal';
 import { ChatwootFloatingButton } from '../../components/chat/ChatwootFloatingButton';
 import { clearAuthCookies, getCookie } from '../../utils/cookies';
 import { useAuthCheck } from '../../hooks/useAuthCheck';
+import { userInfoApi } from '../../services/userApi';
 
 // Tab配置接口
 interface TabConfig {
@@ -78,6 +80,7 @@ const UserCenter: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
+  const [emailUnbound, setEmailUnbound] = useState(false);
   const navigate = useNavigate();
 
   // 使用认证检查Hook
@@ -100,6 +103,30 @@ const UserCenter: React.FC = () => {
       window.removeEventListener('authFailure', handleGlobalAuthFailure as EventListener);
     };
   }, [handleAuthFailure]);
+
+  // 检测占位邮箱用户，显示常驻横幅
+  useEffect(() => {
+    let cancelled = false;
+    if (!isAuthenticated) return;
+    (async () => {
+      try {
+        const resp = await userInfoApi.getUserInfo();
+        if (!cancelled && resp.code === 20000 && resp.data?.email?.endsWith('@default.com')) {
+          setEmailUnbound(true);
+        }
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [isAuthenticated]);
+
+  // 一键跳转到绑定邮箱（profile tab，并通过 query 携带 openEdit=email 由 ProfileTab 自动打开弹窗）
+  const goBindEmail = () => {
+    const params = new URLSearchParams(searchParams);
+    params.set('tab', 'profile');
+    params.set('openEdit', 'email');
+    setSearchParams(params);
+    setActiveTab('profile');
+  };
 
   // 根据 URL 查询参数同步激活的 Tab（支持 ?tab=subscription 等）
   useEffect(() => {
@@ -275,6 +302,28 @@ const UserCenter: React.FC = () => {
       </div>
 
       <div className="container max-w-[2700px] mx-auto px-4 lg:px-6 py-6">
+        {emailUnbound && (
+          <Card className="mb-4 border border-danger/30 bg-danger/5">
+            <CardBody className="p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex items-start gap-3 flex-1">
+                  <AlertCircle size={20} className="text-danger flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-danger-700 leading-5">
+                    你的账号尚未绑定真实邮箱。为了您的账户安全，请尽快绑定邮箱。
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  color="danger"
+                  className="self-start sm:self-auto flex-shrink-0"
+                  onPress={goBindEmail}
+                >
+                  立即绑定
+                </Button>
+              </div>
+            </CardBody>
+          </Card>
+        )}
         <div className="flex flex-col lg:flex-row gap-6">
           {/* 桌面端侧边导航栏 */}
           <motion.aside

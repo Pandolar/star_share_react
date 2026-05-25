@@ -5,7 +5,6 @@ import { User, Mail, Calendar, Shield, AlertCircle, Package, Crown, Edit3, Messa
 import { useSearchParams } from 'react-router-dom';
 import { userInfoApi } from '../../../services/userApi';
 import { EditProfileModal } from './profile/EditProfileModal';
-import { WechatBindModal } from './profile/WechatBindModal';
 import type { UserInfo, EditTabKey } from './profile/types';
 
 const getStatusChip = (status: number) =>
@@ -32,10 +31,16 @@ export const ProfileTab: React.FC = () => {
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [editModal, setEditModal] = useState<{ open: boolean; tab: EditTabKey }>({ open: false, tab: 'username' });
-  const [wechatModalOpen, setWechatModalOpen] = useState(false);
+
+  useEffect(() => {
+    const openEdit = searchParams.get('openEdit');
+    if (openEdit === 'email' || openEdit === 'username' || openEdit === 'password') {
+      setEditModal({ open: true, tab: openEdit });
+    }
+  }, [searchParams]);
 
   const fetchUserInfo = async () => {
     try {
@@ -104,6 +109,30 @@ export const ProfileTab: React.FC = () => {
 
       {userInfo && (
         <>
+          {/* 占位邮箱用户：常驻提醒横幅 */}
+          {userInfo.email && userInfo.email.endsWith('@default.com') && (
+            <Card className="border border-danger/30 bg-danger/5">
+              <CardBody className="p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex items-start gap-3 flex-1">
+                    <AlertCircle size={20} className="text-danger flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-danger-700 leading-5">
+                      你的账号尚未绑定真实邮箱。为了您的账户安全，请尽快绑定邮箱。
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    color="danger"
+                    className="self-start sm:self-auto flex-shrink-0"
+                    onPress={() => openEditModal('email')}
+                  >
+                    立即绑定
+                  </Button>
+                </div>
+              </CardBody>
+            </Card>
+          )}
+
           {/* 用户基本信息卡片 */}
           <Card className="overflow-visible">
             <CardBody className="p-6">
@@ -125,7 +154,22 @@ export const ProfileTab: React.FC = () => {
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center gap-2 text-default-600">
                       <Mail size={16} />
-                      <span>{userInfo.email}</span>
+                      {userInfo.email && userInfo.email.endsWith('@default.com') ? (
+                        <>
+                          <span className="text-danger">未绑定邮箱</span>
+                          <Button
+                            size="sm"
+                            color="danger"
+                            variant="flat"
+                            className="ml-2 h-6 min-w-0 px-2 text-xs"
+                            onPress={() => openEditModal('email')}
+                          >
+                            立即绑定
+                          </Button>
+                        </>
+                      ) : (
+                        <span>{userInfo.email}</span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 text-default-600">
                       <Calendar size={16} />
@@ -135,28 +179,12 @@ export const ProfileTab: React.FC = () => {
                       <User size={16} />
                       <span>邀请人：{userInfo.inviter_user}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-default-600">
-                      <MessageCircle size={16} />
-                      <span>
-                        微信：
-                        {userInfo.wechat_openid ? (
-                          <span className="text-success">已绑定微信</span>
-                        ) : (
-                          <>
-                            <span className="text-warning">未绑定微信</span>
-                            <Button
-                              size="sm"
-                              color="success"
-                              variant="flat"
-                              className="ml-2 h-6 min-w-0 px-2 text-xs"
-                              onPress={() => setWechatModalOpen(true)}
-                            >
-                              绑定
-                            </Button>
-                          </>
-                        )}
-                      </span>
-                    </div>
+                    {userInfo.wechat_openid && (
+                      <div className="flex items-center gap-2 text-default-600">
+                        <MessageCircle size={16} />
+                        <span>微信：<span className="text-success">已绑定微信</span></span>
+                      </div>
+                    )}
                   </div>
 
                   {/* 操作按钮 - 移动端显示在信息下方 */}
@@ -283,12 +311,6 @@ export const ProfileTab: React.FC = () => {
         userInfo={userInfo}
         onClose={closeEditModal}
         onUserInfoChange={(next) => setUserInfo((prev) => (prev ? { ...prev, ...next } : prev))}
-      />
-
-      <WechatBindModal
-        isOpen={wechatModalOpen}
-        onClose={() => setWechatModalOpen(false)}
-        onBindSuccess={fetchUserInfo}
       />
     </motion.div>
   );

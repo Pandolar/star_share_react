@@ -514,6 +514,19 @@ const LoginPage: React.FC = () => {
           {/* 登录方式选择 */}
           <div className="flex space-x-1 bg-default-100 p-1 rounded-lg">
             <button
+              onClick={() => handleLoginMethodChange('email')}
+              className={`flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-md text-sm font-medium transition-colors ${loginMethod === 'email'
+                ? 'bg-white text-primary-600 shadow-sm'
+                : 'text-default-500 hover:text-default-700'
+                }`}
+            >
+              <Mail size={16} />
+              <span>邮箱登录</span>
+              <span className="ml-1 inline-flex items-center rounded-full bg-primary-100 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-700">
+                推荐
+              </span>
+            </button>
+            <button
               onClick={() => handleLoginMethodChange('wechat')}
               className={`flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-md text-sm font-medium transition-colors ${loginMethod === 'wechat'
                 ? 'bg-white text-primary-600 shadow-sm'
@@ -523,16 +536,6 @@ const LoginPage: React.FC = () => {
               <Smartphone size={16} />
               <span>微信登录</span>
             </button>
-            <button
-              onClick={() => handleLoginMethodChange('email')}
-              className={`flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-md text-sm font-medium transition-colors ${loginMethod === 'email'
-                ? 'bg-white text-primary-600 shadow-sm'
-                : 'text-default-500 hover:text-default-700'
-                }`}
-            >
-              <Mail size={16} />
-              <span>邮箱登录</span>
-            </button>
           </div>
 
           {/* 微信二维码登录 */}
@@ -540,6 +543,12 @@ const LoginPage: React.FC = () => {
             <Card className="w-full">
               <CardBody className="flex flex-col items-center space-y-4 p-8">
                 <h3 className="text-lg font-semibold text-default-800">微信扫码登录</h3>
+                <div className="w-full flex items-start gap-2 p-3 bg-warning/10 border border-warning/30 rounded-lg">
+                  <AlertCircle size={16} className="text-warning flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-warning-700 leading-5">
+                    如果你之前用邮箱注册过本站，请直接用<span className="font-semibold">邮箱登录</span>，避免创建重复账号。
+                  </p>
+                </div>
                 <p className="text-sm text-default-500 text-center">
                   使用微信扫描下方二维码即可快速登录
                 </p>
