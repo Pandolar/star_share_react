@@ -55,6 +55,8 @@ const LoginPage: React.FC = () => {
 
   // 登录方式切换
   const [loginMethod, setLoginMethod] = useState<'wechat' | 'email'>('email');
+  // 切到微信 Tab 后是否已确认继续使用（用于在显示二维码前先弹推荐邮箱登录的提示）
+  const [wechatConfirmed, setWechatConfirmed] = useState(false);
 
   // 获取微信二维码
   const fetchWechatQR = async () => {
@@ -446,8 +448,17 @@ const LoginPage: React.FC = () => {
   // 处理登录方式切换
   const handleLoginMethodChange = (method: 'wechat' | 'email') => {
     setLoginMethod(method);
-    // 如果切换到微信登录且还没有二维码，则获取二维码
-    if (method === 'wechat' && !qrCodeUrl) {
+    // 切回邮箱登录时重置微信确认态，再次切回微信 Tab 仍需重新确认
+    if (method === 'email') {
+      setWechatConfirmed(false);
+    }
+    // 切到微信 Tab 不再立即拉取二维码，要等用户点击“继续使用微信登录”
+  };
+
+  // 微信确认继续使用：拉二维码并展示
+  const confirmUseWechat = () => {
+    setWechatConfirmed(true);
+    if (!qrCodeUrl) {
       fetchWechatQR();
     }
   };
@@ -461,12 +472,7 @@ const LoginPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [bindCountdown]);
 
-  // 组件挂载时获取微信二维码
-  useEffect(() => {
-    if (!isLoggedIn && !qrCodeUrl && loginMethod === 'wechat') {
-      fetchWechatQR();
-    }
-  }, [isLoggedIn, loginMethod]);
+  // 组件挂载时不再自动拉取二维码：用户需先点击"继续使用微信登录"
 
   // 如果用户取消勾选协议，停止二维码轮询并清空二维码状态
   useEffect(() => {
@@ -522,7 +528,7 @@ const LoginPage: React.FC = () => {
             >
               <Mail size={16} />
               <span>邮箱登录</span>
-              <span className="ml-1 inline-flex items-center rounded-full bg-primary-100 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-700">
+              <span className="ml-1 hidden sm:inline-flex items-center rounded-full bg-primary-100 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-700">
                 推荐
               </span>
             </button>
@@ -539,7 +545,39 @@ const LoginPage: React.FC = () => {
           </div>
 
           {/* 微信二维码登录 */}
-          {loginMethod === 'wechat' && (
+          {loginMethod === 'wechat' && !wechatConfirmed && (
+            <Card className="w-full">
+              <CardBody className="flex flex-col items-center space-y-5 p-6 sm:p-8">
+                <div className="w-12 h-12 rounded-full bg-warning/15 flex items-center justify-center">
+                  <AlertCircle size={24} className="text-warning" />
+                </div>
+                <div className="text-center space-y-2">
+                  <h3 className="text-lg font-semibold text-default-800">不建议使用微信登录</h3>
+                  <p className="text-sm text-default-600 leading-6">
+                    为了账户安全和长期可用，推荐使用<span className="font-semibold text-primary-600">邮箱登录</span>。如果你之前用邮箱注册过本站，请直接使用邮箱登录，避免创建重复账号。
+                  </p>
+                </div>
+                <div className="w-full flex flex-col sm:flex-row gap-2">
+                  <Button
+                    color="primary"
+                    fullWidth
+                    onPress={() => handleLoginMethodChange('email')}
+                  >
+                    切回邮箱登录
+                  </Button>
+                  <Button
+                    variant="bordered"
+                    fullWidth
+                    onPress={confirmUseWechat}
+                  >
+                    继续使用微信登录
+                  </Button>
+                </div>
+              </CardBody>
+            </Card>
+          )}
+
+          {loginMethod === 'wechat' && wechatConfirmed && (
             <Card className="w-full">
               <CardBody className="flex flex-col items-center space-y-4 p-8">
                 <h3 className="text-lg font-semibold text-default-800">微信扫码登录</h3>
