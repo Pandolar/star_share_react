@@ -18,6 +18,14 @@ export interface UserInfo {
   inviter_user: string;
   created_at: string;
   wechat_openid?: string;
+  preferences?: {
+    payment_info?: {
+      type: string;
+      real_name: string;
+      account: string;
+      updated_at?: string;
+    };
+  };
 }
 
-export type EditTabKey = 'username' | 'email' | 'password';
+export type EditTabKey = 'username' | 'email' | 'password' | 'payment_info';

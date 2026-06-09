@@ -10,7 +10,7 @@ import {
   Input,
   Spinner,
 } from '@heroui/react';
-import { Edit3, User, Mail, Shield, AlertCircle, Send, Eye, EyeOff } from 'lucide-react';
+import { Edit3, User, Mail, Shield, AlertCircle, Send, Eye, EyeOff, Wallet } from 'lucide-react';
 import { userInfoApi } from '../../../../services/userApi';
 import { sendEmailCode as sendAuthEmailCode, resetPassword } from '../../../../services/authApi';
 import { setAuthCookies } from '../../../../utils/cookies';
@@ -25,6 +25,7 @@ interface EditProfileModalProps {
 }
 
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+const PHONE_REGEX = /^1[3-9]\d{9}$/;
 
 const useCountdown = () => {
   const [value, setValue] = useState(0);
@@ -38,7 +39,7 @@ const useCountdown = () => {
 
 export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   isOpen,
-  initialTab = 'username',
+  initialTab = 'username' as EditTabKey,
   userInfo,
   onClose,
   onUserInfoChange,
@@ -71,6 +72,10 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const [pwdCountdown, setPwdCountdown] = useCountdown();
   const [showPwdEmailCode, setShowPwdEmailCode] = useState(false);
 
+  // 收款方式
+  const [realName, setRealName] = useState('');
+  const [paymentAccount, setPaymentAccount] = useState('');
+
   // Modal 打开时，初始化字段
   useEffect(() => {
     if (!isOpen) return;
@@ -88,6 +93,8 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     setPwdCodeSent(false);
     setPwdCountdown(0);
     setShowPwdEmailCode(false);
+    setRealName(userInfo?.preferences?.payment_info?.real_name || '');
+    setPaymentAccount(userInfo?.preferences?.payment_info?.account || '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
@@ -232,6 +239,43 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
         } catch {
           // 错误已被拦截器提示
         }
+      } else if (activeTab === 'payment_info') {
+        if (!realName.trim()) {
+          setEditError('请输入真实姓名');
+          return;
+        }
+        if (!paymentAccount.trim()) {
+          setEditError('请输入收款账号');
+          return;
+        }
+        // 验证账号格式：必须是手机号或邮箱
+        const isPhone = PHONE_REGEX.test(paymentAccount.trim());
+        const isEmail = EMAIL_REGEX.test(paymentAccount.trim());
+        if (!isPhone && !isEmail) {
+          setEditError('收款账号格式不正确，请输入有效的手机号或邮箱');
+          return;
+        }
+        const response = await userInfoApi.changeUserInfo({
+          change_type: 'payment_info',
+          payment_info: {
+            real_name: realName.trim(),
+            account: paymentAccount.trim(),
+          },
+        });
+        if (response.code === 20000) {
+          const updatedPreferences = {
+            ...userInfo?.preferences,
+            payment_info: {
+              type: 'alipay',
+              real_name: realName.trim(),
+              account: paymentAccount.trim(),
+            },
+          };
+          onUserInfoChange({ preferences: updatedPreferences });
+          onClose();
+        } else {
+          setEditError(response.msg || '修改收款方式失败');
+        }
       }
     } catch (err) {
       setEditError(err instanceof Error ? err.message : '操作失败');
@@ -245,7 +289,9 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       ? !newUsername.trim()
       : activeTab === 'email'
         ? (!newEmail.trim() || !emailCode.trim() || Boolean(userInfo?.email && !userInfo.email.endsWith('@default.com')) || (bindPassword.trim().length > 0 && bindPassword.trim().length < 8))
-        : (!userInfo?.email || userInfo.email.endsWith('@default.com') || !pwdEmailCode.trim() || !newPassword.trim() || !confirmPassword.trim() || newPassword !== confirmPassword || newPassword.length < 8)
+        : activeTab === 'password'
+          ? (!userInfo?.email || userInfo.email.endsWith('@default.com') || !pwdEmailCode.trim() || !newPassword.trim() || !confirmPassword.trim() || newPassword !== confirmPassword || newPassword.length < 8)
+          : (!realName.trim() || !paymentAccount.trim())
   );
 
   const sendCodeDisabled = emailCodeSending || countdown > 0 || !newEmail.trim() || Boolean(userInfo?.email && !userInfo.email.endsWith('@default.com'));
@@ -498,6 +544,57 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   />
                 </div>
                 <p className="text-xs text-default-400">密码重置将通过邮箱验证码完成，发送至当前绑定邮箱</p>
+              </div>
+            </Tab>
+
+            <Tab key="payment_info" title={<div className="flex items-center space-x-2"><Wallet size={16} /><span>收款方式</span></div>}>
+              <div className="space-y-4 mt-4">
+                <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                  <p className="text-sm text-primary">支付宝收款信息</p>
+                  <p className="text-xs text-default-500 mt-1">用于邀请返利等收款场景</p>
+                </div>
+                {userInfo?.preferences?.payment_info && (
+                  <div className="p-3 bg-success/10 border border-success/20 rounded-lg">
+                    <p className="text-xs text-success">✓ 当前已设置收款方式</p>
+                    <p className="text-xs text-default-500 mt-1">
+                      真实姓名: {userInfo.preferences.payment_info.real_name}
+                    </p>
+                    <p className="text-xs text-default-500">
+                      收款账号: {userInfo.preferences.payment_info.account}
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <label className="block text-sm font-medium text-default-700 mb-2">
+                    真实姓名 <span className="text-danger">*</span>
+                  </label>
+                  <Input
+                    value={realName}
+                    onChange={(e) => setRealName(e.target.value)}
+                    placeholder="请输入支付宝实名姓名"
+                    variant="bordered"
+                    isInvalid={!!editError && !realName.trim()}
+                  />
+                  <p className="text-xs text-default-400 mt-1">请填写支付宝账号的实名姓名</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-default-700 mb-2">
+                    收款账号 <span className="text-danger">*</span>
+                  </label>
+                  <Input
+                    value={paymentAccount}
+                    onChange={(e) => setPaymentAccount(e.target.value)}
+                    placeholder="请输入支付宝手机号或邮箱"
+                    variant="bordered"
+                    isInvalid={!!editError && !paymentAccount.trim()}
+                  />
+                  <p className="text-xs text-default-400 mt-1">
+                    仅支持手机号（11位）或邮箱格式
+                  </p>
+                </div>
+                <div className="p-3 bg-warning/10 border border-warning/20 rounded-lg">
+                  <p className="text-xs text-warning">⚠️ 请确保填写的信息准确无误，以免影响收款</p>
+                </div>
               </div>
             </Tab>
           </Tabs>
