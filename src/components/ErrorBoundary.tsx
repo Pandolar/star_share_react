@@ -49,8 +49,9 @@ class ErrorBoundary extends Component<Props, State> {
         sessionStorage.setItem('errorReloadCount', (reloadCount + 1).toString());
         window.location.reload();
       } else {
-        // 超过3次错误，停止自动刷新
-        this.setState({ isReloading: false });
+        // 超过3次仍失败，强制跳转到分享测速页
+        sessionStorage.removeItem('errorReloadCount');
+        window.location.href = '/sharespeedtest';
       }
     }, delay);
   }
