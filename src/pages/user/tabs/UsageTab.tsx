@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Card, CardBody, Chip, Spinner, Button, Progress, Tooltip } from '@heroui/react';
 import { Activity, AlertCircle, RefreshCw, Timer, Cpu, Info } from 'lucide-react';
-import { limitUsageApi, LimitUsageData, LimitUsageItem } from '../../../services/userApi';
+import { LimitUsageData, LimitUsageItem } from '../../../services/userApi';
+import { useLimitUsage } from '../../../hooks/useLimitUsage';
 
 // 将剩余秒数格式化为「x时x分x秒」的简洁形式
 const formatRemaining = (seconds: number): string => {
@@ -118,40 +119,36 @@ const UsageCard: React.FC<UsageCardProps> = ({ item, remaining }) => {
 /**
  * 使用额度区块（可嵌入到个人主页等页面）
  * 展示当前窗口的使用比例、重置剩余时间、涉及模型/消耗权重，以及可配置的消耗规则说明。
+ * 可传入外部 usage 数据避免重复请求；不传则自行拉取。
  */
-export const UsageSection: React.FC = () => {
-  const [data, setData] = useState<LimitUsageData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+interface UsageSectionProps {
+  usage?: LimitUsageData | null;
+  loading?: boolean;
+  error?: string;
+  onRefresh?: () => void;
+}
+
+export const UsageSection: React.FC<UsageSectionProps> = (props) => {
+  const injected = props.usage !== undefined;
+  const own = useLimitUsage(!injected);
+  // 若外部注入了数据则复用，否则使用自身 Hook 拉取
+  const data = injected ? props.usage ?? null : own.data;
+  const loading = injected ? Boolean(props.loading) : own.loading;
+  const error = injected ? (props.error || '') : own.error;
+  const fetchUsage = injected ? (props.onRefresh || (() => {})) : own.refetch;
+
   // 本地维护每个限速项的剩余秒数，做平滑倒计时
   const [remainings, setRemainings] = useState<Record<number, number | null>>({});
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const fetchUsage = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      const resp = await limitUsageApi.getUsage();
-      if (resp.code === 20000) {
-        setData(resp.data);
-        const init: Record<number, number | null> = {};
-        (resp.data.limits || []).forEach((item, idx) => {
-          init[idx] = item.reset_in_seconds ?? null;
-        });
-        setRemainings(init);
-      } else {
-        setError(resp.msg || '获取使用额度失败');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '网络错误');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // 数据返回后初始化倒计时基准
   useEffect(() => {
-    fetchUsage();
-  }, []);
+    if (!data) return;
+    const init: Record<number, number | null> = {};
+    (data.limits || []).forEach((item, idx) => {
+      init[idx] = item.reset_in_seconds ?? null;
+    });
+    setRemainings(init);
+  }, [data]);
 
   // 本地倒计时：每秒递减，归零后不再继续
   useEffect(() => {

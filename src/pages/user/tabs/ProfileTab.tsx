@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardBody, Avatar, Chip, Spinner, Button } from '@heroui/react';
 import { motion } from 'framer-motion';
-import { User, Mail, Calendar, Shield, AlertCircle, Package, Crown, Edit3, MessageCircle, ArrowUpCircle } from 'lucide-react';
+import { User, Mail, Calendar, Shield, AlertCircle, Package, Crown, Edit3, MessageCircle, ArrowUpCircle, Gauge } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { userInfoApi } from '../../../services/userApi';
 import { EditProfileModal } from './profile/EditProfileModal';
 import { UsageSection } from './UsageTab';
+import { useLimitUsage, summarizeQuotaRule } from '../../../hooks/useLimitUsage';
 import type { UserInfo, EditTabKey } from './profile/types';
 
 const getStatusChip = (status: number) =>
@@ -33,6 +34,10 @@ export const ProfileTab: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // 额度详情：用于在套餐卡片展示当前套餐的配额规则，并共享给使用额度区块
+  const { data: usageData, loading: usageLoading, error: usageError, refetch: refetchUsage } = useLimitUsage();
+  const quotaRule = summarizeQuotaRule(usageData);
 
   const [editModal, setEditModal] = useState<{ open: boolean; tab: EditTabKey }>({ open: false, tab: 'username' });
 
@@ -228,6 +233,12 @@ export const ProfileTab: React.FC = () => {
                                   : `到期时间：${userInfo.user_active_packages!.expiry_date || '-'}`}
                               </span>
                             </div>
+                            {quotaRule && (
+                              <div className="flex items-center gap-2 text-default-600">
+                                <Gauge size={16} />
+                                <span>配额规则：{quotaRule}</span>
+                              </div>
+                            )}
                           </div>
                         </>
                       ) : (
@@ -237,6 +248,12 @@ export const ProfileTab: React.FC = () => {
                             <Chip size="sm" color="default" variant="flat">免费版</Chip>
                           </div>
                           <p className="text-default-500 mb-4">您当前为免费用户，升级套餐可享受更多功能</p>
+                          {quotaRule && (
+                            <div className="flex items-center gap-2 text-sm text-default-600 mb-4">
+                              <Gauge size={16} />
+                              <span>配额规则：{quotaRule}</span>
+                            </div>
+                          )}
                           <Button
                             size="sm"
                             color="primary"
@@ -281,7 +298,7 @@ export const ProfileTab: React.FC = () => {
           </div>
 
           {/* 使用额度 */}
-          <UsageSection />
+          <UsageSection usage={usageData} loading={usageLoading} error={usageError} onRefresh={refetchUsage} />
         </>
       )}
 
