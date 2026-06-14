@@ -90,6 +90,10 @@ const InviteManagePage: React.FC = () => {
   const [rewardSearch, setRewardSearch] = useState('');
   const [rewardsLoading, setRewardsLoading] = useState(true);
   const [inviteRewards, setInviteRewards] = useState<InviteRewardRecord[]>([]);
+  const [rewardsPage, setRewardsPage] = useState(1);
+  const [rewardsPageSize, setRewardsPageSize] = useState(20);
+  const [rewardsTotal, setRewardsTotal] = useState(0);
+  const [rewardsTotalPages, setRewardsTotalPages] = useState(1);
 
   const [workordersLoading, setWorkordersLoading] = useState(true);
   const [workorders, setWorkorders] = useState<WorkOrder[]>([]);
@@ -136,7 +140,10 @@ const InviteManagePage: React.FC = () => {
   const loadRewards = useCallback(async () => {
     setRewardsLoading(true);
     try {
-      const params: Record<string, any> = {};
+      const params: Record<string, any> = {
+        current_page: rewardsPage,
+        page_size: rewardsPageSize,
+      };
       if (rewardModeFilter !== 'all') params.invite_reward_mode = rewardModeFilter;
       if (rewardStatusFilter !== 'all') params.invite_reward_status = rewardStatusFilter;
       if (rewardSearch.trim()) {
@@ -150,13 +157,18 @@ const InviteManagePage: React.FC = () => {
         throw new Error(response.msg || '获取邀请奖励流水失败');
       }
       setInviteRewards(Array.isArray(response.data) ? response.data : []);
+      const t = Number(response.total) || 0;
+      setRewardsTotal(t);
+      setRewardsTotalPages(Math.max(1, Math.ceil(t / rewardsPageSize)));
     } catch (error) {
       showToast(error instanceof Error ? error.message : '获取邀请奖励流水失败', 'error');
       setInviteRewards([]);
+      setRewardsTotal(0);
+      setRewardsTotalPages(1);
     } finally {
       setRewardsLoading(false);
     }
-  }, [rewardModeFilter, rewardSearch, rewardStatusFilter]);
+  }, [rewardModeFilter, rewardSearch, rewardStatusFilter, rewardsPage, rewardsPageSize]);
 
   const loadWorkorders = useCallback(async () => {
     setWorkordersLoading(true);
@@ -468,7 +480,7 @@ const InviteManagePage: React.FC = () => {
               <SelectItem key="withdraw_done">已提现</SelectItem>
               <SelectItem key="skipped">已跳过</SelectItem>
             </Select>
-            <Button variant="flat" color="primary" startContent={<Filter className="w-4 h-4" />} onPress={loadRewards}>筛选</Button>
+            <Button variant="flat" color="primary" startContent={<Filter className="w-4 h-4" />} onPress={() => { setRewardsPage(1); loadRewards(); }}>筛选</Button>
           </div>
         </CardHeader>
         <CardBody>
@@ -512,6 +524,29 @@ const InviteManagePage: React.FC = () => {
               ))}
             </TableBody>
           </Table>
+          <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm text-default-600">
+              <span>每页</span>
+              <Select
+                aria-label="每页数量"
+                selectedKeys={[String(rewardsPageSize)]}
+                onChange={(e) => { setRewardsPageSize(Number(e.target.value)); setRewardsPage(1); }}
+                className="w-24"
+              >
+                <SelectItem key="20">20</SelectItem>
+                <SelectItem key="50">50</SelectItem>
+                <SelectItem key="100">100</SelectItem>
+              </Select>
+              <span>条，共 {rewardsTotal} 条</span>
+            </div>
+            <Pagination
+              total={rewardsTotalPages}
+              page={rewardsPage}
+              onChange={setRewardsPage}
+              showControls
+              color="primary"
+            />
+          </div>
         </CardBody>
       </Card>
 

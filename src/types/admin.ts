@@ -164,6 +164,8 @@ export interface CDK {
     created_at: string;
     used_at?: string;
     user_id?: number;
+    user_username?: string;
+    user_email?: string;
     package_id: number;
     remarks?: string;
 }

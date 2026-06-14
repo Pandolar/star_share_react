@@ -41,6 +41,8 @@ import {
     Gift,
     Copy,
     Package,
+    Download,
+    CheckCircle2,
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import adminApiService from '../../services/adminApi';
@@ -70,8 +72,12 @@ const CDKManagePage: React.FC = () => {
     const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure();
     const { isOpen: isViewOpen, onOpen: onViewOpen, onClose: onViewClose } = useDisclosure();
     const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
+    const { isOpen: isGeneratedOpen, onOpen: onGeneratedOpen, onClose: onGeneratedClose } = useDisclosure();
 
     const [pageSize, setPageSize] = useState<number>(10);
+    const [generatedCDKs, setGeneratedCDKs] = useState<string[]>([]);
+    // 跨页选择：Map<id, cdk字符串> 在翻页时持久化
+    const [crossPageSelection, setCrossPageSelection] = useState<Map<number, string>>(new Map());
 
   // 状态选项
   const statusOptions = [
@@ -142,6 +148,12 @@ const CDKManagePage: React.FC = () => {
         fetchCDKs();
     }, [fetchPackages, fetchCDKs]);
 
+    // 翻页/刷新后，根据跨页选择同步当前页的勾选状态
+    useEffect(() => {
+        const onPage = cdks.filter((c) => crossPageSelection.has(c.id)).map((c) => c.id);
+        setSelectedKeys(new Set(onPage) as any);
+    }, [cdks, crossPageSelection]);
+
     // 处理搜索
     const handleSearch = () => {
         setCurrentPage(1);
@@ -166,8 +178,10 @@ const CDKManagePage: React.FC = () => {
 
             const response = await adminApiService.createCDKs(createData);
             if (response.code === 20000) {
-                showToast(`成功生成${createData.number}个CDK`, 'success');
+                const cdkList: string[] = (response.data?.cdk || []).map((c: any) => c.cdk || c);
+                setGeneratedCDKs(cdkList);
                 onCreateClose();
+                onGeneratedOpen();
                 fetchCDKs();
                 setFormData({});
             } else {
@@ -235,25 +249,74 @@ const CDKManagePage: React.FC = () => {
         }
     };
 
-    // 复制选中的CDK到剪贴板（每行一个）
+    // 复制选中的CDK（跨页选择）
     const handleCopySelectedCDKs = async () => {
         try {
-            let list: CDK[] = [];
-            if (selectedKeys === 'all') {
-                list = cdks;
-            } else {
-                const keySet = selectedKeys as Set<React.Key>;
-                list = cdks.filter((c) => keySet.has(c.id));
-            }
-            if (list.length === 0) {
+            if (crossPageSelection.size === 0) {
                 showToast('请先选择需要复制的CDK', 'warning');
                 return;
             }
-            const text = list.map((c) => c.cdk).join('\n');
+            const text = Array.from(crossPageSelection.values()).join('\n');
             await navigator.clipboard.writeText(text);
-            showToast(`已复制 ${list.length} 个CDK`, 'success');
+            showToast(`已复制 ${crossPageSelection.size} 个CDK`, 'success');
         } catch (_) {
             showToast('复制失败', 'error');
+        }
+    };
+
+    // 复制全部筛选结果（跨所有页）
+    const handleCopyAllFiltered = async () => {
+        try {
+            const params: CDKQueryParams = { page_size: 99999 };
+            if (searchQuery.trim()) params.querystring = searchQuery.trim();
+            if (statusFilter !== 'all') params.status = statusFilter as any;
+            const response = await adminApiService.getCDKs(params);
+            if (response.code === 20000) {
+                const list = Array.isArray(response.data) ? response.data : [];
+                if (list.length === 0) {
+                    showToast('当前筛选条件下无CDK', 'warning');
+                    return;
+                }
+                const text = list.map((c) => c.cdk).join('\n');
+                await navigator.clipboard.writeText(text);
+                showToast(`已复制全部 ${list.length} 个CDK`, 'success');
+            } else {
+                showToast(response.msg || '获取CDK列表失败', 'error');
+            }
+        } catch (_) {
+            showToast('复制失败', 'error');
+        }
+    };
+
+    // 导出为 .txt 文件
+    const handleExportTxt = async () => {
+        try {
+            const params: CDKQueryParams = { page_size: 99999 };
+            if (searchQuery.trim()) params.querystring = searchQuery.trim();
+            if (statusFilter !== 'all') params.status = statusFilter as any;
+            const response = await adminApiService.getCDKs(params);
+            if (response.code === 20000) {
+                const list = Array.isArray(response.data) ? response.data : [];
+                if (list.length === 0) {
+                    showToast('当前筛选条件下无CDK', 'warning');
+                    return;
+                }
+                const text = list.map((c) => c.cdk).join('\n');
+                const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `cdk_export_${dayjs().format('YYYYMMDD_HHmmss')}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast(`已导出 ${list.length} 个CDK`, 'success');
+            } else {
+                showToast(response.msg || '获取CDK列表失败', 'error');
+            }
+        } catch (_) {
+            showToast('导出失败', 'error');
         }
     };
 
@@ -421,14 +484,31 @@ const CDKManagePage: React.FC = () => {
                     批量生成CDK
                 </Button>
             </div>
-            <div className="flex justify-end mt-2">
+            <div className="flex justify-end mt-2 gap-2 flex-wrap">
                 <Button
                     variant="flat"
                     color="primary"
+                    startContent={<Copy className="w-4 h-4" />}
                     onPress={handleCopySelectedCDKs}
-                    isDisabled={selectedKeys !== 'all' && !(selectedKeys as Set<React.Key>).size}
+                    isDisabled={crossPageSelection.size === 0}
                 >
-                    复制选中CDK
+                    复制选中 ({crossPageSelection.size})
+                </Button>
+                <Button
+                    variant="flat"
+                    color="secondary"
+                    startContent={<Copy className="w-4 h-4" />}
+                    onPress={handleCopyAllFiltered}
+                >
+                    复制全部筛选结果
+                </Button>
+                <Button
+                    variant="flat"
+                    color="default"
+                    startContent={<Download className="w-4 h-4" />}
+                    onPress={handleExportTxt}
+                >
+                    导出 .txt
                 </Button>
             </div>
 
@@ -446,8 +526,20 @@ const CDKManagePage: React.FC = () => {
                         selectedKeys={selectedKeys as any}
                         onSelectionChange={(keys) => {
                             if (keys === 'all') {
+                                // 全选当前页
+                                const newMap = new Map(crossPageSelection);
+                                cdks.forEach((c) => newMap.set(c.id, c.cdk));
+                                setCrossPageSelection(newMap);
                                 setSelectedKeys(new Set(cdks.map((c) => c.id)) as any);
                             } else {
+                                const keySet = keys as Set<React.Key>;
+                                const newMap = new Map(crossPageSelection);
+                                // 取消当前页中不在新选择里的
+                                cdks.forEach((c) => {
+                                    if (!keySet.has(c.id)) newMap.delete(c.id);
+                                    else newMap.set(c.id, c.cdk);
+                                });
+                                setCrossPageSelection(newMap);
                                 setSelectedKeys(keys as any);
                             }
                         }}
@@ -492,7 +584,15 @@ const CDKManagePage: React.FC = () => {
                                     <TableCell>
                                         <div className="space-y-1">
                                             {cdk.user_id && (
-                                                <div className="text-sm">用户ID: {cdk.user_id}</div>
+                                                <div className="text-sm">
+                                                    {cdk.user_username || cdk.user_email || `ID: ${cdk.user_id}`}
+                                                </div>
+                                            )}
+                                            {cdk.user_id && cdk.user_email && !cdk.user_username && (
+                                                <div className="text-xs text-default-500">{cdk.user_email}</div>
+                                            )}
+                                            {cdk.user_id && cdk.user_username && (
+                                                <div className="text-xs text-default-500">{cdk.user_email || `ID: ${cdk.user_id}`}</div>
                                             )}
                                             {cdk.used_at && (
                                                 <div className="text-xs text-default-500">
@@ -696,8 +796,13 @@ const CDKManagePage: React.FC = () => {
                                     )}
                                     {selectedCDK.user_id && (
                                         <div>
-                                            <span className="text-sm text-default-500">使用用户ID</span>
-                                            <div className="font-medium">{selectedCDK.user_id}</div>
+                                            <span className="text-sm text-default-500">使用用户</span>
+                                            <div className="font-medium">
+                                                {selectedCDK.user_username || selectedCDK.user_email || `ID: ${selectedCDK.user_id}`}
+                                                {selectedCDK.user_username && selectedCDK.user_email && (
+                                                    <span className="text-sm text-default-500 ml-2">({selectedCDK.user_email})</span>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -745,6 +850,45 @@ const CDKManagePage: React.FC = () => {
                         </Button>
                         <Button color="danger" onPress={handleDelete}>
                             确认删除
+                        </Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
+
+            {/* 生成结果Modal */}
+            <Modal
+                isOpen={isGeneratedOpen}
+                onClose={onGeneratedClose}
+                size="2xl"
+                scrollBehavior="inside"
+            >
+                <ModalContent>
+                    <ModalHeader className="flex gap-2 items-center">
+                        <CheckCircle2 className="w-5 h-5 text-success" />
+                        生成完成 — 共 {generatedCDKs.length} 个CDK
+                    </ModalHeader>
+                    <ModalBody>
+                        <div className="bg-default-50 rounded-lg p-4 max-h-80 overflow-y-auto">
+                            <pre className="text-sm font-mono whitespace-pre-wrap break-all">
+                                {generatedCDKs.join('\n')}
+                            </pre>
+                        </div>
+                    </ModalBody>
+                    <ModalFooter>
+                        <Button variant="light" onPress={onGeneratedClose}>
+                            关闭
+                        </Button>
+                        <Button
+                            color="primary"
+                            startContent={<Copy className="w-4 h-4" />}
+                            onPress={async () => {
+                                try {
+                                    await navigator.clipboard.writeText(generatedCDKs.join('\n'));
+                                    showToast(`已复制全部 ${generatedCDKs.length} 个CDK`, 'success');
+                                } catch { showToast('复制失败', 'error'); }
+                            }}
+                        >
+                            一键复制全部
                         </Button>
                     </ModalFooter>
                 </ModalContent>

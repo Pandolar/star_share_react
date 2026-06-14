@@ -370,6 +370,37 @@ export const inviteUserApi = {
     },
 };
 
+// 额度使用详情类型
+export interface LimitUsageItem {
+    scope: 'model' | 'group' | 'default';
+    name: string;
+    mode: 'fixed' | 'sliding';
+    mode_label: string;
+    limit: number;
+    used: number;
+    remaining: number;
+    window: string;
+    reset_in_seconds: number | null;
+    reset_in: string | null;
+    models: string[];
+    model_costs: Record<string, number>;
+}
+
+export interface LimitUsageData {
+    package_level: string;
+    limits: LimitUsageItem[];
+}
+
+// 额度使用API
+export const limitUsageApi = {
+    // 获取当前用户额度使用详情
+    getUsage: async (): Promise<ApiResponse<LimitUsageData>> => {
+        return createUserRequest(getUserApiUrl('/u/limit_usage'), {
+            method: 'GET',
+        });
+    },
+};
+
 // 导出所有用户端API
 const userApi = {
     auth: userAuthApi,
@@ -379,6 +410,7 @@ const userApi = {
     order: orderUserApi,
     exchange: exchangeUserApi,
     invite: inviteUserApi,
+    limitUsage: limitUsageApi,
 };
 
 export default userApi; 

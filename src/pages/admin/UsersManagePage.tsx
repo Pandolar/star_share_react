@@ -44,7 +44,7 @@ import {
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import adminApiService from '../../services/adminApi';
-import { User, CreateUserRequest, UpdateUserRequest, UserQueryParams } from '../../types/admin';
+import { User, CreateUserRequest, UpdateUserRequest, UserQueryParams, UserPackage, Order } from '../../types/admin';
 import { showToast } from '../../components/Toast';
 
 /**
@@ -77,6 +77,9 @@ const UsersManagePage: React.FC = () => {
     const [clearLimitSearchLoading, setClearLimitSearchLoading] = useState(false);
     const [clearLimitSubmitting, setClearLimitSubmitting] = useState(false);
     const [pendingClearLimitUser, setPendingClearLimitUser] = useState<User | null>(null);
+    const [viewUserPackages, setViewUserPackages] = useState<UserPackage[]>([]);
+    const [viewUserOrders, setViewUserOrders] = useState<Order[]>([]);
+    const [viewDetailLoading, setViewDetailLoading] = useState(false);
 
     // 状态选项
     const statusOptions = [
@@ -314,10 +317,23 @@ const UsersManagePage: React.FC = () => {
         onEditOpen();
     };
 
-    // 打开查看Modal
-    const openViewModal = (user: User) => {
+    // 打开查看Modal（同时加载该用户的套餐和订单记录）
+    const openViewModal = async (user: User) => {
         setSelectedUser(user);
+        setViewUserPackages([]);
+        setViewUserOrders([]);
+        setViewDetailLoading(true);
         onViewOpen();
+        try {
+            const [pkgResp, orderResp] = await Promise.all([
+                adminApiService.getUserPackages({ user_id: user.id, page_size: 50 }),
+                adminApiService.getOrders({ user_id: user.id, page_size: 50 }),
+            ]);
+            if (pkgResp.code === 20000) setViewUserPackages(Array.isArray(pkgResp.data) ? pkgResp.data : []);
+            if (orderResp.code === 20000) setViewUserOrders(Array.isArray(orderResp.data) ? orderResp.data : []);
+        } catch {} finally {
+            setViewDetailLoading(false);
+        }
     };
 
     // 打开删除Modal
@@ -753,6 +769,81 @@ const UsersManagePage: React.FC = () => {
                                             {selectedUser.preferences ? JSON.stringify(selectedUser.preferences, null, 2) : '-'}
                                         </pre>
                                     </div>
+                                </div>
+
+                                {/* 套餐记录 */}
+                                <Divider className="my-2" />
+                                <div>
+                                    <span className="text-sm font-medium text-default-700">套餐记录</span>
+                                    {viewDetailLoading ? (
+                                        <div className="py-4 flex justify-center"><Spinner size="sm" /></div>
+                                    ) : viewUserPackages.length === 0 ? (
+                                        <div className="mt-2 text-sm text-default-400">暂无套餐记录</div>
+                                    ) : (
+                                        <div className="mt-2 overflow-x-auto">
+                                            <table className="w-full text-sm border-collapse">
+                                                <thead>
+                                                    <tr className="text-default-500 border-b border-default-200">
+                                                        <th className="text-left py-1.5 pr-3 font-medium">套餐ID</th>
+                                                        <th className="text-left py-1.5 pr-3 font-medium">状态</th>
+                                                        <th className="text-left py-1.5 pr-3 font-medium">方式</th>
+                                                        <th className="text-left py-1.5 font-medium">创建时间</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {viewUserPackages.map((pkg) => (
+                                                        <tr key={pkg.id} className="border-b border-default-100">
+                                                            <td className="py-1.5 pr-3">{pkg.package_id}</td>
+                                                            <td className="py-1.5 pr-3">
+                                                                <Chip size="sm" variant="flat" color={pkg.status === 'active' ? 'success' : pkg.status === 'frozen' ? 'warning' : 'default'}>
+                                                                    {pkg.status}
+                                                                </Chip>
+                                                            </td>
+                                                            <td className="py-1.5 pr-3">{pkg.way || '-'}</td>
+                                                            <td className="py-1.5">{dayjs(pkg.created_at).format('YYYY-MM-DD HH:mm')}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* 订单记录 */}
+                                <div>
+                                    <span className="text-sm font-medium text-default-700">订单记录</span>
+                                    {viewDetailLoading ? (
+                                        <div className="py-4 flex justify-center"><Spinner size="sm" /></div>
+                                    ) : viewUserOrders.length === 0 ? (
+                                        <div className="mt-2 text-sm text-default-400">暂无订单记录</div>
+                                    ) : (
+                                        <div className="mt-2 overflow-x-auto">
+                                            <table className="w-full text-sm border-collapse">
+                                                <thead>
+                                                    <tr className="text-default-500 border-b border-default-200">
+                                                        <th className="text-left py-1.5 pr-3 font-medium">订单号</th>
+                                                        <th className="text-left py-1.5 pr-3 font-medium">状态</th>
+                                                        <th className="text-left py-1.5 pr-3 font-medium">方式</th>
+                                                        <th className="text-left py-1.5 font-medium">创建时间</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {viewUserOrders.map((order) => (
+                                                        <tr key={order.id} className="border-b border-default-100">
+                                                            <td className="py-1.5 pr-3 font-mono text-xs">{order.order_id}</td>
+                                                            <td className="py-1.5 pr-3">
+                                                                <Chip size="sm" variant="flat" color={order.status === 'paid' ? 'success' : order.status === 'failed' ? 'danger' : 'warning'}>
+                                                                    {order.status}
+                                                                </Chip>
+                                                            </td>
+                                                            <td className="py-1.5 pr-3">{order.way || '-'}</td>
+                                                            <td className="py-1.5">{dayjs(order.created_at).format('YYYY-MM-DD HH:mm')}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
