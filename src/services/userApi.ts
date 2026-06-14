@@ -389,6 +389,7 @@ export interface LimitUsageItem {
 export interface LimitUsageData {
     package_level: string;
     limits: LimitUsageItem[];
+    usage_note?: string;
 }
 
 // 额度使用API

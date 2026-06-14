@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Card, CardBody, Chip, Spinner, Button, Progress, Tooltip } from '@heroui/react';
-import { motion } from 'framer-motion';
-import { Activity, AlertCircle, RefreshCw, Timer, Cpu } from 'lucide-react';
+import { Activity, AlertCircle, RefreshCw, Timer, Cpu, Info } from 'lucide-react';
 import { limitUsageApi, LimitUsageData, LimitUsageItem } from '../../../services/userApi';
 
 // 将剩余秒数格式化为「x时x分x秒」的简洁形式
@@ -24,6 +23,12 @@ const ratioColor = (ratio: number): 'success' | 'warning' | 'danger' => {
   return 'success';
 };
 
+// 展示名称：default 作用域的「其他模型」改为更易懂的「各模型使用情况」
+const displayName = (item: LimitUsageItem): string => {
+  if (item.scope === 'default') return '各模型使用情况';
+  return item.name;
+};
+
 interface UsageCardProps {
   item: LimitUsageItem;
   // 本地倒计时秒数（null 表示窗口未开始，无需重置）
@@ -37,25 +42,25 @@ const UsageCard: React.FC<UsageCardProps> = ({ item, remaining }) => {
 
   return (
     <Card className="border border-default-200">
-      <CardBody className="p-5 space-y-4">
+      <CardBody className="p-6 space-y-5">
         {/* 标题行：名称 + 窗口 */}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="text-base font-semibold text-default-900 truncate">{item.name}</h3>
-            <p className="text-xs text-default-400 mt-0.5">每 {item.window} 配额</p>
+            <h3 className="text-lg font-semibold text-default-900 truncate">{displayName(item)}</h3>
+            <p className="text-xs text-default-400 mt-1">每 {item.window} 配额 · {item.mode_label}</p>
           </div>
           <Chip size="sm" variant="flat" color={ratioColor(ratio)}>
-            {hasLimit ? `${percent}%` : '不可用'}
+            {hasLimit ? `已用 ${percent}%` : '不可用'}
           </Chip>
         </div>
 
         {/* 使用比例进度条 */}
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <Progress
             aria-label="使用比例"
             value={percent}
             color={ratioColor(ratio)}
-            size="sm"
+            size="md"
             className="max-w-full"
           />
           <div className="flex items-center justify-between text-sm">
@@ -72,8 +77,8 @@ const UsageCard: React.FC<UsageCardProps> = ({ item, remaining }) => {
         </div>
 
         {/* 重置剩余时间 */}
-        <div className="flex items-center gap-2 text-sm text-default-600">
-          <Timer size={15} className="text-default-400 flex-shrink-0" />
+        <div className="flex items-center gap-2 text-sm text-default-600 pt-1 border-t border-default-100">
+          <Timer size={16} className="text-default-400 flex-shrink-0" />
           <span>
             重置剩余：
             <span className="font-medium text-default-800">
@@ -85,7 +90,7 @@ const UsageCard: React.FC<UsageCardProps> = ({ item, remaining }) => {
         {/* 涉及模型 / 消耗权重 */}
         {item.models.length > 0 && (
           <div className="flex items-start gap-2">
-            <Cpu size={15} className="text-default-400 flex-shrink-0 mt-1" />
+            <Cpu size={16} className="text-default-400 flex-shrink-0 mt-1" />
             <div className="flex flex-wrap gap-1.5">
               {item.models.map((model) => {
                 const cost = item.model_costs?.[model];
@@ -110,7 +115,11 @@ const UsageCard: React.FC<UsageCardProps> = ({ item, remaining }) => {
   );
 };
 
-export const UsageTab: React.FC = () => {
+/**
+ * 使用额度区块（可嵌入到个人主页等页面）
+ * 展示当前窗口的使用比例、重置剩余时间、涉及模型/消耗权重，以及可配置的消耗规则说明。
+ */
+export const UsageSection: React.FC = () => {
   const [data, setData] = useState<LimitUsageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -169,21 +178,16 @@ export const UsageTab: React.FC = () => {
   }, []);
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-      {/* 页面标题 */}
+    <div className="space-y-4">
+      {/* 区块标题 */}
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-            <Activity size={20} className="text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-default-900">使用额度</h1>
-            <p className="text-sm text-default-500 mt-1">查看当前窗口的额度使用情况与重置时间</p>
-          </div>
+        <div className="flex items-center gap-2">
+          <Activity size={18} className="text-primary" />
+          <h2 className="text-lg font-bold text-default-900">使用额度</h2>
         </div>
         <Button
           size="sm"
-          variant="flat"
+          variant="light"
           color="primary"
           startContent={<RefreshCw size={14} />}
           onPress={fetchUsage}
@@ -196,7 +200,7 @@ export const UsageTab: React.FC = () => {
       {loading && (
         <Card>
           <CardBody className="p-6">
-            <div className="flex items-center justify-center py-12">
+            <div className="flex items-center justify-center py-10">
               <Spinner size="lg" color="primary" />
               <span className="ml-3 text-default-600">加载中...</span>
             </div>
@@ -207,7 +211,7 @@ export const UsageTab: React.FC = () => {
       {!loading && error && (
         <Card>
           <CardBody className="p-6">
-            <div className="flex items-start gap-4 p-6 bg-danger/10 rounded-lg">
+            <div className="flex items-start gap-4 p-4 bg-danger/10 rounded-lg">
               <AlertCircle size={20} className="text-danger flex-shrink-0 mt-1" />
               <div>
                 <h3 className="font-semibold text-danger mb-2">加载失败</h3>
@@ -225,21 +229,35 @@ export const UsageTab: React.FC = () => {
         <>
           {data.limits.length === 0 ? (
             <Card>
-              <CardBody className="p-10 text-center text-default-500">
+              <CardBody className="p-8 text-center text-default-500">
                 当前套餐暂无额度限制信息
               </CardBody>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-4">
               {data.limits.map((item, idx) => (
                 <UsageCard key={`${item.scope}-${item.name}-${idx}`} item={item} remaining={remainings[idx]} />
               ))}
             </div>
           )}
+
+          {/* 可配置的消耗规则说明 */}
+          {data.usage_note && (
+            <Card className="border border-primary/20 bg-primary/5">
+              <CardBody className="p-4">
+                <div className="flex items-start gap-3">
+                  <Info size={18} className="text-primary flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-default-700 leading-6 whitespace-pre-wrap break-words">
+                    {data.usage_note}
+                  </div>
+                </div>
+              </CardBody>
+            </Card>
+          )}
         </>
       )}
-    </motion.div>
+    </div>
   );
 };
 
-export default UsageTab;
+export default UsageSection;

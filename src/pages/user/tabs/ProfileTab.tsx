@@ -5,6 +5,7 @@ import { User, Mail, Calendar, Shield, AlertCircle, Package, Crown, Edit3, Messa
 import { useSearchParams } from 'react-router-dom';
 import { userInfoApi } from '../../../services/userApi';
 import { EditProfileModal } from './profile/EditProfileModal';
+import { UsageSection } from './UsageTab';
 import type { UserInfo, EditTabKey } from './profile/types';
 
 const getStatusChip = (status: number) =>
@@ -278,6 +279,9 @@ export const ProfileTab: React.FC = () => {
               </CardBody>
             </Card>
           </div>
+
+          {/* 使用额度 */}
+          <UsageSection />
         </>
       )}
 

@@ -17,7 +17,6 @@ import {
   LogOut,
   Home,
   AlertCircle,
-  Activity,
 } from 'lucide-react';
 
 // Tab页面组件导入
@@ -26,7 +25,6 @@ import { ProfileTab } from './tabs/ProfileTab';
 import { SubscriptionTab } from './tabs/SubscriptionTab';
 import { OrderHistoryTab } from './tabs/OrderHistoryTab';
 import { InviteTab } from './tabs/InviteTab';
-import { UsageTab } from './tabs/UsageTab';
 
 // 组件和工具导入
 import { LogoutConfirmModal } from '../../components/LogoutConfirmModal';
@@ -62,12 +60,6 @@ const tabConfigs: TabConfig[] = [
     label: '订阅套餐',
     icon: <Package size={20} />,
     component: SubscriptionTab
-  },
-  {
-    key: 'usage',
-    label: '使用额度',
-    icon: <Activity size={20} />,
-    component: UsageTab
   },
   {
     key: 'orders',
