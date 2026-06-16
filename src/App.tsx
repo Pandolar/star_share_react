@@ -1,31 +1,32 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { ToastContainer } from './components/Toast';
 import ErrorBoundary from './components/ErrorBoundary';
+import { lazyWithRetry } from './utils/lazyWithRetry';
 
-const HomePage = lazy(() => import('./pages/HomePage'));
-const UserCenter = lazy(() => import('./pages/user/UserCenter'));
-const GoPlusPage = lazy(() => import('./pages/features/GoPlusPage'));
-const ShareSpeedTestPage = lazy(() => import('./pages/features/ShareSpeedTestPage'));
-const JumpNsPage = lazy(() => import('./pages/features/JumpNsPage'));
-const RedirectPage = lazy(() => import('./pages/features/RedirectPage'));
-const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
-const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
-const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
-const NewApiPage = lazy(() => import('./pages/features/NewApiPage'));
-const CustomerServicePage = lazy(() => import('./pages/features/CustomerServicePage'));
-const AdminLoginPage = lazy(() => import('./pages/admin/AdminLoginPage'));
-const AdminLayout = lazy(() => import('./components/admin/AdminLayout'));
-const OverviewDashboardPage = lazy(() => import('./pages/admin/OverviewDashboardPage'));
-const AdminProtectedRoute = lazy(() => import('./components/admin/AdminProtectedRoute'));
-const UsersManagePage = lazy(() => import('./pages/admin/UsersManagePage'));
-const PackagesManagePage = lazy(() => import('./pages/admin/PackagesManagePage'));
-const SettingsManagePage = lazy(() => import('./pages/admin/SettingsManagePage'));
-const OrdersManagePage = lazy(() => import('./pages/admin/OrdersManagePage'));
-const CDKManagePage = lazy(() => import('./pages/admin/CDKManagePage'));
-const UserPackagesManagePage = lazy(() => import('./pages/admin/UserPackagesManagePage'));
-const InviteManagePage = lazy(() => import('./pages/admin/InviteManagePage'));
+const HomePage = lazyWithRetry(() => import('./pages/HomePage'), 'HomePage');
+const UserCenter = lazyWithRetry(() => import('./pages/user/UserCenter'), 'UserCenter');
+const GoPlusPage = lazyWithRetry(() => import('./pages/features/GoPlusPage'), 'GoPlusPage');
+const ShareSpeedTestPage = lazyWithRetry(() => import('./pages/features/ShareSpeedTestPage'), 'ShareSpeedTestPage');
+const JumpNsPage = lazyWithRetry(() => import('./pages/features/JumpNsPage'), 'JumpNsPage');
+const RedirectPage = lazyWithRetry(() => import('./pages/features/RedirectPage'), 'RedirectPage');
+const LoginPage = lazyWithRetry(() => import('./pages/auth/LoginPage'), 'LoginPage');
+const RegisterPage = lazyWithRetry(() => import('./pages/auth/RegisterPage'), 'RegisterPage');
+const ForgotPasswordPage = lazyWithRetry(() => import('./pages/auth/ForgotPasswordPage'), 'ForgotPasswordPage');
+const NewApiPage = lazyWithRetry(() => import('./pages/features/NewApiPage'), 'NewApiPage');
+const CustomerServicePage = lazyWithRetry(() => import('./pages/features/CustomerServicePage'), 'CustomerServicePage');
+const AdminLoginPage = lazyWithRetry(() => import('./pages/admin/AdminLoginPage'), 'AdminLoginPage');
+const AdminLayout = lazyWithRetry(() => import('./components/admin/AdminLayout'), 'AdminLayout');
+const OverviewDashboardPage = lazyWithRetry(() => import('./pages/admin/OverviewDashboardPage'), 'OverviewDashboardPage');
+const AdminProtectedRoute = lazyWithRetry(() => import('./components/admin/AdminProtectedRoute'), 'AdminProtectedRoute');
+const UsersManagePage = lazyWithRetry(() => import('./pages/admin/UsersManagePage'), 'UsersManagePage');
+const PackagesManagePage = lazyWithRetry(() => import('./pages/admin/PackagesManagePage'), 'PackagesManagePage');
+const SettingsManagePage = lazyWithRetry(() => import('./pages/admin/SettingsManagePage'), 'SettingsManagePage');
+const OrdersManagePage = lazyWithRetry(() => import('./pages/admin/OrdersManagePage'), 'OrdersManagePage');
+const CDKManagePage = lazyWithRetry(() => import('./pages/admin/CDKManagePage'), 'CDKManagePage');
+const UserPackagesManagePage = lazyWithRetry(() => import('./pages/admin/UserPackagesManagePage'), 'UserPackagesManagePage');
+const InviteManagePage = lazyWithRetry(() => import('./pages/admin/InviteManagePage'), 'InviteManagePage');
 
 const RouteLoadingFallback: React.FC = () => (
   <div className="flex min-h-screen items-center justify-center bg-white px-4 text-sm text-default-500">
@@ -46,8 +47,10 @@ const App: React.FC = () => {
         <div className="App">
           {/* 全局Toast通知容器 */}
           <ToastContainer />
-          <Suspense fallback={<RouteLoadingFallback />}>
-            <Routes>
+          {/* 全局兜底：任何路由的渲染/懒加载错误都进入恢复流程，避免整页白屏 */}
+          <ErrorBoundary autoReload={true} reloadDelay={1500}>
+            <Suspense fallback={<RouteLoadingFallback />}>
+              <Routes>
               {/* 主页路由 */}
               <Route
                 path="/"
@@ -88,8 +91,9 @@ const App: React.FC = () => {
                 <Route path="settings" element={<SettingsManagePage />} />
                 <Route path="invites" element={<InviteManagePage />} />
               </Route>
-            </Routes>
-          </Suspense>
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
         </div>
       </Router>
     </HelmetProvider>
