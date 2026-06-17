@@ -324,7 +324,7 @@ export const SubscriptionTab: React.FC = () => {
                   <div>2. 订阅同等级套餐将直接<strong className="font-semibold text-default-900">叠加延期</strong>。</div>
                   <div>3. 订阅更高等级套餐后将<strong className="font-semibold text-default-900">自动冻结低等级套餐</strong>，待高等级套餐过期后将自动解冻。</div>
                   <div>4. 如果您有激活码/CDK/兑换码，可直接在右上角【兑换激活码】直接兑换。</div>
-                  <div>5. 单笔订单金额超100元可联系客服进行开发票，支持高校或企业抬头。</div>
+                  <div>5. 单笔订单金额<strong className="font-semibold text-default-900">超100元且30天内</strong>可联系客服进行开票，支持高校或企业抬头。</div>
                 </>
               )}
             </div>
