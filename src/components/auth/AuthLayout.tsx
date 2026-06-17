@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { ChatwootFloatingButton } from '../chat/ChatwootFloatingButton';
+import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -8,6 +9,7 @@ interface AuthLayoutProps {
 }
 
 const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title }) => {
+  const { isWhiteLabel } = useWhiteLabel();
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-25 px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-8">
@@ -36,8 +38,8 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title }) => {
         </motion.div>
       </div>
 
-      {/* 浮动客服按钮 - 游客模式 */}
-      <ChatwootFloatingButton mode="guest" />
+      {/* 浮动客服按钮 - 游客模式（白牌模式不加载客服） */}
+      {!isWhiteLabel && <ChatwootFloatingButton mode="guest" />}
     </div>
   );
 };

@@ -32,6 +32,7 @@ import { ChatwootFloatingButton } from '../../components/chat/ChatwootFloatingBu
 import { clearAuthCookies, getCookie } from '../../utils/cookies';
 import { useAuthCheck } from '../../hooks/useAuthCheck';
 import { userInfoApi } from '../../services/userApi';
+import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
 
 // Tab配置接口
 interface TabConfig {
@@ -41,8 +42,8 @@ interface TabConfig {
   component: React.ComponentType;
 }
 
-// Tab配置数组
-const tabConfigs: TabConfig[] = [
+// Tab配置数组（全量，白牌模式下会过滤）
+const ALL_TAB_CONFIGS: TabConfig[] = [
   {
     key: 'announcements',
     label: '公告通知',
@@ -82,6 +83,16 @@ const UserCenter: React.FC = () => {
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [emailUnbound, setEmailUnbound] = useState(false);
   const navigate = useNavigate();
+
+  // 白牌模式：隐藏“邀请好友”“订单记录”Tab（白牌无邀请、无支付即无订单）
+  const { isWhiteLabel } = useWhiteLabel();
+  const tabConfigs = React.useMemo(
+    () =>
+      isWhiteLabel
+        ? ALL_TAB_CONFIGS.filter(t => t.key !== 'invite' && t.key !== 'orders')
+        : ALL_TAB_CONFIGS,
+    [isWhiteLabel]
+  );
 
   // 使用认证检查Hook
   const { isAuthenticated, isChecking, countdown, handleAuthFailure } = useAuthCheck({
@@ -452,15 +463,19 @@ const UserCenter: React.FC = () => {
           </AnimatePresence>
 
           {/* 主内容区域 */}
+          {/* 注意：不要用 initial 透明度动画包裹整个内容区。
+              framer-motion 的入场动画依赖 requestAnimationFrame，
+              若首屏处于后台标签/重定向/慢首绘等场景，rAF 被节流时入场动画可能不触发，
+              元素会卡在 opacity:0 造成白屏（切换 Tab 才恢复）。
+              这里持久容器不做透明度入场，AnimatePresence 用 initial={false} 让首个子项直接以最终态渲染。 */}
           <motion.main
-            initial={{ opacity: 0, y: 20 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.1 }}
             className="flex-1 min-w-0"
           >
             <Card className="min-h-[calc(min(100vh,1600px)-12rem)]">
               <CardBody className="p-6">
-                <AnimatePresence mode="wait">
+                <AnimatePresence mode="wait" initial={false}>
                   <motion.div
                     key={activeTab}
                     initial={{ opacity: 0, x: 20 }}
@@ -485,7 +500,7 @@ const UserCenter: React.FC = () => {
       />
 
       {/* 浮动客服按钮 - 用户模式 */}
-      <ChatwootFloatingButton mode="user" />
+      {!isWhiteLabel && <ChatwootFloatingButton mode="user" />}
     </div>
   );
 };

@@ -1,4 +1,5 @@
 import React, { Suspense } from 'react';
+import { Navigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Hero from '../components/Hero';
 import LatestModels from '../components/LatestModels';
@@ -9,6 +10,7 @@ import ForceBrowserPage from '../components/ForceBrowserPage';
 import { homeSEOConfig } from '../config/seo';
 import { HomeInfoProvider } from '../contexts/HomeInfoContext';
 import { useWeChatDetection } from '../hooks/useWeChatDetection';
+import { useWhiteLabel } from '../contexts/WhiteLabelContext';
 
 // 骨架屏组件
 const HomePageSkeleton: React.FC = () => (
@@ -35,11 +37,22 @@ const HomePageSkeleton: React.FC = () => (
 );
 
 const HomePage: React.FC = () => {
+  // 白牌模式：不展示自营营销首页（含品牌/外链），直接进入登录
+  const { isWhiteLabel, loading: wlLoading } = useWhiteLabel();
+
   // 微信检测功能 - 启用强制模式
   const { isWeChat, showBrowserTip, forceBlockWeChat, hideTip } = useWeChatDetection({
     forceMode: true, // 启用强制模式，不允许在微信中访问
     showTipByDefault: false // 强制模式下不使用普通提示
   });
+
+  // 白牌模式判定中：先空白等待，避免闪现自营首页
+  if (wlLoading) {
+    return <div className="min-h-screen bg-white" />;
+  }
+  if (isWhiteLabel) {
+    return <Navigate to="/login" replace />;
+  }
 
   // 如果在微信中且启用强制模式，显示强制浏览器打开页面
   if (forceBlockWeChat) {

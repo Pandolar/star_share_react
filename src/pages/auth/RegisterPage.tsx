@@ -8,6 +8,7 @@ import { toast } from '../../utils/toast';
 import { setAuthCookies } from '../../utils/cookies';
 import { useAutoLogin } from '../../hooks/useAutoLogin';
 import { useRedirect } from '../../hooks/useRedirect';
+import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
 
 const USER_AGREEMENT_URL = 'https://r7r3bw489x.feishu.cn/wiki/Mq7FwBuhdiNH12kmqFvc4W0onqg';
 const AFF_STORAGE_KEY = 'register_aff';
@@ -31,6 +32,7 @@ const RegisterPage: React.FC = () => {
   const isLoggedIn = useAutoLogin();
   const redirect = useRedirect();
   const location = useLocation();
+  const { isWhiteLabel } = useWhiteLabel();
 
   const initialAff = useMemo(() => {
     const searchAff = new URLSearchParams(location.search).get('aff') || '';
@@ -201,6 +203,7 @@ const RegisterPage: React.FC = () => {
             />
           </div>
 
+          {!isWhiteLabel && (
           <div className="rounded-xl border border-default-200 bg-default-50/70 p-4 space-y-3">
             <button
               type="button"
@@ -233,6 +236,7 @@ const RegisterPage: React.FC = () => {
               </div>
             )}
           </div>
+          )}
 
           <div className="flex items-start gap-2 text-sm text-default-600">
             <input

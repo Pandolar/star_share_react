@@ -51,6 +51,7 @@ async function createUserRequest(
     // 准备请求头
     const headers: { [key: string]: string } = {
         'Content-Type': 'application/json',
+        'X-Site-Domain': window.location.hostname, // 白牌模式判定：携带客户实际访问域名
         ...getUserAuthHeaders(), // 添加用户认证头
         ...(fetchOptions.headers as any || {}),
     };
@@ -148,6 +149,21 @@ export const announcementApi = {
         home_info: import('../types/homeInfo').HomeInfo;
     }>> => {
         return createUserRequest(getUserApiUrl('/u/get_public_info'), {
+            method: 'GET',
+        });
+    },
+};
+
+// 站点模式API（自营/白牌）
+export const siteModeApi = {
+    // 获取当前站点模式，依据访问域名由后端判定
+    getSiteMode: async (): Promise<ApiResponse<{
+        mode: 'normal' | 'whitelabel';
+        is_white_label: boolean;
+        notice?: string;
+        notice_id?: string;
+    }>> => {
+        return createUserRequest(getUserApiUrl('/u/get_site_mode'), {
             method: 'GET',
         });
     },

@@ -10,6 +10,7 @@ import { userInfoApi } from '../../services/userApi';
 import { useAutoLogin } from '../../hooks/useAutoLogin';
 import { useRedirect } from '../../hooks/useRedirect';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
 
 const USER_AGREEMENT_URL = 'https://r7r3bw489x.feishu.cn/wiki/Mq7FwBuhdiNH12kmqFvc4W0onqg';
 
@@ -55,6 +56,8 @@ const LoginPage: React.FC = () => {
 
   // 登录方式切换
   const [loginMethod, setLoginMethod] = useState<'wechat' | 'email'>('email');
+  // 白牌模式：隐藏微信登录，仅保留邮箱登录
+  const { isWhiteLabel } = useWhiteLabel();
   // 切到微信 Tab 后是否已确认继续使用（用于在显示二维码前先弹推荐邮箱登录的提示）
   const [wechatConfirmed, setWechatConfirmed] = useState(false);
 
@@ -517,7 +520,8 @@ const LoginPage: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-6">
-          {/* 登录方式选择 */}
+          {/* 登录方式选择（白牌模式隐藏微信登录，仅邮箱登录） */}
+          {!isWhiteLabel && (
           <div className="flex space-x-1 bg-default-100 p-1 rounded-lg">
             <button
               onClick={() => handleLoginMethodChange('email')}
@@ -543,9 +547,10 @@ const LoginPage: React.FC = () => {
               <span>微信登录</span>
             </button>
           </div>
+          )}
 
           {/* 微信二维码登录 */}
-          {loginMethod === 'wechat' && !wechatConfirmed && (
+          {!isWhiteLabel && loginMethod === 'wechat' && !wechatConfirmed && (
             <Card className="w-full">
               <CardBody className="flex flex-col items-center space-y-5 p-6 sm:p-8">
                 <div className="w-12 h-12 rounded-full bg-warning/15 flex items-center justify-center">
@@ -577,7 +582,7 @@ const LoginPage: React.FC = () => {
             </Card>
           )}
 
-          {loginMethod === 'wechat' && wechatConfirmed && (
+          {!isWhiteLabel && loginMethod === 'wechat' && wechatConfirmed && (
             <Card className="w-full">
               <CardBody className="flex flex-col items-center space-y-4 p-8">
                 <h3 className="text-lg font-semibold text-default-800">微信扫码登录</h3>

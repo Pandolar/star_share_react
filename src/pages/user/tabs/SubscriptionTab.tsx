@@ -9,6 +9,7 @@ import { Package, Star, Crown, AlertCircle, Calendar, Timer, ChevronDown, Info }
 import { packageUserApi, orderUserApi } from '../../../services/userApi';
 import { toast } from '../../../utils/toast';
 import { useIsMobile } from '../../../hooks/useIsMobile';
+import { useWhiteLabel } from '../../../contexts/WhiteLabelContext';
 import { PaymentModal } from './subscription/PaymentModal';
 import { CdkRedeemModal } from './subscription/CdkRedeemModal';
 import {
@@ -35,6 +36,7 @@ export const SubscriptionTab: React.FC = () => {
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
 
   const isMobileDevice = useIsMobile();
+  const { isWhiteLabel } = useWhiteLabel();
 
   const subscriptionCategories: SubscriptionCategory[] = useMemo(
     () => [
@@ -309,11 +311,22 @@ export const SubscriptionTab: React.FC = () => {
           </button>
           {showSubscriptionGuide && (
             <div className="mt-4 rounded-xl bg-white/80 border border-default-100 px-4 py-3 text-sm text-default-700 leading-7">
-              <div>1. 若您已有订阅套餐，不可再次订阅<strong className="font-semibold text-default-900">更低</strong>等级套餐。</div>
-              <div>2. 订阅同等级套餐将直接<strong className="font-semibold text-default-900">叠加延期</strong>。</div>
-              <div>3. 订阅更高等级套餐后将<strong className="font-semibold text-default-900">自动冻结低等级套餐</strong>，待高等级套餐过期后将自动解冻。</div>
-              <div>4. 如果您有激活码/CDK/兑换码，可直接在右上角【兑换激活码】直接兑换。</div>
-              <div>5. 单笔订单金额超100元可联系客服进行开发票，支持高校或企业抬头。</div>
+              {isWhiteLabel ? (
+                <>
+                  <div>1. 若您已有订阅套餐，不可再次兑换<strong className="font-semibold text-default-900">更低</strong>等级套餐。</div>
+                  <div>2. 兑换同等级套餐将直接<strong className="font-semibold text-default-900">叠加延期</strong>。</div>
+                  <div>3. 兑换更高等级套餐后将<strong className="font-semibold text-default-900">自动冻结低等级套餐</strong>，待高等级套餐过期后将自动解冻。</div>
+                  <div>4. 请通过右上角【兑换激活码】使用您获得的激活码开通对应套餐。</div>
+                </>
+              ) : (
+                <>
+                  <div>1. 若您已有订阅套餐，不可再次订阅<strong className="font-semibold text-default-900">更低</strong>等级套餐。</div>
+                  <div>2. 订阅同等级套餐将直接<strong className="font-semibold text-default-900">叠加延期</strong>。</div>
+                  <div>3. 订阅更高等级套餐后将<strong className="font-semibold text-default-900">自动冻结低等级套餐</strong>，待高等级套餐过期后将自动解冻。</div>
+                  <div>4. 如果您有激活码/CDK/兑换码，可直接在右上角【兑换激活码】直接兑换。</div>
+                  <div>5. 单笔订单金额超100元可联系客服进行开发票，支持高校或企业抬头。</div>
+                </>
+              )}
             </div>
           )}
         </CardBody>
@@ -418,6 +431,7 @@ export const SubscriptionTab: React.FC = () => {
                         </div>
                       </div>
                       <div className="divider" />
+                      {!isWhiteLabel && (
                       <div className="package-price">
                         {showMonthlyPrice ? (
                           <>
@@ -434,26 +448,37 @@ export const SubscriptionTab: React.FC = () => {
                           </div>
                         )}
                       </div>
+                      )}
                       <div className="package-description">
                         <div className="description-box">
                           <p className="description-text">{pkg.introduce || '暂无详细描述'}</p>
                         </div>
                       </div>
                       <div className="subscribe-button">
-                        <button
-                          className={`hero-button ${isPopular ? 'primary' : 'secondary'}`}
-                          disabled={pkg.status !== 1 || (orderLoading && selectedPackage?.id === pkg.id)}
-                          onClick={() => createOrder(pkg)}
-                        >
-                          {orderLoading && selectedPackage?.id === pkg.id ? (
-                            <>
-                              <div className="loading-spinner" />
-                              处理中...
-                            </>
-                          ) : (
-                            pkg.status === 1 ? '立即订阅' : '暂不可用'
-                          )}
-                        </button>
+                        {isWhiteLabel ? (
+                          <button
+                            className={`hero-button ${isPopular ? 'primary' : 'secondary'}`}
+                            disabled={pkg.status !== 1}
+                            onClick={() => setRedeemModalOpen(true)}
+                          >
+                            {pkg.status === 1 ? '使用兑换码激活' : '暂不可用'}
+                          </button>
+                        ) : (
+                          <button
+                            className={`hero-button ${isPopular ? 'primary' : 'secondary'}`}
+                            disabled={pkg.status !== 1 || (orderLoading && selectedPackage?.id === pkg.id)}
+                            onClick={() => createOrder(pkg)}
+                          >
+                            {orderLoading && selectedPackage?.id === pkg.id ? (
+                              <>
+                                <div className="loading-spinner" />
+                                处理中...
+                              </>
+                            ) : (
+                              pkg.status === 1 ? '立即订阅' : '暂不可用'
+                            )}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -496,22 +521,24 @@ export const SubscriptionTab: React.FC = () => {
                         </Chip>
                       </div>
                     </div>
-                    <div className="package-price" style={{ margin: '16px 0' }}>
-                      {showMonthlyPrice ? (
-                        <>
+                    {!isWhiteLabel && (
+                      <div className="package-price" style={{ margin: '16px 0' }}>
+                        {showMonthlyPrice ? (
+                          <>
+                            <div className="price-main">
+                              <span className="price-amount" style={{ fontSize: '28px' }}>≈¥{monthlyPrice}</span>
+                              <span className="price-unit">/ 月</span>
+                            </div>
+                            <p className="price-daily">共 ¥{pkg.price} / {getDurationText(pkg.duration)}</p>
+                          </>
+                        ) : (
                           <div className="price-main">
-                            <span className="price-amount" style={{ fontSize: '28px' }}>≈¥{monthlyPrice}</span>
-                            <span className="price-unit">/ 月</span>
+                            <span className="price-amount" style={{ fontSize: '28px' }}>¥{pkg.price}</span>
+                            <span className="price-unit">/ {getDurationText(pkg.duration)}</span>
                           </div>
-                          <p className="price-daily">共 ¥{pkg.price} / {getDurationText(pkg.duration)}</p>
-                        </>
-                      ) : (
-                        <div className="price-main">
-                          <span className="price-amount" style={{ fontSize: '28px' }}>¥{pkg.price}</span>
-                          <span className="price-unit">/ {getDurationText(pkg.duration)}</span>
-                        </div>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    )}
                     <div className="package-description" style={{ margin: '12px 0 20px 0' }}>
                       <div className="description-box" style={{ minHeight: '60px', padding: '12px' }}>
                         <p className="description-text" style={{ fontSize: '13px' }}>
@@ -520,21 +547,32 @@ export const SubscriptionTab: React.FC = () => {
                       </div>
                     </div>
                     <div className="subscribe-button">
-                      <button
-                        className="hero-button primary"
-                        disabled={pkg.status !== 1 || (orderLoading && selectedPackage?.id === pkg.id)}
-                        onClick={() => createOrder(pkg)}
-                        style={{ height: '40px', fontSize: '14px' }}
-                      >
-                        {orderLoading && selectedPackage?.id === pkg.id ? (
-                          <>
-                            <div className="loading-spinner" />
-                            处理中...
-                          </>
-                        ) : (
-                          pkg.status === 1 ? '立即订阅' : '暂不可用'
-                        )}
-                      </button>
+                      {isWhiteLabel ? (
+                        <button
+                          className="hero-button primary"
+                          disabled={pkg.status !== 1}
+                          onClick={() => setRedeemModalOpen(true)}
+                          style={{ height: '40px', fontSize: '14px' }}
+                        >
+                          {pkg.status === 1 ? '兑换激活码' : '暂不可用'}
+                        </button>
+                      ) : (
+                        <button
+                          className="hero-button primary"
+                          disabled={pkg.status !== 1 || (orderLoading && selectedPackage?.id === pkg.id)}
+                          onClick={() => createOrder(pkg)}
+                          style={{ height: '40px', fontSize: '14px' }}
+                        >
+                          {orderLoading && selectedPackage?.id === pkg.id ? (
+                            <>
+                              <div className="loading-spinner" />
+                              处理中...
+                            </>
+                          ) : (
+                            pkg.status === 1 ? '立即订阅' : '暂不可用'
+                          )}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

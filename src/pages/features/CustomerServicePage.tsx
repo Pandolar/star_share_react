@@ -1,15 +1,33 @@
 import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChatwootWidget, toggleChatwoot } from '../../components/chat/ChatwootWidget';
+import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
 
 const CustomerServicePage: React.FC = () => {
-  // 页面加载时自动打开客服窗口
+  const { isWhiteLabel, loading } = useWhiteLabel();
+  const navigate = useNavigate();
+
+  // 白牌模式：无客服系统，购买与客诉均由分销商负责，跳回用户中心
   useEffect(() => {
+    if (!loading && isWhiteLabel) {
+      navigate('/user-center', { replace: true });
+    }
+  }, [loading, isWhiteLabel, navigate]);
+
+  // 页面加载时自动打开客服窗口（仅自营模式）
+  useEffect(() => {
+    if (loading || isWhiteLabel) return;
     const timer = setTimeout(() => {
       toggleChatwoot('open');
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [loading, isWhiteLabel]);
+
+  // 白牌模式不渲染任何客服相关内容
+  if (loading || isWhiteLabel) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-default-50">

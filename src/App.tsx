@@ -4,6 +4,7 @@ import { HelmetProvider } from 'react-helmet-async';
 import { ToastContainer } from './components/Toast';
 import ErrorBoundary from './components/ErrorBoundary';
 import { lazyWithRetry } from './utils/lazyWithRetry';
+import { WhiteLabelProvider } from './contexts/WhiteLabelContext';
 
 const HomePage = lazyWithRetry(() => import('./pages/HomePage'), 'HomePage');
 const UserCenter = lazyWithRetry(() => import('./pages/user/UserCenter'), 'UserCenter');
@@ -44,13 +45,14 @@ const App: React.FC = () => {
   return (
     <HelmetProvider>
       <Router>
-        <div className="App">
-          {/* 全局Toast通知容器 */}
-          <ToastContainer />
-          {/* 全局兜底：任何路由的渲染/懒加载错误都进入恢复流程，避免整页白屏 */}
-          <ErrorBoundary autoReload={true} reloadDelay={1500}>
-            <Suspense fallback={<RouteLoadingFallback />}>
-              <Routes>
+        <WhiteLabelProvider>
+          <div className="App">
+            {/* 全局Toast通知容器 */}
+            <ToastContainer />
+            {/* 全局兜底：任何路由的渲染/懒加载错误都进入恢复流程，避免整页白屏 */}
+            <ErrorBoundary autoReload={true} reloadDelay={1500}>
+              <Suspense fallback={<RouteLoadingFallback />}>
+                <Routes>
               {/* 主页路由 */}
               <Route
                 path="/"
@@ -94,7 +96,8 @@ const App: React.FC = () => {
               </Routes>
             </Suspense>
           </ErrorBoundary>
-        </div>
+          </div>
+        </WhiteLabelProvider>
       </Router>
     </HelmetProvider>
   );
