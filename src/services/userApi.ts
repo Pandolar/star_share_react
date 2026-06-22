@@ -160,6 +160,7 @@ export const siteModeApi = {
     getSiteMode: async (): Promise<ApiResponse<{
         mode: 'normal' | 'whitelabel';
         is_white_label: boolean;
+        enable_register?: boolean;
         notice?: string;
         notice_id?: string;
     }>> => {

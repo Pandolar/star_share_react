@@ -57,7 +57,7 @@ const LoginPage: React.FC = () => {
   // 登录方式切换
   const [loginMethod, setLoginMethod] = useState<'wechat' | 'email'>('email');
   // 白牌模式：隐藏微信登录，仅保留邮箱登录
-  const { isWhiteLabel } = useWhiteLabel();
+  const { isWhiteLabel, enableRegister } = useWhiteLabel();
   // 切到微信 Tab 后是否已确认继续使用（用于在显示二维码前先弹推荐邮箱登录的提示）
   const [wechatConfirmed, setWechatConfirmed] = useState(false);
 
@@ -782,15 +782,17 @@ const LoginPage: React.FC = () => {
                     >
                       找回密码
                     </Link>
-                    <Link
-                      to={`/register${location.search}`}
-                      className="text-sm text-primary-700 hover:text-primary-600 font-medium"
-                    >
-                      还没有账户？
-                      <span className="ml-1 text-sm text-primary-600 hover:text-primary-700 underline underline-offset-2">
-                        立即注册
-                      </span>
-                    </Link>
+                    {enableRegister && (
+                      <Link
+                        to={`/register${location.search}`}
+                        className="text-sm text-primary-700 hover:text-primary-600 font-medium"
+                      >
+                        还没有账户？
+                        <span className="ml-1 text-sm text-primary-600 hover:text-primary-700 underline underline-offset-2">
+                          立即注册
+                        </span>
+                      </Link>
+                    )}
                   </div>
                 </div>
               </CardBody>

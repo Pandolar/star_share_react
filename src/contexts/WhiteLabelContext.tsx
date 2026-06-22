@@ -15,6 +15,7 @@ interface WhiteLabelState {
     loading: boolean;
     notice: string;
     noticeId: string;
+    enableRegister: boolean;
 }
 
 const defaultState: WhiteLabelState = {
@@ -22,6 +23,7 @@ const defaultState: WhiteLabelState = {
     loading: true,
     notice: '',
     noticeId: '',
+    enableRegister: true,
 };
 
 const WhiteLabelContext = createContext<WhiteLabelState>(defaultState);
@@ -61,6 +63,7 @@ export const WhiteLabelProvider: React.FC<WhiteLabelProviderProps> = ({ children
                         loading: false,
                         notice: res.data.notice || '',
                         noticeId: res.data.notice_id || '',
+                        enableRegister: res.data.enable_register !== false,
                     });
                     return;
                 }

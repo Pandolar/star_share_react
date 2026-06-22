@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import AuthLayout from '../../components/auth/AuthLayout';
 import { Input, Button, Spinner } from '@heroui/react';
 import { Eye, EyeOff, ChevronDown, Gift } from 'lucide-react';
@@ -32,7 +32,15 @@ const RegisterPage: React.FC = () => {
   const isLoggedIn = useAutoLogin();
   const redirect = useRedirect();
   const location = useLocation();
-  const { isWhiteLabel } = useWhiteLabel();
+  const navigate = useNavigate();
+  const { isWhiteLabel, enableRegister, loading: wlLoading } = useWhiteLabel();
+
+  // 注册功能关闭时，直接跳回登录页（防止直接访问 /register）
+  useEffect(() => {
+    if (!wlLoading && !enableRegister) {
+      navigate(`/login${location.search}`, { replace: true });
+    }
+  }, [wlLoading, enableRegister, navigate, location.search]);
 
   const initialAff = useMemo(() => {
     const searchAff = new URLSearchParams(location.search).get('aff') || '';
