@@ -320,6 +320,37 @@ export const exchangeUserApi = {
     },
 };
 
+// 付费重置配额API
+export const resetQuotaApi = {
+    // 获取重置配额展示信息（是否开放、价格、当前用户是否可重置）
+    getInfo: async (): Promise<ApiResponse<{
+        enabled: boolean;
+        eligible: boolean;
+        price: number;
+        package_name?: string;
+    }>> => {
+        return createUserRequest(getUserApiUrl('/u/reset_quota_info'), {
+            method: 'GET',
+        });
+    },
+
+    // 创建重置配额订单（支付成功后清空本周期配额）
+    createOrder: async (extraData?: any): Promise<ApiResponse<{
+        success: boolean;
+        trade_no: string;
+        order_id: string;
+        payment_url: string | null;
+        qr_code: string;
+        channel: string;
+        pay_type: string;
+    }>> => {
+        return createUserRequest(getUserApiUrl('/u/reset_quota_order'), {
+            method: 'POST',
+            body: JSON.stringify({ ...extraData }),
+        });
+    },
+};
+
 
 
 // 邀请相关API

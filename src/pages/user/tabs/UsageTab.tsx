@@ -1,8 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardBody, Chip, Spinner, Button, Progress, Tooltip } from '@heroui/react';
-import { Activity, AlertCircle, RefreshCw, Timer, Cpu, Info } from 'lucide-react';
-import { LimitUsageData, LimitUsageItem } from '../../../services/userApi';
+import { Activity, AlertCircle, RefreshCw, Timer, Cpu, Info, Zap } from 'lucide-react';
+import { LimitUsageData, LimitUsageItem, resetQuotaApi } from '../../../services/userApi';
 import { useLimitUsage } from '../../../hooks/useLimitUsage';
+import { ResetQuotaModal } from '../../../components/ResetQuotaModal';
+import { useWhiteLabel } from '../../../contexts/WhiteLabelContext';
 
 // 将剩余秒数格式化为「x时x分x秒」的简洁形式
 const formatRemaining = (seconds: number): string => {
@@ -140,6 +143,42 @@ export const UsageSection: React.FC<UsageSectionProps> = (props) => {
   // 本地维护每个限速项的剩余秒数，做平滑倒计时
   const [remainings, setRemainings] = useState<Record<number, number | null>>({});
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // 付费重置配额：入口信息与弹窗状态
+  const { isWhiteLabel } = useWhiteLabel();
+  const [resetInfo, setResetInfo] = useState<{ enabled: boolean; eligible: boolean; price: number } | null>(null);
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  useEffect(() => {
+    // 白牌模式下该功能无论如何关闭：不拉取信息、不显示入口
+    if (isWhiteLabel) {
+      setResetInfo(null);
+      return;
+    }
+    let cancelled = false;
+    resetQuotaApi
+      .getInfo()
+      .then((res) => {
+        if (!cancelled && res.code === 20000 && res.data) setResetInfo(res.data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isWhiteLabel]);
+  const showReset = Boolean(!isWhiteLabel && resetInfo?.enabled && resetInfo?.eligible);
+
+  // 深链：限速提醒等场景通过 ?action=reset_quota 直达，自动打开重置弹窗
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('action') !== 'reset_quota') return;
+    if (!resetInfo) return; // 等信息就绪再决定
+    if (showReset) setResetModalOpen(true);
+    // 消费掉该参数，避免刷新/关闭后重复触发
+    const params = new URLSearchParams(searchParams);
+    params.delete('action');
+    setSearchParams(params, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetInfo, showReset]);
   // 数据返回后初始化倒计时基准
   useEffect(() => {
     if (!data) return;
@@ -182,16 +221,29 @@ export const UsageSection: React.FC<UsageSectionProps> = (props) => {
           <Activity size={18} className="text-primary" />
           <h2 className="text-lg font-bold text-default-900">使用额度</h2>
         </div>
-        <Button
-          size="sm"
-          variant="light"
-          color="primary"
-          startContent={<RefreshCw size={14} />}
-          onPress={fetchUsage}
-          isLoading={loading}
-        >
-          刷新
-        </Button>
+        <div className="flex items-center gap-2">
+          {showReset && (
+            <Button
+              size="sm"
+              color="warning"
+              variant="flat"
+              startContent={<Zap size={14} />}
+              onPress={() => setResetModalOpen(true)}
+            >
+              ¥{resetInfo?.price} 重置配额
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="light"
+            color="primary"
+            startContent={<RefreshCw size={14} />}
+            onPress={fetchUsage}
+            isLoading={loading}
+          >
+            刷新
+          </Button>
+        </div>
       </div>
 
       {loading && (
@@ -253,6 +305,13 @@ export const UsageSection: React.FC<UsageSectionProps> = (props) => {
           )}
         </>
       )}
+
+      {/* 付费重置配额支付弹窗 */}
+      <ResetQuotaModal
+        isOpen={resetModalOpen}
+        price={resetInfo?.price ?? 0}
+        onClose={() => setResetModalOpen(false)}
+      />
     </div>
   );
 };

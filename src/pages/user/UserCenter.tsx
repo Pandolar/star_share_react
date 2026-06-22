@@ -145,8 +145,13 @@ const UserCenter: React.FC = () => {
     const validKeys = tabConfigs.map(t => t.key);
     if (urlTab && validKeys.includes(urlTab) && urlTab !== activeTab) {
       setActiveTab(urlTab);
+      return;
     }
-  }, [searchParams, activeTab]);
+    // 付费重置配额深链：未指定 tab 时落到“个人主页”（使用额度区块在此）
+    if (!urlTab && searchParams.get('action') === 'reset_quota' && activeTab !== 'profile') {
+      setActiveTab('profile');
+    }
+  }, [searchParams, activeTab, tabConfigs]);
 
   // 切换 Tab 并将 tab 写入 URL 查询参数
   const switchTab = (key: string, isMobile = false) => {

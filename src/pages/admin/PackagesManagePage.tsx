@@ -78,6 +78,7 @@ const PackagesManagePage: React.FC = () => {
         { key: 'GPT', label: 'GPT' },
         { key: '克劳德', label: '克劳德' },
         { key: 'Claude', label: 'Claude' },
+        { key: 'reset', label: '配额重置' },
         { key: '其他', label: '其他' },
     ];
 
@@ -233,6 +234,7 @@ const PackagesManagePage: React.FC = () => {
             priority: pkg.priority,
             introduce: pkg.introduce || '',
             remarks: pkg.remarks || '',
+            status: pkg.status,
         });
         onEditOpen();
     };
