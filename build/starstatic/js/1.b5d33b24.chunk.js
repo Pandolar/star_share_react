@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunkstar_share_web=self.webpackChunkstar_share_web||[]).push([[1],[,(e,s,r)=>{r.d(s,{l:()=>n});var a=r(5887),h=r(3652);const n={renderer:r(4952).J,...a.W,...h.n}}]]);

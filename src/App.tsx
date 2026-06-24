@@ -29,6 +29,9 @@ const CDKManagePage = lazyWithRetry(() => import('./pages/admin/CDKManagePage'),
 const UserPackagesManagePage = lazyWithRetry(() => import('./pages/admin/UserPackagesManagePage'), 'UserPackagesManagePage');
 const InviteManagePage = lazyWithRetry(() => import('./pages/admin/InviteManagePage'), 'InviteManagePage');
 const DistributorsManagePage = lazyWithRetry(() => import('./pages/admin/DistributorsManagePage'), 'DistributorsManagePage');
+const DistributorLoginPage = lazyWithRetry(() => import('./pages/distributor/DistributorLoginPage'), 'DistributorLoginPage');
+const DistributorDashboardPage = lazyWithRetry(() => import('./pages/distributor/DistributorDashboardPage'), 'DistributorDashboardPage');
+const DistributorProtectedRoute = lazyWithRetry(() => import('./components/distributor/DistributorProtectedRoute'), 'DistributorProtectedRoute');
 
 const RouteLoadingFallback: React.FC = () => (
   <div className="flex min-h-screen items-center justify-center bg-white px-4 text-sm text-default-500">
@@ -79,6 +82,17 @@ const App: React.FC = () => {
               <Route path="/jumpns" element={<JumpNsPage />} />
               <Route path="/new-api" element={<NewApiPage />} />
               <Route path="/customer-service" element={<CustomerServicePage />} />
+
+              {/* 分销商路由 */}
+              <Route path="/distributor-login" element={<DistributorLoginPage />} />
+              <Route
+                path="/distributor-dashboard"
+                element={
+                  <DistributorProtectedRoute>
+                    <DistributorDashboardPage />
+                  </DistributorProtectedRoute>
+                }
+              />
 
               {/* Admin管理后台路由 */}
               <Route path="/star-admin/login" element={<AdminLoginPage />} />
