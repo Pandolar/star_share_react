@@ -28,6 +28,7 @@ const OrdersManagePage = lazyWithRetry(() => import('./pages/admin/OrdersManageP
 const CDKManagePage = lazyWithRetry(() => import('./pages/admin/CDKManagePage'), 'CDKManagePage');
 const UserPackagesManagePage = lazyWithRetry(() => import('./pages/admin/UserPackagesManagePage'), 'UserPackagesManagePage');
 const InviteManagePage = lazyWithRetry(() => import('./pages/admin/InviteManagePage'), 'InviteManagePage');
+const DistributorsManagePage = lazyWithRetry(() => import('./pages/admin/DistributorsManagePage'), 'DistributorsManagePage');
 
 const RouteLoadingFallback: React.FC = () => (
   <div className="flex min-h-screen items-center justify-center bg-white px-4 text-sm text-default-500">
@@ -90,6 +91,7 @@ const App: React.FC = () => {
                 <Route path="user-packages" element={<UserPackagesManagePage />} />
                 <Route path="orders" element={<OrdersManagePage />} />
                 <Route path="cdk" element={<CDKManagePage />} />
+                <Route path="distributors" element={<DistributorsManagePage />} />
                 <Route path="settings" element={<SettingsManagePage />} />
                 <Route path="invites" element={<InviteManagePage />} />
               </Route>

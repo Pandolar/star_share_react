@@ -429,6 +429,53 @@ class AdminApiService {
         const response = await this.api.get('/star/dashboard');
         return response.data;
     }
+
+    // ==================== 分销商管理 ====================
+
+    /**
+     * 获取分销商列表
+     */
+    async getDistributors(params: { page?: number; page_size?: number; search?: string } = {}): Promise<AdminApiResponse<any>> {
+        const queryString = this.buildQueryString(params);
+        const response = await this.api.get(`/star/distributors?${queryString}`);
+        return response.data;
+    }
+
+    /**
+     * 创建分销商
+     */
+    async createDistributor(data: {
+        username: string;
+        password: string;
+        domains: string[];
+        remarks?: string;
+    }): Promise<AdminApiResponse> {
+        const response = await this.api.post('/star/distributors', data);
+        return response.data;
+    }
+
+    /**
+     * 更新分销商
+     */
+    async updateDistributor(data: {
+        id: number;
+        username?: string;
+        password?: string;
+        status?: number;
+        domains?: string[];
+        remarks?: string;
+    }): Promise<AdminApiResponse> {
+        const response = await this.api.put('/star/distributors', data);
+        return response.data;
+    }
+
+    /**
+     * 删除分销商
+     */
+    async deleteDistributor(id: number): Promise<AdminApiResponse> {
+        const response = await this.api.delete('/star/distributors', { data: { id } });
+        return response.data;
+    }
 }
 
 // 创建单例实例

@@ -99,6 +99,12 @@ const AdminLayout: React.FC = () => {
             path: '/star-admin/cdk',
         },
         {
+            key: 'distributors',
+            label: '分销商管理',
+            icon: <Users className="w-4 h-4" />,
+            path: '/star-admin/distributors',
+        },
+        {
             key: 'settings',
             label: '系统配置',
             icon: <Settings className="w-4 h-4" />,
