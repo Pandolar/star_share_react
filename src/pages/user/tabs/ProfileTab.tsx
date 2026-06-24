@@ -7,6 +7,7 @@ import { userInfoApi } from '../../../services/userApi';
 import { EditProfileModal } from './profile/EditProfileModal';
 import { UsageSection } from './UsageTab';
 import { useLimitUsage, summarizeQuotaRule } from '../../../hooks/useLimitUsage';
+import { useWhiteLabel } from '../../../contexts/WhiteLabelContext';
 import type { UserInfo, EditTabKey } from './profile/types';
 
 const getStatusChip = (status: number) =>
@@ -30,6 +31,7 @@ const getPackageLevelStyle = (level?: string) => {
 };
 
 export const ProfileTab: React.FC = () => {
+  const { isWhiteLabel } = useWhiteLabel();
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -157,10 +159,12 @@ export const ProfileTab: React.FC = () => {
                       <Calendar size={16} />
                       <span>注册时间：{userInfo.created_at}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-default-600">
-                      <User size={16} />
-                      <span>邀请人：{userInfo.inviter_user}</span>
-                    </div>
+                    {!isWhiteLabel && (
+                      <div className="flex items-center gap-2 text-default-600">
+                        <User size={16} />
+                        <span>邀请人：{userInfo.inviter_user}</span>
+                      </div>
+                    )}
                     {userInfo.wechat_openid && (
                       <div className="flex items-center gap-2 text-default-600">
                         <MessageCircle size={16} />

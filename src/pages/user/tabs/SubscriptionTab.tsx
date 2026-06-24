@@ -36,7 +36,9 @@ export const SubscriptionTab: React.FC = () => {
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
 
   const isMobileDevice = useIsMobile();
-  const { isWhiteLabel } = useWhiteLabel();
+  const { isWhiteLabel, purchaseUrl } = useWhiteLabel();
+
+  const [cdkCode, setCdkCode] = useState('');
 
   const subscriptionCategories: SubscriptionCategory[] = useMemo(
     () => [
@@ -284,12 +286,63 @@ export const SubscriptionTab: React.FC = () => {
           <h1 className="text-3xl font-bold text-foreground mb-2">订阅套餐</h1>
           <p className="text-default-500 max-w-md">选择适合您的订阅方案，享受优质服务</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button color="primary" variant="flat" onPress={() => setRedeemModalOpen(true)}>
-            兑换激活码
-          </Button>
-        </div>
+        {!isWhiteLabel && (
+          <div className="flex items-center gap-3">
+            <Button color="primary" variant="flat" onPress={() => setRedeemModalOpen(true)}>
+              兑换激活码
+            </Button>
+          </div>
+        )}
       </div>
+
+      {/* 白牌模式：兑换卡片 */}
+      {isWhiteLabel && (
+        <Card className="mb-6 border border-warning/20 bg-gradient-to-br from-warning/5 to-primary/5">
+          <CardBody className="p-5 sm:p-6">
+            <div className="flex items-start gap-4 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center flex-shrink-0">
+                <Package className="w-5 h-5 text-warning" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-lg text-default-900 mb-1">兑换激活码</h3>
+                <p className="text-sm text-default-500">输入您获得的激活码，即可开通对应套餐</p>
+              </div>
+            </div>
+            <div className="flex gap-3 items-start">
+              <input
+                type="text"
+                value={cdkCode}
+                onChange={(e) => setCdkCode(e.target.value.toUpperCase())}
+                placeholder="请输入激活码（如：ABCD-1234-EFGH）"
+                className="flex-1 px-4 py-2.5 rounded-xl border border-default-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+              />
+              <Button
+                color="primary"
+                isDisabled={!cdkCode.trim()}
+                onPress={() => {
+                  setRedeemModalOpen(true);
+                }}
+                className="px-6"
+              >
+                兑换
+              </Button>
+            </div>
+            {purchaseUrl && (
+              <div className="mt-4 pt-4 border-t border-default-100">
+                <Button
+                  color="primary"
+                  variant="flat"
+                  size="sm"
+                  onPress={() => window.open(purchaseUrl, '_blank')}
+                  className="w-full sm:w-auto"
+                >
+                  购买激活码
+                </Button>
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      )}
 
       <Card className="mb-6 border border-primary/10 bg-primary/5 shadow-sm">
         <CardBody className="p-4 sm:p-5">
@@ -602,7 +655,14 @@ export const SubscriptionTab: React.FC = () => {
         }}
       />
 
-      <CdkRedeemModal isOpen={redeemModalOpen} onClose={() => setRedeemModalOpen(false)} />
+      <CdkRedeemModal
+        isOpen={redeemModalOpen}
+        onClose={() => {
+          setRedeemModalOpen(false);
+          setCdkCode('');
+        }}
+        initialCdk={cdkCode}
+      />
     </div>
   );
 };

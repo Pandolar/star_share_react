@@ -163,6 +163,8 @@ export const siteModeApi = {
         enable_register?: boolean;
         notice?: string;
         notice_id?: string;
+        purchase_url?: string;
+        customer_service_url?: string;
     }>> => {
         return createUserRequest(getUserApiUrl('/u/get_site_mode'), {
             method: 'GET',

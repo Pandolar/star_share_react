@@ -15,9 +15,10 @@ import { exchangeUserApi } from '../../../../services/userApi';
 interface CdkRedeemModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialCdk?: string;
 }
 
-export const CdkRedeemModal: React.FC<CdkRedeemModalProps> = ({ isOpen, onClose }) => {
+export const CdkRedeemModal: React.FC<CdkRedeemModalProps> = ({ isOpen, onClose, initialCdk }) => {
   const [cdkValue, setCdkValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<'idle' | 'success' | 'failed'>('idle');
@@ -25,12 +26,12 @@ export const CdkRedeemModal: React.FC<CdkRedeemModalProps> = ({ isOpen, onClose 
 
   useEffect(() => {
     if (isOpen) {
-      setCdkValue('');
+      setCdkValue(initialCdk || '');
       setStatus('idle');
       setMessage('');
       setLoading(false);
     }
-  }, [isOpen]);
+  }, [isOpen, initialCdk]);
 
   const handleRedeem = async () => {
     const cdk = cdkValue.trim();
