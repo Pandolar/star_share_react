@@ -323,10 +323,48 @@ class AdminApiService {
     }
 
     /**
-     * 删除CDK
+     * 删除CDK（支持单个ID、ID列表或批次）
      */
     async deleteCDK(id: number): Promise<AdminApiResponse> {
-        const response = await this.api.delete('/star/cdk', { data: { id } });
+        const response = await this.api.delete('/star/cdk', { data: { ids: [id] } });
+        return response.data;
+    }
+
+    /**
+     * 批量删除CDK（按ID列表或批次ID）
+     */
+    async deleteCDKs(params: { ids?: number[]; batch_id?: string }): Promise<AdminApiResponse> {
+        const response = await this.api.delete('/star/cdk', { data: params });
+        return response.data;
+    }
+
+    /**
+     * 导出CDK（full=完整模式，distribute=分发模式）
+     */
+    async exportCDKs(params: {
+        distributor_id?: number | null;
+        status?: string;
+        batch_id?: string;
+        package_id?: number;
+        mode?: 'full' | 'distribute';
+    }): Promise<Blob> {
+        const response = await this.api.post('/star/cdk/export', params, { responseType: 'blob' });
+        return response.data;
+    }
+
+    /**
+     * 获取CDK使用日志
+     */
+    async getCDKUsageLog(params: {
+        cdk_id?: number;
+        user_id?: number;
+        distributor_id?: number;
+        cdk_code?: string;
+        page?: number;
+        page_size?: number;
+    } = {}): Promise<AdminApiResponse<any[]>> {
+        const queryString = this.buildQueryString(params);
+        const response = await this.api.get(`/star/cdk/usage_log?${queryString}`);
         return response.data;
     }
 

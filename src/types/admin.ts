@@ -167,7 +167,15 @@ export interface CDK {
     user_username?: string;
     user_email?: string;
     package_id: number;
+    package_name?: string;
     remarks?: string;
+    expires_at?: string | null;
+    distributor_id?: number | null;
+    distributor_name?: string;
+    batch_id?: string | null;
+    max_uses?: number;
+    use_count?: number;
+    created_by?: string;
 }
 
 export interface CreateCDKRequest {
@@ -175,6 +183,10 @@ export interface CreateCDKRequest {
     package_id: number;
     status?: 'used' | 'unused' | 'disabled';
     remarks?: string;
+    expires_days?: number;       // 有效期天数（0=永不过期）
+    distributor_id?: number | null;  // 归属分销商（null=自营）
+    prefix?: string;             // CDK前缀
+    max_uses?: number;           // 每码可用次数
 }
 
 export interface UpdateCDKRequest {
@@ -182,6 +194,7 @@ export interface UpdateCDKRequest {
     status?: 'used' | 'unused' | 'disabled';
     package_id?: number;
     remarks?: string;
+    expires_days_extend?: number;  // 延期天数
 }
 
 export interface CDKQueryParams extends CommonQueryParams {
@@ -192,6 +205,9 @@ export interface CDKQueryParams extends CommonQueryParams {
     used_at?: string;
     user_id?: number;
     package_id?: number;
+    distributor_id?: number;
+    batch_id?: string;
+    is_expired?: boolean;
     remarks?: string;
 }
 

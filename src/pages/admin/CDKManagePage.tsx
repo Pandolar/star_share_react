@@ -65,7 +65,7 @@ const CDKManagePage: React.FC = () => {
     const [total, setTotal] = useState(0);
     const [selectedCDK, setSelectedCDK] = useState<CDK | null>(null);
     const [selectedKeys, setSelectedKeys] = useState<Set<React.Key> | 'all'>(new Set());
-    const [formData, setFormData] = useState<Partial<CreateCDKRequest | UpdateCDKRequest>>({});
+    const [formData, setFormData] = useState<Partial<CreateCDKRequest & UpdateCDKRequest>>({});
 
     // Modal控制
     const { isOpen: isCreateOpen, onOpen: onCreateOpen, onClose: onCreateClose } = useDisclosure();
@@ -78,6 +78,10 @@ const CDKManagePage: React.FC = () => {
     const [generatedCDKs, setGeneratedCDKs] = useState<string[]>([]);
     // 跨页选择：Map<id, cdk字符串> 在翻页时持久化
     const [crossPageSelection, setCrossPageSelection] = useState<Map<number, string>>(new Map());
+    // 分销商列表（用于生成CDK时选择归属）
+    const [distributors, setDistributors] = useState<Array<{ id: number; username: string }>>([]);
+    // 分销商筛选
+    const [distributorFilter, setDistributorFilter] = useState<string>('all');
 
   // 状态选项
   const statusOptions = [
@@ -99,6 +103,19 @@ const CDKManagePage: React.FC = () => {
         }
     }, []);
 
+    // 获取分销商列表（用于生成CDK时选择归属、筛选）
+    const fetchDistributors = useCallback(async () => {
+        try {
+            const response = await adminApiService.getDistributors({ page: 1, page_size: 1000 });
+            if (response.code === 20000) {
+                const data = Array.isArray(response.data) ? response.data : (response.data?.list || []);
+                setDistributors(data.map((d: any) => ({ id: d.id, username: d.username })));
+            }
+        } catch (error) {
+            console.error('获取分销商列表失败:', error);
+        }
+    }, []);
+
     // 获取CDK列表
     const fetchCDKs = useCallback(async () => {
         setLoading(true);
@@ -114,6 +131,10 @@ const CDKManagePage: React.FC = () => {
 
             if (statusFilter !== 'all') {
                 params.status = statusFilter as 'used' | 'unused' | 'disabled';
+            }
+
+            if (distributorFilter !== 'all') {
+                params.distributor_id = distributorFilter === 'self' ? 0 : Number(distributorFilter);
             }
 
             const response = await adminApiService.getCDKs(params);
@@ -140,13 +161,14 @@ const CDKManagePage: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [currentPage, searchQuery, statusFilter, pageSize]);
+    }, [currentPage, searchQuery, statusFilter, distributorFilter, pageSize]);
 
     // 初始化
     useEffect(() => {
         fetchPackages();
+        fetchDistributors();
         fetchCDKs();
-    }, [fetchPackages, fetchCDKs]);
+    }, [fetchPackages, fetchDistributors, fetchCDKs]);
 
     // 翻页/刷新后，根据跨页选择同步当前页的勾选状态
     useEffect(() => {
@@ -164,7 +186,32 @@ const CDKManagePage: React.FC = () => {
     const handleReset = () => {
         setSearchQuery('');
         setStatusFilter('all');
+        setDistributorFilter('all');
         setCurrentPage(1);
+    };
+
+    // 导出CDK（mode: full=完整, distribute=分发）
+    const handleExport = async (mode: 'full' | 'distribute') => {
+        try {
+            const params: any = { mode };
+            if (statusFilter !== 'all') params.status = statusFilter;
+            if (distributorFilter !== 'all') {
+                params.distributor_id = distributorFilter === 'self' ? 0 : Number(distributorFilter);
+            }
+            const blob = await adminApiService.exportCDKs(params);
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `cdk_export_${mode}_${dayjs().format('YYYYMMDD_HHmmss')}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            showToast('导出成功', 'success');
+        } catch (error) {
+            console.error('导出失败:', error);
+            showToast('导出失败', 'error');
+        }
     };
 
     // 处理批量生成CDK
@@ -178,10 +225,11 @@ const CDKManagePage: React.FC = () => {
 
             const response = await adminApiService.createCDKs(createData);
             if (response.code === 20000) {
-                const cdkList: string[] = (response.data?.cdk || []).map((c: any) => c.cdk || c);
-                setGeneratedCDKs(cdkList);
+                // 后端返回 batch_id + count，生成成功后提示并刷新列表
+                const count = (response.data as any)?.count || createData.number;
+                const batchId = (response.data as any)?.batch_id || '';
+                showToast(`成功生成 ${count} 个CDK${batchId ? `（批次：${batchId}）` : ''}`, 'success');
                 onCreateClose();
-                onGeneratedOpen();
                 fetchCDKs();
                 setFormData({});
             } else {
@@ -441,8 +489,8 @@ const CDKManagePage: React.FC = () => {
                         />
                                     <Select
               placeholder="选择状态"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              selectedKeys={[statusFilter]}
+              onChange={(e) => setStatusFilter(e.target.value || 'all')}
               className="w-full sm:w-40"
             >
               {statusOptions.map((option) => (
@@ -450,6 +498,20 @@ const CDKManagePage: React.FC = () => {
                   {option.label}
                 </SelectItem>
               ))}
+            </Select>
+                                    <Select
+              placeholder="选择归属"
+              selectedKeys={[distributorFilter]}
+              onChange={(e) => setDistributorFilter(e.target.value || 'all')}
+              className="w-full sm:w-44"
+            >
+              {[
+                <SelectItem key="all">全部归属</SelectItem>,
+                <SelectItem key="self">自营</SelectItem>,
+                ...distributors.map((d) => (
+                  <SelectItem key={String(d.id)}>{d.username}</SelectItem>
+                )),
+              ]}
             </Select>
                         <div className="flex gap-2">
                             <Button
@@ -476,13 +538,31 @@ const CDKManagePage: React.FC = () => {
                 <div className="text-sm text-default-600">
                     共 {total} 个CDK
                 </div>
-                <Button
-                    color="primary"
-                    startContent={<Plus className="w-4 h-4" />}
-                    onPress={onCreateOpen}
-                >
-                    批量生成CDK
-                </Button>
+                <div className="flex gap-2">
+                    <Button
+                        variant="flat"
+                        color="secondary"
+                        startContent={<Download className="w-4 h-4" />}
+                        onPress={() => handleExport('full')}
+                    >
+                        导出(完整)
+                    </Button>
+                    <Button
+                        variant="flat"
+                        color="secondary"
+                        startContent={<Download className="w-4 h-4" />}
+                        onPress={() => handleExport('distribute')}
+                    >
+                        导出(分发)
+                    </Button>
+                    <Button
+                        color="primary"
+                        startContent={<Plus className="w-4 h-4" />}
+                        onPress={onCreateOpen}
+                    >
+                        批量生成CDK
+                    </Button>
+                </div>
             </div>
             <div className="flex justify-end mt-2 gap-2 flex-wrap">
                 <Button
@@ -548,8 +628,10 @@ const CDKManagePage: React.FC = () => {
                             <TableColumn width={100}>ID</TableColumn>
                             <TableColumn>CDK信息</TableColumn>
                             <TableColumn>关联套餐</TableColumn>
+                            <TableColumn>归属</TableColumn>
                             <TableColumn>状态</TableColumn>
                             <TableColumn>使用信息</TableColumn>
+                            <TableColumn>过期时间</TableColumn>
                             <TableColumn>创建时间</TableColumn>
                             <TableColumn>备注</TableColumn>
                             <TableColumn width={80}>操作</TableColumn>
@@ -580,6 +662,15 @@ const CDKManagePage: React.FC = () => {
                                             </span>
                                         </div>
                                     </TableCell>
+                                    <TableCell>
+                                        {cdk.distributor_id ? (
+                                            <Chip size="sm" variant="flat" color="primary">
+                                                {cdk.distributor_name || `分销商#${cdk.distributor_id}`}
+                                            </Chip>
+                                        ) : (
+                                            <Chip size="sm" variant="flat" color="success">自营</Chip>
+                                        )}
+                                    </TableCell>
                                     <TableCell>{renderStatus(cdk.status)}</TableCell>
                                     <TableCell>
                                         <div className="space-y-1">
@@ -594,15 +685,35 @@ const CDKManagePage: React.FC = () => {
                                             {cdk.user_id && cdk.user_username && (
                                                 <div className="text-xs text-default-500">{cdk.user_email || `ID: ${cdk.user_id}`}</div>
                                             )}
+                                            {(cdk.max_uses || 1) > 1 && (
+                                                <div className="text-xs text-default-500">
+                                                    使用次数: {cdk.use_count || 0}/{cdk.max_uses}
+                                                </div>
+                                            )}
                                             {cdk.used_at && (
                                                 <div className="text-xs text-default-500">
                                                     使用时间: {dayjs(cdk.used_at).format('MM-DD HH:mm')}
                                                 </div>
                                             )}
-                                            {!cdk.user_id && !cdk.used_at && (
+                                            {!cdk.user_id && !cdk.used_at && (cdk.max_uses || 1) <= 1 && (
                                                 <div className="text-xs text-default-400">-</div>
                                             )}
                                         </div>
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {cdk.expires_at ? (
+                                            (() => {
+                                                const expired = dayjs(cdk.expires_at).isBefore(dayjs());
+                                                return (
+                                                    <span className={expired ? 'text-danger' : 'text-default-600'}>
+                                                        {dayjs(cdk.expires_at).format('YYYY-MM-DD HH:mm')}
+                                                        {expired && <span className="block text-xs">已过期</span>}
+                                                    </span>
+                                                );
+                                            })()
+                                        ) : (
+                                            <span className="text-default-400">永不过期</span>
+                                        )}
                                     </TableCell>
                                     <TableCell className="text-sm">
                                         {dayjs(cdk.created_at).format('YYYY-MM-DD HH:mm')}
@@ -662,14 +773,26 @@ const CDKManagePage: React.FC = () => {
                     </ModalHeader>
                     <ModalBody>
                         <div className="space-y-4">
-                            <Input
-                                label="生成数量"
-                                type="number"
-                                placeholder="请输入生成数量"
-
-                                onChange={(e) => setFormData({ ...formData, number: Number(e.target.value) })}
-                                isRequired
-                            />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <Input
+                                    label="生成数量"
+                                    type="number"
+                                    placeholder="请输入生成数量"
+                                    value={formData.number ? String(formData.number) : ''}
+                                    onChange={(e) => setFormData({ ...formData, number: Number(e.target.value) })}
+                                    isRequired
+                                    variant="bordered"
+                                />
+                                <Input
+                                    label="有效期（天）"
+                                    type="number"
+                                    placeholder="0 或留空 = 永不过期"
+                                    value={(formData as CreateCDKRequest).expires_days ? String((formData as CreateCDKRequest).expires_days) : ''}
+                                    onChange={(e) => setFormData({ ...formData, expires_days: Number(e.target.value) })}
+                                    variant="bordered"
+                                    description="从生成时起算"
+                                />
+                            </div>
                             <Select
                                 label="关联套餐"
                                 placeholder="选择关联套餐"
@@ -684,12 +807,40 @@ const CDKManagePage: React.FC = () => {
                                     </SelectItem>
                                 ))}
                             </Select>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <Select
+                                    label="归属"
+                                    placeholder="选择归属"
+                                    selectedKeys={[(formData as CreateCDKRequest).distributor_id ? String((formData as CreateCDKRequest).distributor_id) : 'self']}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setFormData({ ...formData, distributor_id: val === 'self' ? null : Number(val) });
+                                    }}
+                                    variant="bordered"
+                                >
+                                    {[
+                                        <SelectItem key="self">自营</SelectItem>,
+                                        ...distributors.map((d) => (
+                                            <SelectItem key={String(d.id)}>{d.username}</SelectItem>
+                                        )),
+                                    ]}
+                                </Select>
+                                <Input
+                                    label="CDK前缀（可选）"
+                                    placeholder="如 VIP"
+                                    value={(formData as CreateCDKRequest).prefix || ''}
+                                    onChange={(e) => setFormData({ ...formData, prefix: e.target.value.toUpperCase() })}
+                                    variant="bordered"
+                                    description="生成 VIP-XXXX-XXXX 格式"
+                                />
+                            </div>
                             <Textarea
                                 label="备注"
                                 placeholder="请输入备注信息（可选）"
-
+                                value={formData.remarks || ''}
                                 onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-                                minRows={3}
+                                minRows={2}
+                                variant="bordered"
                             />
                         </div>
                     </ModalBody>

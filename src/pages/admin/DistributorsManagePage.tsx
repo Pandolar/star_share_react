@@ -300,18 +300,18 @@ const DistributorsManagePage: React.FC = () => {
     };
 
     return (
-        <div className="p-6 max-w-7xl mx-auto">
+        <div className="space-y-6">
             {/* 页面标题 */}
-            <div className="mb-6">
+            <div>
                 <div className="flex items-center gap-3 mb-2">
-                    <Users className="w-8 h-8 text-primary" />
-                    <h1 className="text-3xl font-bold">分销商管理</h1>
+                    <Users className="w-6 h-6 text-blue-600" />
+                    <h1 className="text-2xl font-bold text-default-800">分销商管理</h1>
                 </div>
                 <p className="text-default-500">管理白牌分销商账号、域名和配置</p>
             </div>
 
             {/* 工具栏 */}
-            <Card className="mb-6">
+            <Card>
                 <CardBody>
                     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                         <div className="flex gap-3 items-center flex-1 w-full sm:w-auto">
@@ -344,7 +344,7 @@ const DistributorsManagePage: React.FC = () => {
             </Card>
 
             {/* 统计信息 */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Card>
                     <CardBody className="text-center">
                         <p className="text-default-500 text-sm">总分销商</p>
