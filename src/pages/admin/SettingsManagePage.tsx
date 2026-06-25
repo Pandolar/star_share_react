@@ -267,15 +267,16 @@ const SettingsManagePage: React.FC = () => {
                     )}
                 </div>
 
-                {config.key === 'NOTICE' ? (
+                {(config.key === 'NOTICE' || config.key.startsWith('SUBSCRIPTION_NOTICE_')) ? (
                     <Textarea
                         value={value}
                         onChange={(e) => updateConfigValue(config.key, e.target.value)}
                         isDisabled={!config.editable}
                         variant={isChanged ? 'bordered' : 'flat'}
                         color={isChanged ? 'warning' : 'default'}
-                        placeholder={`请输入${config.description}`}
-                        minRows={3}
+                        placeholder={`请输入${config.description}（支持Markdown格式）`}
+                        minRows={5}
+                        description={config.key.startsWith('SUBSCRIPTION_NOTICE_') ? '支持Markdown：标题、列表、**粗体**、链接等' : undefined}
                     />
                 ) : isJson ? (
                     <Textarea
