@@ -2,7 +2,8 @@
  * 简单的 Markdown 渲染工具
  * 支持：
  * - **粗体**
- * - \n 换行
+ * - 真实换行符（\n）
+ * - 字面量 \n（数据库中输入的 \\n）
  */
 export function renderSimpleMarkdown(text: string): string {
     if (!text) return '';
@@ -10,7 +11,10 @@ export function renderSimpleMarkdown(text: string): string {
     // 1. 处理粗体：**text** -> <strong>text</strong>
     let html = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
 
-    // 2. 处理换行：\n -> <br/>
+    // 2. 处理字面量 \n（数据库中输入的 \\n）
+    html = html.replace(/\\n/g, '<br/>');
+
+    // 3. 处理真实换行符
     html = html.replace(/\n/g, '<br/>');
 
     return html;
