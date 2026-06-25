@@ -165,6 +165,7 @@ export const siteModeApi = {
         notice_id?: string;
         purchase_url?: string;
         customer_service_url?: string;
+        subscription_notice?: string;
     }>> => {
         return createUserRequest(getUserApiUrl('/u/get_site_mode'), {
             method: 'GET',

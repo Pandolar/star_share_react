@@ -147,7 +147,15 @@ const UserCenter: React.FC = () => {
       setActiveTab(urlTab);
       return;
     }
-    // 付费重置配额深链：未指定 tab 时落到“个人主页”（使用额度区块在此）
+    // 白牌模式下，如果访问被禁用的 tab（如 invite/orders），重定向到第一个可用 tab
+    if (urlTab && !validKeys.includes(urlTab) && isWhiteLabel) {
+      const params = new URLSearchParams(searchParams);
+      params.delete('tab');
+      setSearchParams(params);
+      setActiveTab(validKeys[0] || 'usage');
+      return;
+    }
+    // 付费重置配额深链：未指定 tab 时落到”个人主页”（使用额度区块在此）
     if (!urlTab && searchParams.get('action') === 'reset_quota' && activeTab !== 'profile') {
       setActiveTab('profile');
     }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardBody, Input, Button } from '@nextui-org/react';
+import { Card, CardBody, Input, Button } from '@heroui/react';
 import { Lock, User, LogIn } from 'lucide-react';
 import distributorApiService from '../../services/distributorApi';
 import { showToast } from '../../components/Toast';

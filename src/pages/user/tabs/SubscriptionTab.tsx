@@ -10,6 +10,7 @@ import { packageUserApi, orderUserApi } from '../../../services/userApi';
 import { toast } from '../../../utils/toast';
 import { useIsMobile } from '../../../hooks/useIsMobile';
 import { useWhiteLabel } from '../../../contexts/WhiteLabelContext';
+import { MarkdownText } from '../../../utils/markdown';
 import { PaymentModal } from './subscription/PaymentModal';
 import { CdkRedeemModal } from './subscription/CdkRedeemModal';
 import {
@@ -36,7 +37,7 @@ export const SubscriptionTab: React.FC = () => {
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
 
   const isMobileDevice = useIsMobile();
-  const { isWhiteLabel, purchaseUrl } = useWhiteLabel();
+  const { isWhiteLabel, purchaseUrl, subscriptionNotice } = useWhiteLabel();
 
   const [cdkCode, setCdkCode] = useState('');
 
@@ -364,20 +365,28 @@ export const SubscriptionTab: React.FC = () => {
           </button>
           {showSubscriptionGuide && (
             <div className="mt-4 rounded-xl bg-white/80 border border-default-100 px-4 py-3 text-sm text-default-700 leading-7">
-              {isWhiteLabel ? (
-                <>
-                  <div>1. 若您已有订阅套餐，不可再次兑换<strong className="font-semibold text-default-900">更低</strong>等级套餐。</div>
-                  <div>2. 兑换同等级套餐将直接<strong className="font-semibold text-default-900">叠加延期</strong>。</div>
-                  <div>3. 兑换更高等级套餐后将<strong className="font-semibold text-default-900">自动冻结低等级套餐</strong>，待高等级套餐过期后将自动解冻。</div>
-                  <div>4. 请通过右上角【兑换激活码】使用您获得的激活码开通对应套餐。</div>
-                </>
+              {subscriptionNotice ? (
+                // 使用配置的订阅说明（支持 Markdown）
+                <MarkdownText text={subscriptionNotice} />
               ) : (
+                // 降级：配置为空时显示默认说明
                 <>
-                  <div>1. 若您已有订阅套餐，不可再次订阅<strong className="font-semibold text-default-900">更低</strong>等级套餐。</div>
-                  <div>2. 订阅同等级套餐将直接<strong className="font-semibold text-default-900">叠加延期</strong>。</div>
-                  <div>3. 订阅更高等级套餐后将<strong className="font-semibold text-default-900">自动冻结低等级套餐</strong>，待高等级套餐过期后将自动解冻。</div>
-                  <div>4. 如果您有激活码/CDK/兑换码，可直接在右上角【兑换激活码】直接兑换。</div>
-                  <div>5. 单笔订单金额<strong className="font-semibold text-default-900">超100元且30天内</strong>可联系客服进行开票，支持高校或企业抬头。</div>
+                  {isWhiteLabel ? (
+                    <>
+                      <div>1. 若您已有订阅套餐，不可再次兑换<strong className="font-semibold text-default-900">更低</strong>等级套餐。</div>
+                      <div>2. 兑换同等级套餐将直接<strong className="font-semibold text-default-900">叠加延期</strong>。</div>
+                      <div>3. 兑换更高等级套餐后将<strong className="font-semibold text-default-900">自动冻结低等级套餐</strong>，待高等级套餐过期后将自动解冻。</div>
+                      <div>4. 请通过右上角【兑换激活码】使用您获得的激活码开通对应套餐。</div>
+                    </>
+                  ) : (
+                    <>
+                      <div>1. 若您已有订阅套餐，不可再次订阅<strong className="font-semibold text-default-900">更低</strong>等级套餐。</div>
+                      <div>2. 订阅同等级套餐将直接<strong className="font-semibold text-default-900">叠加延期</strong>。</div>
+                      <div>3. 订阅更高等级套餐后将<strong className="font-semibold text-default-900">自动冻结低等级套餐</strong>，待高等级套餐过期后将自动解冻。</div>
+                      <div>4. 如果您有激活码/CDK/兑换码，可直接在右上角【兑换激活码】直接兑换。</div>
+                      <div>5. 单笔订单金额<strong className="font-semibold text-default-900">超100元且30天内</strong>可联系客服进行开票，支持高校或企业抬头。</div>
+                    </>
+                  )}
                 </>
               )}
             </div>

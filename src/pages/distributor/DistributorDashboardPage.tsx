@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardBody, CardHeader, Input, Textarea, Button, Chip, Divider } from '@nextui-org/react';
+import { Card, CardBody, CardHeader, Input, Textarea, Button, Chip, Divider } from '@heroui/react';
 import { Settings, Link as LinkIcon, Bell, Lock, LogOut, Save, Globe, ExternalLink } from 'lucide-react';
 import distributorApiService, { DistributorInfo } from '../../services/distributorApi';
 import { showToast } from '../../components/Toast';
@@ -266,7 +266,7 @@ const DistributorDashboardPage: React.FC = () => {
                                     onChange={(e) => setPurchaseUrl(e.target.value)}
                                     startContent={<LinkIcon className="w-4 h-4 text-default-400" />}
                                     variant="bordered"
-                                    description="订阅页面"购买激活码"按钮跳转链接"
+                                    description='订阅页面"购买激活码"按钮跳转链接'
                                 />
 
                                 <Input

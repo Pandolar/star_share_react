@@ -18,6 +18,7 @@ interface WhiteLabelState {
     enableRegister: boolean;
     purchaseUrl: string;
     customerServiceUrl: string;
+    subscriptionNotice: string;
 }
 
 const defaultState: WhiteLabelState = {
@@ -28,6 +29,7 @@ const defaultState: WhiteLabelState = {
     enableRegister: true,
     purchaseUrl: '',
     customerServiceUrl: '',
+    subscriptionNotice: '',
 };
 
 const WhiteLabelContext = createContext<WhiteLabelState>(defaultState);
@@ -70,6 +72,7 @@ export const WhiteLabelProvider: React.FC<WhiteLabelProviderProps> = ({ children
                         enableRegister: res.data.enable_register !== false,
                         purchaseUrl: res.data.purchase_url || '',
                         customerServiceUrl: res.data.customer_service_url || '',
+                        subscriptionNotice: res.data.subscription_notice || '',
                     });
                     return;
                 }
