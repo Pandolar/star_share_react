@@ -5,7 +5,7 @@
 /// <reference path="../../types/chatwoot.d.ts" />
 
 import { useEffect, useRef } from 'react';
-import { CHATWOOT_BASE_URL, CHATWOOT_WEBSITE_TOKEN } from '../../config';
+import { getChatwootBaseUrl, getChatwootWebsiteToken, loadChatwootConfig } from '../../config';
 import { getChatwootGuestSignature, getChatwootUserSignature } from '../../services/chatwootApi';
 import { getCookie } from '../../utils/cookies';
 
@@ -72,7 +72,11 @@ const isLoggedIn = (): boolean => {
 };
 
 // 加载 Chatwoot SDK
-const loadChatwootSDK = (): Promise<void> => {
+const loadChatwootSDK = async (): Promise<void> => {
+  // 先加载配置
+  await loadChatwootConfig();
+  const baseUrl = getChatwootBaseUrl();
+
   return new Promise((resolve, reject) => {
     // 如果 SDK 已经加载
     if (window.chatwootSDK) {
@@ -93,7 +97,7 @@ const loadChatwootSDK = (): Promise<void> => {
     // 创建脚本标签
     const script = document.createElement('script');
     script.id = 'chatwoot-sdk-script';
-    script.src = `${CHATWOOT_BASE_URL}/packs/js/sdk.js`;
+    script.src = `${baseUrl}/packs/js/sdk.js`;
     script.async = true;
     script.defer = true;
 
@@ -123,13 +127,17 @@ const initChatwootSDK = (): Promise<void> => {
       return;
     }
 
+    // 获取动态配置
+    const websiteToken = getChatwootWebsiteToken();
+    const baseUrl = getChatwootBaseUrl();
+
     // 运行 SDK
     if (window.chatwootSDK?.run) {
       window.chatwootSDK.run({
-        websiteToken: CHATWOOT_WEBSITE_TOKEN,
-        baseUrl: CHATWOOT_BASE_URL,
+        websiteToken,
+        baseUrl,
       });
-      log('SDK 初始化完成');
+      log('SDK 初始化完成', { websiteToken, baseUrl });
 
       // 等待 $chatwoot 对象可用
       const checkInterval = setInterval(() => {

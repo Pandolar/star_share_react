@@ -126,6 +126,9 @@ export const isAuthenticated = (): boolean => {
     return !!getStoredToken();
 };
 
-// Chatwoot 在线客服配置
+// Chatwoot 在线客服配置（从后端动态加载）
+export { getChatwootBaseUrl, getChatwootWebsiteToken, loadChatwootConfig } from './chatwoot';
+
+// 兼容性导出：保留原有的常量导出（但推荐使用函数）
 export const CHATWOOT_BASE_URL = 'https://chatwoot.foxaigc.com';
 export const CHATWOOT_WEBSITE_TOKEN = 'ZRAa6tfs39gTE5Mn3R3KDHVj';
