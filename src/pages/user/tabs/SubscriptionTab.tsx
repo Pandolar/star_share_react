@@ -10,7 +10,8 @@ import { packageUserApi, orderUserApi } from '../../../services/userApi';
 import { toast } from '../../../utils/toast';
 import { useIsMobile } from '../../../hooks/useIsMobile';
 import { useWhiteLabel } from '../../../contexts/WhiteLabelContext';
-import { MarkdownText } from '../../../utils/markdown';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { PaymentModal } from './subscription/PaymentModal';
 import { CdkRedeemModal } from './subscription/CdkRedeemModal';
 import {
@@ -364,13 +365,17 @@ export const SubscriptionTab: React.FC = () => {
             <ChevronDown className={`w-4 h-4 text-default-500 transition-transform ${showSubscriptionGuide ? 'rotate-180' : ''}`} />
           </button>
           {showSubscriptionGuide && (
-            <div className="mt-4 rounded-xl bg-white/80 border border-default-100 px-4 py-3 text-sm text-default-700 leading-7">
+            <div className="mt-4 rounded-xl bg-white/80 border border-default-100 px-4 py-3 text-sm leading-7">
               {subscriptionNotice ? (
-                // 使用配置的订阅说明（支持 Markdown）
-                <MarkdownText text={subscriptionNotice} />
+                // 使用配置的订阅说明（React Markdown 渲染，与公告一致）
+                <div className="prose prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_strong]:text-default-900 [&_strong]:font-semibold">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {subscriptionNotice}
+                  </ReactMarkdown>
+                </div>
               ) : (
                 // 降级：配置为空时显示默认说明
-                <>
+                <div className="text-default-700">
                   {isWhiteLabel ? (
                     <>
                       <div>1. 若您已有订阅套餐，不可再次兑换<strong className="font-semibold text-default-900">更低</strong>等级套餐。</div>
@@ -387,7 +392,7 @@ export const SubscriptionTab: React.FC = () => {
                       <div>5. 单笔订单金额<strong className="font-semibold text-default-900">超100元且30天内</strong>可联系客服进行开票，支持高校或企业抬头。</div>
                     </>
                   )}
-                </>
+                </div>
               )}
             </div>
           )}
