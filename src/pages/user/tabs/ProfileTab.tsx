@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Card, CardBody, Avatar, Chip, Spinner, Button } from '@heroui/react';
+import { Card, CardBody, Avatar, Chip, Spinner, Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from '@heroui/react';
 import { motion } from 'framer-motion';
-import { User, Mail, Calendar, Shield, AlertCircle, Package, Crown, Edit3, MessageCircle, ArrowUpCircle, Gauge } from 'lucide-react';
+import { User, Mail, Calendar, Shield, AlertCircle, Package, Crown, Edit3, MessageCircle, ArrowUpCircle, Gauge, Snowflake, Info } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { userInfoApi } from '../../../services/userApi';
 import { EditProfileModal } from './profile/EditProfileModal';
@@ -36,6 +36,9 @@ export const ProfileTab: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // 冻结套餐Modal
+  const { isOpen: isFrozenOpen, onOpen: onFrozenOpen, onClose: onFrozenClose } = useDisclosure();
 
   // 额度详情：用于在套餐卡片展示当前套餐的配额规则，并共享给使用额度区块
   const { data: usageData, loading: usageLoading, error: usageError, refetch: refetchUsage } = useLimitUsage();
@@ -200,6 +203,7 @@ export const ProfileTab: React.FC = () => {
           {/* 当前套餐信息 */}
           {(() => {
             const hasPackage = userInfo.user_active_packages && userInfo.user_active_packages.package_id;
+            const hasFrozenPackages = userInfo.frozen_packages && userInfo.frozen_packages.length > 0;
             const levelStyle = hasPackage
               ? getPackageLevelStyle(userInfo.user_active_packages!.level)
               : { icon: Package, color: 'default' as const, bgColor: 'bg-default/10' };
@@ -226,6 +230,18 @@ export const ProfileTab: React.FC = () => {
                             >
                               {userInfo.user_active_packages!.status_text || userInfo.user_active_packages!.level}
                             </Chip>
+                            {hasFrozenPackages && (
+                              <Button
+                                size="sm"
+                                variant="flat"
+                                color="warning"
+                                startContent={<Snowflake size={14} />}
+                                onPress={onFrozenOpen}
+                                className="ml-auto"
+                              >
+                                查看已冻结套餐
+                              </Button>
+                            )}
                           </div>
                           <p className="text-default-600 mb-4">{userInfo.user_active_packages!.package_name}</p>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
@@ -313,6 +329,80 @@ export const ProfileTab: React.FC = () => {
         onClose={closeEditModal}
         onUserInfoChange={(next) => setUserInfo((prev) => (prev ? { ...prev, ...next } : prev))}
       />
+
+      {/* 冻结套餐Modal */}
+      <Modal isOpen={isFrozenOpen} onClose={onFrozenClose} size="2xl">
+        <ModalContent>
+          <ModalHeader className="flex gap-2 items-center">
+            <Snowflake className="w-5 h-5 text-warning" />
+            已冻结套餐
+          </ModalHeader>
+          <ModalBody>
+            {/* 说明文字 */}
+            <div className="bg-warning-50 border border-warning-200 rounded-lg p-4 mb-4">
+              <div className="flex items-start gap-2 mb-2">
+                <Info className="w-5 h-5 text-warning-600 flex-shrink-0 mt-0.5" />
+                <h4 className="font-semibold text-warning-900">什么是冻结套餐？</h4>
+              </div>
+              <div className="text-sm text-warning-800 space-y-2 ml-7">
+                <p>1. 冻结套餐不会失效或者消失，它会在高等级套餐或者其他同等级套餐消耗完毕后自动解冻，优先自动使用高等级套餐；</p>
+                <p>2. 低等级套餐使用过程中购买高等级套餐后，剩余的低等级套餐会被冻结；</p>
+                <p>3. 在某些情况下奖励的额度也存在于冻结套餐中。</p>
+              </div>
+            </div>
+
+            {/* 冻结套餐列表 */}
+            {userInfo?.frozen_packages && userInfo.frozen_packages.length > 0 ? (
+              <div className="space-y-3">
+                {userInfo.frozen_packages.map((pkg: any, index: number) => {
+                  const levelStyle = getPackageLevelStyle(pkg.level);
+                  return (
+                    <Card key={index} className="border-l-4 border-l-warning">
+                      <CardBody className="p-4">
+                        <div className="flex items-start gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${levelStyle.bgColor}`}>
+                            {React.createElement(levelStyle.icon, {
+                              size: 20,
+                              className: `text-${levelStyle.color}`,
+                            })}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-semibold text-default-900">{pkg.package_name}</h4>
+                              <Chip size="sm" color={levelStyle.color} variant="flat">
+                                {pkg.level}
+                              </Chip>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-sm text-default-600">
+                              <div>
+                                <span className="text-default-500">剩余时长：</span>
+                                <span className="font-medium">{pkg.remaining_text}</span>
+                              </div>
+                              <div>
+                                <span className="text-default-500">冻结时间：</span>
+                                <span className="font-medium">{pkg.frozen_at || '-'}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </CardBody>
+                    </Card>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-default-400">
+                暂无冻结套餐
+              </div>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button color="primary" onPress={onFrozenClose}>
+              关闭
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </motion.div>
   );
 };

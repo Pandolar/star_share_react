@@ -14,6 +14,15 @@ export interface UserInfo {
     remaining_duration?: number | null;
     remaining_text?: string;
   };
+  frozen_packages?: Array<{
+    package_id: number;
+    package_name: string;
+    level: string;
+    remaining_duration: number;
+    remaining_text: string;
+    created_at: string | null;
+    frozen_at: string | null;
+  }>;
   status: number;
   inviter_user: string;
   created_at: string;
