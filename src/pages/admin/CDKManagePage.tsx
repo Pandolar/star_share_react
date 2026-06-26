@@ -391,26 +391,34 @@ const CDKManagePage: React.FC = () => {
     };
 
     // 状态渲染
-    const renderStatus = (status: string) => {
+    const renderStatus = (status: string, expiresAt?: string | null) => {
+        // 检查是否过期
+        const isExpired = expiresAt && dayjs(expiresAt).isBefore(dayjs());
+
         const colorMap = {
             used: 'success',
             unused: 'primary',
             disabled: 'danger',
+            expired: 'warning',
         } as const;
 
         const labelMap = {
             used: '已使用',
             unused: '未使用',
             disabled: '已停用',
+            expired: '已过期',
         };
+
+        // 如果未使用但已过期，显示已过期状态
+        const displayStatus = (status === 'unused' && isExpired) ? 'expired' : status;
 
         return (
             <Chip
-                color={colorMap[status as keyof typeof colorMap] || 'default'}
+                color={colorMap[displayStatus as keyof typeof colorMap] || 'default'}
                 variant="flat"
                 size="sm"
             >
-                {labelMap[status as keyof typeof labelMap] || status}
+                {labelMap[displayStatus as keyof typeof labelMap] || status}
             </Chip>
         );
     };
@@ -671,7 +679,7 @@ const CDKManagePage: React.FC = () => {
                                             <Chip size="sm" variant="flat" color="success">自营</Chip>
                                         )}
                                     </TableCell>
-                                    <TableCell>{renderStatus(cdk.status)}</TableCell>
+                                    <TableCell>{renderStatus(cdk.status, cdk.expires_at)}</TableCell>
                                     <TableCell>
                                         <div className="space-y-1">
                                             {cdk.user_id && (

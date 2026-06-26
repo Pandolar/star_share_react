@@ -218,13 +218,13 @@ const UserCenter: React.FC = () => {
         clearAuthCookies();
       } catch {}
 
-      // 导航到测速页
-      navigate('/sharespeedtest', { replace: true });
+      // 导航到首页
+      navigate('/', { replace: true });
 
       // 兜底：若单页导航失败，强制跳转
       setTimeout(() => {
-        if (window.location.pathname !== '/sharespeedtest') {
-          window.location.href = '/sharespeedtest';
+        if (window.location.pathname !== '/') {
+          window.location.href = '/';
         }
       }, 100);
     }
