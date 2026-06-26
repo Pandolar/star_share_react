@@ -886,6 +886,14 @@ const CDKManagePage: React.FC = () => {
                                 <SelectItem key="unused">未使用</SelectItem>
                                 <SelectItem key="disabled">已停用</SelectItem>
                             </Select>
+                            <Input
+                                label="延期天数"
+                                placeholder="输入正数延长有效期，负数缩短有效期"
+                                type="number"
+                                value={formData.expires_days_extend?.toString() || ''}
+                                onChange={(e) => setFormData({ ...formData, expires_days_extend: e.target.value ? parseInt(e.target.value) : undefined })}
+                                description="留空表示不修改到期时间，正数延长、负数缩短"
+                            />
                             <Textarea
                                 label="备注"
                                 placeholder="请输入备注信息"
@@ -937,7 +945,22 @@ const CDKManagePage: React.FC = () => {
                                     </div>
                                     <div>
                                         <span className="text-sm text-default-500">状态</span>
-                                        <div>{renderStatus(selectedCDK.status)}</div>
+                                        <div>{renderStatus(selectedCDK.status, selectedCDK.expires_at)}</div>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-default-500">到期时间</span>
+                                        <div className="font-medium">
+                                            {selectedCDK.expires_at ? (
+                                                <>
+                                                    {dayjs(selectedCDK.expires_at).format('YYYY-MM-DD HH:mm:ss')}
+                                                    {dayjs(selectedCDK.expires_at).isBefore(dayjs()) && (
+                                                        <span className="text-danger text-xs ml-2">(已过期)</span>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <span className="text-default-400">永不过期</span>
+                                            )}
+                                        </div>
                                     </div>
                                     <div>
                                         <span className="text-sm text-default-500">创建时间</span>
