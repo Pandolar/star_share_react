@@ -40,6 +40,9 @@ export const ProfileTab: React.FC = () => {
 
   // 冻结套餐Modal
   const { isOpen: isFrozenOpen, onOpen: onFrozenOpen, onClose: onFrozenClose } = useDisclosure();
+  // 补偿领取成功Modal
+  const { isOpen: isClaimSuccessOpen, onOpen: onClaimSuccessOpen, onClose: onClaimSuccessClose } = useDisclosure();
+  const [claimResult, setClaimResult] = useState<{ title: string; days: number; level: string | null } | null>(null);
 
   // 额度详情：用于在套餐卡片展示当前套餐的配额规则，并共享给使用额度区块
   const { data: usageData, loading: usageLoading, error: usageError, refetch: refetchUsage } = useLimitUsage();
@@ -66,10 +69,17 @@ export const ProfileTab: React.FC = () => {
 
   const handleClaim = async (campaignId: string) => {
     setClaimingId(campaignId);
+    // 领取前记录该活动信息（领取成功后列表会刷新）
+    const campaign = compensations.find((c) => c.id === campaignId);
     try {
       const resp = await compensationApi.claim(campaignId);
       if (resp.code === 20000) {
-        toast.success(resp.msg || '领取成功');
+        setClaimResult({
+          title: campaign?.title || '补偿福利',
+          days: campaign?.days || 0,
+          level: campaign?.level || null,
+        });
+        onClaimSuccessOpen();
         await fetchUserInfo();
         await fetchCompensations();
       } else {
@@ -477,6 +487,35 @@ export const ProfileTab: React.FC = () => {
           <ModalFooter>
             <Button color="primary" onPress={onFrozenClose}>
               关闭
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* 补偿领取成功 Modal */}
+      <Modal isOpen={isClaimSuccessOpen} onClose={onClaimSuccessClose} size="sm">
+        <ModalContent>
+          <ModalBody className="py-8">
+            <div className="flex flex-col items-center text-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center">
+                <Gift className="w-8 h-8 text-success" />
+              </div>
+              <h3 className="text-xl font-bold text-default-900">领取成功</h3>
+              {claimResult && (
+                <p className="text-default-600">
+                  「{claimResult.title}」已为您增加
+                  <span className="font-bold text-success mx-1">{claimResult.days} 天</span>
+                  {claimResult.level ? `「${claimResult.level}」` : ''}会员时长
+                </p>
+              )}
+              <p className="text-xs text-default-400">
+                补偿时长已追加到您的套餐，可在「当前套餐」处查看更新后的到期时间
+              </p>
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button color="primary" className="w-full" onPress={onClaimSuccessClose}>
+              我知道了
             </Button>
           </ModalFooter>
         </ModalContent>
