@@ -246,6 +246,36 @@ export const userInfoApi = {
     },
 };
 
+// 补偿活动API
+export interface CompensationItem {
+    id: string;
+    title: string;
+    days: number;
+    level_mode: 'fixed' | 'follow';
+    level: string | null;
+    category: string;
+    expires_at?: string;
+    claimable: boolean;
+    reason: string;
+}
+
+export const compensationApi = {
+    // 获取当前用户可领取的补偿活动
+    getAvailable: async (): Promise<ApiResponse<CompensationItem[]>> => {
+        return createUserRequest(getUserApiUrl('/u/compensation_available'), {
+            method: 'GET',
+        });
+    },
+
+    // 领取补偿
+    claim: async (campaign_id: string): Promise<ApiResponse<any>> => {
+        return createUserRequest(getUserApiUrl('/u/compensation_claim'), {
+            method: 'POST',
+            body: JSON.stringify({ campaign_id }),
+        });
+    },
+};
+
 // 套餐API
 export const packageUserApi = {
     // 获取套餐列表

@@ -386,6 +386,14 @@ class AdminApiService {
         return response.data;
     }
 
+    /**
+     * 定向补偿：给指定用户补 N 天指定等级会员
+     */
+    async grantCompensation(data: { user_id: number; level: string; days: number; category: string }): Promise<AdminApiResponse> {
+        const response = await this.api.post('/star/compensation_manual', data);
+        return response.data;
+    }
+
     // ==================== 订单管理 ====================
 
     /**

@@ -41,6 +41,7 @@ import {
     UserPlus,
     Filter,
     RefreshCw,
+    Gift,
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import adminApiService from '../../services/adminApi';
@@ -70,6 +71,14 @@ const UsersManagePage: React.FC = () => {
     const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
     const { isOpen: isQuickClearOpen, onOpen: onQuickClearOpen, onClose: onQuickClearClose } = useDisclosure();
     const { isOpen: isClearLimitConfirmOpen, onOpen: onClearLimitConfirmOpen, onClose: onClearLimitConfirmClose } = useDisclosure();
+    const { isOpen: isCompensationOpen, onOpen: onCompensationOpen, onClose: onCompensationClose } = useDisclosure();
+
+    // 补偿表单
+    const [compensationUser, setCompensationUser] = useState<User | null>(null);
+    const [compensationForm, setCompensationForm] = useState<{ level: string; days: string; category: string }>({ level: '', days: '', category: 'GPT' });
+    const [compensationSubmitting, setCompensationSubmitting] = useState(false);
+    // 套餐等级/类别选项（从套餐列表派生）
+    const [packageLevels, setPackageLevels] = useState<Array<{ level: string; category: string }>>([]);
 
     const [pageSize, setPageSize] = useState<number>(10);
     const [clearLimitKeyword, setClearLimitKeyword] = useState('');
@@ -134,6 +143,71 @@ const UsersManagePage: React.FC = () => {
     useEffect(() => {
         fetchUsers();
     }, [fetchUsers]);
+
+    // 加载套餐等级/类别（用于补偿弹窗下拉，去重）
+    useEffect(() => {
+        (async () => {
+            try {
+                const resp = await adminApiService.getPackages({ page_size: 1000 } as any);
+                if (resp.code === 20000 && Array.isArray(resp.data)) {
+                    const seen = new Set<string>();
+                    const levels: Array<{ level: string; category: string }> = [];
+                    resp.data.forEach((p: any) => {
+                        const key = `${p.level}|${p.category}`;
+                        if (p.level && p.category && !seen.has(key)) {
+                            seen.add(key);
+                            levels.push({ level: p.level, category: p.category });
+                        }
+                    });
+                    setPackageLevels(levels);
+                }
+            } catch (e) {
+                console.error('加载套餐等级失败:', e);
+            }
+        })();
+    }, []);
+
+    // 打开补偿弹窗
+    const openCompensationModal = (user: User) => {
+        setCompensationUser(user);
+        setCompensationForm({ level: '', days: '', category: 'GPT' });
+        onCompensationOpen();
+    };
+
+    // 提交补偿
+    const handleGrantCompensation = async () => {
+        if (!compensationUser) return;
+        if (!compensationForm.level) {
+            showToast('请选择补偿等级', 'warning');
+            return;
+        }
+        const days = parseInt(compensationForm.days);
+        if (!days || days <= 0) {
+            showToast('请输入有效的补偿天数', 'warning');
+            return;
+        }
+        setCompensationSubmitting(true);
+        try {
+            const resp = await adminApiService.grantCompensation({
+                user_id: compensationUser.id,
+                level: compensationForm.level,
+                days,
+                category: compensationForm.category,
+            });
+            if (resp.code === 20000) {
+                showToast(resp.msg || '补偿成功', 'success');
+                onCompensationClose();
+                fetchUsers();
+            } else {
+                showToast(resp.msg || '补偿失败', 'error');
+            }
+        } catch (e: any) {
+            console.error('补偿失败:', e);
+            showToast(e?.response?.data?.msg || '补偿失败', 'error');
+        } finally {
+            setCompensationSubmitting(false);
+        }
+    };
 
     // 处理搜索
     const handleSearch = () => {
@@ -379,6 +453,13 @@ const UsersManagePage: React.FC = () => {
                     onPress={() => openClearLimitConfirm(user)}
                 >
                     清除限速
+                </DropdownItem>
+                <DropdownItem
+                    key="compensation"
+                    startContent={<Gift className="w-4 h-4" />}
+                    onPress={() => openCompensationModal(user)}
+                >
+                    补偿套餐
                 </DropdownItem>
                 <DropdownItem
                     key="edit"
@@ -992,6 +1073,60 @@ const UsersManagePage: React.FC = () => {
                         </Button>
                         <Button color="warning" onPress={confirmClearLimit} isLoading={clearLimitSubmitting}>
                             确认解除限速
+                        </Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
+
+            {/* 补偿套餐 Modal */}
+            <Modal isOpen={isCompensationOpen} onClose={onCompensationClose} size="lg">
+                <ModalContent>
+                    <ModalHeader className="flex gap-2 items-center">
+                        <Gift className="w-5 h-5 text-warning" />
+                        补偿套餐
+                    </ModalHeader>
+                    <ModalBody>
+                        <div className="space-y-4">
+                            {compensationUser && (
+                                <div className="text-sm text-default-600 bg-default-50 rounded-lg p-3">
+                                    用户：<span className="font-medium">{compensationUser.username || compensationUser.email}</span>
+                                    <span className="text-default-400 ml-2">(ID: {compensationUser.id})</span>
+                                </div>
+                            )}
+                            <Select
+                                label="补偿等级"
+                                placeholder="选择补偿的套餐等级"
+                                selectedKeys={compensationForm.level ? [`${compensationForm.level}|${compensationForm.category}`] : []}
+                                onChange={(e) => {
+                                    const [level, category] = e.target.value.split('|');
+                                    setCompensationForm({ ...compensationForm, level: level || '', category: category || 'GPT' });
+                                }}
+                                isRequired
+                                variant="bordered"
+                                description="仅列出系统中存在套餐的等级"
+                            >
+                                {packageLevels.map((pl) => (
+                                    <SelectItem key={`${pl.level}|${pl.category}`}>
+                                        {pl.level}（{pl.category}）
+                                    </SelectItem>
+                                ))}
+                            </Select>
+                            <Input
+                                label="补偿天数"
+                                type="number"
+                                placeholder="请输入补偿天数，如 3"
+                                value={compensationForm.days}
+                                onChange={(e) => setCompensationForm({ ...compensationForm, days: e.target.value })}
+                                isRequired
+                                variant="bordered"
+                                description="补偿时长将作为该等级套餐排队，在现有套餐消耗完后自动使用"
+                            />
+                        </div>
+                    </ModalBody>
+                    <ModalFooter>
+                        <Button variant="light" onPress={onCompensationClose}>取消</Button>
+                        <Button color="primary" onPress={handleGrantCompensation} isLoading={compensationSubmitting}>
+                            确认补偿
                         </Button>
                     </ModalFooter>
                 </ModalContent>

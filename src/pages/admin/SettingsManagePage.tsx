@@ -32,6 +32,7 @@ import {
 import adminApiService from '../../services/adminApi';
 import { SystemConfig, UpdateConfigRequest } from '../../types/admin';
 import { showToast } from '../../components/Toast';
+import { CompensationConfigEditor } from './CompensationConfigEditor';
 
 /**
  * 系统配置管理页面
@@ -44,6 +45,7 @@ const SettingsManagePage: React.FC = () => {
     const [saving, setSaving] = useState(false);
     const [configValues, setConfigValues] = useState<Record<string, string>>({});
     const [selectedGroup, setSelectedGroup] = useState<string>('');
+    const [packageLevels, setPackageLevels] = useState<Array<{ level: string; category: string }>>([]);
     const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onOpenChange: onConfirmOpenChange } = useDisclosure();
     const [pendingConfig, setPendingConfig] = useState<{ key: string; value: string; description: string } | null>(null);
 
@@ -76,6 +78,29 @@ const SettingsManagePage: React.FC = () => {
     useEffect(() => {
         fetchConfigs();
     }, [fetchConfigs]);
+
+    // 加载套餐等级（补偿活动固定等级下拉用，去重）
+    useEffect(() => {
+        (async () => {
+            try {
+                const resp = await adminApiService.getPackages({ page_size: 1000 } as any);
+                if (resp.code === 20000 && Array.isArray(resp.data)) {
+                    const seen = new Set<string>();
+                    const levels: Array<{ level: string; category: string }> = [];
+                    resp.data.forEach((p: any) => {
+                        const key = `${p.level}|${p.category}`;
+                        if (p.level && p.category && !seen.has(key)) {
+                            seen.add(key);
+                            levels.push({ level: p.level, category: p.category });
+                        }
+                    });
+                    setPackageLevels(levels);
+                }
+            } catch (e) {
+                console.error('加载套餐等级失败:', e);
+            }
+        })();
+    }, []);
 
     // 更新配置值
     const updateConfigValue = (key: string, value: string) => {
@@ -277,6 +302,13 @@ const SettingsManagePage: React.FC = () => {
                         placeholder={`请输入${config.description}（支持Markdown格式）`}
                         minRows={5}
                         description={config.key.startsWith('SUBSCRIPTION_NOTICE_') ? '支持Markdown：标题、列表、**粗体**、链接等' : undefined}
+                    />
+                ) : config.key === 'COMPENSATION_CONFIG' ? (
+                    <CompensationConfigEditor
+                        value={value}
+                        onChange={(json) => updateConfigValue(config.key, json)}
+                        disabled={!config.editable}
+                        levelOptions={packageLevels}
                     />
                 ) : isJson ? (
                     <Textarea

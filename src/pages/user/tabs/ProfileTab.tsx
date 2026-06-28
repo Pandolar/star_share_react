@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardBody, Avatar, Chip, Spinner, Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from '@heroui/react';
 import { motion } from 'framer-motion';
-import { User, Mail, Calendar, Shield, AlertCircle, Package, Crown, Edit3, MessageCircle, ArrowUpCircle, Gauge, Snowflake, Info } from 'lucide-react';
+import { User, Mail, Calendar, Shield, AlertCircle, Package, Crown, Edit3, MessageCircle, ArrowUpCircle, Gauge, Snowflake, Info, Gift } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
-import { userInfoApi } from '../../../services/userApi';
+import { userInfoApi, compensationApi, CompensationItem } from '../../../services/userApi';
+import { toast } from '../../../utils/toast';
 import { EditProfileModal } from './profile/EditProfileModal';
 import { UsageSection } from './UsageTab';
 import { useLimitUsage, summarizeQuotaRule } from '../../../hooks/useLimitUsage';
@@ -46,6 +47,41 @@ export const ProfileTab: React.FC = () => {
 
   const [editModal, setEditModal] = useState<{ open: boolean; tab: EditTabKey }>({ open: false, tab: 'username' });
 
+  // 补偿活动
+  const [compensations, setCompensations] = useState<CompensationItem[]>([]);
+  const [claimingId, setClaimingId] = useState<string | null>(null);
+
+  const fetchCompensations = async () => {
+    try {
+      const resp = await compensationApi.getAvailable();
+      if (resp.code === 20000 && Array.isArray(resp.data)) {
+        setCompensations(resp.data);
+      } else {
+        setCompensations([]);
+      }
+    } catch {
+      setCompensations([]);
+    }
+  };
+
+  const handleClaim = async (campaignId: string) => {
+    setClaimingId(campaignId);
+    try {
+      const resp = await compensationApi.claim(campaignId);
+      if (resp.code === 20000) {
+        toast.success(resp.msg || '领取成功');
+        await fetchUserInfo();
+        await fetchCompensations();
+      } else {
+        toast.error(resp.msg || '领取失败');
+      }
+    } catch {
+      toast.error('领取失败，请稍后重试');
+    } finally {
+      setClaimingId(null);
+    }
+  };
+
   useEffect(() => {
     const openEdit = searchParams.get('openEdit');
     if (openEdit === 'email' || openEdit === 'username' || openEdit === 'password') {
@@ -72,6 +108,7 @@ export const ProfileTab: React.FC = () => {
 
   useEffect(() => {
     fetchUserInfo();
+    fetchCompensations();
   }, []);
 
   const openEditModal = (tab: EditTabKey = 'username') => setEditModal({ open: true, tab });
@@ -120,6 +157,47 @@ export const ProfileTab: React.FC = () => {
 
       {userInfo && (
         <>
+          {/* 补偿活动卡片（有可见活动时才显示） */}
+          {compensations.length > 0 && (
+            <Card className="border-l-4 border-l-warning bg-warning-50/40">
+              <CardBody className="p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Gift className="w-5 h-5 text-warning" />
+                  <h3 className="text-lg font-bold text-default-900">补偿福利</h3>
+                </div>
+                <div className="space-y-3">
+                  {compensations.map((c) => (
+                    <div
+                      key={c.id}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-white border border-warning-200"
+                    >
+                      <div className="flex-1">
+                        <div className="font-semibold text-default-900">{c.title}</div>
+                        <div className="text-sm text-default-600 mt-1">
+                          补偿 <span className="font-medium text-warning-700">{c.days} 天</span>
+                          {c.level && <span className="ml-1">「{c.level}」会员</span>}
+                          {c.level_mode === 'follow' && !c.level && <span className="ml-1">（跟随您的最高有效等级）</span>}
+                        </div>
+                        {!c.claimable && c.reason && (
+                          <div className="text-xs text-danger mt-1">{c.reason}</div>
+                        )}
+                      </div>
+                      <Button
+                        color="warning"
+                        size="sm"
+                        isDisabled={!c.claimable}
+                        isLoading={claimingId === c.id}
+                        onPress={() => handleClaim(c.id)}
+                      >
+                        {c.claimable ? '立即领取' : '不可领取'}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </CardBody>
+            </Card>
+          )}
+
           {/* 用户基本信息卡片 */}
           <Card className="overflow-visible">
             <CardBody className="p-6">
