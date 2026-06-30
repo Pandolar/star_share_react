@@ -40,7 +40,7 @@ export const AnnouncementTab: React.FC = () => {
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
+      initial={false}
       animate={{ opacity: 1 }}
       className="space-y-6"
     >

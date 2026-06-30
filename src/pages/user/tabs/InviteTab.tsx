@@ -172,7 +172,7 @@ export const InviteTab: React.FC = () => {
   const minHistoryPackageValue = overview?.min_history_package_value ?? 45;
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+    <motion.div initial={false} animate={{ opacity: 1 }} className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">

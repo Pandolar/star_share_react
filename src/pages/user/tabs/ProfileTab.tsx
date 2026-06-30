@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardBody, Avatar, Chip, Spinner, Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from '@heroui/react';
-import { motion } from 'framer-motion';
 import { User, Mail, Calendar, Shield, AlertCircle, Package, Crown, Edit3, MessageCircle, ArrowUpCircle, Gauge, Snowflake, Info, Gift } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { userInfoApi, compensationApi, CompensationItem } from '../../../services/userApi';
@@ -125,7 +124,7 @@ export const ProfileTab: React.FC = () => {
   const closeEditModal = () => setEditModal((s) => ({ ...s, open: false }));
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+    <div className="space-y-6">
       {/* 页面标题 */}
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
@@ -520,6 +519,6 @@ export const ProfileTab: React.FC = () => {
           </ModalFooter>
         </ModalContent>
       </Modal>
-    </motion.div>
+    </div>
   );
 };
