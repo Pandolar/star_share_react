@@ -77,8 +77,25 @@ const ALL_TAB_CONFIGS: TabConfig[] = [
 ];
 
 const UserCenter: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('subscription');
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // 关键：activeTab 直接从 URL 初始化，避免“挂载后再切换”导致的白屏。
+  // 若初始固定为 'subscription'，直链访问 ?tab=profile 时会先渲染 subscription，
+  // 随后 effect 再切到 profile。AnimatePresence 的 mode="wait" 必须先播完 subscription
+  // 的退出动画（opacity→0）才挂载 profile，而退出动画依赖 requestAnimationFrame，
+  // 首屏/重定向/被节流的场景下退出完成回调可能不触发，导致 mode="wait" 卡住、
+  // profile 永不挂载 → 右侧白屏（切 Tab 或按 F12 触发重排后才恢复）。
+  // 首帧就用 URL 里的目标 tab，则无挂载期切换、无退出动画，AnimatePresence 直接以
+  // 最终态渲染目标 tab。
+  const getInitialTab = (): string => {
+    const urlTab = searchParams.get('tab');
+    const allKeys = ALL_TAB_CONFIGS.map(t => t.key);
+    if (urlTab && allKeys.includes(urlTab)) return urlTab;
+    // 付费重置配额深链：未指定 tab 时落到“个人主页”
+    if (!urlTab && searchParams.get('action') === 'reset_quota') return 'profile';
+    return 'subscription';
+  };
+  const [activeTab, setActiveTab] = useState<string>(getInitialTab);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [emailUnbound, setEmailUnbound] = useState(false);
