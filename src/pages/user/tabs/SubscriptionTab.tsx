@@ -346,6 +346,8 @@ export const SubscriptionTab: React.FC = () => {
         </Card>
       )}
 
+      {/* 订阅说明：白牌模式下隐藏（白牌无自营订阅规则，统一走兑换激活码） */}
+      {!isWhiteLabel && (
       <Card className="mb-6 border border-primary/10 bg-primary/5 shadow-sm">
         <CardBody className="p-4 sm:p-5">
           <button
@@ -398,6 +400,7 @@ export const SubscriptionTab: React.FC = () => {
           )}
         </CardBody>
       </Card>
+      )}
 
       {loading && (
         <div className="flex flex-col items-center justify-center py-16">
