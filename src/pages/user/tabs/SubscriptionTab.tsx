@@ -3,7 +3,7 @@
  * 显示用户当前订阅和可用套餐
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, CardBody, Button, Chip, Spinner, Tab, Tabs } from '@heroui/react';
+import { Card, CardBody, Button, Chip, Input, Spinner, Tab, Tabs } from '@heroui/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Package, Star, Crown, AlertCircle, Calendar, Timer, ChevronDown, Info } from 'lucide-react';
 import { packageUserApi, orderUserApi } from '../../../services/userApi';
@@ -299,7 +299,7 @@ export const SubscriptionTab: React.FC = () => {
 
       {/* 白牌模式：兑换卡片 */}
       {isWhiteLabel && (
-        <Card className="mb-6 border border-warning/20 bg-gradient-to-br from-warning/5 to-primary/5">
+        <Card className="mb-6">
           <CardBody className="p-5 sm:p-6">
             <div className="flex items-start gap-4 mb-4">
               <div className="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center flex-shrink-0">
@@ -311,12 +311,11 @@ export const SubscriptionTab: React.FC = () => {
               </div>
             </div>
             <div className="flex gap-3 items-start">
-              <input
-                type="text"
+              <Input
                 value={cdkCode}
                 onChange={(e) => setCdkCode(e.target.value.toUpperCase())}
                 placeholder="请输入激活码（如：ABCD-1234-EFGH）"
-                className="flex-1 px-4 py-2.5 rounded-xl border border-default-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                className="flex-1"
               />
               <Button
                 color="primary"

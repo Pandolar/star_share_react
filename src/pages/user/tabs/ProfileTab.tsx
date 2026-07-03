@@ -296,7 +296,7 @@ export const ProfileTab: React.FC = () => {
               : { icon: Package, color: 'default' as const, bgColor: 'bg-default/10' };
 
             return (
-              <Card className={`border-l-4 ${hasPackage ? 'border-l-primary' : 'border-l-default-300'}`}>
+              <Card>
                 <CardBody className="p-6">
                   <div className="flex items-start gap-4">
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center ${levelStyle.bgColor}`}>
