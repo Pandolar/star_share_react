@@ -9,7 +9,9 @@ interface AuthLayoutProps {
 }
 
 const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title }) => {
-  const { isWhiteLabel } = useWhiteLabel();
+  // loading 未完成前不渲染客服：白牌判定完成前 isWhiteLabel 默认 false，
+  // 若此时挂载会注入 Chatwoot SDK（且不清理、持久存活），导致白牌站残留客服。
+  const { isWhiteLabel, loading: wlLoading } = useWhiteLabel();
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-25 px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-8">
@@ -38,8 +40,8 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title }) => {
         </motion.div>
       </div>
 
-      {/* 浮动客服按钮 - 游客模式（白牌模式不加载客服） */}
-      {!isWhiteLabel && <ChatwootFloatingButton mode="guest" />}
+      {/* 浮动客服按钮 - 游客模式（白牌模式不加载客服；判定完成前也不加载） */}
+      {!wlLoading && !isWhiteLabel && <ChatwootFloatingButton mode="guest" />}
     </div>
   );
 };

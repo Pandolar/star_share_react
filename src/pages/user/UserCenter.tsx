@@ -102,7 +102,8 @@ const UserCenter: React.FC = () => {
   const navigate = useNavigate();
 
   // 白牌模式：隐藏“邀请好友”“订单记录”Tab（白牌无邀请、无支付即无订单）
-  const { isWhiteLabel } = useWhiteLabel();
+  // wlLoading：白牌判定完成前不挂载客服，避免注入并持久残留 Chatwoot SDK。
+  const { isWhiteLabel, loading: wlLoading } = useWhiteLabel();
   const tabConfigs = React.useMemo(
     () =>
       isWhiteLabel
@@ -529,8 +530,8 @@ const UserCenter: React.FC = () => {
         onConfirm={handleLogout}
       />
 
-      {/* 浮动客服按钮 - 用户模式 */}
-      {!isWhiteLabel && <ChatwootFloatingButton mode="user" />}
+      {/* 浮动客服按钮 - 用户模式（白牌模式不加载客服；判定完成前也不加载） */}
+      {!wlLoading && !isWhiteLabel && <ChatwootFloatingButton mode="user" />}
     </div>
   );
 };
