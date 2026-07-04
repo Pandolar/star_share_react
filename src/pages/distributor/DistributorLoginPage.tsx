@@ -34,7 +34,7 @@ const DistributorLoginPage: React.FC = () => {
             if (response.code === 20000 && response.data) {
                 // 保存 dtoken 和分销商信息
                 localStorage.setItem('dtoken', response.data.dtoken);
-                localStorage.setItem('distributor', JSON.stringify(response.data.distributor));
+                localStorage.setItem('distributor', JSON.stringify(response.data));
 
                 showToast('登录成功', 'success');
 

@@ -33,6 +33,8 @@ import {
     Globe,
     CheckCircle2,
     XCircle,
+    Wallet,
+    Percent,
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import adminApiService from '../../services/adminApi';
@@ -48,25 +50,51 @@ interface Distributor {
     purchase_url: string;
     customer_service_url: string;
     remarks: string;
+    balance: number;
+    level: number;
+    default_cdk_expire_days: number;
+    can_login: boolean;
+    can_generate_cdk: boolean;
+    can_edit_notice: boolean;
+    can_edit_links: boolean;
     created_at: string;
     updated_at: string;
 }
 
-interface CreateDistributorRequest {
+interface DistributorFormState {
     username: string;
     password: string;
     domains: string[];
-    remarks?: string;
+    remarks: string;
+    status: number;
+    level: number;
+    default_cdk_expire_days: number;
+    can_login: boolean;
+    can_generate_cdk: boolean;
+    can_edit_notice: boolean;
+    can_edit_links: boolean;
 }
 
-interface UpdateDistributorRequest {
-    id: number;
-    username?: string;
-    password?: string;
-    status?: number;
-    domains?: string[];
-    remarks?: string;
-}
+const DEFAULT_FORM: DistributorFormState = {
+    username: '',
+    password: '',
+    domains: [],
+    remarks: '',
+    status: 1,
+    level: 1,
+    default_cdk_expire_days: 90,
+    can_login: true,
+    can_generate_cdk: true,
+    can_edit_notice: true,
+    can_edit_links: true,
+};
+
+const PERMISSION_FIELDS: { key: keyof DistributorFormState; label: string }[] = [
+    { key: 'can_login', label: '登录后台' },
+    { key: 'can_generate_cdk', label: '生成卡密' },
+    { key: 'can_edit_notice', label: '自定义公告' },
+    { key: 'can_edit_links', label: '改购买/客服链接' },
+];
 
 /**
  * 分销商管理页面
@@ -86,16 +114,28 @@ const DistributorsManagePage: React.FC = () => {
     const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure();
     const { isOpen: isViewOpen, onOpen: onViewOpen, onClose: onViewClose } = useDisclosure();
     const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
+    const { isOpen: isBalanceOpen, onOpen: onBalanceOpen, onClose: onBalanceClose } = useDisclosure();
+    const { isOpen: isDiscountOpen, onOpen: onDiscountOpen, onClose: onDiscountClose } = useDisclosure();
 
     // 表单数据
-    const [formData, setFormData] = useState<Partial<CreateDistributorRequest & { status: number }>>({
-        username: '',
-        password: '',
-        domains: [],
-        remarks: '',
-        status: 1,
-    });
+    const [formData, setFormData] = useState<DistributorFormState>({ ...DEFAULT_FORM });
     const [domainsInput, setDomainsInput] = useState('');
+
+    // 充值相关
+    const [rechargeAmount, setRechargeAmount] = useState('');
+    const [rechargeRemarks, setRechargeRemarks] = useState('');
+    const [balanceLogs, setBalanceLogs] = useState<any[]>([]);
+
+    // 折扣相关
+    const [packageOptions, setPackageOptions] = useState<Array<{ id: number; package_name: string }>>([]);
+    const [currentLevel, setCurrentLevel] = useState<number>(1);
+    const [levelMapRaw, setLevelMapRaw] = useState<Record<string, any>>({});
+    // 本分销商个体折扣（输入框用字符串）
+    const [distOverall, setDistOverall] = useState<string>('');
+    const [distPkgRates, setDistPkgRates] = useState<Record<string, string>>({});
+    // 当前等级默认折扣
+    const [levelOverall, setLevelOverall] = useState<string>('');
+    const [levelPkgRates, setLevelPkgRates] = useState<Record<string, string>>({});
 
     // 获取分销商列表
     const fetchDistributors = useCallback(async () => {
@@ -146,11 +186,17 @@ const DistributorsManagePage: React.FC = () => {
                 return;
             }
 
-            const requestData: CreateDistributorRequest = {
+            const requestData = {
                 username: formData.username!,
                 password: formData.password!,
                 domains: domains,
                 remarks: formData.remarks,
+                level: formData.level,
+                default_cdk_expire_days: formData.default_cdk_expire_days,
+                can_login: formData.can_login,
+                can_generate_cdk: formData.can_generate_cdk,
+                can_edit_notice: formData.can_edit_notice,
+                can_edit_links: formData.can_edit_links,
             };
 
             const response = await adminApiService.createDistributor(requestData);
@@ -178,13 +224,19 @@ const DistributorsManagePage: React.FC = () => {
                 .map(d => d.trim())
                 .filter(d => d.length > 0);
 
-            const requestData: UpdateDistributorRequest = {
+            const requestData = {
                 id: selectedDistributor.id,
                 username: formData.username,
                 password: formData.password,
                 status: formData.status,
                 domains: domains.length > 0 ? domains : undefined,
                 remarks: formData.remarks,
+                level: formData.level,
+                default_cdk_expire_days: formData.default_cdk_expire_days,
+                can_login: formData.can_login,
+                can_generate_cdk: formData.can_generate_cdk,
+                can_edit_notice: formData.can_edit_notice,
+                can_edit_links: formData.can_edit_links,
             };
 
             const response = await adminApiService.updateDistributor(requestData);
@@ -223,12 +275,7 @@ const DistributorsManagePage: React.FC = () => {
 
     // 重置表单
     const resetForm = () => {
-        setFormData({
-            username: '',
-            password: '',
-            domains: [],
-            remarks: '',
-        });
+        setFormData({ ...DEFAULT_FORM });
         setDomainsInput('');
         setSelectedDistributor(null);
     };
@@ -251,8 +298,15 @@ const DistributorsManagePage: React.FC = () => {
         setFormData({
             username: distributor.username,
             password: '',
+            domains: [],
+            remarks: distributor.remarks || '',
             status: distributor.status,
-            remarks: distributor.remarks,
+            level: distributor.level ?? 1,
+            default_cdk_expire_days: distributor.default_cdk_expire_days ?? 90,
+            can_login: distributor.can_login ?? true,
+            can_generate_cdk: distributor.can_generate_cdk ?? true,
+            can_edit_notice: distributor.can_edit_notice ?? true,
+            can_edit_links: distributor.can_edit_links ?? true,
         });
         setDomainsInput(domains.join('\n'));
         onEditOpen();
@@ -268,6 +322,157 @@ const DistributorsManagePage: React.FC = () => {
     const openDeleteModal = (distributor: Distributor) => {
         setSelectedDistributor(distributor);
         onDeleteOpen();
+    };
+
+    // ===== 余额充值 =====
+    const openBalanceModal = async (distributor: Distributor) => {
+        setSelectedDistributor(distributor);
+        setRechargeAmount('');
+        setRechargeRemarks('');
+        setBalanceLogs([]);
+        onBalanceOpen();
+        try {
+            const res = await adminApiService.getDistributorBalanceLog({ distributor_id: distributor.id, page: 1, page_size: 20 });
+            if (res.code === 20000) {
+                setBalanceLogs(res.data?.logs || []);
+            }
+        } catch (e) { /* 忽略流水加载失败 */ }
+    };
+
+    const handleRecharge = async (sign: 1 | -1) => {
+        if (!selectedDistributor) return;
+        const num = parseFloat(rechargeAmount);
+        if (isNaN(num) || num <= 0) {
+            showToast('请输入正确的金额', 'error');
+            return;
+        }
+        try {
+            const res = await adminApiService.rechargeDistributorBalance({
+                distributor_id: selectedDistributor.id,
+                amount: sign * num,
+                remarks: rechargeRemarks,
+            });
+            if (res.code === 20000) {
+                showToast(sign > 0 ? '充值成功' : '扣减成功', 'success');
+                setRechargeAmount('');
+                setRechargeRemarks('');
+                openBalanceModal(selectedDistributor); // 刷新流水
+                fetchDistributors();
+            } else {
+                showToast(res.msg || '操作失败', 'error');
+            }
+        } catch (e: any) {
+            showToast(e.message || '操作失败', 'error');
+        }
+    };
+
+    // ===== 折扣（无独立折扣表：个体折扣存分销商，等级默认折扣存全局配置）=====
+    const ratesFromConfig = (cfg: any): { overall: string; pkgRates: Record<string, string> } => {
+        const overall = cfg?.overall != null ? String(cfg.overall) : '';
+        const pkgRates: Record<string, string> = {};
+        const packages = cfg?.packages || {};
+        Object.entries(packages).forEach(([pid, r]) => { pkgRates[String(pid)] = String(r); });
+        return { overall, pkgRates };
+    };
+
+    const buildConfig = (overall: string, pkgRates: Record<string, string>): { ok: boolean; cfg?: any; err?: string } => {
+        const cfg: any = {};
+        const check = (v: string): number | null => {
+            if (v === '' || v == null) return null;
+            const n = Number(v);
+            if (isNaN(n) || n <= 0 || n > 1) return NaN as any;
+            return Math.round(n * 10000) / 10000;
+        };
+        const ov = check(overall);
+        if (Number.isNaN(ov as any)) return { ok: false, err: '整体折扣率需在 (0,1] 之间' };
+        if (ov != null) cfg.overall = ov;
+        const packages: Record<string, number> = {};
+        for (const [pid, raw] of Object.entries(pkgRates)) {
+            const n = check(raw);
+            if (Number.isNaN(n as any)) return { ok: false, err: '套餐折扣率需在 (0,1] 之间' };
+            if (n != null) packages[pid] = n;
+        }
+        if (Object.keys(packages).length) cfg.packages = packages;
+        return { ok: true, cfg };
+    };
+
+    const loadDiscounts = async (distributor: Distributor) => {
+        try {
+            const [dRes, pRes] = await Promise.all([
+                adminApiService.getDistributorDiscounts({ distributor_id: distributor.id }),
+                adminApiService.getPackages({ current_page: 1, page_size: 1000 }),
+            ]);
+            if (pRes.code === 20000) {
+                const list: any[] = Array.isArray(pRes.data) ? pRes.data : [];
+                setPackageOptions(list.map((p: any) => ({ id: p.id, package_name: p.package_name })));
+            }
+            if (dRes.code === 20000) {
+                const levelMap = dRes.data?.level_discounts || {};
+                setLevelMapRaw(levelMap);
+                const dcfg = dRes.data?.distributor?.discount_config || {};
+                const dr = ratesFromConfig(dcfg);
+                setDistOverall(dr.overall);
+                setDistPkgRates(dr.pkgRates);
+                const lvl = distributor.level ?? 1;
+                const lr = ratesFromConfig(levelMap[String(lvl)] || {});
+                setLevelOverall(lr.overall);
+                setLevelPkgRates(lr.pkgRates);
+            }
+        } catch (e) { /* 忽略 */ }
+    };
+
+    const openDiscountModal = (distributor: Distributor) => {
+        setSelectedDistributor(distributor);
+        setCurrentLevel(distributor.level ?? 1);
+        setPackageOptions([]);
+        setLevelMapRaw({});
+        setDistOverall(''); setDistPkgRates({});
+        setLevelOverall(''); setLevelPkgRates({});
+        onDiscountOpen();
+        loadDiscounts(distributor);
+    };
+
+    const handleSaveDistDiscount = async () => {
+        if (!selectedDistributor) return;
+        const built = buildConfig(distOverall, distPkgRates);
+        if (!built.ok) { showToast(built.err || '折扣率格式错误', 'error'); return; }
+        try {
+            const res = await adminApiService.saveDistributorDiscount({
+                distributor_id: selectedDistributor.id,
+                discount_config: built.cfg,
+            });
+            if (res.code === 20000) {
+                showToast('本分销商折扣已保存', 'success');
+                loadDiscounts(selectedDistributor);
+            } else {
+                showToast(res.msg || '保存失败', 'error');
+            }
+        } catch (e: any) {
+            showToast(e.response?.data?.msg || e.message || '保存失败', 'error');
+        }
+    };
+
+    const handleSaveLevelDiscount = async () => {
+        const built = buildConfig(levelOverall, levelPkgRates);
+        if (!built.ok) { showToast(built.err || '折扣率格式错误', 'error'); return; }
+        // 合并当前等级到完整 map（其它等级保持不变）
+        const merged: Record<string, any> = { ...levelMapRaw };
+        if (built.cfg && Object.keys(built.cfg).length) {
+            merged[String(currentLevel)] = built.cfg;
+        } else {
+            delete merged[String(currentLevel)];
+        }
+        try {
+            const res = await adminApiService.saveLevelDiscounts(merged);
+            if (res.code === 20000) {
+                showToast(`等级 L${currentLevel} 默认折扣已保存`, 'success');
+                setLevelMapRaw(merged);
+            } else {
+                showToast(res.msg || '保存失败', 'error');
+            }
+        } catch (e: any) {
+            showToast(e.response?.data?.msg || e.message || '保存失败', 'error');
+        }
     };
 
     // 快速切换状态
@@ -386,6 +591,8 @@ const DistributorsManagePage: React.FC = () => {
                                     <TableColumn>ID</TableColumn>
                                     <TableColumn>账号</TableColumn>
                                     <TableColumn>状态</TableColumn>
+                                    <TableColumn>等级</TableColumn>
+                                    <TableColumn>余额</TableColumn>
                                     <TableColumn>域名</TableColumn>
                                     <TableColumn>备注</TableColumn>
                                     <TableColumn>创建时间</TableColumn>
@@ -410,6 +617,12 @@ const DistributorsManagePage: React.FC = () => {
                                                         size="sm"
                                                         color="success"
                                                     />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Chip size="sm" variant="flat" color="secondary">L{distributor.level ?? 1}</Chip>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="font-medium text-success">¥{Number(distributor.balance ?? 0).toFixed(2)}</span>
                                                 </TableCell>
                                                 <TableCell>
                                                     <div className="flex flex-wrap gap-1">
@@ -443,6 +656,26 @@ const DistributorsManagePage: React.FC = () => {
                                                 </TableCell>
                                                 <TableCell>
                                                     <div className="flex gap-2">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="flat"
+                                                            color="success"
+                                                            onPress={() => openBalanceModal(distributor)}
+                                                            isIconOnly
+                                                            title="余额充值"
+                                                        >
+                                                            <Wallet size={16} />
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="flat"
+                                                            color="secondary"
+                                                            onPress={() => openDiscountModal(distributor)}
+                                                            isIconOnly
+                                                            title="折扣设置"
+                                                        >
+                                                            <Percent size={16} />
+                                                        </Button>
                                                         <Button
                                                             size="sm"
                                                             variant="flat"
@@ -531,6 +764,39 @@ const DistributorsManagePage: React.FC = () => {
                                 onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
                                 minRows={2}
                             />
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input
+                                    type="number"
+                                    label="分销商等级"
+                                    value={String(formData.level)}
+                                    onChange={(e) => setFormData({ ...formData, level: Number(e.target.value) || 1 })}
+                                    min={1}
+                                    description="用于匹配等级默认折扣"
+                                />
+                                <Input
+                                    type="number"
+                                    label="默认CDK过期天数"
+                                    value={String(formData.default_cdk_expire_days)}
+                                    onChange={(e) => setFormData({ ...formData, default_cdk_expire_days: Number(e.target.value) || 0 })}
+                                    min={0}
+                                    description="0=永不过期，分销商生成时默认使用"
+                                />
+                            </div>
+                            <div>
+                                <p className="text-sm text-default-500 mb-2">权限开关</p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {PERMISSION_FIELDS.map(({ key, label }) => (
+                                        <Switch
+                                            key={key}
+                                            size="sm"
+                                            isSelected={formData[key] as boolean}
+                                            onValueChange={(v) => setFormData({ ...formData, [key]: v })}
+                                        >
+                                            {label}
+                                        </Switch>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
                     </ModalBody>
                     <ModalFooter>
@@ -578,6 +844,39 @@ const DistributorsManagePage: React.FC = () => {
                                 onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
                                 minRows={2}
                             />
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input
+                                    type="number"
+                                    label="分销商等级"
+                                    value={String(formData.level)}
+                                    onChange={(e) => setFormData({ ...formData, level: Number(e.target.value) || 1 })}
+                                    min={1}
+                                    description="用于匹配等级默认折扣"
+                                />
+                                <Input
+                                    type="number"
+                                    label="默认CDK过期天数"
+                                    value={String(formData.default_cdk_expire_days)}
+                                    onChange={(e) => setFormData({ ...formData, default_cdk_expire_days: Number(e.target.value) || 0 })}
+                                    min={0}
+                                    description="0=永不过期"
+                                />
+                            </div>
+                            <div>
+                                <p className="text-sm text-default-500 mb-2">权限开关</p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {PERMISSION_FIELDS.map(({ key, label }) => (
+                                        <Switch
+                                            key={key}
+                                            size="sm"
+                                            isSelected={formData[key] as boolean}
+                                            onValueChange={(v) => setFormData({ ...formData, [key]: v })}
+                                        >
+                                            {label}
+                                        </Switch>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
                     </ModalBody>
                     <ModalFooter>
@@ -653,6 +952,177 @@ const DistributorsManagePage: React.FC = () => {
                     </ModalBody>
                     <ModalFooter>
                         <Button onPress={onViewClose}>关闭</Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
+
+            {/* 余额充值Modal */}
+            <Modal isOpen={isBalanceOpen} onClose={onBalanceClose} size="2xl">
+                <ModalContent>
+                    <ModalHeader>
+                        余额管理 - {selectedDistributor?.username}
+                    </ModalHeader>
+                    <ModalBody>
+                        <div className="space-y-4">
+                            <Card>
+                                <CardBody className="text-center">
+                                    <p className="text-default-500 text-sm">当前余额</p>
+                                    <p className="text-3xl font-bold text-success">
+                                        ¥{Number(selectedDistributor?.balance ?? 0).toFixed(2)}
+                                    </p>
+                                </CardBody>
+                            </Card>
+                            <Input
+                                type="number"
+                                label="金额（元）"
+                                placeholder="输入充值或扣减的金额"
+                                value={rechargeAmount}
+                                onChange={(e) => setRechargeAmount(e.target.value)}
+                                min={0}
+                            />
+                            <Input
+                                label="备注"
+                                placeholder="可选，如：季度返点"
+                                value={rechargeRemarks}
+                                onChange={(e) => setRechargeRemarks(e.target.value)}
+                            />
+                            <div className="flex gap-3">
+                                <Button color="success" className="flex-1" onPress={() => handleRecharge(1)}>
+                                    充值（+）
+                                </Button>
+                                <Button color="danger" variant="flat" className="flex-1" onPress={() => handleRecharge(-1)}>
+                                    扣减（-）
+                                </Button>
+                            </div>
+                            <div>
+                                <p className="text-sm text-default-500 mb-2">最近流水</p>
+                                <div className="max-h-64 overflow-auto space-y-2">
+                                    {balanceLogs.length === 0 && (
+                                        <p className="text-sm text-default-400">暂无流水</p>
+                                    )}
+                                    {balanceLogs.map((log) => (
+                                        <div key={log.id} className="flex justify-between text-sm border-b pb-1">
+                                            <span>
+                                                <span className={log.change_amount >= 0 ? 'text-success' : 'text-danger'}>
+                                                    {log.change_amount >= 0 ? '+' : ''}{Number(log.change_amount).toFixed(2)}
+                                                </span>
+                                                <span className="text-default-400 ml-2">{log.type}</span>
+                                                {log.remarks && <span className="text-default-400 ml-2">{log.remarks}</span>}
+                                            </span>
+                                            <span className="text-default-400">
+                                                余额{Number(log.balance_after).toFixed(2)} · {dayjs(log.created_at).format('MM-DD HH:mm')}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </ModalBody>
+                    <ModalFooter>
+                        <Button onPress={onBalanceClose}>关闭</Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
+
+            {/* 折扣设置Modal */}
+            <Modal isOpen={isDiscountOpen} onClose={onDiscountClose} size="3xl">
+                <ModalContent>
+                    <ModalHeader>
+                        折扣设置 - {selectedDistributor?.username}（当前等级 L{currentLevel}）
+                    </ModalHeader>
+                    <ModalBody>
+                        <div className="space-y-5">
+                            <p className="text-xs text-default-400">
+                                生效优先级：分销商×套餐 &gt; 分销商整体 &gt; 等级×套餐 &gt; 等级整体 &gt; 原价。折扣率 0.8 表示 8 折；留空表示不设。
+                            </p>
+
+                            {/* 本分销商个体折扣 */}
+                            <Card>
+                                <CardBody className="space-y-3">
+                                    <p className="text-sm font-semibold">本分销商专属折扣</p>
+                                    <Input
+                                        type="number"
+                                        label="整体折扣率"
+                                        size="sm"
+                                        placeholder="如 0.8，留空=不设整体"
+                                        value={distOverall}
+                                        onChange={(e) => setDistOverall(e.target.value)}
+                                        step={0.01}
+                                        min={0}
+                                        max={1}
+                                    />
+                                    <div className="space-y-2">
+                                        <p className="text-xs text-default-500">按套餐定制（优先于整体）</p>
+                                        {packageOptions.length === 0 && <p className="text-xs text-default-400">加载套餐中...</p>}
+                                        {packageOptions.map((p) => (
+                                            <div key={p.id} className="flex items-center gap-3">
+                                                <span className="text-sm flex-1">{p.package_name}</span>
+                                                <Input
+                                                    type="number"
+                                                    size="sm"
+                                                    className="w-32"
+                                                    placeholder="折扣率"
+                                                    value={distPkgRates[String(p.id)] || ''}
+                                                    onChange={(e) => setDistPkgRates({ ...distPkgRates, [String(p.id)]: e.target.value })}
+                                                    step={0.01}
+                                                    min={0}
+                                                    max={1}
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <Button color="primary" size="sm" onPress={handleSaveDistDiscount}>
+                                        保存本分销商折扣
+                                    </Button>
+                                </CardBody>
+                            </Card>
+
+                            {/* 等级默认折扣 */}
+                            <Card>
+                                <CardBody className="space-y-3">
+                                    <p className="text-sm font-semibold">
+                                        等级 L{currentLevel} 默认折扣
+                                        <span className="text-xs text-default-400 font-normal ml-2">影响所有 L{currentLevel} 分销商</span>
+                                    </p>
+                                    <Input
+                                        type="number"
+                                        label="整体折扣率"
+                                        size="sm"
+                                        placeholder="如 0.9，留空=不设整体"
+                                        value={levelOverall}
+                                        onChange={(e) => setLevelOverall(e.target.value)}
+                                        step={0.01}
+                                        min={0}
+                                        max={1}
+                                    />
+                                    <div className="space-y-2">
+                                        <p className="text-xs text-default-500">按套餐定制（优先于整体）</p>
+                                        {packageOptions.map((p) => (
+                                            <div key={p.id} className="flex items-center gap-3">
+                                                <span className="text-sm flex-1">{p.package_name}</span>
+                                                <Input
+                                                    type="number"
+                                                    size="sm"
+                                                    className="w-32"
+                                                    placeholder="折扣率"
+                                                    value={levelPkgRates[String(p.id)] || ''}
+                                                    onChange={(e) => setLevelPkgRates({ ...levelPkgRates, [String(p.id)]: e.target.value })}
+                                                    step={0.01}
+                                                    min={0}
+                                                    max={1}
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <Button color="secondary" size="sm" onPress={handleSaveLevelDiscount}>
+                                        保存等级 L{currentLevel} 默认折扣
+                                    </Button>
+                                </CardBody>
+                            </Card>
+                        </div>
+                    </ModalBody>
+                    <ModalFooter>
+                        <Button onPress={onDiscountClose}>关闭</Button>
                     </ModalFooter>
                 </ModalContent>
             </Modal>

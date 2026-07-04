@@ -22,8 +22,22 @@ export interface DistributorInfo {
     purchase_url: string;
     customer_service_url: string;
     remarks: string;
+    balance?: number;
+    level?: number;
+    default_cdk_expire_days?: number;
+    permissions?: DistributorPermissions;
     created_at: string;
     updated_at: string;
+}
+
+/**
+ * 分销商权限
+ */
+export interface DistributorPermissions {
+    can_login: boolean;
+    can_generate_cdk: boolean;
+    can_edit_notice: boolean;
+    can_edit_links: boolean;
 }
 
 /**
@@ -39,7 +53,11 @@ export interface DistributorLoginRequest {
  */
 export interface DistributorLoginResponse {
     dtoken: string;
-    distributor: DistributorInfo;
+    distributor_id: number;
+    username: string;
+    balance?: number;
+    level?: number;
+    permissions?: DistributorPermissions;
 }
 
 /**
@@ -57,6 +75,56 @@ export interface DistributorSettingsRequest {
 export interface DistributorChangePasswordRequest {
     old_password: string;
     new_password: string;
+}
+
+/**
+ * 可生成套餐（含折后单价）
+ */
+export interface DistributorPackage {
+    package_id: number;
+    package_name: string;
+    category: string;
+    level: string;
+    duration: number;
+    base_price: number;
+    discount_rate: number;
+    unit_price: number;
+}
+
+/**
+ * 生成CDK请求
+ */
+export interface DistributorGenerateRequest {
+    package_id: number;
+    number: number;
+    expires_days?: number | null;
+    remarks?: string;
+}
+
+/**
+ * 生成CDK响应
+ */
+export interface DistributorGenerateResponse {
+    batch_id: string;
+    count: number;
+    unit_price: number;
+    total_cost: number;
+    balance_after: number;
+    discount_rate: number;
+}
+
+/**
+ * 余额流水
+ */
+export interface BalanceLog {
+    id: number;
+    change_amount: number;
+    balance_after: number;
+    type: string;
+    batch_id?: string | null;
+    operator?: string | null;
+    remarks?: string | null;
+    created_at: string;
 }
 
 /**
@@ -131,7 +199,31 @@ class DistributorApiService {
      * 修改密码
      */
     async changePassword(data: DistributorChangePasswordRequest): Promise<DistributorApiResponse> {
-        const response = await this.api.put('/password', data);
+        const response = await this.api.put('/change_password', data);
+        return response.data;
+    }
+
+    /**
+     * 获取可生成套餐及折后单价
+     */
+    async getPackages(): Promise<DistributorApiResponse<DistributorPackage[]>> {
+        const response = await this.api.get('/packages');
+        return response.data;
+    }
+
+    /**
+     * 用余额自助生成CDK
+     */
+    async generateCdk(data: DistributorGenerateRequest): Promise<DistributorApiResponse<DistributorGenerateResponse>> {
+        const response = await this.api.post('/generate_cdk', data);
+        return response.data;
+    }
+
+    /**
+     * 查看自己的余额及流水
+     */
+    async getMyBalance(params: { current_page?: number; page_size?: number } = {}): Promise<DistributorApiResponse<{ balance: number; logs: BalanceLog[]; total: number }>> {
+        const response = await this.api.get('/my_balance', { params });
         return response.data;
     }
 

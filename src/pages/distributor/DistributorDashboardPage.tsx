@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardBody, CardHeader, Input, Textarea, Button, Chip, Divider } from '@heroui/react';
-import { Settings, Link as LinkIcon, Bell, Lock, LogOut, Save, Globe, ExternalLink } from 'lucide-react';
-import distributorApiService, { DistributorInfo } from '../../services/distributorApi';
+import { Card, CardBody, CardHeader, Input, Textarea, Button, Chip, Divider, Select, SelectItem } from '@heroui/react';
+import { Settings, Link as LinkIcon, Bell, Lock, LogOut, Save, Globe, ExternalLink, Ticket } from 'lucide-react';
+import distributorApiService, { DistributorInfo, DistributorPackage } from '../../services/distributorApi';
 import { showToast } from '../../components/Toast';
 import dayjs from 'dayjs';
 
@@ -23,6 +23,23 @@ const DistributorDashboardPage: React.FC = () => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [changingPassword, setChangingPassword] = useState(false);
 
+    // 余额 / 生成卡密
+    const [balance, setBalance] = useState<number>(0);
+    const [balanceLogs, setBalanceLogs] = useState<any[]>([]);
+    const [packages, setPackages] = useState<DistributorPackage[]>([]);
+    const [genPackageId, setGenPackageId] = useState<string>('');
+    const [genCount, setGenCount] = useState<string>('1');
+    const [genExpireDays, setGenExpireDays] = useState<string>('');
+    const [generating, setGenerating] = useState(false);
+
+    const permissions = distributor?.permissions;
+    const canGenerate = permissions?.can_generate_cdk ?? true;
+    const canEditNotice = permissions?.can_edit_notice ?? true;
+    const canEditLinks = permissions?.can_edit_links ?? true;
+
+    const selectedPackage = packages.find((p) => String(p.package_id) === genPackageId);
+    const estimatedCost = selectedPackage ? (selectedPackage.unit_price * (Number(genCount) || 0)) : 0;
+
     useEffect(() => {
         // 检查登录状态
         if (!distributorApiService.isLoggedIn()) {
@@ -31,7 +48,64 @@ const DistributorDashboardPage: React.FC = () => {
         }
 
         fetchSettings();
+        fetchBalance();
+        fetchPackages();
     }, [navigate]);
+
+    const fetchBalance = async () => {
+        try {
+            const res = await distributorApiService.getMyBalance({ current_page: 1, page_size: 20 });
+            if (res.code === 20000 && res.data) {
+                setBalance(res.data.balance);
+                setBalanceLogs(res.data.logs || []);
+            }
+        } catch (e) { /* 忽略 */ }
+    };
+
+    const fetchPackages = async () => {
+        try {
+            const res = await distributorApiService.getPackages();
+            if (res.code === 20000 && res.data) {
+                setPackages(res.data);
+                if (res.data.length > 0) setGenPackageId(String(res.data[0].package_id));
+            }
+        } catch (e) { /* 忽略 */ }
+    };
+
+    const handleGenerateCdk = async () => {
+        if (!genPackageId) {
+            showToast('请选择套餐', 'warning');
+            return;
+        }
+        const count = Number(genCount);
+        if (!count || count < 1) {
+            showToast('请输入生成数量', 'warning');
+            return;
+        }
+        if (estimatedCost > balance) {
+            showToast('余额不足，无法生成', 'error');
+            return;
+        }
+        setGenerating(true);
+        try {
+            const res = await distributorApiService.generateCdk({
+                package_id: Number(genPackageId),
+                number: count,
+                expires_days: genExpireDays === '' ? null : Number(genExpireDays),
+            });
+            if (res.code === 20000 && res.data) {
+                showToast(`成功生成 ${res.data.count} 个CDK，扣款 ¥${res.data.total_cost}`, 'success');
+                setBalance(res.data.balance_after);
+                fetchBalance();
+            } else {
+                showToast(res.msg || '生成失败', 'error');
+            }
+        } catch (e: any) {
+            showToast(e.response?.data?.msg || e.message || '生成失败', 'error');
+        } finally {
+            setGenerating(false);
+        }
+    };
 
     const fetchSettings = async () => {
         setLoading(true);
@@ -42,6 +116,7 @@ const DistributorDashboardPage: React.FC = () => {
                 setNotice(response.data.notice || '');
                 setPurchaseUrl(response.data.purchase_url || '');
                 setCustomerServiceUrl(response.data.customer_service_url || '');
+                if (typeof response.data.balance === 'number') setBalance(response.data.balance);
                 // 更新本地存储
                 localStorage.setItem('distributor', JSON.stringify(response.data));
             } else {
@@ -58,11 +133,19 @@ const DistributorDashboardPage: React.FC = () => {
     const handleSaveSettings = async () => {
         setSaving(true);
         try {
-            const response = await distributorApiService.updateSettings({
-                notice: notice.trim(),
-                purchase_url: purchaseUrl.trim(),
-                customer_service_url: customerServiceUrl.trim(),
-            });
+            // 仅提交有权限的字段，避免后端权限校验拦截整次保存
+            const payload: any = {};
+            if (canEditNotice) payload.notice = notice.trim();
+            if (canEditLinks) {
+                payload.purchase_url = purchaseUrl.trim();
+                payload.customer_service_url = customerServiceUrl.trim();
+            }
+            if (Object.keys(payload).length === 0) {
+                showToast('当前账号无可修改的配置项', 'warning');
+                setSaving(false);
+                return;
+            }
+            const response = await distributorApiService.updateSettings(payload);
 
             if (response.code === 20000) {
                 showToast('保存成功', 'success');
@@ -183,6 +266,13 @@ const DistributorDashboardPage: React.FC = () => {
                                     <p className="text-sm text-default-500 mb-1">账号</p>
                                     <p className="font-medium">{distributor?.username}</p>
                                 </div>
+                                <div className="p-3 bg-success-50 rounded-lg">
+                                    <p className="text-sm text-default-500 mb-1">账户余额</p>
+                                    <p className="text-2xl font-bold text-success">¥{Number(balance).toFixed(2)}</p>
+                                    {typeof distributor?.level === 'number' && (
+                                        <Chip size="sm" variant="flat" color="secondary" className="mt-1">等级 L{distributor.level}</Chip>
+                                    )}
+                                </div>
                                 <div>
                                     <p className="text-sm text-default-500 mb-1">状态</p>
                                     <Chip
@@ -237,6 +327,103 @@ const DistributorDashboardPage: React.FC = () => {
 
                     {/* 右侧：配置和修改密码 */}
                     <div className="lg:col-span-2 space-y-6">
+                        {/* 生成卡密（用余额） */}
+                        {canGenerate && (
+                            <Card>
+                                <CardHeader className="flex gap-3">
+                                    <Ticket className="w-5 h-5 text-success" />
+                                    <div className="flex flex-col">
+                                        <p className="text-md font-semibold">生成卡密</p>
+                                        <p className="text-sm text-default-500">用账户余额生成已上架套餐的卡密</p>
+                                    </div>
+                                </CardHeader>
+                                <Divider />
+                                <CardBody className="space-y-4">
+                                    {packages.length === 0 ? (
+                                        <p className="text-sm text-default-400">暂无可生成的套餐</p>
+                                    ) : (
+                                        <>
+                                            <Select
+                                                label="选择套餐"
+                                                selectedKeys={genPackageId ? [genPackageId] : []}
+                                                onChange={(e) => setGenPackageId(e.target.value)}
+                                                variant="bordered"
+                                            >
+                                                {packages.map((p) => (
+                                                    <SelectItem key={String(p.package_id)} textValue={p.package_name}>
+                                                        {p.package_name}（{(p.discount_rate * 10).toFixed(1)}折 · ¥{p.unit_price.toFixed(2)}/张）
+                                                    </SelectItem>
+                                                ))}
+                                            </Select>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <Input
+                                                    type="number"
+                                                    label="生成数量"
+                                                    value={genCount}
+                                                    onChange={(e) => setGenCount(e.target.value)}
+                                                    min={1}
+                                                    variant="bordered"
+                                                />
+                                                <Input
+                                                    type="number"
+                                                    label="过期天数"
+                                                    placeholder={String(distributor?.default_cdk_expire_days ?? 90)}
+                                                    value={genExpireDays}
+                                                    onChange={(e) => setGenExpireDays(e.target.value)}
+                                                    min={0}
+                                                    variant="bordered"
+                                                    description={`留空用默认 ${distributor?.default_cdk_expire_days ?? 90} 天，0=永不过期`}
+                                                />
+                                            </div>
+                                            {selectedPackage && (
+                                                <div className="flex items-center justify-between p-3 bg-default-100 rounded-lg text-sm">
+                                                    <span>
+                                                        单价 <span className="font-medium">¥{selectedPackage.unit_price.toFixed(2)}</span>
+                                                        <span className="text-default-400"> × {Number(genCount) || 0}</span>
+                                                    </span>
+                                                    <span>
+                                                        预计扣款：<span className={`font-bold ${estimatedCost > balance ? 'text-danger' : 'text-success'}`}>¥{estimatedCost.toFixed(2)}</span>
+                                                    </span>
+                                                </div>
+                                            )}
+                                            <Button
+                                                color="success"
+                                                size="lg"
+                                                className="w-full"
+                                                onPress={handleGenerateCdk}
+                                                isLoading={generating}
+                                                isDisabled={estimatedCost > balance}
+                                                startContent={!generating && <Ticket className="w-5 h-5" />}
+                                            >
+                                                {estimatedCost > balance ? '余额不足' : (generating ? '生成中...' : '确认生成并扣款')}
+                                            </Button>
+                                            <p className="text-xs text-default-400">
+                                                生成的卡密可在管理员/CDK列表中查看，归属本分销商。
+                                            </p>
+                                        </>
+                                    )}
+                                    {balanceLogs.length > 0 && (
+                                        <div className="pt-2">
+                                            <p className="text-sm text-default-500 mb-2">最近余额流水</p>
+                                            <div className="max-h-48 overflow-auto space-y-1">
+                                                {balanceLogs.map((log) => (
+                                                    <div key={log.id} className="flex justify-between text-xs border-b pb-1">
+                                                        <span>
+                                                            <span className={log.change_amount >= 0 ? 'text-success' : 'text-danger'}>
+                                                                {log.change_amount >= 0 ? '+' : ''}{Number(log.change_amount).toFixed(2)}
+                                                            </span>
+                                                            {log.remarks && <span className="text-default-400 ml-2">{log.remarks}</span>}
+                                                        </span>
+                                                        <span className="text-default-400">{dayjs(log.created_at).format('MM-DD HH:mm')}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </CardBody>
+                            </Card>
+                        )}
+
                         {/* 白牌配置 */}
                         <Card>
                             <CardHeader className="flex gap-3">
@@ -256,7 +443,8 @@ const DistributorDashboardPage: React.FC = () => {
                                     minRows={3}
                                     maxRows={6}
                                     variant="bordered"
-                                    description="留空则不显示公告"
+                                    isDisabled={!canEditNotice}
+                                    description={canEditNotice ? '留空则不显示公告' : '当前账号无自定义公告权限'}
                                 />
 
                                 <Input
@@ -266,7 +454,8 @@ const DistributorDashboardPage: React.FC = () => {
                                     onChange={(e) => setPurchaseUrl(e.target.value)}
                                     startContent={<LinkIcon className="w-4 h-4 text-default-400" />}
                                     variant="bordered"
-                                    description='订阅页面"购买激活码"按钮跳转链接'
+                                    isDisabled={!canEditLinks}
+                                    description={canEditLinks ? '订阅页面"购买激活码"按钮跳转链接' : '当前账号无修改链接权限'}
                                 />
 
                                 <Input
@@ -276,7 +465,8 @@ const DistributorDashboardPage: React.FC = () => {
                                     onChange={(e) => setCustomerServiceUrl(e.target.value)}
                                     startContent={<LinkIcon className="w-4 h-4 text-default-400" />}
                                     variant="bordered"
-                                    description="右下角客服icon跳转链接"
+                                    isDisabled={!canEditLinks}
+                                    description={canEditLinks ? '右下角客服icon跳转链接' : '当前账号无修改链接权限'}
                                 />
 
                                 <Button
@@ -285,6 +475,7 @@ const DistributorDashboardPage: React.FC = () => {
                                     className="w-full"
                                     onPress={handleSaveSettings}
                                     isLoading={saving}
+                                    isDisabled={!canEditNotice && !canEditLinks}
                                     startContent={!saving && <Save className="w-5 h-5" />}
                                 >
                                     {saving ? '保存中...' : '保存配置'}

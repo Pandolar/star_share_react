@@ -833,14 +833,6 @@ const CDKManagePage: React.FC = () => {
                                         )),
                                     ]}
                                 </Select>
-                                <Input
-                                    label="CDK前缀（可选）"
-                                    placeholder="如 VIP"
-                                    value={(formData as CreateCDKRequest).prefix || ''}
-                                    onChange={(e) => setFormData({ ...formData, prefix: e.target.value.toUpperCase() })}
-                                    variant="bordered"
-                                    description="生成 VIP-XXXX-XXXX 格式"
-                                />
                             </div>
                             <Textarea
                                 label="备注"

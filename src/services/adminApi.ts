@@ -495,6 +495,12 @@ class AdminApiService {
         password: string;
         domains: string[];
         remarks?: string;
+        level?: number;
+        default_cdk_expire_days?: number;
+        can_login?: boolean;
+        can_generate_cdk?: boolean;
+        can_edit_notice?: boolean;
+        can_edit_links?: boolean;
     }): Promise<AdminApiResponse> {
         const response = await this.api.post('/star/distributors', data);
         return response.data;
@@ -510,6 +516,12 @@ class AdminApiService {
         status?: number;
         domains?: string[];
         remarks?: string;
+        level?: number;
+        default_cdk_expire_days?: number;
+        can_login?: boolean;
+        can_generate_cdk?: boolean;
+        can_edit_notice?: boolean;
+        can_edit_links?: boolean;
     }): Promise<AdminApiResponse> {
         const response = await this.api.put('/star/distributors', data);
         return response.data;
@@ -520,6 +532,54 @@ class AdminApiService {
      */
     async deleteDistributor(id: number): Promise<AdminApiResponse> {
         const response = await this.api.delete('/star/distributors', { data: { id } });
+        return response.data;
+    }
+
+    /**
+     * 分销商余额：充值/扣减（amount 正=充值，负=扣减）
+     */
+    async rechargeDistributorBalance(data: { distributor_id: number; amount: number; remarks?: string }): Promise<AdminApiResponse> {
+        const response = await this.api.post('/star/distributor/balance', data);
+        return response.data;
+    }
+
+    /**
+     * 分销商余额流水
+     */
+    async getDistributorBalanceLog(params: { distributor_id: number; page?: number; page_size?: number }): Promise<AdminApiResponse<any>> {
+        const queryString = this.buildQueryString(params);
+        const response = await this.api.get(`/star/distributor/balance?${queryString}`);
+        return response.data;
+    }
+
+    /**
+     * 折扣信息：等级默认折扣 + 指定分销商的个体折扣
+     * 返回 { level_discounts: {...}, distributor: {id, discount_config}|null }
+     */
+    async getDistributorDiscounts(params: { distributor_id?: number | null } = {}): Promise<AdminApiResponse<any>> {
+        const queryString = this.buildQueryString(params);
+        const response = await this.api.get(`/star/distributor/discounts?${queryString}`);
+        return response.data;
+    }
+
+    /**
+     * 保存某分销商的个体折扣配置
+     * discount_config: {"overall": 0.8, "packages": {"2": 0.6}}
+     */
+    async saveDistributorDiscount(data: {
+        distributor_id: number;
+        discount_config: { overall?: number; packages?: Record<string, number> };
+    }): Promise<AdminApiResponse> {
+        const response = await this.api.put('/star/distributor/discounts', data);
+        return response.data;
+    }
+
+    /**
+     * 保存等级默认折扣（整体覆盖）
+     * level_discounts: {"1": {"overall": 0.9, "packages": {"2": 0.85}}, ...}
+     */
+    async saveLevelDiscounts(level_discounts: Record<string, { overall?: number; packages?: Record<string, number> }>): Promise<AdminApiResponse> {
+        const response = await this.api.put('/star/distributor/discounts', { level_discounts });
         return response.data;
     }
 }
