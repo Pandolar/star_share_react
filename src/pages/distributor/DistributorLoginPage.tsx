@@ -14,7 +14,7 @@ const DistributorLoginPage: React.FC = () => {
     useEffect(() => {
         // 如果已登录，跳转到控制面板
         if (distributorApiService.isLoggedIn()) {
-            navigate('/distributor-dashboard');
+            navigate('/distributor/dashboard');
         }
     }, [navigate]);
 
@@ -40,7 +40,7 @@ const DistributorLoginPage: React.FC = () => {
 
                 // 跳转到控制面板
                 setTimeout(() => {
-                    navigate('/distributor-dashboard');
+                    navigate('/distributor/dashboard');
                 }, 500);
             } else {
                 showToast(response.msg || '登录失败', 'error');

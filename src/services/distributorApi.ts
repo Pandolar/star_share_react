@@ -164,7 +164,7 @@ class DistributorApiService {
                     // dtoken 失效，清除并跳转登录
                     localStorage.removeItem('dtoken');
                     localStorage.removeItem('distributor');
-                    window.location.href = '/distributor-login';
+                    window.location.href = '/distributor/login';
                 }
                 return Promise.reject(error);
             }
@@ -233,7 +233,7 @@ class DistributorApiService {
     logout() {
         localStorage.removeItem('dtoken');
         localStorage.removeItem('distributor');
-        window.location.href = '/distributor-login';
+        window.location.href = '/distributor/login';
     }
 
     /**

@@ -18,7 +18,7 @@ const DistributorProtectedRoute: React.FC<DistributorProtectedRouteProps> = ({ c
         if (isLoggedIn) {
             const interval = setInterval(() => {
                 if (!distributorApiService.isLoggedIn()) {
-                    window.location.href = '/distributor-login';
+                    window.location.href = '/distributor/login';
                 }
             }, 60000); // 每分钟检查一次
 
@@ -27,7 +27,7 @@ const DistributorProtectedRoute: React.FC<DistributorProtectedRouteProps> = ({ c
     }, [isLoggedIn]);
 
     if (!isLoggedIn) {
-        return <Navigate to="/distributor-login" replace />;
+        return <Navigate to="/distributor/login" replace />;
     }
 
     return <>{children}</>;

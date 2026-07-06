@@ -43,7 +43,7 @@ const DistributorDashboardPage: React.FC = () => {
     useEffect(() => {
         // 检查登录状态
         if (!distributorApiService.isLoggedIn()) {
-            navigate('/distributor-login');
+            navigate('/distributor/login');
             return;
         }
 

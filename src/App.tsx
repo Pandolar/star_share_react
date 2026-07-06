@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { ToastContainer } from './components/Toast';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -45,6 +45,12 @@ const AdminRouteShell: React.FC = () => (
   </AdminProtectedRoute>
 );
 
+const DistributorRouteShell: React.FC = () => (
+  <DistributorProtectedRoute>
+    <Outlet />
+  </DistributorProtectedRoute>
+);
+
 const App: React.FC = () => {
   return (
     <HelmetProvider>
@@ -83,16 +89,13 @@ const App: React.FC = () => {
               <Route path="/new-api" element={<NewApiPage />} />
               <Route path="/customer-service" element={<CustomerServicePage />} />
 
-              {/* 分销商路由 */}
-              <Route path="/distributor-login" element={<DistributorLoginPage />} />
-              <Route
-                path="/distributor-dashboard"
-                element={
-                  <DistributorProtectedRoute>
-                    <DistributorDashboardPage />
-                  </DistributorProtectedRoute>
-                }
-              />
+              {/* 分销商路由（结构对齐 /star-admin/：登录页独立，其余在 /distributor 受保护壳下） */}
+              <Route path="/distributor/login" element={<DistributorLoginPage />} />
+              <Route path="/distributor" element={<DistributorRouteShell />}>
+                {/* 默认重定向到控制面板 */}
+                <Route index element={<Navigate to="/distributor/dashboard" replace />} />
+                <Route path="dashboard" element={<DistributorDashboardPage />} />
+              </Route>
 
               {/* Admin管理后台路由 */}
               <Route path="/star-admin/login" element={<AdminLoginPage />} />
