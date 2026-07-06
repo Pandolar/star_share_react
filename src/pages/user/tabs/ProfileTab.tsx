@@ -296,7 +296,7 @@ export const ProfileTab: React.FC = () => {
               : { icon: Package, color: 'default' as const, bgColor: 'bg-default/10' };
 
             return (
-              <Card>
+              <Card shadow={hasPackage ? 'md' : 'sm'}>
                 <CardBody className="p-6">
                   <div className="flex items-start gap-4">
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center ${levelStyle.bgColor}`}>
@@ -313,7 +313,7 @@ export const ProfileTab: React.FC = () => {
                             <Chip
                               size="sm"
                               color={userInfo.user_active_packages!.status === 'frozen' ? 'warning' : levelStyle.color}
-                              variant="flat"
+                              variant="solid"
                             >
                               {userInfo.user_active_packages!.status_text || userInfo.user_active_packages!.level}
                             </Chip>
@@ -330,7 +330,7 @@ export const ProfileTab: React.FC = () => {
                               </Button>
                             )}
                           </div>
-                          <p className="text-default-600 mb-4">{userInfo.user_active_packages!.package_name}</p>
+                          <p className="text-xl font-semibold text-default-900 mb-4">{userInfo.user_active_packages!.package_name}</p>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                             <div className="flex items-center gap-2 text-default-600">
                               <Calendar size={16} />
