@@ -16,7 +16,7 @@ export interface DistributorInfo {
     id: number;
     username: string;
     status: number;
-    domains: string;
+    domains: string | string[];
     notice: string;
     notice_id: string;
     purchase_url: string;

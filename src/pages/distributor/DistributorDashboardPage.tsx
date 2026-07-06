@@ -217,7 +217,12 @@ const DistributorDashboardPage: React.FC = () => {
         );
     }
 
-    const domains = distributor?.domains ? distributor.domains.split(',').map(d => d.trim()) : [];
+    // 域名兼容：后端 /settings 返回的是数组，历史/本地缓存可能是逗号字符串
+    const domains: string[] = Array.isArray(distributor?.domains)
+        ? (distributor!.domains as unknown as string[])
+        : (typeof distributor?.domains === 'string' && distributor.domains
+            ? distributor.domains.split(',').map((d) => d.trim()).filter(Boolean)
+            : []);
 
     return (
         <div className="min-h-screen bg-default-50">
@@ -286,7 +291,9 @@ const DistributorDashboardPage: React.FC = () => {
                                 <div>
                                     <p className="text-sm text-default-500 mb-2">绑定域名</p>
                                     <div className="space-y-2">
-                                        {domains.map((domain, index) => (
+                                        {domains.length === 0 ? (
+                                            <p className="text-sm text-default-400">未绑定独立域名（仅通过通用白牌分销）</p>
+                                        ) : domains.map((domain, index) => (
                                             <div key={index} className="flex items-center gap-2">
                                                 <Chip size="sm" variant="flat" color="primary">
                                                     {domain}

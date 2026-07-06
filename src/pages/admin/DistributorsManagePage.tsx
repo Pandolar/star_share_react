@@ -181,10 +181,7 @@ const DistributorsManagePage: React.FC = () => {
                 .map(d => d.trim())
                 .filter(d => d.length > 0);
 
-            if (domains.length === 0) {
-                showToast('请至少添加一个域名', 'error');
-                return;
-            }
+            // 域名可选：无域名的分销商只走通用白牌（不绑定独立反代域名）
 
             const requestData = {
                 username: formData.username!,
@@ -229,7 +226,8 @@ const DistributorsManagePage: React.FC = () => {
                 username: formData.username,
                 password: formData.password,
                 status: formData.status,
-                domains: domains.length > 0 ? domains : undefined,
+                // 始终提交域名数组（含空数组），允许清空域名改为纯通用白牌分销商
+                domains: domains,
                 remarks: formData.remarks,
                 level: formData.level,
                 default_cdk_expire_days: formData.default_cdk_expire_days,
@@ -749,13 +747,12 @@ const DistributorsManagePage: React.FC = () => {
                                 isRequired
                             />
                             <Textarea
-                                label="域名列表"
+                                label="域名列表（可选）"
                                 placeholder="每行一个域名，例如：&#10;aaa.com&#10;www.aaa.com"
                                 value={domainsInput}
                                 onChange={(e) => setDomainsInput(e.target.value)}
                                 minRows={4}
-                                isRequired
-                                description="分销商的白牌域名，一个域名只能属于一个分销商"
+                                description="可留空。留空则该分销商无独立反代域名，仅通过通用白牌分销；填写则一个域名只能属于一个分销商"
                             />
                             <Textarea
                                 label="备注"
@@ -831,11 +828,12 @@ const DistributorsManagePage: React.FC = () => {
                                 description="留空表示不修改密码"
                             />
                             <Textarea
-                                label="域名列表"
-                                placeholder="每行一个域名"
+                                label="域名列表（可选）"
+                                placeholder="每行一个域名，留空=仅通用白牌分销"
                                 value={domainsInput}
                                 onChange={(e) => setDomainsInput(e.target.value)}
                                 minRows={4}
+                                description="可留空。清空后该分销商无独立反代域名，仅通过通用白牌分销"
                             />
                             <Textarea
                                 label="备注"
