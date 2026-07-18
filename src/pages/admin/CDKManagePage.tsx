@@ -9,6 +9,7 @@ import {
     TableCell,
     Input,
     Button,
+    Checkbox,
     Dropdown,
     DropdownTrigger,
     DropdownMenu,
@@ -30,7 +31,6 @@ import {
     SelectItem,
     Snippet,
     Spinner,
-    type SharedSelection,
 } from '@heroui/react';
 import {
     Search,
@@ -68,7 +68,6 @@ const CDKManagePage: React.FC = () => {
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
     const [selectedCDK, setSelectedCDK] = useState<CDK | null>(null);
-    const [selectedKeys, setSelectedKeys] = useState<SharedSelection>(new Set());
     const [formData, setFormData] = useState<Partial<CreateCDKRequest & UpdateCDKRequest>>({});
 
     // Modal控制
@@ -177,11 +176,6 @@ const CDKManagePage: React.FC = () => {
         fetchCDKs();
     }, [fetchCDKs]);
 
-    // 翻页/刷新后，根据跨页选择同步当前页的勾选状态
-    useEffect(() => {
-        const onPage = cdks.filter((c) => crossPageSelection.has(c.id)).map((c) => c.id);
-        setSelectedKeys(new Set(onPage));
-    }, [cdks, crossPageSelection]);
 
     // 处理搜索
     const handleSearch = () => {
@@ -202,6 +196,33 @@ const CDKManagePage: React.FC = () => {
         setDistributorFilter('all');
         setCurrentPage(1);
     };
+
+    const toggleCurrentPageSelection = (isSelected: boolean) => {
+        setCrossPageSelection((current) => {
+            const next = new Map(current);
+            cdks.forEach((cdk) => {
+                if (isSelected) next.set(cdk.id, cdk.cdk);
+                else next.delete(cdk.id);
+            });
+            return next;
+        });
+    };
+
+    const toggleCDKSelection = (cdk: CDK, isSelected: boolean) => {
+        setCrossPageSelection((current) => {
+            const next = new Map(current);
+            if (isSelected) next.set(cdk.id, cdk.cdk);
+            else next.delete(cdk.id);
+            return next;
+        });
+    };
+
+    const selectedOnCurrentPage = cdks.reduce(
+        (count, cdk) => count + Number(crossPageSelection.has(cdk.id)),
+        0,
+    );
+    const isCurrentPageSelected = cdks.length > 0 && selectedOnCurrentPage === cdks.length;
+    const isCurrentPagePartiallySelected = selectedOnCurrentPage > 0 && !isCurrentPageSelected;
 
     // 导出CDK（mode: full=完整, distribute=分发）
     const handleExport = async (mode: 'full' | 'distribute') => {
@@ -361,36 +382,25 @@ const CDKManagePage: React.FC = () => {
     };
 
     // 导出为 .txt 文件
-    const handleExportTxt = async () => {
+    // TXT 只导出表格中当前筛选条件下的当前页。
+    const handleExportTxt = () => {
         try {
-            const params: CDKQueryParams = { page_size: 99999 };
-            if (searchQuery.trim()) params.querystring = searchQuery.trim();
-            if (statusFilter !== 'all') params.status = statusFilter as CDKQueryParams['status'];
-            if (distributorFilter !== 'all') {
-                params.distributor_id = distributorFilter === 'self' ? 0 : Number(distributorFilter);
+            if (cdks.length === 0) {
+                showToast('当前页没有可导出的CDK', 'warning');
+                return;
             }
-            const response = await adminApiService.getCDKs(params);
-            if (response.code === 20000) {
-                const list = Array.isArray(response.data) ? response.data : [];
-                if (list.length === 0) {
-                    showToast('当前筛选条件下无CDK', 'warning');
-                    return;
-                }
-                const text = list.map((c) => c.cdk).join('\n');
-                const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `cdk_export_${dayjs().format('YYYYMMDD_HHmmss')}.txt`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                showToast(`已导出 ${list.length} 个CDK`, 'success');
-            } else {
-                showToast(response.msg || '获取CDK列表失败', 'error');
-            }
-        } catch (_) {
+            const text = cdks.map((cdk) => cdk.cdk).join('\n');
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `cdk_export_page_${currentPage}_${dayjs().format('YYYYMMDD_HHmmss')}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast(`已导出当前页 ${cdks.length} 个CDK`, 'success');
+        } catch {
             showToast('导出失败', 'error');
         }
     };
@@ -629,7 +639,7 @@ const CDKManagePage: React.FC = () => {
                     startContent={<Download className="w-4 h-4" />}
                     onPress={handleExportTxt}
                 >
-                    导出 .txt
+                    导出当前页 .txt
                 </Button>
             </div>
 
@@ -643,29 +653,16 @@ const CDKManagePage: React.FC = () => {
                             wrapper: "max-h-[600px] overflow-x-auto",
                             table: "min-w-[1100px]",
                         }}
-                        selectionMode="multiple"
-                        selectedKeys={selectedKeys}
-                        onSelectionChange={(keys) => {
-                            if (keys === 'all') {
-                                // 全选当前页
-                                const newMap = new Map(crossPageSelection);
-                                cdks.forEach((c) => newMap.set(c.id, c.cdk));
-                                setCrossPageSelection(newMap);
-                                setSelectedKeys(new Set(cdks.map((c) => c.id)));
-                            } else {
-                                const keySet = keys;
-                                const newMap = new Map(crossPageSelection);
-                                // 取消当前页中不在新选择里的
-                                cdks.forEach((c) => {
-                                    if (!keySet.has(c.id)) newMap.delete(c.id);
-                                    else newMap.set(c.id, c.cdk);
-                                });
-                                setCrossPageSelection(newMap);
-                                setSelectedKeys(keys);
-                            }
-                        }}
                     >
                         <TableHeader>
+                            <TableColumn width={64} align="center">
+                                <Checkbox
+                                    aria-label="选择当前页全部CDK"
+                                    isSelected={isCurrentPageSelected}
+                                    isIndeterminate={isCurrentPagePartiallySelected}
+                                    onValueChange={toggleCurrentPageSelection}
+                                />
+                            </TableColumn>
                             <TableColumn width={100}>ID</TableColumn>
                             <TableColumn>CDK信息</TableColumn>
                             <TableColumn>关联套餐</TableColumn>
@@ -684,6 +681,14 @@ const CDKManagePage: React.FC = () => {
                         >
                             {cdks.map((cdk) => (
                                 <TableRow key={cdk.id} onDoubleClick={() => openEditModal(cdk)}>
+                                    <TableCell>
+                                        <Checkbox
+                                            aria-label={`选择 CDK ${cdk.cdk}`}
+                                            isSelected={crossPageSelection.has(cdk.id)}
+                                            onValueChange={(isSelected) => toggleCDKSelection(cdk, isSelected)}
+                                            onDoubleClick={(event) => event.stopPropagation()}
+                                        />
+                                    </TableCell>
                                     <TableCell>{cdk.id}</TableCell>
                                     <TableCell>
                                         <Snippet hideSymbol size="sm" codeString={cdk.cdk}>{cdk.cdk}</Snippet>

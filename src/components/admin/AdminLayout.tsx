@@ -65,55 +65,55 @@ const AdminLayout: React.FC = () => {
         {
             key: 'overview',
             label: '系统总览',
-            icon: <BarChart3 className="w-4 h-4" />,
+            icon: <BarChart3 className="w-5 h-5" />,
             path: '/star-admin/overview',
         },
         {
             key: 'users',
             label: '用户管理',
-            icon: <Users className="w-4 h-4" />,
+            icon: <Users className="w-5 h-5" />,
             path: '/star-admin/users',
         },
         {
             key: 'packages',
             label: '套餐管理',
-            icon: <Package className="w-4 h-4" />,
+            icon: <Package className="w-5 h-5" />,
             path: '/star-admin/packages',
         },
         {
             key: 'user-packages',
             label: '用户套餐',
-            icon: <UserCheck className="w-4 h-4" />,
+            icon: <UserCheck className="w-5 h-5" />,
             path: '/star-admin/user-packages',
         },
         {
             key: 'orders',
             label: '订单管理',
-            icon: <ShoppingCart className="w-4 h-4" />,
+            icon: <ShoppingCart className="w-5 h-5" />,
             path: '/star-admin/orders',
         },
         {
             key: 'cdk',
             label: 'CDK管理',
-            icon: <CreditCard className="w-4 h-4" />,
+            icon: <CreditCard className="w-5 h-5" />,
             path: '/star-admin/cdk',
         },
         {
             key: 'distributors',
             label: '分销商管理',
-            icon: <Users className="w-4 h-4" />,
+            icon: <Users className="w-5 h-5" />,
             path: '/star-admin/distributors',
         },
         {
             key: 'settings',
             label: '系统配置',
-            icon: <Settings className="w-4 h-4" />,
+            icon: <Settings className="w-5 h-5" />,
             path: '/star-admin/settings',
         },
         {
             key: 'invites',
             label: '邀请管理',
-            icon: <Gift className="w-4 h-4" />,
+            icon: <Gift className="w-5 h-5" />,
             path: '/star-admin/invites',
         },
     ];
@@ -194,11 +194,12 @@ const AdminLayout: React.FC = () => {
                                 variant={getCurrentTab() === item.key ? "flat" : "light"}
                                 color={getCurrentTab() === item.key ? "primary" : "default"}
                                 startContent={item.icon}
+                                size="lg"
                                 onPress={() => {
                                     handleTabChange(item.key);
                                     setIsMenuOpen(false);
                                 }}
-                                className="w-full justify-start"
+                                className="w-full justify-start text-base"
                             >
                                 {item.label}
                             </Button>
@@ -211,8 +212,8 @@ const AdminLayout: React.FC = () => {
             <div className="mx-auto px-4 py-6 w-full max-w-[1600px]">
                 <div className="hidden sm:flex gap-6">
                     {/* 左侧导航 */}
-                    <Card shadow="sm" className="w-64 shrink-0 h-fit">
-                        <CardBody>
+                    <Card shadow="sm" className="w-72 shrink-0 h-fit">
+                        <CardBody className="p-3">
                             <Listbox
                                 aria-label="管理后台导航"
                                 selectionMode="single"
@@ -228,8 +229,9 @@ const AdminLayout: React.FC = () => {
                                         key={item.key}
                                         startContent={item.icon}
                                         textValue={item.label}
+                                        className="min-h-12 px-4"
                                     >
-                                        {item.label}
+                                        <span className="text-base font-medium">{item.label}</span>
                                     </ListboxItem>
                                 ))}
                             </Listbox>

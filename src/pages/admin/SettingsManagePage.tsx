@@ -9,8 +9,8 @@ import {
     Switch,
     Divider,
     Spinner,
-    Tabs,
-    Tab,
+    Autocomplete,
+    AutocompleteItem,
     Modal,
     ModalContent,
     ModalHeader,
@@ -29,6 +29,7 @@ import {
     CreditCard,
     Shield,
     Bell,
+    Search,
 } from 'lucide-react';
 import adminApiService from '../../services/adminApi';
 import { SystemConfig, UpdateConfigRequest } from '../../types/admin';
@@ -195,6 +196,18 @@ const SettingsManagePage: React.FC = () => {
 
     // 分组列表
     const groupKeys = useMemo(() => Object.keys(groupedConfigs), [groupedConfigs]);
+
+    const filterGroups = useCallback((textValue: string, inputValue: string) => {
+        const query = inputValue.trim().toLocaleLowerCase();
+        if (!query) return true;
+
+        const groupConfigs = groupedConfigs[textValue] || [];
+        return textValue.toLocaleLowerCase().includes(query)
+            || groupConfigs.some((config) => (
+                config.key.toLocaleLowerCase().includes(query)
+                || config.description.toLocaleLowerCase().includes(query)
+            ));
+    }, [groupedConfigs]);
 
     // 初始化选中的分组
     useEffect(() => {
@@ -400,29 +413,38 @@ const SettingsManagePage: React.FC = () => {
                 description="黄色输入框表示已修改但未保存；禁用的输入框不可编辑。保存只作用于当前分类，JSON 配置会在提交前校验格式。"
             />
 
-            {/* 二级Tab：配置分组 */}
+            {/* 支持按分组名、配置说明或配置键查找所在分组 */}
             <Card>
-                <CardBody>
-                    <Tabs
-                        aria-label="配置分组"
-                        selectedKey={selectedGroup}
-                        onSelectionChange={(key) => setSelectedGroup(key as string)}
-                        variant="underlined"
-                        color="primary"
+                <CardBody className="gap-3">
+                    <div>
+                        <p className="font-medium text-foreground">配置分组</p>
+                        <p className="text-sm text-default-500">输入分组名，或直接搜索配置说明和配置键，快速定位所在分组。</p>
+                    </div>
+                    <Autocomplete
+                        aria-label="查找配置分组"
+                        label="查找配置分组"
+                        placeholder="例如：通知、SMTP、WHITE_LABEL_CONFIG"
+                        selectedKey={selectedGroup || null}
+                        onSelectionChange={(key) => {
+                            if (key != null) setSelectedGroup(String(key));
+                        }}
+                        defaultFilter={filterGroups}
+                        menuTrigger="focus"
+                        isClearable={false}
+                        startContent={<Search className="h-4 w-4 text-default-400" />}
+                        description={`共 ${groupKeys.length} 个分组，当前分组有 ${groupedConfigs[selectedGroup]?.length || 0} 项配置`}
+                        className="w-full max-w-2xl"
                     >
                         {groupKeys.map((group) => (
-                            <Tab
-                                key={group}
-                                title={
-                                    <div className="flex items-center gap-2">
-                                        {getGroupIcon(group)}
-                                        <span>{group}</span>
-                                        <span className="text-sm text-default-500">({groupedConfigs[group]?.length || 0})</span>
-                                    </div>
-                                }
-                            />
+                            <AutocompleteItem key={group} textValue={group}>
+                                <div className="flex w-full items-center gap-2">
+                                    {getGroupIcon(group)}
+                                    <span className="flex-1">{group}</span>
+                                    <span className="text-sm text-default-500">{groupedConfigs[group]?.length || 0} 项</span>
+                                </div>
+                            </AutocompleteItem>
                         ))}
-                    </Tabs>
+                    </Autocomplete>
                 </CardBody>
             </Card>
 

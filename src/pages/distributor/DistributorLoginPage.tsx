@@ -64,7 +64,7 @@ const DistributorLoginPage: React.FC = () => {
                         <Avatar color="primary" icon={<LogIn className="h-7 w-7" />} size="lg" />
                         <div>
                             <h1 className="text-2xl font-semibold text-foreground">分销商登录</h1>
-                            <p className="mt-1 text-sm text-default-500">管理卡密、余额和白牌站点内容</p>
+                            <p className="mt-1 text-sm text-default-500">进入你的业务控制台</p>
                         </div>
                     </CardHeader>
                     <Divider />
@@ -118,7 +118,7 @@ const DistributorLoginPage: React.FC = () => {
                     color="default"
                     variant="flat"
                     title="无法登录或忘记密码？"
-                    description="分销商账号、登录权限、余额、折扣和域名均由平台管理员配置，请联系管理员处理。"
+                    description="请联系平台管理员协助处理。"
                 />
             </div>
         </main>
