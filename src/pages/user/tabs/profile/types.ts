@@ -34,7 +34,13 @@ export interface UserInfo {
       account: string;
       updated_at?: string;
     };
+    billing_profile?: {
+      title: string;
+      tax_number: string;
+      confirmed_at?: string;
+      updated_at?: string;
+    };
   };
 }
 
-export type EditTabKey = 'username' | 'email' | 'password' | 'payment_info';
+export type EditTabKey = 'username' | 'email' | 'password' | 'payment_info' | 'billing_profile';

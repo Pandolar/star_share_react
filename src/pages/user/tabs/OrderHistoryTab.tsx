@@ -24,6 +24,9 @@ interface OrderInfo {
   package_name: string;
   status: string;
   created_at: string;
+  invoice_requested?: boolean;
+  invoice_status?: string | null;
+  payable_amount?: number | null;
 }
 
 type OrderStatus = 'all' | 'completed' | 'pending' | 'failed';
@@ -179,6 +182,17 @@ export const OrderHistoryTab: React.FC = () => {
   useEffect(() => {
     fetchOrders();
   }, []);
+
+  const renderInvoiceStatus = (order: OrderInfo) => {
+    if (!order.invoice_requested) return <Chip size="sm" variant="flat">未申请开票</Chip>;
+    const labels: Record<string, string> = {
+      awaiting_payment: '支付后待开票',
+      pending_issue: '待开票',
+      issued: '已开票',
+    };
+    const color = order.invoice_status === 'issued' ? 'success' : order.invoice_status === 'pending_issue' ? 'warning' : 'default';
+    return <Chip size="sm" color={color} variant="flat">{labels[order.invoice_status || ''] || '开票处理中'}</Chip>;
+  };
 
   return (
     <motion.div
@@ -392,6 +406,15 @@ export const OrderHistoryTab: React.FC = () => {
                               <div className="font-medium text-default-900">
                                 {order.package_name}
                               </div>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3 text-sm">
+                              <div className="flex items-center gap-2">
+                                <span className="text-default-500">开票：</span>
+                                {renderInvoiceStatus(order)}
+                              </div>
+                              {order.payable_amount != null && (
+                                <span className="text-default-500">实付金额：¥{order.payable_amount}</span>
+                              )}
                             </div>
                           </div>
                         </div>

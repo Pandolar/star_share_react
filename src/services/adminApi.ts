@@ -28,6 +28,8 @@ import {
     WorkOrder,
     WorkOrderQueryParams,
     UpdateWorkOrderRequest,
+    InvoiceRecord,
+    InvoiceQueryParams,
 } from '../types/admin';
 
 /**
@@ -414,6 +416,23 @@ class AdminApiService {
      */
     async deleteOrder(id: number): Promise<AdminApiResponse> {
         const response = await this.api.delete('/star/order', { data: { id } });
+        return response.data;
+    }
+
+    async getInvoices(params: InvoiceQueryParams = {}): Promise<AdminApiResponse<InvoiceRecord[]>> {
+        const queryString = this.buildQueryString(params);
+        const response = await this.api.get(`/star/invoices?${queryString}`);
+        return response.data;
+    }
+
+    async markInvoiceIssued(id: number, remarks?: string): Promise<AdminApiResponse> {
+        const response = await this.api.put('/star/invoices', { id, invoice_status: 'issued', remarks });
+        return response.data;
+    }
+
+    async exportInvoices(params: InvoiceQueryParams = {}): Promise<Blob> {
+        const queryString = this.buildQueryString(params);
+        const response = await this.api.get(`/star/invoices/export?${queryString}`, { responseType: 'blob' });
         return response.data;
     }
 

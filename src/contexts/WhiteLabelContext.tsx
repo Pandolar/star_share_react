@@ -76,11 +76,15 @@ export const WhiteLabelProvider: React.FC<WhiteLabelProviderProps> = ({ children
                     });
                     return;
                 }
-                // 异常响应：安全降级为自营模式
-                setState({ ...defaultState, loading: false });
+                // 站点模式未知时按白牌处理，避免短暂暴露支付、开票等自营能力。
+                whiteLabelSnapshot = true;
+                setState({ ...defaultState, isWhiteLabel: true, loading: false });
             } catch {
-                // 网络错误：安全降级为自营模式，避免白屏
-                if (mounted) setState({ ...defaultState, loading: false });
+                // 网络异常同样 fail closed；恢复连接后刷新即可重新判定。
+                if (mounted) {
+                    whiteLabelSnapshot = true;
+                    setState({ ...defaultState, isWhiteLabel: true, loading: false });
+                }
             }
         })();
         return () => {

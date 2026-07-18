@@ -38,7 +38,7 @@ export const SubscriptionTab: React.FC = () => {
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
 
   const isMobileDevice = useIsMobile();
-  const { isWhiteLabel, purchaseUrl, subscriptionNotice } = useWhiteLabel();
+  const { isWhiteLabel, loading: whiteLabelLoading, purchaseUrl, subscriptionNotice } = useWhiteLabel();
 
   const [cdkCode, setCdkCode] = useState('');
 
@@ -78,6 +78,7 @@ export const SubscriptionTab: React.FC = () => {
   );
 
   const fetchPackages = React.useCallback(async () => {
+    if (whiteLabelLoading) return;
     try {
       setLoading(true);
       setError('');
@@ -97,7 +98,7 @@ export const SubscriptionTab: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [subscriptionCategories]);
+  }, [subscriptionCategories, whiteLabelLoading]);
 
   useEffect(() => {
     fetchPackages();
@@ -110,11 +111,11 @@ export const SubscriptionTab: React.FC = () => {
       setSelectedPackage(pkg);
 
       const isAndroid = /android/i.test(navigator.userAgent);
-      const requestData = isMobileDevice ? { device: 'mobile' } : {};
+      const requestData = isMobileDevice ? { device: 'mobile' as const } : {};
       const response = await orderUserApi.createOrder(pkg.id, requestData);
 
       if (response.code === 20000) {
-        setOrderInfo(response.data);
+        setOrderInfo({ ...response.data, invoice_snapshot: response.data.invoice_snapshot || null });
         setPaymentModalOpen(true);
 
         // 仅 Android 尝试弹出支付页（Android 浏览器通常不拦截）
@@ -131,11 +132,36 @@ export const SubscriptionTab: React.FC = () => {
     }
   };
 
+  const replaceOrder = async (invoiceRequested: boolean) => {
+    if (!selectedPackage || !orderInfo) return;
+    setOrderLoading(true);
+    try {
+      const response = await orderUserApi.createOrder(selectedPackage.id, {
+        ...(isMobileDevice ? { device: 'mobile' } : {}),
+        invoice_requested: invoiceRequested,
+        replaced_order_id: orderInfo.order_id,
+      });
+      if (response.code === 20000) {
+        setOrderInfo({ ...response.data, invoice_snapshot: response.data.invoice_snapshot || null });
+      } else {
+        toast.error(response.msg || '切换开票选项失败');
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '切换开票选项失败');
+    } finally {
+      setOrderLoading(false);
+    }
+  };
+
   const getMostPopularPackage = (categoryPackages: PackageInfo[]) => {
     if (categoryPackages.length <= 1) return null;
     const sortedByPrice = [...categoryPackages].sort((a, b) => a.price - b.price);
     return sortedByPrice[Math.floor(sortedByPrice.length / 2)];
   };
+
+  if (whiteLabelLoading) {
+    return <div className="flex min-h-64 items-center justify-center"><Spinner label="正在确认站点模式..." /></div>;
+  }
 
   return (
     <div
@@ -664,6 +690,8 @@ export const SubscriptionTab: React.FC = () => {
         isOpen={paymentModalOpen}
         selectedPackage={selectedPackage}
         orderInfo={orderInfo}
+        replacingOrder={orderLoading}
+        onInvoiceOptionChange={replaceOrder}
         onClose={() => {
           setPaymentModalOpen(false);
           setOrderInfo(null);

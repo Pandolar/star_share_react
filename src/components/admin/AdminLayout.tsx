@@ -31,6 +31,7 @@ import {
     Home,
     BarChart3,
     Gift,
+    ReceiptText,
 } from 'lucide-react';
 import adminApiService from '../../services/adminApi';
 
@@ -91,6 +92,12 @@ const AdminLayout: React.FC = () => {
             label: '订单管理',
             icon: <ShoppingCart className="w-5 h-5" />,
             path: '/star-admin/orders',
+        },
+        {
+            key: 'invoices',
+            label: '开票管理',
+            icon: <ReceiptText className="w-5 h-5" />,
+            path: '/star-admin/invoices',
         },
         {
             key: 'cdk',

@@ -9,8 +9,9 @@ import {
   Tab,
   Input,
   Spinner,
+  Checkbox,
 } from '@heroui/react';
-import { Edit3, User, Mail, Shield, AlertCircle, Send, Eye, EyeOff, Wallet } from 'lucide-react';
+import { Edit3, User, Mail, Shield, AlertCircle, Send, Eye, EyeOff, Wallet, ReceiptText } from 'lucide-react';
 import { userInfoApi } from '../../../../services/userApi';
 import { sendEmailCode as sendAuthEmailCode, resetPassword } from '../../../../services/authApi';
 import { setAuthCookies } from '../../../../utils/cookies';
@@ -19,6 +20,7 @@ import type { UserInfo, EditTabKey } from './types';
 interface EditProfileModalProps {
   isOpen: boolean;
   initialTab?: EditTabKey;
+  showFinancialTabs: boolean;
   userInfo: UserInfo | null;
   onClose: () => void;
   onUserInfoChange: (next: Partial<UserInfo>) => void;
@@ -41,6 +43,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   isOpen,
   initialTab = 'username' as EditTabKey,
   userInfo,
+  showFinancialTabs,
   onClose,
   onUserInfoChange,
 }) => {
@@ -76,6 +79,11 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const [realName, setRealName] = useState('');
   const [paymentAccount, setPaymentAccount] = useState('');
 
+  // 开票主体
+  const [billingTitle, setBillingTitle] = useState('');
+  const [billingTaxNumber, setBillingTaxNumber] = useState('');
+  const [billingConfirmed, setBillingConfirmed] = useState(false);
+
   // Modal 打开时，初始化字段
   useEffect(() => {
     if (!isOpen) return;
@@ -95,6 +103,9 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     setShowPwdEmailCode(false);
     setRealName(userInfo?.preferences?.payment_info?.real_name || '');
     setPaymentAccount(userInfo?.preferences?.payment_info?.account || '');
+    setBillingTitle(userInfo?.preferences?.billing_profile?.title || '');
+    setBillingTaxNumber(userInfo?.preferences?.billing_profile?.tax_number || '');
+    setBillingConfirmed(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
@@ -276,6 +287,39 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
         } else {
           setEditError(response.msg || '修改收款方式失败');
         }
+      } else if (activeTab === 'billing_profile') {
+        if (billingTitle.trim().length < 2) {
+          setEditError('请输入完整的发票抬头');
+          return;
+        }
+        const normalizedTaxNumber = billingTaxNumber.replace(/\s+/g, '').toUpperCase();
+        if (!/^\d{15}$/.test(normalizedTaxNumber) && !/^[0-9A-HJ-NPQRTUWXY]{18}$/.test(normalizedTaxNumber)) {
+          setEditError('请输入 15 位旧税号或 18 位统一社会信用代码');
+          return;
+        }
+        if (!billingConfirmed) {
+          setEditError('请确认主体信息准确无误');
+          return;
+        }
+        const response = await userInfoApi.changeUserInfo({
+          change_type: 'billing_profile',
+          billing_profile: {
+            title: billingTitle.trim(),
+            tax_number: normalizedTaxNumber,
+            confirmed: true,
+          },
+        });
+        if (response.code === 20000) {
+          onUserInfoChange({
+            preferences: {
+              ...userInfo?.preferences,
+              billing_profile: { title: billingTitle.trim(), tax_number: normalizedTaxNumber },
+            },
+          });
+          onClose();
+        } else {
+          setEditError(response.msg || '保存开票主体失败');
+        }
       }
     } catch (err) {
       setEditError(err instanceof Error ? err.message : '操作失败');
@@ -288,10 +332,12 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     activeTab === 'username'
       ? !newUsername.trim()
       : activeTab === 'email'
-        ? (!newEmail.trim() || !emailCode.trim() || Boolean(userInfo?.email && !userInfo.email.endsWith('@default.com')) || (bindPassword.trim().length > 0 && bindPassword.trim().length < 8))
+        ? !newEmail.trim()
         : activeTab === 'password'
-          ? (!userInfo?.email || userInfo.email.endsWith('@default.com') || !pwdEmailCode.trim() || !newPassword.trim() || !confirmPassword.trim() || newPassword !== confirmPassword || newPassword.length < 8)
-          : (!realName.trim() || !paymentAccount.trim())
+          ? (!newPassword.trim() || !confirmPassword.trim())
+          : activeTab === 'billing_profile'
+            ? (!billingTitle.trim() || !billingTaxNumber.trim() || !billingConfirmed)
+            : (!realName.trim() || !paymentAccount.trim())
   );
 
   const sendCodeDisabled = emailCodeSending || countdown > 0 || !newEmail.trim() || Boolean(userInfo?.email && !userInfo.email.endsWith('@default.com'));
@@ -547,6 +593,8 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
               </div>
             </Tab>
 
+            {showFinancialTabs && (
+              <>
             <Tab key="payment_info" title={<div className="flex items-center space-x-2"><Wallet size={16} /><span>收款方式</span></div>}>
               <div className="space-y-4 mt-4">
                 <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
@@ -597,6 +645,35 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 </div>
               </div>
             </Tab>
+            <Tab key="billing_profile" title={<div className="flex items-center space-x-2"><ReceiptText size={16} /><span>主体信息</span></div>}>
+              <div className="space-y-4 mt-4">
+                <div className="p-3 bg-warning/10 border border-warning/20 rounded-lg">
+                  <p className="text-sm text-warning-700">开票资料</p>
+                  <p className="text-xs text-default-500 mt-1">提交订单时会保存当前资料快照，后续修改不会影响历史订单。</p>
+                </div>
+                <Input
+                  label="发票抬头"
+                  value={billingTitle}
+                  onChange={(event) => setBillingTitle(event.target.value)}
+                  placeholder="请输入公司或组织全称"
+                  variant="bordered"
+                  isRequired
+                />
+                <Input
+                  label="税号"
+                  value={billingTaxNumber}
+                  onChange={(event) => setBillingTaxNumber(event.target.value.toUpperCase())}
+                  placeholder="统一社会信用代码或旧税号"
+                  variant="bordered"
+                  isRequired
+                />
+                <Checkbox isSelected={billingConfirmed} onValueChange={setBillingConfirmed}>
+                  我已核对并确认主体名称和税号准确无误
+                </Checkbox>
+              </div>
+            </Tab>
+              </>
+            )}
           </Tabs>
 
           {editError && (

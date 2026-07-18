@@ -241,6 +241,12 @@ export interface Order {
     status: 'pending' | 'paid' | 'failed';
     way?: string;
     remarks?: string;
+    invoice_requested?: boolean;
+    invoice_status?: 'not_requested' | 'awaiting_payment' | 'pending_issue' | 'issued' | null;
+    base_amount?: number | null;
+    payable_amount?: number | null;
+    paid_amount?: number | null;
+    invoice_snapshot?: Record<string, unknown> | null;
 }
 
 export interface UpdateOrderRequest {
@@ -258,6 +264,37 @@ export interface OrderQueryParams extends CommonQueryParams {
     created_at?: string;
     way?: string;
     remarks?: string;
+}
+
+export interface InvoiceRecord {
+    id: number;
+    order_id: string;
+    user_id: number;
+    user_email: string;
+    package_name: string;
+    order_status: 'pending' | 'paid' | 'failed';
+    invoice_status: 'awaiting_payment' | 'pending_issue' | 'issued';
+    base_amount: number;
+    surcharge_amount: number;
+    payable_amount: number;
+    paid_amount: number;
+    title: string;
+    tax_number: string;
+    delivery_workdays?: number;
+    created_at?: string | null;
+    paid_at?: string | null;
+    invoice_issued_at?: string | null;
+    remarks?: string | null;
+    invoice_status_history?: Array<{
+        from: string;
+        to: string;
+        at: string;
+    }>;
+}
+
+export interface InvoiceQueryParams extends CommonQueryParams {
+    invoice_status?: string;
+    order_status?: string;
 }
 
 // 分页数据类型

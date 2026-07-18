@@ -21,6 +21,16 @@ export interface OrderInfo {
   qr_code: string;
   channel: string;
   pay_type: string;
+  base_amount?: string;
+  payable_amount?: string;
+  invoice_requested?: boolean;
+  invoice_snapshot?: {
+    title: string;
+    tax_number: string;
+    email: string;
+    surcharge_amount: string;
+    delivery_workdays: number;
+  } | null;
 }
 
 export type SubscriptionType = 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'more';

@@ -213,7 +213,7 @@ export const userInfoApi = {
 
     // 修改用户信息
     changeUserInfo: async (params: {
-        change_type: 'username' | 'email' | 'password' | 'payment_info';
+        change_type: 'username' | 'email' | 'password' | 'payment_info' | 'billing_profile';
         username?: string;
         email?: string;
         email_code?: string;
@@ -224,6 +224,11 @@ export const userInfoApi = {
         payment_info?: {
             real_name: string;
             account: string;
+        };
+        billing_profile?: {
+            title: string;
+            tax_number: string;
+            confirmed: boolean;
         };
     }): Promise<ApiResponse<any>> => {
         return createUserRequest(getUserApiUrl('/u/change_user_info'), {
@@ -276,31 +281,60 @@ export const compensationApi = {
     },
 };
 
+export interface PackageInfoResponse {
+    id: number;
+    package_name: string;
+    category: string;
+    price: number;
+    duration: number;
+    introduce: string;
+    level: string;
+    priority: number;
+    remarks: string;
+    status: number;
+}
+
+export interface InvoiceEligibility {
+    eligible: boolean;
+    reason: 'invoice_disabled' | 'below_threshold' | 'email_unbound' | 'email_not_allowed' | 'billing_profile_missing' | 'non_self_site' | null;
+    base_amount: string;
+    surcharge_rate: string;
+    surcharge_amount: string;
+    payable_amount: string;
+    delivery_workdays: number;
+    email: string;
+    billing_profile: { title: string; tax_number: string } | null;
+}
+
 // 套餐API
 export const packageUserApi = {
-    // 获取套餐列表
-    getPackages: async (): Promise<ApiResponse<Array<{
-        id: number;
-        package_name: string;
-        category: string;
-        price: number;
-        duration: number;
-        introduce: string;
-        level: string;
-        priority: number;
-        remarks: string;
-        status: number;
-    }>>> => {
+    getPackages: async (): Promise<ApiResponse<PackageInfoResponse[]>> => {
         return createUserRequest(getUserApiUrl('/u/package'), {
             method: 'GET',
         });
     },
 };
 
+export interface CreateOrderOptions {
+    device?: 'mobile' | 'pc';
+    invoice_requested?: boolean;
+    replaced_order_id?: string;
+}
+
+export interface InvoiceOrderSnapshot {
+    title: string;
+    tax_number: string;
+    email: string;
+    base_amount: string;
+    surcharge_rate: string;
+    surcharge_amount: string;
+    payable_amount: string;
+    delivery_workdays: number;
+}
+
 // 订单API
 export const orderUserApi = {
-    // 创建订单
-    createOrder: async (package_id: number, extraData?: any): Promise<ApiResponse<{
+    createOrder: async (package_id: number, extraData?: CreateOrderOptions): Promise<ApiResponse<{
         success: boolean;
         trade_no: string;
         order_id: string;
@@ -308,6 +342,10 @@ export const orderUserApi = {
         qr_code: string;
         channel: string;
         pay_type: string;
+        base_amount?: string;
+        payable_amount?: string;
+        invoice_requested?: boolean;
+        invoice_snapshot?: InvoiceOrderSnapshot | null;
     }>> => {
         return createUserRequest(getUserApiUrl('/u/pay_order'), {
             method: 'POST',
@@ -315,13 +353,21 @@ export const orderUserApi = {
         });
     },
 
-    // 获取订单列表
+    getInvoiceEligibility: async (package_id: number): Promise<ApiResponse<InvoiceEligibility>> => {
+        return createUserRequest(getUserApiUrl(`/u/invoice/eligibility?package_id=${package_id}`), {
+            method: 'GET',
+        });
+    },
+
     getOrders: async (): Promise<ApiResponse<Array<{
         order_id: string;
         package_id: number;
         package_name: string;
         status: string;
         created_at: string;
+        invoice_requested: boolean;
+        invoice_status?: string | null;
+        payable_amount?: number | null;
     }>>> => {
         return createUserRequest(getUserApiUrl('/u/pay_order'), {
             method: 'GET',

@@ -238,6 +238,13 @@ const OrdersManagePage: React.FC = () => {
         );
     };
 
+    const renderInvoiceStatus = (order: Order) => {
+        if (!order.invoice_requested) return <Chip size="sm" variant="flat">未申请</Chip>;
+        const labels: Record<string, string> = { not_requested: '未申请', awaiting_payment: '待支付', pending_issue: '待开票', issued: '已开票' };
+        const color = order.invoice_status === 'issued' ? 'success' : order.invoice_status === 'pending_issue' ? 'warning' : 'default';
+        return <Chip size="sm" color={color} variant="flat">{labels[order.invoice_status || 'awaiting_payment']}</Chip>;
+    };
+
     // 操作按钮渲染
     const renderActions = (order: Order) => (
         <Dropdown>
@@ -362,6 +369,7 @@ const OrdersManagePage: React.FC = () => {
                             <TableColumn>用户信息</TableColumn>
                             <TableColumn>套餐信息</TableColumn>
                             <TableColumn>状态</TableColumn>
+                            <TableColumn>开票</TableColumn>
                             <TableColumn>创建时间</TableColumn>
                             <TableColumn>备注</TableColumn>
                             <TableColumn width={80}>操作</TableColumn>
@@ -395,6 +403,7 @@ const OrdersManagePage: React.FC = () => {
                                         </div>
                                     </TableCell>
                                     <TableCell>{renderStatus(order.status)}</TableCell>
+                                    <TableCell>{renderInvoiceStatus(order)}</TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
                                             <Calendar className="w-4 h-4 text-default-400" />
@@ -526,6 +535,16 @@ const OrdersManagePage: React.FC = () => {
                                         <span className="text-sm text-default-500">状态</span>
                                         <div>{renderStatus(selectedOrder.status)}</div>
                                     </div>
+                                    <div>
+                                        <span className="text-sm text-default-500">开票状态</span>
+                                        <div>{renderInvoiceStatus(selectedOrder)}</div>
+                                    </div>
+                                    {selectedOrder.payable_amount != null && (
+                                        <div>
+                                            <span className="text-sm text-default-500">应付金额</span>
+                                            <div className="font-medium">¥{selectedOrder.payable_amount}</div>
+                                        </div>
+                                    )}
                                     <div>
                                         <span className="text-sm text-default-500">创建时间</span>
                                         <div className="font-medium">

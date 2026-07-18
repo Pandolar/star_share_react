@@ -10,10 +10,11 @@ import {
   CardBody,
   Chip,
   Spinner,
+  Switch,
 } from '@heroui/react';
 import { motion } from 'framer-motion';
-import { CheckCircle, AlertCircle, QrCode, ExternalLink } from 'lucide-react';
-import { orderUserApi } from '../../../../services/userApi';
+import { CheckCircle, AlertCircle, QrCode, ExternalLink, ReceiptText } from 'lucide-react';
+import { orderUserApi, type InvoiceEligibility } from '../../../../services/userApi';
 import { toast } from '../../../../utils/toast';
 import { generateQRCodeDataUrl } from './qrCode';
 import { getDurationText, PackageInfo, OrderInfo } from './types';
@@ -22,6 +23,8 @@ interface PaymentModalProps {
   isOpen: boolean;
   selectedPackage: PackageInfo | null;
   orderInfo: OrderInfo | null;
+  replacingOrder: boolean;
+  onInvoiceOptionChange: (requested: boolean) => Promise<void>;
   onClose: () => void;
 }
 
@@ -31,11 +34,15 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   isOpen,
   selectedPackage,
   orderInfo,
+  replacingOrder,
+  onInvoiceOptionChange,
   onClose,
 }) => {
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('pending');
   const [qrCodeExpired, setQrCodeExpired] = useState(false);
   const [manualCheckLoading, setManualCheckLoading] = useState(false);
+  const [eligibility, setEligibility] = useState<InvoiceEligibility | null>(null);
+  const [eligibilityLoading, setEligibilityLoading] = useState(false);
 
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const qrTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -88,6 +95,23 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, orderInfo?.order_id]);
 
+  const selectedPackageId = selectedPackage?.id;
+
+  useEffect(() => {
+    if (!isOpen || !selectedPackageId || orderInfo?.invoice_requested) return;
+    let cancelled = false;
+    setEligibility(null);
+    setEligibilityLoading(true);
+    orderUserApi.getInvoiceEligibility(selectedPackageId)
+      .then((response) => {
+        if (!cancelled && response.code === 20000) setEligibility(response.data || null);
+      })
+      .finally(() => {
+        if (!cancelled) setEligibilityLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [isOpen, selectedPackageId, orderInfo?.invoice_requested]);
+
   const handleManualCheck = async () => {
     if (!orderInfo?.order_id) return;
     try {
@@ -120,6 +144,24 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   };
 
   const qrCodeValue = getQRCodeValue(orderInfo);
+
+  const handleInvoiceChange = async (requested: boolean) => {
+    if (!selectedPackage || !orderInfo) return;
+    if (requested && !eligibility?.eligible) {
+      const reasonText = {
+        invoice_disabled: '开票功能暂未开放',
+        below_threshold: '当前套餐金额未达到开票门槛',
+        email_unbound: '请先绑定邮箱后再开票',
+        email_not_allowed: '当前邮箱不符合开票要求，请联系客服',
+        billing_profile_missing: '请先完善开票主体信息',
+        non_self_site: '开票仅在自营站点可用',
+      }[eligibility?.reason || 'invoice_disabled'];
+      toast.warning(reasonText);
+      return;
+    }
+    cleanup();
+    await onInvoiceOptionChange(requested);
+  };
 
   return (
     <Modal
@@ -159,7 +201,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-default-500">支付金额</span>
-                      <span className="text-2xl font-bold text-primary">¥{selectedPackage?.price}</span>
+                      <span className="text-2xl font-bold text-primary">¥{orderInfo.payable_amount || selectedPackage?.price}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-default-500">套餐时长</span>
@@ -167,9 +209,64 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                         {selectedPackage ? getDurationText(selectedPackage.duration) : ''}
                       </span>
                     </div>
+                    {orderInfo.invoice_requested && orderInfo.invoice_snapshot && (
+                      <>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-default-500">套餐金额</span>
+                          <span>¥{orderInfo.base_amount}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-default-500">开票服务费</span>
+                          <span>¥{orderInfo.invoice_snapshot.surcharge_amount}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </CardBody>
               </Card>
+
+              {paymentStatus === 'pending' && !qrCodeExpired && (
+                <Card className="border border-primary/20">
+                  <CardBody className="p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <ReceiptText className="w-5 h-5 text-primary" />
+                        <div>
+                          <p className="font-medium">需要开票</p>
+                          <p className="text-xs text-default-500">切换后会生成新支付二维码，原二维码立即失效。</p>
+                        </div>
+                      </div>
+                      <Switch
+                        isSelected={Boolean(orderInfo.invoice_requested)}
+                        isDisabled={replacingOrder || eligibilityLoading}
+                        onValueChange={handleInvoiceChange}
+                        aria-label="需要开票"
+                      />
+                    </div>
+                    {orderInfo.invoice_requested && orderInfo.invoice_snapshot ? (
+                      <div className="rounded-lg bg-primary/5 p-3 text-sm space-y-1">
+                        <p>抬头：{orderInfo.invoice_snapshot.title}</p>
+                        <p>接收邮箱：{orderInfo.invoice_snapshot.email}</p>
+                        <p>预计在支付完成后 {orderInfo.invoice_snapshot.delivery_workdays} 个工作日内发送。</p>
+                      </div>
+                    ) : eligibility && !eligibility.eligible ? (
+                      <p className="text-xs text-warning-700">
+                        当前账户暂不满足开票条件；
+                        {(eligibility.reason === 'email_unbound' || eligibility.reason === 'billing_profile_missing') && (
+                          <a
+                            href={`/user-center?tab=profile&openEdit=${eligibility.reason === 'email_unbound' ? 'email' : 'billing_profile'}`}
+                            className="text-primary hover:underline"
+                          >
+                            {eligibility.reason === 'email_unbound' ? '去绑定邮箱' : '去完善主体信息'}
+                          </a>
+                        )}
+                      </p>
+                    ) : eligibility?.eligible ? (
+                      <p className="text-xs text-default-500">开启后应付 ¥{eligibility.payable_amount}，含服务费 ¥{eligibility.surcharge_amount}。</p>
+                    ) : null}
+                  </CardBody>
+                </Card>
+              )}
 
               {/* 支付区域 */}
               <div className="text-center">

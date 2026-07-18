@@ -31,7 +31,7 @@ const getPackageLevelStyle = (level?: string) => {
 };
 
 export const ProfileTab: React.FC = () => {
-  const { isWhiteLabel } = useWhiteLabel();
+  const { isWhiteLabel, loading: whiteLabelLoading } = useWhiteLabel();
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -93,10 +93,12 @@ export const ProfileTab: React.FC = () => {
 
   useEffect(() => {
     const openEdit = searchParams.get('openEdit');
-    if (openEdit === 'email' || openEdit === 'username' || openEdit === 'password') {
+    if (openEdit === 'email' || openEdit === 'username' || openEdit === 'password' || (!whiteLabelLoading && !isWhiteLabel && (openEdit === 'payment_info' || openEdit === 'billing_profile'))) {
       setEditModal({ open: true, tab: openEdit });
+    } else if (openEdit === 'payment_info' || openEdit === 'billing_profile') {
+      setEditModal((current) => ({ ...current, open: false }));
     }
-  }, [searchParams]);
+  }, [searchParams, isWhiteLabel, whiteLabelLoading]);
 
   const fetchUserInfo = async () => {
     try {
@@ -116,12 +118,17 @@ export const ProfileTab: React.FC = () => {
   };
 
   useEffect(() => {
+    if (whiteLabelLoading) return;
     fetchUserInfo();
     fetchCompensations();
-  }, []);
+  }, [whiteLabelLoading]);
 
   const openEditModal = (tab: EditTabKey = 'username') => setEditModal({ open: true, tab });
   const closeEditModal = () => setEditModal((s) => ({ ...s, open: false }));
+
+  if (whiteLabelLoading) {
+    return <div className="flex min-h-64 items-center justify-center"><Spinner label="正在确认站点模式..." /></div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -413,6 +420,7 @@ export const ProfileTab: React.FC = () => {
         isOpen={editModal.open}
         initialTab={editModal.tab}
         userInfo={userInfo}
+        showFinancialTabs={!whiteLabelLoading && !isWhiteLabel}
         onClose={closeEditModal}
         onUserInfoChange={(next) => setUserInfo((prev) => (prev ? { ...prev, ...next } : prev))}
       />
