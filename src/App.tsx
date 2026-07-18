@@ -1,7 +1,6 @@
 import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
-import { ToastContainer } from './components/Toast';
 import ErrorBoundary from './components/ErrorBoundary';
 import { lazyWithRetry } from './utils/lazyWithRetry';
 import { WhiteLabelProvider } from './contexts/WhiteLabelContext';
@@ -57,8 +56,6 @@ const App: React.FC = () => {
       <Router>
         <WhiteLabelProvider>
           <div className="App">
-            {/* 全局Toast通知容器 */}
-            <ToastContainer />
             {/* 全局兜底：任何路由的渲染/懒加载错误都进入恢复流程，避免整页白屏 */}
             <ErrorBoundary autoReload={true} reloadDelay={1500}>
               <Suspense fallback={<RouteLoadingFallback />}>

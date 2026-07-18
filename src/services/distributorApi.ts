@@ -7,6 +7,7 @@ export interface DistributorApiResponse<T = any> {
     code: number;
     msg?: string;
     data?: T;
+    total?: number;
 }
 
 /**
@@ -26,8 +27,8 @@ export interface DistributorInfo {
     level?: number;
     default_cdk_expire_days?: number;
     permissions?: DistributorPermissions;
-    created_at: string;
-    updated_at: string;
+    created_at: string | null;
+    updated_at: string | null;
 }
 
 /**
@@ -128,6 +129,42 @@ export interface BalanceLog {
 }
 
 /**
+ * 分销商名下的卡密（只读）
+ */
+export interface DistributorCdk {
+    id: number;
+    cdk: string;
+    status: 'used' | 'unused' | 'disabled';
+    package_id: number;
+    package_name?: string;
+    batch_id?: string | null;
+    created_at: string;
+    used_at?: string | null;
+    expires_at?: string | null;
+    use_count?: number;
+    max_uses?: number;
+    remarks?: string | null;
+}
+
+export interface DistributorCdkStats {
+    total: number;
+    used: number;
+    unused: number;
+    expired: number;
+}
+
+export interface DistributorCdkQuery {
+    current_page?: number;
+    page_size?: number;
+    querystring?: string;
+    status?: 'used' | 'unused' | 'disabled';
+    package_id?: number;
+    batch_id?: string;
+    order_column?: string;
+    order?: 'asc' | 'desc';
+}
+
+/**
  * 分销商 API 服务类
  */
 class DistributorApiService {
@@ -208,6 +245,22 @@ class DistributorApiService {
      */
     async getPackages(): Promise<DistributorApiResponse<DistributorPackage[]>> {
         const response = await this.api.get('/packages');
+        return response.data;
+    }
+
+    /**
+     * 查看当前分销商名下的卡密
+     */
+    async getCdks(params: DistributorCdkQuery = {}): Promise<DistributorApiResponse<DistributorCdk[]>> {
+        const response = await this.api.get('/cdk', { params });
+        return response.data;
+    }
+
+    /**
+     * 查看当前分销商的卡密汇总
+     */
+    async getCdkStats(): Promise<DistributorApiResponse<DistributorCdkStats>> {
+        const response = await this.api.get('/cdk/stats');
         return response.data;
     }
 

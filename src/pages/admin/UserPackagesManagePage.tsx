@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
+    Alert,
     Table,
     TableHeader,
     TableColumn,
@@ -47,6 +48,7 @@ const UserPackagesManagePage: React.FC = () => {
     // 状态管理
     const [userPackages, setUserPackages] = useState<UserPackage[]>([]);
     const [loading, setLoading] = useState(false);
+    const [searchInput, setSearchInput] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [currentPage, setCurrentPage] = useState(1);
@@ -89,8 +91,10 @@ const UserPackagesManagePage: React.FC = () => {
             if (response.code === 20000) {
                 setUserPackages(Array.isArray(response.data) ? response.data : []);
                 const totalNum = Number(response.total) || 0;
+                const nextTotalPages = Math.max(1, Math.ceil(totalNum / pageSize));
                 setTotal(totalNum);
-                setTotalPages(Math.ceil(totalNum / pageSize));
+                setTotalPages(nextTotalPages);
+                if (currentPage > nextTotalPages) setCurrentPage(nextTotalPages);
             } else {
                 // 错误捕获：显示空表格
                 setUserPackages([]);
@@ -98,8 +102,7 @@ const UserPackagesManagePage: React.FC = () => {
                 setTotalPages(1);
                 showToast(response.msg || '获取用户套餐记录失败', 'error');
             }
-        } catch (error) {
-            console.error('获取用户套餐记录失败:', error);
+        } catch {
             // 错误捕获：显示空表格
             setUserPackages([]);
             setTotal(0);
@@ -117,12 +120,18 @@ const UserPackagesManagePage: React.FC = () => {
 
     // 处理搜索
     const handleSearch = () => {
+        const nextQuery = searchInput.trim();
+        if (currentPage === 1 && searchQuery === nextQuery) {
+            fetchUserPackages();
+            return;
+        }
         setCurrentPage(1);
-        fetchUserPackages();
+        setSearchQuery(nextQuery);
     };
 
     // 处理重置
     const handleReset = () => {
+        setSearchInput('');
         setSearchQuery('');
         setStatusFilter('all');
         setCurrentPage(1);
@@ -174,7 +183,7 @@ const UserPackagesManagePage: React.FC = () => {
         <div className="space-y-6">
             {/* 页面标题 */}
             <div className="flex items-center gap-3">
-                <UserCheck className="w-6 h-6 text-blue-600" />
+                <UserCheck className="w-6 h-6 text-primary" />
                 <h1 className="text-2xl font-bold text-default-800">用户套餐记录</h1>
             </div>
 
@@ -190,24 +199,27 @@ const UserPackagesManagePage: React.FC = () => {
                     <div className="flex flex-col sm:flex-row gap-4">
                         <Input
                             placeholder="搜索用户ID、套餐ID或订单号..."
-
-                            onChange={(e) => setSearchQuery(e.target.value)}
+                            value={searchInput}
+                            onValueChange={setSearchInput}
                             startContent={<Search className="w-4 h-4 text-default-400" />}
                             className="flex-1"
-                            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                         />
-                                  <Select
-            placeholder="选择状态"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full sm:w-40"
-          >
-            {statusOptions.map((option) => (
-              <SelectItem key={option.key}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </Select>
+                        <Select
+                            placeholder="选择状态"
+                            selectedKeys={[statusFilter]}
+                            onSelectionChange={(keys) => {
+                                setStatusFilter(String(Array.from(keys)[0] || 'all'));
+                                setCurrentPage(1);
+                            }}
+                            className="w-full sm:w-40"
+                        >
+                            {statusOptions.map((option) => (
+                                <SelectItem key={option.key}>
+                                    {option.label}
+                                </SelectItem>
+                            ))}
+                        </Select>
                         <div className="flex gap-2">
                             <Button
                                 color="primary"
@@ -334,8 +346,11 @@ const UserPackagesManagePage: React.FC = () => {
                         <span>每页</span>
                         <Select
                             aria-label="每页数量"
-                            value={String(pageSize)}
-                            onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                            selectedKeys={[String(pageSize)]}
+                            onSelectionChange={(keys) => {
+                                setPageSize(Number(Array.from(keys)[0] || 10));
+                                setCurrentPage(1);
+                            }}
                             className="w-28"
                         >
                             <SelectItem key="10">10</SelectItem>
@@ -409,12 +424,7 @@ const UserPackagesManagePage: React.FC = () => {
                                     </div>
                                 </div>
                                 {selectedUserPackage.remarks && (
-                                    <div>
-                                        <span className="text-sm text-default-500">备注</span>
-                                        <div className="mt-1 p-3 bg-default-50 rounded-lg text-sm">
-                                            {selectedUserPackage.remarks}
-                                        </div>
-                                    </div>
+                                    <Alert isVisible color="default" variant="flat" title="备注" description={selectedUserPackage.remarks} />
                                 )}
                             </div>
                         )}

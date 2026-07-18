@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+    Avatar,
     Card,
     CardBody,
     CardHeader,
     Input,
     Button,
     Divider,
-    Spinner,
+    Form,
 } from '@heroui/react';
 import { Eye, EyeOff, Shield, User } from 'lucide-react';
 import adminApiService from '../../services/adminApi';
@@ -47,20 +48,15 @@ const AdminLoginPage: React.FC = () => {
         setIsLoading(true);
 
         try {
-            console.log('[AdminLogin] 开始登录，用户名:', formData.username);
             const response = await adminApiService.login(formData.username, formData.password);
-            console.log('[AdminLogin] 登录API响应:', response);
 
             if (response.code === 20000) {
-                console.log('[AdminLogin] 登录成功，准备跳转到:', '/star-admin');
                 showToast('登录成功', 'success');
                 navigate('/star-admin');
             } else {
-                console.log('[AdminLogin] 登录失败，错误信息:', response.msg);
                 showToast(response.msg || '登录失败', 'error');
             }
-        } catch (error) {
-            console.error('[AdminLogin] 登录异常:', error);
+        } catch {
             showToast('登录失败，请检查网络连接', 'error');
         } finally {
             setIsLoading(false);
@@ -70,11 +66,9 @@ const AdminLoginPage: React.FC = () => {
     return (
         <div className="min-h-screen bg-default-50 flex items-center justify-center p-4">
             <div className="w-full max-w-md">
-                <Card className="shadow-2xl border-0">
+                <Card shadow="lg">
                     <CardHeader className="flex flex-col gap-3 pb-6">
-                        <div className="flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full">
-                            <Shield className="w-8 h-8 text-white" />
-                        </div>
+                        <Avatar color="primary" icon={<Shield className="h-7 w-7" />} size="lg" />
                         <div className="text-center">
                             <h1 className="text-2xl font-bold text-default-800">管理员登录</h1>
                             <p className="text-default-600 text-sm mt-1">欢迎使用Star Share管理后台</p>
@@ -84,12 +78,12 @@ const AdminLoginPage: React.FC = () => {
                     <Divider />
 
                     <CardBody className="pt-6">
-                        <form onSubmit={handleSubmit} className="space-y-6">
+                        <Form onSubmit={handleSubmit} className="space-y-6">
                             <Input
                                 type="text"
                                 label="用户名"
                                 placeholder="请输入用户名"
-
+                                value={formData.username}
                                 onValueChange={handleInputChange('username')}
                                 startContent={<User className="w-4 h-4 text-default-400" />}
                                 variant="bordered"
@@ -100,17 +94,23 @@ const AdminLoginPage: React.FC = () => {
                             <Input
                                 label="密码"
                                 placeholder="请输入密码"
-
+                                value={formData.password}
                                 onValueChange={handleInputChange('password')}
                                 startContent={<Shield className="w-4 h-4 text-default-400" />}
                                 endContent={
-                                    <button className="focus:outline-none" type="button" onClick={toggleVisibility}>
+                                    <Button
+                                        isIconOnly
+                                        size="sm"
+                                        variant="light"
+                                        aria-label={isVisible ? '隐藏密码' : '显示密码'}
+                                        onPress={toggleVisibility}
+                                    >
                                         {isVisible ? (
                                             <EyeOff className="w-4 h-4 text-default-400" />
                                         ) : (
                                             <Eye className="w-4 h-4 text-default-400" />
                                         )}
-                                    </button>
+                                    </Button>
                                 }
                                 type={isVisible ? "text" : "password"}
                                 variant="bordered"
@@ -123,18 +123,11 @@ const AdminLoginPage: React.FC = () => {
                                 color="primary"
                                 size="lg"
                                 className="w-full font-medium"
-                                isDisabled={isLoading}
+                                isLoading={isLoading}
                             >
-                                {isLoading ? (
-                                    <>
-                                        <Spinner size="sm" color="white" />
-                                        登录中...
-                                    </>
-                                ) : (
-                                    '登录'
-                                )}
+                                {isLoading ? '登录中...' : '登录'}
                             </Button>
-                        </form>
+                        </Form>
                     </CardBody>
                 </Card>
 
@@ -148,4 +141,4 @@ const AdminLoginPage: React.FC = () => {
     );
 };
 
-export default AdminLoginPage; 
+export default AdminLoginPage;

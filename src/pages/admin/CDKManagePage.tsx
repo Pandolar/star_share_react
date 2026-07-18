@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
+    Alert,
     Table,
     TableHeader,
     TableColumn,
@@ -19,6 +20,7 @@ import {
     ModalHeader,
     ModalBody,
     ModalFooter,
+    NumberInput,
     useDisclosure,
     Card,
     CardBody,
@@ -26,7 +28,9 @@ import {
     Textarea,
     Select,
     SelectItem,
+    Snippet,
     Spinner,
+    type SharedSelection,
 } from '@heroui/react';
 import {
     Search,
@@ -42,7 +46,6 @@ import {
     Copy,
     Package,
     Download,
-    CheckCircle2,
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import adminApiService from '../../services/adminApi';
@@ -58,13 +61,14 @@ const CDKManagePage: React.FC = () => {
     const [cdks, setCDKs] = useState<CDK[]>([]);
     const [packages, setPackages] = useState<PackageType[]>([]);
     const [loading, setLoading] = useState(false);
+    const [searchInput, setSearchInput] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
     const [selectedCDK, setSelectedCDK] = useState<CDK | null>(null);
-    const [selectedKeys, setSelectedKeys] = useState<Set<React.Key> | 'all'>(new Set());
+    const [selectedKeys, setSelectedKeys] = useState<SharedSelection>(new Set());
     const [formData, setFormData] = useState<Partial<CreateCDKRequest & UpdateCDKRequest>>({});
 
     // Modal控制
@@ -72,10 +76,8 @@ const CDKManagePage: React.FC = () => {
     const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure();
     const { isOpen: isViewOpen, onOpen: onViewOpen, onClose: onViewClose } = useDisclosure();
     const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
-    const { isOpen: isGeneratedOpen, onOpen: onGeneratedOpen, onClose: onGeneratedClose } = useDisclosure();
 
     const [pageSize, setPageSize] = useState<number>(10);
-    const [generatedCDKs, setGeneratedCDKs] = useState<string[]>([]);
     // 跨页选择：Map<id, cdk字符串> 在翻页时持久化
     const [crossPageSelection, setCrossPageSelection] = useState<Map<number, string>>(new Map());
     // 分销商列表（用于生成CDK时选择归属）
@@ -94,25 +96,25 @@ const CDKManagePage: React.FC = () => {
     // 获取套餐列表（用于生成CDK）
     const fetchPackages = useCallback(async () => {
         try {
-            const response = await adminApiService.getPackages();
+            const response = await adminApiService.getPackages({ current_page: 1, page_size: 1000 });
             if (response.code === 20000) {
                 setPackages(Array.isArray(response.data) ? response.data : []);
             }
-        } catch (error) {
-            console.error('获取套餐列表失败:', error);
+        } catch {
+            showToast('获取套餐选项失败', 'error');
         }
     }, []);
 
     // 获取分销商列表（用于生成CDK时选择归属、筛选）
     const fetchDistributors = useCallback(async () => {
         try {
-            const response = await adminApiService.getDistributors({ page: 1, page_size: 1000 });
+            const response = await adminApiService.getDistributors({ current_page: 1, page_size: 1000 });
             if (response.code === 20000) {
                 const data = Array.isArray(response.data) ? response.data : (response.data?.list || []);
                 setDistributors(data.map((d: any) => ({ id: d.id, username: d.username })));
             }
-        } catch (error) {
-            console.error('获取分销商列表失败:', error);
+        } catch {
+            showToast('获取分销商选项失败', 'error');
         }
     }, []);
 
@@ -142,8 +144,10 @@ const CDKManagePage: React.FC = () => {
             if (response.code === 20000) {
                 setCDKs(Array.isArray(response.data) ? response.data : []);
                 const totalNum = Number(response.total) || 0;
+                const nextTotalPages = Math.max(1, Math.ceil(totalNum / pageSize));
                 setTotal(totalNum);
-                setTotalPages(Math.ceil(totalNum / pageSize));
+                setTotalPages(nextTotalPages);
+                if (currentPage > nextTotalPages) setCurrentPage(nextTotalPages);
             } else {
                 // 错误捕获：显示空表格
                 setCDKs([]);
@@ -151,8 +155,7 @@ const CDKManagePage: React.FC = () => {
                 setTotalPages(1);
                 showToast(response.msg || '获取CDK列表失败', 'error');
             }
-        } catch (error) {
-            console.error('获取CDK列表失败:', error);
+        } catch {
             // 错误捕获：显示空表格
             setCDKs([]);
             setTotal(0);
@@ -163,27 +166,37 @@ const CDKManagePage: React.FC = () => {
         }
     }, [currentPage, searchQuery, statusFilter, distributorFilter, pageSize]);
 
-    // 初始化
+    // 初始化筛选选项
     useEffect(() => {
         fetchPackages();
         fetchDistributors();
+    }, [fetchPackages, fetchDistributors]);
+
+    // 列表条件变化时刷新
+    useEffect(() => {
         fetchCDKs();
-    }, [fetchPackages, fetchDistributors, fetchCDKs]);
+    }, [fetchCDKs]);
 
     // 翻页/刷新后，根据跨页选择同步当前页的勾选状态
     useEffect(() => {
         const onPage = cdks.filter((c) => crossPageSelection.has(c.id)).map((c) => c.id);
-        setSelectedKeys(new Set(onPage) as any);
+        setSelectedKeys(new Set(onPage));
     }, [cdks, crossPageSelection]);
 
     // 处理搜索
     const handleSearch = () => {
+        const nextQuery = searchInput.trim();
+        if (currentPage === 1 && searchQuery === nextQuery) {
+            fetchCDKs();
+            return;
+        }
         setCurrentPage(1);
-        fetchCDKs();
+        setSearchQuery(nextQuery);
     };
 
     // 处理重置
     const handleReset = () => {
+        setSearchInput('');
         setSearchQuery('');
         setStatusFilter('all');
         setDistributorFilter('all');
@@ -193,7 +206,11 @@ const CDKManagePage: React.FC = () => {
     // 导出CDK（mode: full=完整, distribute=分发）
     const handleExport = async (mode: 'full' | 'distribute') => {
         try {
-            const params: any = { mode };
+            const params: {
+                mode: 'full' | 'distribute';
+                status?: string;
+                distributor_id?: number | null;
+            } = { mode };
             if (statusFilter !== 'all') params.status = statusFilter;
             if (distributorFilter !== 'all') {
                 params.distributor_id = distributorFilter === 'self' ? 0 : Number(distributorFilter);
@@ -208,8 +225,7 @@ const CDKManagePage: React.FC = () => {
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
             showToast('导出成功', 'success');
-        } catch (error) {
-            console.error('导出失败:', error);
+        } catch {
             showToast('导出失败', 'error');
         }
     };
@@ -222,12 +238,20 @@ const CDKManagePage: React.FC = () => {
                 showToast('生成数量和关联套餐不能为空', 'warning');
                 return;
             }
+            if (!Number.isInteger(createData.number) || createData.number < 1 || createData.number > 10000) {
+                showToast('生成数量必须是 1-10000 的整数', 'warning');
+                return;
+            }
+            if (createData.expires_days !== undefined && (!Number.isInteger(createData.expires_days) || createData.expires_days < 0)) {
+                showToast('有效期必须是大于等于 0 的整数', 'warning');
+                return;
+            }
 
             const response = await adminApiService.createCDKs(createData);
             if (response.code === 20000) {
                 // 后端返回 batch_id + count，生成成功后提示并刷新列表
-                const count = (response.data as any)?.count || createData.number;
-                const batchId = (response.data as any)?.batch_id || '';
+                const count = response.data?.count || createData.number;
+                const batchId = response.data?.batch_id || '';
                 showToast(`成功生成 ${count} 个CDK${batchId ? `（批次：${batchId}）` : ''}`, 'success');
                 onCreateClose();
                 fetchCDKs();
@@ -235,8 +259,7 @@ const CDKManagePage: React.FC = () => {
             } else {
                 showToast(response.msg || '生成CDK失败', 'error');
             }
-        } catch (error) {
-            console.error('生成CDK失败:', error);
+        } catch {
             showToast('生成CDK失败', 'error');
         }
     };
@@ -261,8 +284,7 @@ const CDKManagePage: React.FC = () => {
             } else {
                 showToast(response.msg || '更新CDK失败', 'error');
             }
-        } catch (error) {
-            console.error('更新CDK失败:', error);
+        } catch {
             showToast('更新CDK失败', 'error');
         }
     };
@@ -281,8 +303,7 @@ const CDKManagePage: React.FC = () => {
             } else {
                 showToast(response.msg || '删除CDK失败', 'error');
             }
-        } catch (error) {
-            console.error('删除CDK失败:', error);
+        } catch {
             showToast('删除CDK失败', 'error');
         }
     };
@@ -317,7 +338,10 @@ const CDKManagePage: React.FC = () => {
         try {
             const params: CDKQueryParams = { page_size: 99999 };
             if (searchQuery.trim()) params.querystring = searchQuery.trim();
-            if (statusFilter !== 'all') params.status = statusFilter as any;
+            if (statusFilter !== 'all') params.status = statusFilter as CDKQueryParams['status'];
+            if (distributorFilter !== 'all') {
+                params.distributor_id = distributorFilter === 'self' ? 0 : Number(distributorFilter);
+            }
             const response = await adminApiService.getCDKs(params);
             if (response.code === 20000) {
                 const list = Array.isArray(response.data) ? response.data : [];
@@ -341,7 +365,10 @@ const CDKManagePage: React.FC = () => {
         try {
             const params: CDKQueryParams = { page_size: 99999 };
             if (searchQuery.trim()) params.querystring = searchQuery.trim();
-            if (statusFilter !== 'all') params.status = statusFilter as any;
+            if (statusFilter !== 'all') params.status = statusFilter as CDKQueryParams['status'];
+            if (distributorFilter !== 'all') {
+                params.distributor_id = distributorFilter === 'self' ? 0 : Number(distributorFilter);
+            }
             const response = await adminApiService.getCDKs(params);
             if (response.code === 20000) {
                 const list = Array.isArray(response.data) ? response.data : [];
@@ -473,7 +500,7 @@ const CDKManagePage: React.FC = () => {
         <div className="space-y-6">
             {/* 页面标题 */}
             <div className="flex items-center gap-3">
-                <CreditCard className="w-6 h-6 text-blue-600" />
+                <CreditCard className="w-6 h-6 text-primary" />
                 <h1 className="text-2xl font-bold text-default-800">CDK管理</h1>
             </div>
 
@@ -489,38 +516,44 @@ const CDKManagePage: React.FC = () => {
                     <div className="flex flex-col sm:flex-row gap-4">
                         <Input
                             placeholder="搜索CDK..."
-
-                            onChange={(e) => setSearchQuery(e.target.value)}
+                            value={searchInput}
+                            onValueChange={setSearchInput}
                             startContent={<Search className="w-4 h-4 text-default-400" />}
                             className="flex-1"
-                            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                         />
-                                    <Select
-              placeholder="选择状态"
-              selectedKeys={[statusFilter]}
-              onChange={(e) => setStatusFilter(e.target.value || 'all')}
-              className="w-full sm:w-40"
-            >
-              {statusOptions.map((option) => (
-                <SelectItem key={option.key}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </Select>
-                                    <Select
-              placeholder="选择归属"
-              selectedKeys={[distributorFilter]}
-              onChange={(e) => setDistributorFilter(e.target.value || 'all')}
-              className="w-full sm:w-44"
-            >
-              {[
-                <SelectItem key="all">全部归属</SelectItem>,
-                <SelectItem key="self">自营</SelectItem>,
-                ...distributors.map((d) => (
-                  <SelectItem key={String(d.id)}>{d.username}</SelectItem>
-                )),
-              ]}
-            </Select>
+                        <Select
+                            placeholder="选择状态"
+                            selectedKeys={[statusFilter]}
+                            onSelectionChange={(keys) => {
+                                setStatusFilter(String(Array.from(keys)[0] || 'all'));
+                                setCurrentPage(1);
+                            }}
+                            className="w-full sm:w-40"
+                        >
+                            {statusOptions.map((option) => (
+                                <SelectItem key={option.key}>
+                                    {option.label}
+                                </SelectItem>
+                            ))}
+                        </Select>
+                        <Select
+                            placeholder="选择归属"
+                            selectedKeys={[distributorFilter]}
+                            onSelectionChange={(keys) => {
+                                setDistributorFilter(String(Array.from(keys)[0] || 'all'));
+                                setCurrentPage(1);
+                            }}
+                            className="w-full sm:w-44"
+                        >
+                            {[
+                                <SelectItem key="all">全部归属</SelectItem>,
+                                <SelectItem key="self">自营</SelectItem>,
+                                ...distributors.map((d) => (
+                                    <SelectItem key={String(d.id)}>{d.username}</SelectItem>
+                                )),
+                            ]}
+                        </Select>
                         <div className="flex gap-2">
                             <Button
                                 color="primary"
@@ -611,16 +644,16 @@ const CDKManagePage: React.FC = () => {
                             table: "min-w-[1100px]",
                         }}
                         selectionMode="multiple"
-                        selectedKeys={selectedKeys as any}
+                        selectedKeys={selectedKeys}
                         onSelectionChange={(keys) => {
                             if (keys === 'all') {
                                 // 全选当前页
                                 const newMap = new Map(crossPageSelection);
                                 cdks.forEach((c) => newMap.set(c.id, c.cdk));
                                 setCrossPageSelection(newMap);
-                                setSelectedKeys(new Set(cdks.map((c) => c.id)) as any);
+                                setSelectedKeys(new Set(cdks.map((c) => c.id)));
                             } else {
-                                const keySet = keys as Set<React.Key>;
+                                const keySet = keys;
                                 const newMap = new Map(crossPageSelection);
                                 // 取消当前页中不在新选择里的
                                 cdks.forEach((c) => {
@@ -628,7 +661,7 @@ const CDKManagePage: React.FC = () => {
                                     else newMap.set(c.id, c.cdk);
                                 });
                                 setCrossPageSelection(newMap);
-                                setSelectedKeys(keys as any);
+                                setSelectedKeys(keys);
                             }
                         }}
                     >
@@ -653,11 +686,7 @@ const CDKManagePage: React.FC = () => {
                                 <TableRow key={cdk.id} onDoubleClick={() => openEditModal(cdk)}>
                                     <TableCell>{cdk.id}</TableCell>
                                     <TableCell>
-                                        <div className="space-y-1">
-                                            <div className="font-mono text-sm bg-default-100 px-2 py-1 rounded">
-                                                {cdk.cdk}
-                                            </div>
-                                        </div>
+                                        <Snippet hideSymbol size="sm" codeString={cdk.cdk}>{cdk.cdk}</Snippet>
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
@@ -746,8 +775,11 @@ const CDKManagePage: React.FC = () => {
                         <span>每页</span>
                         <Select
                             aria-label="每页数量"
-                            value={String(pageSize)}
-                            onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                            selectedKeys={[String(pageSize)]}
+                            onSelectionChange={(keys) => {
+                                setPageSize(Number(Array.from(keys)[0] || 10));
+                                setCurrentPage(1);
+                            }}
                             className="w-28"
                         >
                             <SelectItem key="10">10</SelectItem>
@@ -782,22 +814,23 @@ const CDKManagePage: React.FC = () => {
                     <ModalBody>
                         <div className="space-y-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <Input
+                                <NumberInput
                                     label="生成数量"
-                                    type="number"
                                     placeholder="请输入生成数量"
-                                    value={formData.number ? String(formData.number) : ''}
-                                    onChange={(e) => setFormData({ ...formData, number: Number(e.target.value) })}
+                                    value={formData.number}
+                                    onValueChange={(number) => setFormData({ ...formData, number: Number.isNaN(number) ? undefined : number })}
+                                    minValue={1}
+                                    maxValue={10000}
+                                    step={1}
                                     isRequired
-                                    variant="bordered"
                                 />
-                                <Input
+                                <NumberInput
                                     label="有效期（天）"
-                                    type="number"
                                     placeholder="0 或留空 = 永不过期"
-                                    value={(formData as CreateCDKRequest).expires_days ? String((formData as CreateCDKRequest).expires_days) : ''}
-                                    onChange={(e) => setFormData({ ...formData, expires_days: Number(e.target.value) })}
-                                    variant="bordered"
+                                    value={(formData as CreateCDKRequest).expires_days}
+                                    onValueChange={(expires_days) => setFormData({ ...formData, expires_days: Number.isNaN(expires_days) ? undefined : expires_days })}
+                                    minValue={0}
+                                    step={1}
                                     description="从生成时起算"
                                 />
                             </div>
@@ -805,7 +838,7 @@ const CDKManagePage: React.FC = () => {
                                 label="关联套餐"
                                 placeholder="选择关联套餐"
                                 selectedKeys={formData.package_id ? [String(formData.package_id)] : []}
-                                onChange={(e) => setFormData({ ...formData, package_id: Number(e.target.value) })}
+                                onSelectionChange={(keys) => setFormData({ ...formData, package_id: Number(Array.from(keys)[0]) })}
                                 isRequired
                                 variant="bordered"
                             >
@@ -820,8 +853,8 @@ const CDKManagePage: React.FC = () => {
                                     label="归属"
                                     placeholder="选择归属"
                                     selectedKeys={[(formData as CreateCDKRequest).distributor_id ? String((formData as CreateCDKRequest).distributor_id) : 'self']}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
+                                    onSelectionChange={(keys) => {
+                                        const val = String(Array.from(keys)[0] || 'self');
                                         setFormData({ ...formData, distributor_id: val === 'self' ? null : Number(val) });
                                     }}
                                     variant="bordered"
@@ -838,7 +871,7 @@ const CDKManagePage: React.FC = () => {
                                 label="备注"
                                 placeholder="请输入备注信息（可选）"
                                 value={formData.remarks || ''}
-                                onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                                onValueChange={(remarks) => setFormData({ ...formData, remarks })}
                                 minRows={2}
                                 variant="bordered"
                             />
@@ -872,25 +905,25 @@ const CDKManagePage: React.FC = () => {
                                 label="CDK状态"
                                 placeholder="选择CDK状态"
                                 selectedKeys={formData.status ? [formData.status] : []}
-                                onChange={(e) => setFormData({ ...formData, status: e.target.value as 'used' | 'unused' | 'disabled' })}
+                                onSelectionChange={(keys) => setFormData({ ...formData, status: String(Array.from(keys)[0] || 'unused') as 'used' | 'unused' | 'disabled' })}
                             >
                                 <SelectItem key="used">已使用</SelectItem>
                                 <SelectItem key="unused">未使用</SelectItem>
                                 <SelectItem key="disabled">已停用</SelectItem>
                             </Select>
-                            <Input
+                            <NumberInput
                                 label="延期天数"
                                 placeholder="输入正数延长有效期，负数缩短有效期"
-                                type="number"
-                                value={formData.expires_days_extend?.toString() || ''}
-                                onChange={(e) => setFormData({ ...formData, expires_days_extend: e.target.value ? parseInt(e.target.value) : undefined })}
+                                value={formData.expires_days_extend}
+                                onValueChange={(expires_days_extend) => setFormData({ ...formData, expires_days_extend: Number.isNaN(expires_days_extend) ? undefined : expires_days_extend })}
+                                step={1}
                                 description="留空表示不修改到期时间，正数延长、负数缩短"
                             />
                             <Textarea
                                 label="备注"
                                 placeholder="请输入备注信息"
-                                value={typeof (formData as any).remarks === 'string' ? (formData as any).remarks : ''}
-                                onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                                value={formData.remarks || ''}
+                                onValueChange={(remarks) => setFormData({ ...formData, remarks })}
                                 minRows={3}
                             />
                         </div>
@@ -927,9 +960,7 @@ const CDKManagePage: React.FC = () => {
                                     </div>
                                     <div>
                                         <span className="text-sm text-default-500">CDK码</span>
-                                        <div className="font-mono text-sm bg-default-100 px-2 py-1 rounded">
-                                            {selectedCDK.cdk}
-                                        </div>
+                                        <Snippet hideSymbol size="sm" codeString={selectedCDK.cdk}>{selectedCDK.cdk}</Snippet>
                                     </div>
                                     <div>
                                         <span className="text-sm text-default-500">关联套餐ID</span>
@@ -981,12 +1012,7 @@ const CDKManagePage: React.FC = () => {
                                     )}
                                 </div>
                                 {selectedCDK.remarks && (
-                                    <div>
-                                        <span className="text-sm text-default-500">备注</span>
-                                        <div className="mt-1 p-3 bg-default-50 rounded-lg text-sm">
-                                            {selectedCDK.remarks}
-                                        </div>
-                                    </div>
+                                    <Alert isVisible color="default" variant="flat" title="备注" description={selectedCDK.remarks} />
                                 )}
                             </div>
                         )}
@@ -1029,46 +1055,8 @@ const CDKManagePage: React.FC = () => {
                 </ModalContent>
             </Modal>
 
-            {/* 生成结果Modal */}
-            <Modal
-                isOpen={isGeneratedOpen}
-                onClose={onGeneratedClose}
-                size="2xl"
-                scrollBehavior="inside"
-            >
-                <ModalContent>
-                    <ModalHeader className="flex gap-2 items-center">
-                        <CheckCircle2 className="w-5 h-5 text-success" />
-                        生成完成 — 共 {generatedCDKs.length} 个CDK
-                    </ModalHeader>
-                    <ModalBody>
-                        <div className="bg-default-50 rounded-lg p-4 max-h-80 overflow-y-auto">
-                            <pre className="text-sm font-mono whitespace-pre-wrap break-all">
-                                {generatedCDKs.join('\n')}
-                            </pre>
-                        </div>
-                    </ModalBody>
-                    <ModalFooter>
-                        <Button variant="light" onPress={onGeneratedClose}>
-                            关闭
-                        </Button>
-                        <Button
-                            color="primary"
-                            startContent={<Copy className="w-4 h-4" />}
-                            onPress={async () => {
-                                try {
-                                    await navigator.clipboard.writeText(generatedCDKs.join('\n'));
-                                    showToast(`已复制全部 ${generatedCDKs.length} 个CDK`, 'success');
-                                } catch { showToast('复制失败', 'error'); }
-                            }}
-                        >
-                            一键复制全部
-                        </Button>
-                    </ModalFooter>
-                </ModalContent>
-            </Modal>
         </div>
     );
 };
 
-export default CDKManagePage; 
+export default CDKManagePage;

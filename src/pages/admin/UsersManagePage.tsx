@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
+    Alert,
     Table,
     TableHeader,
     TableColumn,
@@ -20,6 +21,7 @@ import {
     ModalHeader,
     ModalBody,
     ModalFooter,
+    NumberInput,
     useDisclosure,
     Card,
     CardBody,
@@ -56,6 +58,7 @@ const UsersManagePage: React.FC = () => {
     // 状态管理
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(false);
+    const [searchInput, setSearchInput] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [currentPage, setCurrentPage] = useState(1);
@@ -119,8 +122,10 @@ const UsersManagePage: React.FC = () => {
             if (response.code === 20000) {
                 setUsers(Array.isArray(response.data) ? response.data : []);
                 const totalNum = Number(response.total) || 0;
+                const nextTotalPages = Math.max(1, Math.ceil(totalNum / pageSize));
                 setTotal(totalNum);
-                setTotalPages(Math.ceil(totalNum / pageSize));
+                setTotalPages(nextTotalPages);
+                if (currentPage > nextTotalPages) setCurrentPage(nextTotalPages);
             } else {
                 // 错误捕获：显示空表格
                 setUsers([]);
@@ -148,11 +153,11 @@ const UsersManagePage: React.FC = () => {
     useEffect(() => {
         (async () => {
             try {
-                const resp = await adminApiService.getPackages({ page_size: 1000 } as any);
+                const resp = await adminApiService.getPackages({ page_size: 1000 });
                 if (resp.code === 20000 && Array.isArray(resp.data)) {
                     const seen = new Set<string>();
                     const levels: Array<{ level: string; category: string }> = [];
-                    resp.data.forEach((p: any) => {
+                    resp.data.forEach((p) => {
                         const key = `${p.level}|${p.category}`;
                         if (p.level && p.category && !seen.has(key)) {
                             seen.add(key);
@@ -161,8 +166,8 @@ const UsersManagePage: React.FC = () => {
                     });
                     setPackageLevels(levels);
                 }
-            } catch (e) {
-                console.error('加载套餐等级失败:', e);
+            } catch {
+                showToast('加载补偿套餐选项失败', 'error');
             }
         })();
     }, []);
@@ -202,7 +207,6 @@ const UsersManagePage: React.FC = () => {
                 showToast(resp.msg || '补偿失败', 'error');
             }
         } catch (e: any) {
-            console.error('补偿失败:', e);
             showToast(e?.response?.data?.msg || '补偿失败', 'error');
         } finally {
             setCompensationSubmitting(false);
@@ -211,12 +215,18 @@ const UsersManagePage: React.FC = () => {
 
     // 处理搜索
     const handleSearch = () => {
+        const nextQuery = searchInput.trim();
+        if (currentPage === 1 && searchQuery === nextQuery) {
+            fetchUsers();
+            return;
+        }
         setCurrentPage(1);
-        fetchUsers();
+        setSearchQuery(nextQuery);
     };
 
     // 处理重置
     const handleReset = () => {
+        setSearchInput('');
         setSearchQuery('');
         setStatusFilter('all');
         setCurrentPage(1);
@@ -484,7 +494,7 @@ const UsersManagePage: React.FC = () => {
         <div className="space-y-6">
             {/* 页面标题 */}
             <div className="flex items-center gap-3">
-                <Users className="w-6 h-6 text-blue-600" />
+                <Users className="w-6 h-6 text-primary" />
                 <h1 className="text-2xl font-bold text-default-800">用户管理</h1>
             </div>
 
@@ -500,16 +510,19 @@ const UsersManagePage: React.FC = () => {
                     <div className="flex flex-col sm:flex-row gap-4">
                         <Input
                             placeholder="搜索用户名或邮箱..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
+                            value={searchInput}
+                            onValueChange={setSearchInput}
                             startContent={<Search className="w-4 h-4 text-default-400" />}
                             className="flex-1"
-                            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                         />
                         <Select
                             placeholder="选择状态"
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
+                            selectedKeys={[statusFilter]}
+                            onSelectionChange={(keys) => {
+                                setStatusFilter(String(Array.from(keys)[0] || 'all'));
+                                setCurrentPage(1);
+                            }}
                             className="w-full sm:w-40"
                         >
                             {statusOptions.map((option) => (
@@ -631,8 +644,11 @@ const UsersManagePage: React.FC = () => {
                         <span>每页</span>
                         <Select
                             aria-label="每页数量"
-                            value={String(pageSize)}
-                            onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                            selectedKeys={[String(pageSize)]}
+                            onSelectionChange={(keys) => {
+                                setPageSize(Number(Array.from(keys)[0] || 10));
+                                setCurrentPage(1);
+                            }}
                             className="w-28"
                         >
                             <SelectItem key="10">10</SelectItem>
@@ -670,29 +686,29 @@ const UsersManagePage: React.FC = () => {
                             <Input
                                 label="邮箱"
                                 placeholder="请输入用户邮箱"
-
-                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                value={formData.email || ''}
+                                onValueChange={(email) => setFormData({ ...formData, email })}
                                 isRequired
                             />
                             <Input
                                 label="密码"
                                 type="password"
                                 placeholder="请输入密码"
-
-                                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                value={'password' in formData ? formData.password || '' : ''}
+                                onValueChange={(password) => setFormData({ ...formData, password })}
                                 isRequired
                             />
                             <Input
                                 label="用户名"
                                 placeholder="请输入用户名（可选）"
-
-                                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                                value={formData.username || ''}
+                                onValueChange={(username) => setFormData({ ...formData, username })}
                             />
                             <Select
                                 label="状态"
                                 placeholder="选择用户状态"
                                 selectedKeys={formData.status !== undefined ? [String(formData.status)] : []}
-                                onChange={(e) => setFormData({ ...formData, status: Number(e.target.value) as 0 | 1 })}
+                                onSelectionChange={(keys) => setFormData({ ...formData, status: Number(Array.from(keys)[0] || 1) as 0 | 1 })}
                             >
                                 <SelectItem key="1">正常</SelectItem>
                                 <SelectItem key="0">禁用</SelectItem>
@@ -700,8 +716,8 @@ const UsersManagePage: React.FC = () => {
                             <Textarea
                                 label="备注"
                                 placeholder="请输入备注信息（可选）"
-
-                                onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                                value={formData.remarks || ''}
+                                onValueChange={(remarks) => setFormData({ ...formData, remarks })}
                                 minRows={3}
                             />
                         </div>
@@ -734,20 +750,20 @@ const UsersManagePage: React.FC = () => {
                             <Input
                                 label="邮箱"
                                 placeholder="请输入用户邮箱"
-                                value={typeof (formData as any).email === 'string' ? (formData as any).email : ''}
-                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                value={formData.email || ''}
+                                onValueChange={(email) => setFormData({ ...formData, email })}
                             />
                             <Input
                                 label="用户名"
                                 placeholder="请输入用户名"
-                                value={typeof (formData as any).username === 'string' ? (formData as any).username : ''}
-                                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                                value={formData.username || ''}
+                                onValueChange={(username) => setFormData({ ...formData, username })}
                             />
                             <Select
                                 label="状态"
                                 placeholder="选择用户状态"
                                 selectedKeys={formData.status !== undefined ? [String(formData.status)] : []}
-                                onChange={(e) => setFormData({ ...formData, status: Number(e.target.value) as 0 | 1 })}
+                                onSelectionChange={(keys) => setFormData({ ...formData, status: Number(Array.from(keys)[0] || 1) as 0 | 1 })}
                             >
                                 <SelectItem key="1">正常</SelectItem>
                                 <SelectItem key="0">禁用</SelectItem>
@@ -755,8 +771,8 @@ const UsersManagePage: React.FC = () => {
                             <Textarea
                                 label="备注"
                                 placeholder="请输入备注信息"
-                                value={typeof (formData as any).remarks === 'string' ? (formData as any).remarks : ''}
-                                onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                                value={formData.remarks || ''}
+                                onValueChange={(remarks) => setFormData({ ...formData, remarks })}
                                 minRows={3}
                             />
                         </div>
@@ -837,20 +853,13 @@ const UsersManagePage: React.FC = () => {
                                         <div className="font-medium break-all">{selectedUser.wechat_openid || '-'}</div>
                                     </div>
                                 </div>
-                                <div>
-                                    <span className="text-sm text-default-500">备注</span>
-                                    <div className="mt-1 p-3 bg-default-50 rounded-lg text-sm whitespace-pre-wrap break-words">
-                                        {selectedUser.remarks || '-'}
-                                    </div>
-                                </div>
-                                <div>
-                                    <span className="text-sm text-default-500">用户偏好</span>
-                                    <div className="mt-1 p-3 bg-default-50 rounded-lg text-sm overflow-x-auto">
-                                        <pre className="whitespace-pre-wrap break-words">
-                                            {selectedUser.preferences ? JSON.stringify(selectedUser.preferences, null, 2) : '-'}
-                                        </pre>
-                                    </div>
-                                </div>
+                                <Textarea label="备注" value={selectedUser.remarks || '-'} isReadOnly minRows={2} />
+                                <Textarea
+                                    label="用户偏好"
+                                    value={selectedUser.preferences ? JSON.stringify(selectedUser.preferences, null, 2) : '-'}
+                                    isReadOnly
+                                    minRows={4}
+                                />
 
                                 {/* 套餐记录 */}
                                 <Divider className="my-2" />
@@ -861,32 +870,28 @@ const UsersManagePage: React.FC = () => {
                                     ) : viewUserPackages.length === 0 ? (
                                         <div className="mt-2 text-sm text-default-400">暂无套餐记录</div>
                                     ) : (
-                                        <div className="mt-2 overflow-x-auto">
-                                            <table className="w-full text-sm border-collapse">
-                                                <thead>
-                                                    <tr className="text-default-500 border-b border-default-200">
-                                                        <th className="text-left py-1.5 pr-3 font-medium">套餐ID</th>
-                                                        <th className="text-left py-1.5 pr-3 font-medium">状态</th>
-                                                        <th className="text-left py-1.5 pr-3 font-medium">方式</th>
-                                                        <th className="text-left py-1.5 font-medium">创建时间</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {viewUserPackages.map((pkg) => (
-                                                        <tr key={pkg.id} className="border-b border-default-100">
-                                                            <td className="py-1.5 pr-3">{pkg.package_id}</td>
-                                                            <td className="py-1.5 pr-3">
-                                                                <Chip size="sm" variant="flat" color={pkg.status === 'active' ? 'success' : pkg.status === 'frozen' ? 'warning' : 'default'}>
-                                                                    {pkg.status}
-                                                                </Chip>
-                                                            </td>
-                                                            <td className="py-1.5 pr-3">{pkg.way || '-'}</td>
-                                                            <td className="py-1.5">{dayjs(pkg.created_at).format('YYYY-MM-DD HH:mm')}</td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                        <Table aria-label="用户套餐记录" className="mt-2">
+                                            <TableHeader>
+                                                <TableColumn>套餐ID</TableColumn>
+                                                <TableColumn>状态</TableColumn>
+                                                <TableColumn>方式</TableColumn>
+                                                <TableColumn>创建时间</TableColumn>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {viewUserPackages.map((pkg) => (
+                                                    <TableRow key={pkg.id}>
+                                                        <TableCell>{pkg.package_id}</TableCell>
+                                                        <TableCell>
+                                                            <Chip size="sm" variant="flat" color={pkg.status === 'active' ? 'success' : pkg.status === 'frozen' ? 'warning' : 'default'}>
+                                                                {pkg.status === 'active' ? '有效' : pkg.status === 'frozen' ? '冻结' : '过期'}
+                                                            </Chip>
+                                                        </TableCell>
+                                                        <TableCell>{pkg.way || '-'}</TableCell>
+                                                        <TableCell>{dayjs(pkg.created_at).format('YYYY-MM-DD HH:mm')}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
                                     )}
                                 </div>
 
@@ -898,32 +903,28 @@ const UsersManagePage: React.FC = () => {
                                     ) : viewUserOrders.length === 0 ? (
                                         <div className="mt-2 text-sm text-default-400">暂无订单记录</div>
                                     ) : (
-                                        <div className="mt-2 overflow-x-auto">
-                                            <table className="w-full text-sm border-collapse">
-                                                <thead>
-                                                    <tr className="text-default-500 border-b border-default-200">
-                                                        <th className="text-left py-1.5 pr-3 font-medium">订单号</th>
-                                                        <th className="text-left py-1.5 pr-3 font-medium">状态</th>
-                                                        <th className="text-left py-1.5 pr-3 font-medium">方式</th>
-                                                        <th className="text-left py-1.5 font-medium">创建时间</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {viewUserOrders.map((order) => (
-                                                        <tr key={order.id} className="border-b border-default-100">
-                                                            <td className="py-1.5 pr-3 font-mono text-xs">{order.order_id}</td>
-                                                            <td className="py-1.5 pr-3">
-                                                                <Chip size="sm" variant="flat" color={order.status === 'paid' ? 'success' : order.status === 'failed' ? 'danger' : 'warning'}>
-                                                                    {order.status}
-                                                                </Chip>
-                                                            </td>
-                                                            <td className="py-1.5 pr-3">{order.way || '-'}</td>
-                                                            <td className="py-1.5">{dayjs(order.created_at).format('YYYY-MM-DD HH:mm')}</td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                        <Table aria-label="用户订单记录" className="mt-2">
+                                            <TableHeader>
+                                                <TableColumn>订单号</TableColumn>
+                                                <TableColumn>状态</TableColumn>
+                                                <TableColumn>方式</TableColumn>
+                                                <TableColumn>创建时间</TableColumn>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {viewUserOrders.map((order) => (
+                                                    <TableRow key={order.id}>
+                                                        <TableCell><code className="text-xs">{order.order_id}</code></TableCell>
+                                                        <TableCell>
+                                                            <Chip size="sm" variant="flat" color={order.status === 'paid' ? 'success' : order.status === 'failed' ? 'danger' : 'warning'}>
+                                                                {order.status === 'paid' ? '已支付' : order.status === 'failed' ? '支付失败' : '待支付'}
+                                                            </Chip>
+                                                        </TableCell>
+                                                        <TableCell>{order.way || '-'}</TableCell>
+                                                        <TableCell>{dayjs(order.created_at).format('YYYY-MM-DD HH:mm')}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
                                     )}
                                 </div>
                             </div>
@@ -985,8 +986,8 @@ const UsersManagePage: React.FC = () => {
                                     label="邮箱 / 用户名 / 用户ID"
                                     placeholder="支持模糊搜索，例如输入 aaaaaaa"
                                     value={clearLimitKeyword}
-                                    onChange={(e) => setClearLimitKeyword(e.target.value)}
-                                    onKeyPress={(e) => e.key === 'Enter' && handleQuickClearLimitSearch()}
+                                    onValueChange={setClearLimitKeyword}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleQuickClearLimitSearch()}
                                     className="flex-1"
                                 />
                                 <Button
@@ -1007,23 +1008,23 @@ const UsersManagePage: React.FC = () => {
                                 </div>
                                 <div className="space-y-2">
                                     {clearLimitCandidates.map((user) => (
-                                        <div key={user.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-default-200 p-3">
-                                            <div className="space-y-1">
-                                                <div className="font-medium text-default-900">{user.username || '未设置用户名'}</div>
-                                                <div className="text-sm text-default-600">{user.email}</div>
-                                                <div className="text-xs text-default-500">
-                                                    ID: {user.id} · 状态: {user.status === 1 ? '正常' : '禁用'} · 创建时间: {dayjs(user.created_at).format('YYYY-MM-DD HH:mm:ss')}
+                                        <Card key={user.id} shadow="none">
+                                            <CardBody className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                                <div className="space-y-1">
+                                                    <div className="font-medium text-default-900">{user.username || '未设置用户名'}</div>
+                                                    <div className="text-sm text-default-600">{user.email}</div>
+                                                    <div className="text-xs text-default-500">
+                                                        ID: {user.id} · 状态: {user.status === 1 ? '正常' : '禁用'} · 创建时间: {dayjs(user.created_at).format('YYYY-MM-DD HH:mm:ss')}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <Button color="primary" variant="flat" onPress={() => handleQuickClearLimitSelect(user)}>
-                                                确认是此用户
-                                            </Button>
-                                        </div>
+                                                <Button color="primary" variant="flat" onPress={() => handleQuickClearLimitSelect(user)}>
+                                                    确认是此用户
+                                                </Button>
+                                            </CardBody>
+                                        </Card>
                                     ))}
                                     {!clearLimitSearchLoading && clearLimitCandidates.length === 0 && (
-                                        <div className="rounded-lg border border-dashed border-default-200 p-6 text-center text-sm text-default-500">
-                                            暂无候选用户
-                                        </div>
+                                        <Alert isVisible color="default" variant="flat" title="暂无候选用户" />
                                     )}
                                 </div>
                             </div>
@@ -1053,12 +1054,13 @@ const UsersManagePage: React.FC = () => {
                     <ModalBody>
                         <div className="space-y-3 text-sm text-default-700">
                             <p>请确认要为以下用户执行一键操作（解除限速 + 解封 + 加白）：</p>
-                            <div className="rounded-lg bg-default-50 p-4 space-y-2">
-                                <div><span className="text-default-500">用户ID：</span>{pendingClearLimitUser?.id ?? '-'}</div>
-                                <div><span className="text-default-500">用户名：</span>{pendingClearLimitUser?.username || '-'}</div>
-                                <div><span className="text-default-500">邮箱：</span>{pendingClearLimitUser?.email || '-'}</div>
-                            </div>
-                            <p className="text-warning-600">确认后将同步执行：清除限速、解封（如已封禁）、加白（如未在白名单），请确保目标用户无误。</p>
+                            <Alert
+                                isVisible
+                                color="warning"
+                                variant="flat"
+                                title={pendingClearLimitUser?.username || pendingClearLimitUser?.email || '未选择用户'}
+                                description={`用户 ID：${pendingClearLimitUser?.id ?? '-'}；邮箱：${pendingClearLimitUser?.email || '-'}。确认后将同步执行清除限速、解封和加白。`}
+                            />
                         </div>
                     </ModalBody>
                     <ModalFooter>
@@ -1088,17 +1090,20 @@ const UsersManagePage: React.FC = () => {
                     <ModalBody>
                         <div className="space-y-4">
                             {compensationUser && (
-                                <div className="text-sm text-default-600 bg-default-50 rounded-lg p-3">
-                                    用户：<span className="font-medium">{compensationUser.username || compensationUser.email}</span>
-                                    <span className="text-default-400 ml-2">(ID: {compensationUser.id})</span>
-                                </div>
+                                <Alert
+                                    isVisible
+                                    color="default"
+                                    variant="flat"
+                                    title={compensationUser.username || compensationUser.email}
+                                    description={`用户 ID：${compensationUser.id}`}
+                                />
                             )}
                             <Select
                                 label="补偿等级"
                                 placeholder="选择补偿的套餐等级"
                                 selectedKeys={compensationForm.level ? [`${compensationForm.level}|${compensationForm.category}`] : []}
-                                onChange={(e) => {
-                                    const [level, category] = e.target.value.split('|');
+                                onSelectionChange={(keys) => {
+                                    const [level, category] = String(Array.from(keys)[0] || '').split('|');
                                     setCompensationForm({ ...compensationForm, level: level || '', category: category || 'GPT' });
                                 }}
                                 isRequired
@@ -1111,12 +1116,13 @@ const UsersManagePage: React.FC = () => {
                                     </SelectItem>
                                 ))}
                             </Select>
-                            <Input
+                            <NumberInput
                                 label="补偿天数"
-                                type="number"
                                 placeholder="请输入补偿天数，如 3"
-                                value={compensationForm.days}
-                                onChange={(e) => setCompensationForm({ ...compensationForm, days: e.target.value })}
+                                value={compensationForm.days ? Number(compensationForm.days) : undefined}
+                                onValueChange={(days) => setCompensationForm({ ...compensationForm, days: Number.isNaN(days) ? '' : String(days) })}
+                                minValue={1}
+                                step={1}
                                 isRequired
                                 variant="bordered"
                                 description="补偿时长将作为该等级套餐排队，在现有套餐消耗完后自动使用"
@@ -1135,4 +1141,4 @@ const UsersManagePage: React.FC = () => {
     );
 };
 
-export default UsersManagePage; 
+export default UsersManagePage;

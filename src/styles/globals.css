@@ -23,31 +23,6 @@ a {
   text-decoration: none;
 }
 
-/* 滚动条样式 */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #f4f4f5;
-}
-::-webkit-scrollbar-thumb {
-  background: #d4d4d8;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #a1a1aa;
-}
-
-/* 卡片悬浮上移效果（用于 OverviewDashboardPage 的 KPI 卡片） */
-.card-hover {
-  transition: transform 150ms ease, box-shadow 150ms ease;
-}
-.card-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-}
-
 /* 自定义 .container：固定最大宽度 1200px，覆盖 Tailwind 默认行为
    注意：UserCenter 等页面依赖此规则把内容居中限宽。 */
 .container {
@@ -60,12 +35,4 @@ a {
 }
 @media (min-width: 1024px) {
   .container { padding: 0 32px; }
-}
-
-/* 表格内文本可选中（覆盖组件默认 user-select: none） */
-table, table *,
-[role="grid"], [role="grid"] *,
-.heroui-table, .heroui-table * {
-  -webkit-user-select: text !important;
-  user-select: text !important;
 }

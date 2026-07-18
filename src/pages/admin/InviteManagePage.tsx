@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   Button,
   Card,
   CardBody,
@@ -11,6 +12,7 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
+  NumberInput,
   Pagination,
   Select,
   SelectItem,
@@ -25,7 +27,7 @@ import {
   Textarea,
   useDisclosure,
 } from '@heroui/react';
-import { Filter, Gift, RefreshCw, Save, Settings2, Ticket, Users, Wallet } from 'lucide-react';
+import { Filter, Gift, RefreshCw, Save, Search, Settings2, Ticket, Users, Wallet } from 'lucide-react';
 import dayjs from 'dayjs';
 import adminApiService from '../../services/adminApi';
 import { InvitePolicyConfig, InviteRewardRecord, User, WorkOrder } from '../../types/admin';
@@ -87,6 +89,7 @@ const InviteManagePage: React.FC = () => {
 
   const [rewardModeFilter, setRewardModeFilter] = useState<'all' | 'duration' | 'cash'>('all');
   const [rewardStatusFilter, setRewardStatusFilter] = useState<string>('all');
+  const [rewardSearchInput, setRewardSearchInput] = useState('');
   const [rewardSearch, setRewardSearch] = useState('');
   const [rewardsLoading, setRewardsLoading] = useState(true);
   const [inviteRewards, setInviteRewards] = useState<InviteRewardRecord[]>([]);
@@ -104,6 +107,7 @@ const InviteManagePage: React.FC = () => {
   const { isOpen: isWorkorderOpen, onOpen: onWorkorderOpen, onClose: onWorkorderClose } = useDisclosure();
 
   const [usersLoading, setUsersLoading] = useState(true);
+  const [usersSearchInput, setUsersSearchInput] = useState('');
   const [usersSearch, setUsersSearch] = useState('');
   const [inviterUsers, setInviterUsers] = useState<User[]>([]);
   const [inviterUsersPage, setInviterUsersPage] = useState(1);
@@ -158,8 +162,10 @@ const InviteManagePage: React.FC = () => {
       }
       setInviteRewards(Array.isArray(response.data) ? response.data : []);
       const t = Number(response.total) || 0;
+      const nextTotalPages = Math.max(1, Math.ceil(t / rewardsPageSize));
       setRewardsTotal(t);
-      setRewardsTotalPages(Math.max(1, Math.ceil(t / rewardsPageSize)));
+      setRewardsTotalPages(nextTotalPages);
+      if (rewardsPage > nextTotalPages) setRewardsPage(nextTotalPages);
     } catch (error) {
       showToast(error instanceof Error ? error.message : '获取邀请奖励流水失败', 'error');
       setInviteRewards([]);
@@ -199,9 +205,11 @@ const InviteManagePage: React.FC = () => {
       }
       const list = Array.isArray(response.data) ? response.data : [];
       const total = Number(response.total) || 0;
+      const nextTotalPages = Math.max(1, Math.ceil(total / INVITER_PAGE_SIZE));
       setInviterUsers(list);
       setInviterUsersTotal(total);
-      setInviterUsersTotalPages(Math.max(1, Math.ceil(total / INVITER_PAGE_SIZE)));
+      setInviterUsersTotalPages(nextTotalPages);
+      if (inviterUsersPage > nextTotalPages) setInviterUsersPage(nextTotalPages);
     } catch (error) {
       showToast(error instanceof Error ? error.message : '获取用户列表失败', 'error');
       setInviterUsers([]);
@@ -216,6 +224,26 @@ const InviteManagePage: React.FC = () => {
   useEffect(() => { loadRewards(); }, [loadRewards]);
   useEffect(() => { loadWorkorders(); }, [loadWorkorders]);
   useEffect(() => { loadUsers(); }, [loadUsers]);
+
+  const applyUsersSearch = () => {
+    const nextSearch = usersSearchInput.trim();
+    if (inviterUsersPage === 1 && usersSearch === nextSearch) {
+      loadUsers();
+      return;
+    }
+    setInviterUsersPage(1);
+    setUsersSearch(nextSearch);
+  };
+
+  const applyRewardFilters = () => {
+    const nextSearch = rewardSearchInput.trim();
+    if (rewardsPage === 1 && rewardSearch === nextSearch) {
+      loadRewards();
+      return;
+    }
+    setRewardsPage(1);
+    setRewardSearch(nextSearch);
+  };
 
   const rewardStats = useMemo(() => {
     const durationCount = inviteRewards.filter((item) => item.invite_reward_mode === 'duration').length;
@@ -358,7 +386,7 @@ const InviteManagePage: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Gift className="w-6 h-6 text-blue-600" />
+        <Gift className="w-6 h-6 text-primary" />
         <h1 className="text-2xl font-bold text-default-800">邀请管理</h1>
       </div>
 
@@ -383,18 +411,18 @@ const InviteManagePage: React.FC = () => {
                   启用邀请奖励
                 </Switch>
               </div>
-              <Select label="默认奖励模式" selectedKeys={[globalPolicyForm.reward_mode]} onChange={(e) => setGlobalPolicyForm((prev) => ({ ...prev, reward_mode: (e.target.value || 'duration') as 'duration' | 'cash' }))}>
+              <Select label="默认奖励模式" selectedKeys={[globalPolicyForm.reward_mode]} onSelectionChange={(keys) => setGlobalPolicyForm((prev) => ({ ...prev, reward_mode: String(Array.from(keys)[0] || 'duration') as 'duration' | 'cash' }))}>
                 <SelectItem key="duration">返时长</SelectItem>
                 <SelectItem key="cash">返现</SelectItem>
               </Select>
-              <Input label="默认奖励比例" value={globalPolicyForm.reward_ratio} onChange={(e) => setGlobalPolicyForm((prev) => ({ ...prev, reward_ratio: e.target.value }))} placeholder="如 0.15 表示 15%" />
-              <Input label="默认奖励前N单" value={globalPolicyForm.max_reward_order_count} onChange={(e) => setGlobalPolicyForm((prev) => ({ ...prev, max_reward_order_count: e.target.value }))} />
-              <Input label="默认最低提现金额" value={globalPolicyForm.min_withdraw_amount} onChange={(e) => setGlobalPolicyForm((prev) => ({ ...prev, min_withdraw_amount: e.target.value }))} />
+              <NumberInput label="默认奖励比例" value={globalPolicyForm.reward_ratio === '' ? undefined : Number(globalPolicyForm.reward_ratio)} onValueChange={(reward_ratio) => setGlobalPolicyForm((prev) => ({ ...prev, reward_ratio: Number.isNaN(reward_ratio) ? '' : String(reward_ratio) }))} minValue={0} maxValue={1} step={0.01} description="0.15 表示 15%" />
+              <NumberInput label="默认奖励前 N 单" value={globalPolicyForm.max_reward_order_count === '' ? undefined : Number(globalPolicyForm.max_reward_order_count)} onValueChange={(max_reward_order_count) => setGlobalPolicyForm((prev) => ({ ...prev, max_reward_order_count: Number.isNaN(max_reward_order_count) ? '' : String(max_reward_order_count) }))} minValue={0} step={1} />
+              <NumberInput label="默认最低提现金额" value={globalPolicyForm.min_withdraw_amount === '' ? undefined : Number(globalPolicyForm.min_withdraw_amount)} onValueChange={(min_withdraw_amount) => setGlobalPolicyForm((prev) => ({ ...prev, min_withdraw_amount: Number.isNaN(min_withdraw_amount) ? '' : String(min_withdraw_amount) }))} minValue={0} step={0.01} />
               <div className="md:col-span-2">
                 <Textarea
                   label="套餐覆盖规则 JSON（可选）"
                   value={globalPolicyForm.package_rules}
-                  onChange={(e) => setGlobalPolicyForm((prev) => ({ ...prev, package_rules: e.target.value }))}
+                  onValueChange={(package_rules) => setGlobalPolicyForm((prev) => ({ ...prev, package_rules }))}
                   minRows={6}
                   placeholder={'例如：{\n  "5": { "reward_mode": "cash", "reward_ratio": 0.15 }\n}'}
                 />
@@ -410,14 +438,12 @@ const InviteManagePage: React.FC = () => {
           <div className="flex gap-2 flex-wrap">
             <Input
               placeholder="搜索用户邮箱/用户名"
-              value={usersSearch}
-              onChange={(e) => {
-                setUsersSearch(e.target.value);
-                setInviterUsersPage(1);
-              }}
+              value={usersSearchInput}
+              onValueChange={setUsersSearchInput}
+              onKeyDown={(event) => event.key === 'Enter' && applyUsersSearch()}
               className="w-56"
             />
-            <Button variant="flat" color="primary" startContent={<RefreshCw className="w-4 h-4" />} onPress={loadUsers}>刷新</Button>
+            <Button variant="flat" color="primary" startContent={<Search className="w-4 h-4" />} onPress={applyUsersSearch}>查询</Button>
           </div>
         </CardHeader>
         <CardBody>
@@ -467,20 +493,36 @@ const InviteManagePage: React.FC = () => {
         <CardHeader className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2"><Wallet className="w-4 h-4" /><span className="font-medium">邀请奖励流水</span></div>
           <div className="flex gap-2 flex-wrap">
-            <Input placeholder="筛选邀请人ID" value={rewardSearch} onChange={(e) => setRewardSearch(e.target.value)} className="w-40" />
-            <Select selectedKeys={[rewardModeFilter]} onChange={(e) => setRewardModeFilter((e.target.value || 'all') as 'all' | 'duration' | 'cash')} className="w-36" aria-label="奖励模式筛选">
+            <Input placeholder="筛选邀请人ID" value={rewardSearchInput} onValueChange={setRewardSearchInput} onKeyDown={(event) => event.key === 'Enter' && applyRewardFilters()} className="w-40" />
+            <Select
+              selectedKeys={[rewardModeFilter]}
+              onSelectionChange={(keys) => {
+                setRewardModeFilter(String(Array.from(keys)[0] || 'all') as 'all' | 'duration' | 'cash');
+                setRewardsPage(1);
+              }}
+              className="w-36"
+              aria-label="奖励模式筛选"
+            >
               <SelectItem key="all">全部模式</SelectItem>
               <SelectItem key="duration">返时长</SelectItem>
               <SelectItem key="cash">返现</SelectItem>
             </Select>
-            <Select selectedKeys={[rewardStatusFilter]} onChange={(e) => setRewardStatusFilter(e.target.value || 'all')} className="w-40" aria-label="奖励状态筛选">
+            <Select
+              selectedKeys={[rewardStatusFilter]}
+              onSelectionChange={(keys) => {
+                setRewardStatusFilter(String(Array.from(keys)[0] || 'all'));
+                setRewardsPage(1);
+              }}
+              className="w-40"
+              aria-label="奖励状态筛选"
+            >
               <SelectItem key="all">全部状态</SelectItem>
               <SelectItem key="granted">已发放</SelectItem>
               <SelectItem key="withdraw_pending">提现处理中</SelectItem>
               <SelectItem key="withdraw_done">已提现</SelectItem>
               <SelectItem key="skipped">已跳过</SelectItem>
             </Select>
-            <Button variant="flat" color="primary" startContent={<Filter className="w-4 h-4" />} onPress={() => { setRewardsPage(1); loadRewards(); }}>筛选</Button>
+            <Button variant="flat" color="primary" startContent={<Filter className="w-4 h-4" />} onPress={applyRewardFilters}>筛选</Button>
           </div>
         </CardHeader>
         <CardBody>
@@ -530,7 +572,10 @@ const InviteManagePage: React.FC = () => {
               <Select
                 aria-label="每页数量"
                 selectedKeys={[String(rewardsPageSize)]}
-                onChange={(e) => { setRewardsPageSize(Number(e.target.value)); setRewardsPage(1); }}
+                onSelectionChange={(keys) => {
+                  setRewardsPageSize(Number(Array.from(keys)[0] || 20));
+                  setRewardsPage(1);
+                }}
                 className="w-24"
               >
                 <SelectItem key="20">20</SelectItem>
@@ -594,26 +639,29 @@ const InviteManagePage: React.FC = () => {
           <ModalBody>
             {selectedInviter && (
               <div className="space-y-4">
-                <div className="rounded-lg bg-default-50 p-3 text-sm text-default-700">
-                  当前用户：<span className="font-semibold">{selectedInviter.username || selectedInviter.email}</span>
-                  <div className="text-xs text-default-500 mt-1">邀请码：{selectedInviter.inviter_code || '-'}</div>
-                </div>
+                <Alert
+                  isVisible
+                  color="default"
+                  variant="flat"
+                  title={selectedInviter.username || selectedInviter.email}
+                  description={`邀请码：${selectedInviter.inviter_code || '-'}`}
+                />
                 <Switch isSelected={inviterPolicyForm.enabled} onValueChange={(checked) => setInviterPolicyForm((prev) => ({ ...prev, enabled: checked }))}>
                   启用该邀请人的专属规则
                 </Switch>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Select label="奖励模式" selectedKeys={[inviterPolicyForm.reward_mode]} onChange={(e) => setInviterPolicyForm((prev) => ({ ...prev, reward_mode: (e.target.value || 'duration') as 'duration' | 'cash' }))}>
+                  <Select label="奖励模式" selectedKeys={[inviterPolicyForm.reward_mode]} onSelectionChange={(keys) => setInviterPolicyForm((prev) => ({ ...prev, reward_mode: String(Array.from(keys)[0] || 'duration') as 'duration' | 'cash' }))}>
                     <SelectItem key="duration">返时长</SelectItem>
                     <SelectItem key="cash">返现</SelectItem>
                   </Select>
-                  <Input label="奖励比例" value={inviterPolicyForm.reward_ratio} onChange={(e) => setInviterPolicyForm((prev) => ({ ...prev, reward_ratio: e.target.value }))} placeholder="如 0.15 表示 15%" />
-                  <Input label="奖励前N单" value={inviterPolicyForm.max_reward_order_count} onChange={(e) => setInviterPolicyForm((prev) => ({ ...prev, max_reward_order_count: e.target.value }))} />
-                  <Input label="最低提现金额" value={inviterPolicyForm.min_withdraw_amount} onChange={(e) => setInviterPolicyForm((prev) => ({ ...prev, min_withdraw_amount: e.target.value }))} />
+                  <NumberInput label="奖励比例" value={inviterPolicyForm.reward_ratio === '' ? undefined : Number(inviterPolicyForm.reward_ratio)} onValueChange={(reward_ratio) => setInviterPolicyForm((prev) => ({ ...prev, reward_ratio: Number.isNaN(reward_ratio) ? '' : String(reward_ratio) }))} minValue={0} maxValue={1} step={0.01} description="0.15 表示 15%" />
+                  <NumberInput label="奖励前 N 单" value={inviterPolicyForm.max_reward_order_count === '' ? undefined : Number(inviterPolicyForm.max_reward_order_count)} onValueChange={(max_reward_order_count) => setInviterPolicyForm((prev) => ({ ...prev, max_reward_order_count: Number.isNaN(max_reward_order_count) ? '' : String(max_reward_order_count) }))} minValue={0} step={1} />
+                  <NumberInput label="最低提现金额" value={inviterPolicyForm.min_withdraw_amount === '' ? undefined : Number(inviterPolicyForm.min_withdraw_amount)} onValueChange={(min_withdraw_amount) => setInviterPolicyForm((prev) => ({ ...prev, min_withdraw_amount: Number.isNaN(min_withdraw_amount) ? '' : String(min_withdraw_amount) }))} minValue={0} step={0.01} />
                 </div>
                 <Textarea
                   label="套餐覆盖规则 JSON（可选）"
                   value={inviterPolicyForm.package_rules}
-                  onChange={(e) => setInviterPolicyForm((prev) => ({ ...prev, package_rules: e.target.value }))}
+                  onValueChange={(package_rules) => setInviterPolicyForm((prev) => ({ ...prev, package_rules }))}
                   minRows={6}
                   placeholder={'例如：{\n  "5": { "reward_mode": "cash", "reward_ratio": 0.2 }\n}'}
                 />
@@ -636,14 +684,14 @@ const InviteManagePage: React.FC = () => {
               <div className="space-y-4">
                 <div className="text-sm text-default-600">工单 #{selectedWorkorder.id} · 用户 {selectedWorkorder.user_id}</div>
                 <div className="text-sm text-default-600">申请金额：¥{Number(selectedWorkorder.amount || 0).toFixed(2)}</div>
-                <Select label="工单状态" selectedKeys={[workorderStatus]} onChange={(e) => setWorkorderStatus(e.target.value)}>
+                <Select label="工单状态" selectedKeys={[workorderStatus]} onSelectionChange={(keys) => setWorkorderStatus(String(Array.from(keys)[0] || 'pending'))}>
                   <SelectItem key="pending">待处理</SelectItem>
                   <SelectItem key="processing">处理中</SelectItem>
                   <SelectItem key="paid">已打款</SelectItem>
                   <SelectItem key="rejected">已拒绝</SelectItem>
                   <SelectItem key="cancelled">已取消</SelectItem>
                 </Select>
-                <Textarea label="管理员备注" value={workorderRemark} onChange={(e) => setWorkorderRemark(e.target.value)} minRows={4} />
+                <Textarea label="管理员备注" value={workorderRemark} onValueChange={setWorkorderRemark} minRows={4} />
               </div>
             )}
           </ModalBody>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
+    Alert,
     Table,
     TableHeader,
     TableColumn,
@@ -19,6 +20,7 @@ import {
     ModalHeader,
     ModalBody,
     ModalFooter,
+    NumberInput,
     useDisclosure,
     Card,
     CardBody,
@@ -56,6 +58,7 @@ const PackagesManagePage: React.FC = () => {
     // 状态管理
     const [packages, setPackages] = useState<PackageType[]>([]);
     const [loading, setLoading] = useState(false);
+    const [searchInput, setSearchInput] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState<string>('all');
     const [currentPage, setCurrentPage] = useState(1);
@@ -113,8 +116,10 @@ const PackagesManagePage: React.FC = () => {
             if (response.code === 20000) {
                 setPackages(Array.isArray(response.data) ? response.data : []);
                 const totalNum = Number(response.total) || 0;
+                const nextTotalPages = Math.max(1, Math.ceil(totalNum / pageSize));
                 setTotal(totalNum);
-                setTotalPages(Math.ceil(totalNum / pageSize));
+                setTotalPages(nextTotalPages);
+                if (currentPage > nextTotalPages) setCurrentPage(nextTotalPages);
             } else {
                 // 错误捕获：显示空表格
                 setPackages([]);
@@ -122,8 +127,7 @@ const PackagesManagePage: React.FC = () => {
                 setTotalPages(1);
                 showToast(response.msg || '获取套餐列表失败', 'error');
             }
-        } catch (error) {
-            console.error('获取套餐列表失败:', error);
+        } catch {
             // 错误捕获：显示空表格
             setPackages([]);
             setTotal(0);
@@ -141,12 +145,18 @@ const PackagesManagePage: React.FC = () => {
 
     // 处理搜索
     const handleSearch = () => {
+        const nextQuery = searchInput.trim();
+        if (currentPage === 1 && searchQuery === nextQuery) {
+            fetchPackages();
+            return;
+        }
         setCurrentPage(1);
-        fetchPackages();
+        setSearchQuery(nextQuery);
     };
 
     // 处理重置
     const handleReset = () => {
+        setSearchInput('');
         setSearchQuery('');
         setCategoryFilter('all');
         setCurrentPage(1);
@@ -156,8 +166,12 @@ const PackagesManagePage: React.FC = () => {
     const handleCreate = async () => {
         try {
             const createData = formData as CreatePackageRequest;
-            if (!createData.package_name || !createData.category || !createData.price || !createData.duration || !createData.level) {
-                showToast('套餐名称、类型、价格、时长和等级不能为空', 'warning');
+            if (!createData.package_name || !createData.category || !createData.price || !createData.duration || !createData.level || !createData.priority) {
+                showToast('套餐名称、类型、价格、时长、等级和优先级不能为空', 'warning');
+                return;
+            }
+            if (createData.price <= 0 || !Number.isInteger(createData.duration) || createData.duration <= 0 || !Number.isInteger(createData.priority) || createData.priority <= 0) {
+                showToast('价格必须大于 0，时长和优先级必须是正整数', 'warning');
                 return;
             }
 
@@ -170,8 +184,7 @@ const PackagesManagePage: React.FC = () => {
             } else {
                 showToast(response.msg || '创建套餐失败', 'error');
             }
-        } catch (error) {
-            console.error('创建套餐失败:', error);
+        } catch {
             showToast('创建套餐失败', 'error');
         }
     };
@@ -196,8 +209,7 @@ const PackagesManagePage: React.FC = () => {
             } else {
                 showToast(response.msg || '更新套餐失败', 'error');
             }
-        } catch (error) {
-            console.error('更新套餐失败:', error);
+        } catch {
             showToast('更新套餐失败', 'error');
         }
     };
@@ -216,8 +228,7 @@ const PackagesManagePage: React.FC = () => {
             } else {
                 showToast(response.msg || '删除套餐失败', 'error');
             }
-        } catch (error) {
-            console.error('删除套餐失败:', error);
+        } catch {
             showToast('删除套餐失败', 'error');
         }
     };
@@ -327,7 +338,7 @@ const PackagesManagePage: React.FC = () => {
         <div className="space-y-6">
             {/* 页面标题 */}
             <div className="flex items-center gap-3">
-                <Package className="w-6 h-6 text-blue-600" />
+                <Package className="w-6 h-6 text-primary" />
                 <h1 className="text-2xl font-bold text-default-800">套餐管理</h1>
             </div>
 
@@ -343,16 +354,19 @@ const PackagesManagePage: React.FC = () => {
                     <div className="flex flex-col sm:flex-row gap-4">
                         <Input
                             placeholder="搜索套餐名称..."
-
-                            onChange={(e) => setSearchQuery(e.target.value)}
+                            value={searchInput}
+                            onValueChange={setSearchInput}
                             startContent={<Search className="w-4 h-4 text-default-400" />}
                             className="flex-1"
-                            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                         />
                         <Select
                             placeholder="选择类型"
-                            value={categoryFilter}
-                            onChange={(e) => setCategoryFilter(e.target.value)}
+                            selectedKeys={[categoryFilter]}
+                            onSelectionChange={(keys) => {
+                                setCategoryFilter(String(Array.from(keys)[0] || 'all'));
+                                setCurrentPage(1);
+                            }}
                             className="w-full sm:w-40"
                         >
                             {categoryOptions.map((option) => (
@@ -432,7 +446,7 @@ const PackagesManagePage: React.FC = () => {
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="flex items-center gap-1 text-sm font-medium text-green-600">
+                                        <div className="flex items-center gap-1 text-sm font-medium text-success">
                                             <DollarSign className="w-3 h-3" />
                                             ¥{pkg.price}
                                         </div>
@@ -470,8 +484,11 @@ const PackagesManagePage: React.FC = () => {
                         <span>每页</span>
                         <Select
                             aria-label="每页数量"
-                            value={String(pageSize)}
-                            onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                            selectedKeys={[String(pageSize)]}
+                            onSelectionChange={(keys) => {
+                                setPageSize(Number(Array.from(keys)[0] || 10));
+                                setCurrentPage(1);
+                            }}
                             className="w-28"
                         >
                             <SelectItem key="10">10</SelectItem>
@@ -509,15 +526,15 @@ const PackagesManagePage: React.FC = () => {
                             <Input
                                 label="套餐名称"
                                 placeholder="请输入套餐名称"
-
-                                onChange={(e) => setFormData({ ...formData, package_name: e.target.value })}
+                                value={formData.package_name || ''}
+                                onValueChange={(package_name) => setFormData({ ...formData, package_name })}
                                 isRequired
                             />
                             <Select
                                 label="套餐类型"
                                 placeholder="选择套餐类型"
                                 selectedKeys={formData.category ? [formData.category] : []}
-                                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                                onSelectionChange={(keys) => setFormData({ ...formData, category: String(Array.from(keys)[0] || '') })}
                                 isRequired
                             >
                                 {categoryOptions.map((option) => (
@@ -526,29 +543,31 @@ const PackagesManagePage: React.FC = () => {
                                     </SelectItem>
                                 ))}
                             </Select>
-                            <Input
+                            <NumberInput
                                 label="套餐价格"
-                                type="number"
                                 placeholder="请输入价格（元）"
-
-                                onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
+                                value={formData.price}
+                                onValueChange={(price) => setFormData({ ...formData, price: Number.isNaN(price) ? undefined : price })}
                                 startContent={<DollarSign className="w-4 h-4" />}
+                                minValue={0.01}
+                                step={0.01}
                                 isRequired
                             />
-                            <Input
+                            <NumberInput
                                 label="套餐时长"
-                                type="number"
                                 placeholder="请输入时长（天）"
-
-                                onChange={(e) => setFormData({ ...formData, duration: Number(e.target.value) })}
+                                value={formData.duration}
+                                onValueChange={(duration) => setFormData({ ...formData, duration: Number.isNaN(duration) ? undefined : duration })}
                                 startContent={<Clock className="w-4 h-4" />}
+                                minValue={1}
+                                step={1}
                                 isRequired
                             />
                             <Select
                                 label="套餐等级"
                                 placeholder="选择套餐等级"
                                 selectedKeys={formData.level ? [formData.level] : []}
-                                onChange={(e) => setFormData({ ...formData, level: e.target.value })}
+                                onSelectionChange={(keys) => setFormData({ ...formData, level: String(Array.from(keys)[0] || '') })}
                                 isRequired
                             >
                                 {levelOptions.map((option) => (
@@ -557,19 +576,20 @@ const PackagesManagePage: React.FC = () => {
                                     </SelectItem>
                                 ))}
                             </Select>
-                            <Input
+                            <NumberInput
                                 label="优先级"
-                                type="number"
                                 placeholder="请输入优先级（数字越大越靠前）"
-
-                                onChange={(e) => setFormData({ ...formData, priority: Number(e.target.value) })}
+                                value={formData.priority}
+                                onValueChange={(priority) => setFormData({ ...formData, priority: Number.isNaN(priority) ? undefined : priority })}
+                                minValue={1}
+                                step={1}
                                 isRequired
                             />
                             <Select
                                 label="状态"
                                 placeholder="选择状态"
                                 selectedKeys={formData.status !== undefined ? [String(formData.status)] : []}
-                                onChange={(e) => setFormData({ ...formData, status: Number(e.target.value) as 0 | 1 })}
+                                onSelectionChange={(keys) => setFormData({ ...formData, status: Number(Array.from(keys)[0] || 1) as 0 | 1 })}
                             >
                                 <SelectItem key="1">上架</SelectItem>
                                 <SelectItem key="0">下架</SelectItem>
@@ -578,16 +598,16 @@ const PackagesManagePage: React.FC = () => {
                         <Textarea
                             label="套餐介绍"
                             placeholder="请输入套餐介绍（可选）"
-
-                            onChange={(e) => setFormData({ ...formData, introduce: e.target.value })}
+                            value={formData.introduce || ''}
+                            onValueChange={(introduce) => setFormData({ ...formData, introduce })}
                             minRows={3}
                             className="mt-4"
                         />
                         <Textarea
                             label="备注"
                             placeholder="请输入备注信息（可选）"
-
-                            onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                            value={formData.remarks || ''}
+                            onValueChange={(remarks) => setFormData({ ...formData, remarks })}
                             minRows={2}
                         />
                     </ModalBody>
@@ -619,14 +639,14 @@ const PackagesManagePage: React.FC = () => {
                             <Input
                                 label="套餐名称"
                                 placeholder="请输入套餐名称"
-                                value={typeof (formData as any).package_name === 'string' ? (formData as any).package_name : ''}
-                                onChange={(e) => setFormData({ ...formData, package_name: e.target.value })}
+                                value={formData.package_name || ''}
+                                onValueChange={(package_name) => setFormData({ ...formData, package_name })}
                             />
                             <Select
                                 label="套餐类型"
                                 placeholder="选择套餐类型"
                                 selectedKeys={formData.category ? [formData.category] : []}
-                                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                                onSelectionChange={(keys) => setFormData({ ...formData, category: String(Array.from(keys)[0] || '') })}
                             >
                                 {categoryOptions.map((option) => (
                                     <SelectItem key={option.key}>
@@ -634,27 +654,29 @@ const PackagesManagePage: React.FC = () => {
                                     </SelectItem>
                                 ))}
                             </Select>
-                            <Input
+                            <NumberInput
                                 label="套餐价格"
-                                type="number"
                                 placeholder="请输入价格（元）"
-                                value={(formData as any).price !== undefined ? String((formData as any).price) : ''}
-                                onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
+                                value={formData.price}
+                                onValueChange={(price) => setFormData({ ...formData, price: Number.isNaN(price) ? undefined : price })}
                                 startContent={<DollarSign className="w-4 h-4" />}
+                                minValue={0}
+                                step={0.01}
                             />
-                            <Input
+                            <NumberInput
                                 label="套餐时长"
-                                type="number"
                                 placeholder="请输入时长（天）"
-                                value={(formData as any).duration !== undefined ? String((formData as any).duration) : ''}
-                                onChange={(e) => setFormData({ ...formData, duration: Number(e.target.value) })}
+                                value={formData.duration}
+                                onValueChange={(duration) => setFormData({ ...formData, duration: Number.isNaN(duration) ? undefined : duration })}
                                 startContent={<Clock className="w-4 h-4" />}
+                                minValue={1}
+                                step={1}
                             />
                             <Select
                                 label="套餐等级"
                                 placeholder="选择套餐等级"
                                 selectedKeys={formData.level ? [formData.level] : []}
-                                onChange={(e) => setFormData({ ...formData, level: e.target.value })}
+                                onSelectionChange={(keys) => setFormData({ ...formData, level: String(Array.from(keys)[0] || '') })}
                             >
                                 {levelOptions.map((option) => (
                                     <SelectItem key={option.key}>
@@ -662,27 +684,28 @@ const PackagesManagePage: React.FC = () => {
                                     </SelectItem>
                                 ))}
                             </Select>
-                            <Input
+                            <NumberInput
                                 label="优先级"
-                                type="number"
                                 placeholder="请输入优先级"
-                                value={(formData as any).priority !== undefined ? String((formData as any).priority) : ''}
-                                onChange={(e) => setFormData({ ...formData, priority: Number(e.target.value) })}
+                                value={formData.priority}
+                                onValueChange={(priority) => setFormData({ ...formData, priority: Number.isNaN(priority) ? undefined : priority })}
+                                minValue={0}
+                                step={1}
                             />
                         </div>
                         <Textarea
                             label="套餐介绍"
                             placeholder="请输入套餐介绍"
-                            value={typeof (formData as any).introduce === 'string' ? (formData as any).introduce : ''}
-                            onChange={(e) => setFormData({ ...formData, introduce: e.target.value })}
+                            value={formData.introduce || ''}
+                            onValueChange={(introduce) => setFormData({ ...formData, introduce })}
                             minRows={3}
                             className="mt-4"
                         />
                         <Textarea
                             label="备注"
                             placeholder="请输入备注信息"
-                            value={typeof (formData as any).remarks === 'string' ? (formData as any).remarks : ''}
-                            onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                            value={formData.remarks || ''}
+                            onValueChange={(remarks) => setFormData({ ...formData, remarks })}
                             minRows={2}
                         />
                     </ModalBody>
@@ -726,7 +749,7 @@ const PackagesManagePage: React.FC = () => {
                                     </div>
                                     <div>
                                         <span className="text-sm text-default-500">价格</span>
-                                        <div className="font-medium text-green-600">¥{selectedPackage.price}</div>
+                                        <div className="font-medium text-success">¥{selectedPackage.price}</div>
                                     </div>
                                     <div>
                                         <span className="text-sm text-default-500">时长</span>
@@ -762,20 +785,10 @@ const PackagesManagePage: React.FC = () => {
                                     )}
                                 </div>
                                 {selectedPackage.introduce && (
-                                    <div>
-                                        <span className="text-sm text-default-500">套餐介绍</span>
-                                        <div className="mt-1 p-3 bg-default-50 rounded-lg text-sm">
-                                            {selectedPackage.introduce}
-                                        </div>
-                                    </div>
+                                    <Alert isVisible color="primary" variant="flat" title="套餐介绍" description={selectedPackage.introduce} />
                                 )}
                                 {selectedPackage.remarks && (
-                                    <div>
-                                        <span className="text-sm text-default-500">备注</span>
-                                        <div className="mt-1 p-3 bg-default-50 rounded-lg text-sm">
-                                            {selectedPackage.remarks}
-                                        </div>
-                                    </div>
+                                    <Alert isVisible color="default" variant="flat" title="备注" description={selectedPackage.remarks} />
                                 )}
                             </div>
                         )}

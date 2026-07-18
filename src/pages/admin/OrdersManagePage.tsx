@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
+    Alert,
     Table,
     TableHeader,
     TableColumn,
@@ -54,6 +55,7 @@ const OrdersManagePage: React.FC = () => {
     // 状态管理
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(false);
+    const [searchInput, setSearchInput] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [currentPage, setCurrentPage] = useState(1);
@@ -99,8 +101,10 @@ const OrdersManagePage: React.FC = () => {
             if (response.code === 20000) {
                 setOrders(Array.isArray(response.data) ? response.data : []);
                 const totalNum = Number(response.total) || 0;
+                const nextTotalPages = Math.max(1, Math.ceil(totalNum / pageSize));
                 setTotal(totalNum);
-                setTotalPages(Math.ceil(totalNum / pageSize));
+                setTotalPages(nextTotalPages);
+                if (currentPage > nextTotalPages) setCurrentPage(nextTotalPages);
             } else {
                 // 错误捕获：显示空表格
                 setOrders([]);
@@ -108,8 +112,7 @@ const OrdersManagePage: React.FC = () => {
                 setTotalPages(1);
                 showToast(response.msg || '获取订单列表失败', 'error');
             }
-        } catch (error) {
-            console.error('获取订单列表失败:', error);
+        } catch {
             // 错误捕获：显示空表格
             setOrders([]);
             setTotal(0);
@@ -127,12 +130,18 @@ const OrdersManagePage: React.FC = () => {
 
     // 处理搜索
     const handleSearch = () => {
+        const nextQuery = searchInput.trim();
+        if (currentPage === 1 && searchQuery === nextQuery) {
+            fetchOrders();
+            return;
+        }
         setCurrentPage(1);
-        fetchOrders();
+        setSearchQuery(nextQuery);
     };
 
     // 处理重置
     const handleReset = () => {
+        setSearchInput('');
         setSearchQuery('');
         setStatusFilter('all');
         setCurrentPage(1);
@@ -158,8 +167,7 @@ const OrdersManagePage: React.FC = () => {
             } else {
                 showToast(response.msg || '更新订单失败', 'error');
             }
-        } catch (error) {
-            console.error('更新订单失败:', error);
+        } catch {
             showToast('更新订单失败', 'error');
         }
     };
@@ -178,8 +186,7 @@ const OrdersManagePage: React.FC = () => {
             } else {
                 showToast(response.msg || '删除订单失败', 'error');
             }
-        } catch (error) {
-            console.error('删除订单失败:', error);
+        } catch {
             showToast('删除订单失败', 'error');
         }
     };
@@ -274,7 +281,7 @@ const OrdersManagePage: React.FC = () => {
         <div className="space-y-6">
             {/* 页面标题 */}
             <div className="flex items-center gap-3">
-                <ShoppingCart className="w-6 h-6 text-blue-600" />
+                <ShoppingCart className="w-6 h-6 text-primary" />
                 <h1 className="text-2xl font-bold text-default-800">订单管理</h1>
             </div>
 
@@ -290,24 +297,27 @@ const OrdersManagePage: React.FC = () => {
                     <div className="flex flex-col sm:flex-row gap-4">
                         <Input
                             placeholder="搜索订单号..."
-
-                            onChange={(e) => setSearchQuery(e.target.value)}
+                            value={searchInput}
+                            onValueChange={setSearchInput}
                             startContent={<Search className="w-4 h-4 text-default-400" />}
                             className="flex-1"
-                            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                         />
-                                    <Select
-              placeholder="选择状态"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full sm:w-40"
-            >
-              {statusOptions.map((option) => (
-                <SelectItem key={option.key}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </Select>
+                        <Select
+                            placeholder="选择状态"
+                            selectedKeys={[statusFilter]}
+                            onSelectionChange={(keys) => {
+                                setStatusFilter(String(Array.from(keys)[0] || 'all'));
+                                setCurrentPage(1);
+                            }}
+                            className="w-full sm:w-40"
+                        >
+                            {statusOptions.map((option) => (
+                                <SelectItem key={option.key}>
+                                    {option.label}
+                                </SelectItem>
+                            ))}
+                        </Select>
                         <div className="flex gap-2">
                             <Button
                                 color="primary"
@@ -413,8 +423,11 @@ const OrdersManagePage: React.FC = () => {
                         <span>每页</span>
                         <Select
                             aria-label="每页数量"
-                            value={String(pageSize)}
-                            onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                            selectedKeys={[String(pageSize)]}
+                            onSelectionChange={(keys) => {
+                                setPageSize(Number(Array.from(keys)[0] || 10));
+                                setCurrentPage(1);
+                            }}
                             className="w-28"
                         >
                             <SelectItem key="10">10</SelectItem>
@@ -452,7 +465,7 @@ const OrdersManagePage: React.FC = () => {
                                 label="订单状态"
                                 placeholder="选择订单状态"
                                 selectedKeys={formData.status ? [formData.status] : []}
-                                onChange={(e) => setFormData({ ...formData, status: e.target.value as 'pending' | 'paid' | 'failed' })}
+                                onSelectionChange={(keys) => setFormData({ ...formData, status: String(Array.from(keys)[0] || 'pending') as 'pending' | 'paid' | 'failed' })}
                             >
                                 <SelectItem key="pending">待支付</SelectItem>
                                 <SelectItem key="paid">已支付</SelectItem>
@@ -461,8 +474,8 @@ const OrdersManagePage: React.FC = () => {
                             <Textarea
                                 label="备注"
                                 placeholder="请输入备注信息"
-                                value={typeof (formData as any).remarks === 'string' ? (formData as any).remarks : ''}
-                                onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                                value={formData.remarks || ''}
+                                onValueChange={(remarks) => setFormData({ ...formData, remarks })}
                                 minRows={3}
                             />
                         </div>
@@ -533,12 +546,7 @@ const OrdersManagePage: React.FC = () => {
                                     )}
                                 </div>
                                 {selectedOrder.remarks && (
-                                    <div>
-                                        <span className="text-sm text-default-500">备注</span>
-                                        <div className="mt-1 p-3 bg-default-50 rounded-lg text-sm">
-                                            {selectedOrder.remarks}
-                                        </div>
-                                    </div>
+                                    <Alert isVisible color="default" variant="flat" title="备注" description={selectedOrder.remarks} />
                                 )}
                             </div>
                         )}

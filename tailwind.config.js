@@ -11,22 +11,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // 自定义颜色
-        primary: {
-          DEFAULT: '#006fee',
-          50: '#e6f1fe',
-          100: '#cce3fd',
-          200: '#99c7fb',
-          300: '#66aaf9',
-          400: '#338ef7',
-          500: '#006fee',
-          600: '#005bc4',
-          700: '#004493',
-          800: '#002e62',
-          900: '#001731',
-          foreground: '#ffffff',
-        },
-        // 背景色
+        // Legacy marketing gradients; HeroUI owns semantic colors such as primary.
         'gray-25': '#fafafa',
         'blue-25': '#f0f9ff',
         'green-25': '#f0fdf4',

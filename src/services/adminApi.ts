@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
+import axios, { AxiosInstance } from 'axios';
 import md5 from 'md5';
 import { storage as storageConfig } from '../config';
 import {
@@ -180,12 +180,8 @@ class AdminApiService {
             username,
             password: hashedPassword,
         });
-        // 打日志
-        console.log('[AdminLogin] 登录响应:', response.data);
         if (response.data.code === 20000 && response.data.data?.admin_token) {
             this.setAdminToken(response.data.data.admin_token);
-            // 打日志
-            console.log('[AdminLogin] 登录成功，token:', response.data.data.admin_token);
         }
 
         return response.data;
@@ -309,7 +305,7 @@ class AdminApiService {
     /**
      * 批量生成CDK
      */
-    async createCDKs(data: CreateCDKRequest): Promise<AdminApiResponse<{ cdk: CDK[] }>> {
+    async createCDKs(data: CreateCDKRequest): Promise<AdminApiResponse<{ batch_id: string; count: number }>> {
         const response = await this.api.post('/star/cdk', data);
         return response.data;
     }
@@ -481,7 +477,7 @@ class AdminApiService {
     /**
      * 获取分销商列表
      */
-    async getDistributors(params: { page?: number; page_size?: number; search?: string } = {}): Promise<AdminApiResponse<any>> {
+    async getDistributors(params: { current_page?: number; page_size?: number; querystring?: string } = {}): Promise<AdminApiResponse<any>> {
         const queryString = this.buildQueryString(params);
         const response = await this.api.get(`/star/distributors?${queryString}`);
         return response.data;
@@ -546,7 +542,7 @@ class AdminApiService {
     /**
      * 分销商余额流水
      */
-    async getDistributorBalanceLog(params: { distributor_id: number; page?: number; page_size?: number }): Promise<AdminApiResponse<any>> {
+    async getDistributorBalanceLog(params: { distributor_id: number; current_page?: number; page_size?: number }): Promise<AdminApiResponse<any>> {
         const queryString = this.buildQueryString(params);
         const response = await this.api.get(`/star/distributor/balance?${queryString}`);
         return response.data;

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Card, CardBody, Input, Button, Switch, Select, SelectItem, Divider } from '@heroui/react';
+import { Alert, Button, Card, CardBody, Divider, Input, NumberInput, Select, SelectItem, Switch } from '@heroui/react';
 import { Plus, Trash2, Gift } from 'lucide-react';
 
 /**
@@ -85,26 +85,26 @@ export const CompensationConfigEditor: React.FC<Props> = ({ value, onChange, dis
 
     return (
         <div className="space-y-4">
-            {/* 总开关 */}
-            <div className="flex items-center justify-between bg-default-50 rounded-lg p-3">
-                <div>
-                    <div className="font-medium flex items-center gap-2">
-                        <Gift className="w-4 h-4 text-warning" />
-                        补偿功能总开关
-                    </div>
-                    <div className="text-sm text-default-500">关闭后所有补偿活动均不展示、不可领取</div>
-                </div>
-                <Switch
-                    isSelected={config.enabled}
-                    onValueChange={(v) => updateConfig({ enabled: v })}
-                    isDisabled={disabled}
-                    color="success"
-                />
-            </div>
+            <Alert
+                isVisible
+                color={config.enabled ? 'success' : 'default'}
+                startContent={<Gift className="h-5 w-5" />}
+                title="补偿功能总开关"
+                description="关闭后所有补偿活动均不展示、不可领取。"
+                endContent={(
+                    <Switch
+                        aria-label="启用补偿功能"
+                        isSelected={config.enabled}
+                        onValueChange={(value) => updateConfig({ enabled: value })}
+                        isDisabled={disabled}
+                        color="success"
+                    />
+                )}
+            />
 
             {/* 活动列表 */}
             {config.campaigns.map((c, index) => (
-                <Card key={index} className="border border-default-200">
+                <Card key={c.id || index} shadow="sm">
                     <CardBody className="space-y-3">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -123,6 +123,7 @@ export const CompensationConfigEditor: React.FC<Props> = ({ value, onChange, dis
                                 isIconOnly
                                 onPress={() => removeCampaign(index)}
                                 isDisabled={disabled}
+                                aria-label={`删除补偿活动 ${c.title || index + 1}`}
                             >
                                 <Trash2 className="w-4 h-4" />
                             </Button>
@@ -133,7 +134,7 @@ export const CompensationConfigEditor: React.FC<Props> = ({ value, onChange, dis
                                 label="活动标题/品相"
                                 placeholder="如 20260628维护补偿"
                                 value={c.title}
-                                onChange={(e) => updateCampaign(index, { title: e.target.value })}
+                                onValueChange={(title) => updateCampaign(index, { title })}
                                 isDisabled={disabled}
                                 variant="bordered"
                                 size="sm"
@@ -142,34 +143,34 @@ export const CompensationConfigEditor: React.FC<Props> = ({ value, onChange, dis
                                 label="活动ID（唯一）"
                                 placeholder="如 comp_20260628"
                                 value={c.id}
-                                onChange={(e) => updateCampaign(index, { id: e.target.value })}
+                                onValueChange={(id) => updateCampaign(index, { id })}
                                 isDisabled={disabled}
                                 variant="bordered"
                                 size="sm"
                                 description="修改ID会重置已领取去重，谨慎"
                             />
-                            <Input
+                            <NumberInput
                                 label="补偿天数"
-                                type="number"
-                                value={String(c.days ?? '')}
-                                onChange={(e) => updateCampaign(index, { days: Number(e.target.value) })}
+                                value={c.days}
+                                onValueChange={(days) => updateCampaign(index, { days })}
+                                minValue={1}
+                                step={1}
                                 isDisabled={disabled}
-                                variant="bordered"
                                 size="sm"
                             />
-                            <Input
+                            <NumberInput
                                 label="每人限领次数"
-                                type="number"
-                                value={String(c.limit_per_user ?? 1)}
-                                onChange={(e) => updateCampaign(index, { limit_per_user: Number(e.target.value) })}
+                                value={c.limit_per_user}
+                                onValueChange={(limit_per_user) => updateCampaign(index, { limit_per_user })}
+                                minValue={1}
+                                step={1}
                                 isDisabled={disabled}
-                                variant="bordered"
                                 size="sm"
                             />
                             <Select
                                 label="补偿等级模式"
                                 selectedKeys={[c.level_mode || 'fixed']}
-                                onChange={(e) => updateCampaign(index, { level_mode: e.target.value as 'fixed' | 'follow' })}
+                                onSelectionChange={(keys) => updateCampaign(index, { level_mode: String(Array.from(keys)[0] || 'fixed') as 'fixed' | 'follow' })}
                                 isDisabled={disabled}
                                 variant="bordered"
                                 size="sm"
@@ -182,8 +183,8 @@ export const CompensationConfigEditor: React.FC<Props> = ({ value, onChange, dis
                                     label="固定补偿等级"
                                     placeholder="选择等级"
                                     selectedKeys={c.fixed_level ? [`${c.fixed_level}|${c.category}`] : []}
-                                    onChange={(e) => {
-                                        const [level, category] = e.target.value.split('|');
+                                    onSelectionChange={(keys) => {
+                                        const [level, category] = String(Array.from(keys)[0] || '').split('|');
                                         updateCampaign(index, { fixed_level: level || '', category: category || 'GPT' });
                                     }}
                                     isDisabled={disabled}
@@ -201,7 +202,7 @@ export const CompensationConfigEditor: React.FC<Props> = ({ value, onChange, dis
                                     label="套餐类别"
                                     placeholder="GPT"
                                     value={c.category}
-                                    onChange={(e) => updateCampaign(index, { category: e.target.value })}
+                                    onValueChange={(category) => updateCampaign(index, { category })}
                                     isDisabled={disabled}
                                     variant="bordered"
                                     size="sm"
@@ -211,7 +212,7 @@ export const CompensationConfigEditor: React.FC<Props> = ({ value, onChange, dis
                                 label="须在此时间前开通会员"
                                 placeholder="2026-06-28 00:00:00（空=不限）"
                                 value={c.require_active_before}
-                                onChange={(e) => updateCampaign(index, { require_active_before: e.target.value })}
+                                onValueChange={(require_active_before) => updateCampaign(index, { require_active_before })}
                                 isDisabled={disabled}
                                 variant="bordered"
                                 size="sm"
@@ -220,7 +221,7 @@ export const CompensationConfigEditor: React.FC<Props> = ({ value, onChange, dis
                                 label="活动过期时间"
                                 placeholder="2026-07-05 23:59:59（空=不过期）"
                                 value={c.expires_at}
-                                onChange={(e) => updateCampaign(index, { expires_at: e.target.value })}
+                                onValueChange={(expires_at) => updateCampaign(index, { expires_at })}
                                 isDisabled={disabled}
                                 variant="bordered"
                                 size="sm"

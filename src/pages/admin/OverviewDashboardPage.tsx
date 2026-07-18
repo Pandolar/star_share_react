@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, CardBody, CardHeader, Chip, Spinner } from '@heroui/react';
+import { Avatar, Card, CardBody, CardHeader, Chip, Progress, Spinner } from '@heroui/react';
 import { BarChart3, Users, ShoppingCart, DollarSign, Activity, Package, Gift } from 'lucide-react';
 import dayjs from 'dayjs';
 import adminApiService from '../../services/adminApi';
@@ -45,8 +45,8 @@ const LineChart: React.FC<{ data: Point[]; height?: number; color?: string; xLab
   );
 };
 
-const HBarList: React.FC<{ data: Array<{ name: string; value: number }>; color?: string }>
-  = ({ data, color = '#22c55e' }) => {
+const HBarList: React.FC<{ data: Array<{ name: string; value: number }>; color?: 'primary' | 'secondary' | 'success' | 'warning' | 'danger' }>
+  = ({ data, color = 'success' }) => {
   const max = Math.max(1, ...data.map(d => d.value));
   return (
     <div className="space-y-2">
@@ -56,9 +56,7 @@ const HBarList: React.FC<{ data: Array<{ name: string; value: number }>; color?:
             <span className="truncate mr-2" title={d.name}>{d.name}</span>
             <span>{d.value}</span>
           </div>
-          <div className="h-2 bg-default-100 rounded">
-            <div className="h-2 rounded" style={{ width: `${(d.value / max) * 100}%`, backgroundColor: color }} />
-          </div>
+          <Progress aria-label={`${d.name}占比`} value={(d.value / max) * 100} color={color} size="sm" />
         </div>
       ))}
     </div>
@@ -67,12 +65,10 @@ const HBarList: React.FC<{ data: Array<{ name: string; value: number }>; color?:
 
 const KPICard: React.FC<{ icon: React.ReactNode; label: string; value: string; sub?: string }>
   = ({ icon, label, value, sub }) => (
-  <Card className="card-hover">
+  <Card shadow="sm">
     <CardBody>
       <div className="flex items-center gap-3">
-        <div className="p-2 rounded-md bg-primary-50 text-primary">
-          {icon}
-        </div>
+        <Avatar color="primary" icon={icon} size="sm" />
         <div>
           <div className="text-sm text-default-500">{label}</div>
           <div className="text-xl font-semibold">{value}</div>
@@ -128,7 +124,7 @@ const OverviewDashboardPage: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <BarChart3 className="w-6 h-6 text-blue-600" />
+          <BarChart3 className="w-6 h-6 text-primary" />
           <h1 className="text-2xl font-bold text-default-800">系统总览</h1>
         </div>
         {data?.meta?.generated_at && (
@@ -173,7 +169,7 @@ const OverviewDashboardPage: React.FC = () => {
             <div className="flex items-center gap-2"><Package className="w-4 h-4" /><span className="font-medium">热销套餐（按销量）</span></div>
           </CardHeader>
           <CardBody>
-            {topSales.length === 0 ? <div className="text-sm text-default-500">暂无数据</div> : <HBarList data={topSales} color="#6366f1" />}
+            {topSales.length === 0 ? <div className="text-sm text-default-500">暂无数据</div> : <HBarList data={topSales} color="secondary" />}
           </CardBody>
         </Card>
         <Card>
@@ -181,7 +177,7 @@ const OverviewDashboardPage: React.FC = () => {
             <div className="flex items-center gap-2"><DollarSign className="w-4 h-4" /><span className="font-medium">热销套餐（按收入）</span></div>
           </CardHeader>
           <CardBody>
-            {topRevenue.length === 0 ? <div className="text-sm text-default-500">暂无数据</div> : <HBarList data={topRevenue} color="#10b981" />}
+            {topRevenue.length === 0 ? <div className="text-sm text-default-500">暂无数据</div> : <HBarList data={topRevenue} color="success" />}
           </CardBody>
         </Card>
       </div>
@@ -194,18 +190,9 @@ const OverviewDashboardPage: React.FC = () => {
           </CardHeader>
           <CardBody>
             <div className="grid grid-cols-3 gap-2">
-              <div className="p-3 rounded bg-success-50 text-success">
-                <div className="text-xs">有效</div>
-                <div className="text-lg font-semibold">{data?.packages?.active_count ?? 0}</div>
-              </div>
-              <div className="p-3 rounded bg-warning-50 text-warning">
-                <div className="text-xs">冻结</div>
-                <div className="text-lg font-semibold">{data?.packages?.frozen_count ?? 0}</div>
-              </div>
-              <div className="p-3 rounded bg-danger-50 text-danger">
-                <div className="text-xs">过期</div>
-                <div className="text-lg font-semibold">{data?.packages?.expired_count ?? 0}</div>
-              </div>
+              <Chip className="w-full justify-center" color="success" variant="flat">有效 {data?.packages?.active_count ?? 0}</Chip>
+              <Chip className="w-full justify-center" color="warning" variant="flat">冻结 {data?.packages?.frozen_count ?? 0}</Chip>
+              <Chip className="w-full justify-center" color="danger" variant="flat">过期 {data?.packages?.expired_count ?? 0}</Chip>
             </div>
             <div className="mt-4 text-sm text-default-600">近似获取来源（共 {waysTotal}）</div>
             <div className="mt-2 space-y-2">
@@ -216,7 +203,7 @@ const OverviewDashboardPage: React.FC = () => {
                 return (
                   <div key={k} className="space-y-1">
                     <div className="flex justify-between text-xs text-default-600"><span>{map[k]}</span><span>{v}（{p}%）</span></div>
-                    <div className="h-2 bg-default-100 rounded"><div className="h-2 bg-blue-500 rounded" style={{ width: `${p}%` }} /></div>
+                    <Progress aria-label={`${map[k]}占比`} value={p} color="primary" size="sm" />
                   </div>
                 );
               })}
@@ -229,22 +216,10 @@ const OverviewDashboardPage: React.FC = () => {
           </CardHeader>
           <CardBody>
             <div className="grid grid-cols-2 gap-2">
-              <div className="p-3 rounded bg-primary-50 text-primary">
-                <div className="text-xs">未使用</div>
-                <div className="text-lg font-semibold">{data?.cdk?.unused ?? 0}</div>
-              </div>
-              <div className="p-3 rounded bg-success-50 text-success">
-                <div className="text-xs">已使用</div>
-                <div className="text-lg font-semibold">{data?.cdk?.used ?? 0}</div>
-              </div>
-              <div className="p-3 rounded bg-danger-50 text-danger">
-                <div className="text-xs">已停用</div>
-                <div className="text-lg font-semibold">{data?.cdk?.disabled ?? 0}</div>
-              </div>
-              <div className="p-3 rounded bg-default-100 text-default-600">
-                <div className="text-xs">今日使用 / 7天</div>
-                <div className="text-lg font-semibold">{data?.cdk?.used_today ?? 0} / {data?.cdk?.used_7d ?? 0}</div>
-              </div>
+              <Chip className="w-full justify-center" color="primary" variant="flat">未使用 {data?.cdk?.unused ?? 0}</Chip>
+              <Chip className="w-full justify-center" color="success" variant="flat">已使用 {data?.cdk?.used ?? 0}</Chip>
+              <Chip className="w-full justify-center" color="danger" variant="flat">已停用 {data?.cdk?.disabled ?? 0}</Chip>
+              <Chip className="w-full justify-center" color="default" variant="flat">今日 / 7天 {data?.cdk?.used_today ?? 0} / {data?.cdk?.used_7d ?? 0}</Chip>
             </div>
           </CardBody>
         </Card>

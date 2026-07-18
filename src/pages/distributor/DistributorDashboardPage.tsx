@@ -1,177 +1,371 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardBody, CardHeader, Input, Textarea, Button, Chip, Divider, Select, SelectItem } from '@heroui/react';
-import { Settings, Link as LinkIcon, Bell, Lock, LogOut, Save, Globe, ExternalLink, Ticket } from 'lucide-react';
-import distributorApiService, { DistributorInfo, DistributorPackage } from '../../services/distributorApi';
-import { showToast } from '../../components/Toast';
+import {
+    Accordion,
+    AccordionItem,
+    Alert,
+    Avatar,
+    Button,
+    Card,
+    CardBody,
+    CardFooter,
+    CardHeader,
+    Chip,
+    Divider,
+    Dropdown,
+    DropdownItem,
+    DropdownMenu,
+    DropdownTrigger,
+    Form,
+    Input,
+    Listbox,
+    ListboxItem,
+    Modal,
+    ModalBody,
+    ModalContent,
+    ModalFooter,
+    ModalHeader,
+    Navbar,
+    NavbarBrand,
+    NavbarContent,
+    NavbarItem,
+    NumberInput,
+    Pagination,
+    Progress,
+    Select,
+    SelectItem,
+    Snippet,
+    Spinner,
+    Tab,
+    Table,
+    TableBody,
+    TableCell,
+    TableColumn,
+    TableHeader,
+    TableRow,
+    Tabs,
+    Textarea,
+    useDisclosure,
+    User,
+} from '@heroui/react';
+import {
+    Bell,
+    ChevronDown,
+    CircleHelp,
+    Copy,
+    ExternalLink,
+    Globe,
+    KeyRound,
+    Link as LinkIcon,
+    Lock,
+    LogOut,
+    RefreshCw,
+    Save,
+    Search,
+    Settings,
+    ShieldCheck,
+    Ticket,
+    Wallet,
+} from 'lucide-react';
 import dayjs from 'dayjs';
+import distributorApiService, {
+    BalanceLog,
+    DistributorCdk,
+    DistributorCdkStats,
+    DistributorInfo,
+    DistributorPackage,
+} from '../../services/distributorApi';
+import { showToast } from '../../components/Toast';
+
+type CdkStatusFilter = 'all' | 'unused' | 'used' | 'disabled';
+
+const CDK_PAGE_SIZE = 10;
+const EMPTY_STATS: DistributorCdkStats = { total: 0, used: 0, unused: 0, expired: 0 };
+
+const isExpired = (cdk: DistributorCdk) => (
+    cdk.status === 'unused'
+    && Boolean(cdk.expires_at)
+    && dayjs(cdk.expires_at).isBefore(dayjs())
+);
+
+const normalizeDomains = (domains: DistributorInfo['domains'] | undefined): string[] => {
+    if (Array.isArray(domains)) return domains.map(String).filter(Boolean);
+    if (!domains) return [];
+    try {
+        const parsed = JSON.parse(domains);
+        if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean);
+    } catch {
+        // Historical cache values may be comma separated.
+    }
+    return domains.split(',').map((item) => item.trim()).filter(Boolean);
+};
+
+const isValidHttpUrl = (value: string) => {
+    if (!value) return true;
+    try {
+        const url = new URL(value);
+        return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+        return false;
+    }
+};
+
+const formatDateTime = (value?: string | null) => (
+    value && dayjs(value).isValid() ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'
+);
 
 const DistributorDashboardPage: React.FC = () => {
     const navigate = useNavigate();
     const [distributor, setDistributor] = useState<DistributorInfo | null>(null);
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
+    const [pageError, setPageError] = useState('');
+    const [activeTab, setActiveTab] = useState('cdk');
 
-    // 配置表单
     const [notice, setNotice] = useState('');
     const [purchaseUrl, setPurchaseUrl] = useState('');
     const [customerServiceUrl, setCustomerServiceUrl] = useState('');
+    const [savingSettings, setSavingSettings] = useState(false);
 
-    // 修改密码表单
     const [oldPassword, setOldPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [changingPassword, setChangingPassword] = useState(false);
 
-    // 余额 / 生成卡密
-    const [balance, setBalance] = useState<number>(0);
-    const [balanceLogs, setBalanceLogs] = useState<any[]>([]);
+    const [balance, setBalance] = useState(0);
+    const [balanceLogs, setBalanceLogs] = useState<BalanceLog[]>([]);
     const [packages, setPackages] = useState<DistributorPackage[]>([]);
-    const [genPackageId, setGenPackageId] = useState<string>('');
-    const [genCount, setGenCount] = useState<string>('1');
-    const [genExpireDays, setGenExpireDays] = useState<string>('');
+    const [stats, setStats] = useState<DistributorCdkStats>(EMPTY_STATS);
+    const [genPackageId, setGenPackageId] = useState('');
+    const [genCount, setGenCount] = useState(1);
+    const [genExpireDays, setGenExpireDays] = useState<number | undefined>(undefined);
+    const [genRemarks, setGenRemarks] = useState('');
     const [generating, setGenerating] = useState(false);
+    const [lastBatchId, setLastBatchId] = useState('');
+
+    const [cdks, setCdks] = useState<DistributorCdk[]>([]);
+    const [cdkLoading, setCdkLoading] = useState(false);
+    const [cdkSearchInput, setCdkSearchInput] = useState('');
+    const [cdkSearch, setCdkSearch] = useState('');
+    const [cdkStatus, setCdkStatus] = useState<CdkStatusFilter>('all');
+    const [cdkPage, setCdkPage] = useState(1);
+    const [cdkTotal, setCdkTotal] = useState(0);
+
+    const generateModal = useDisclosure();
+    const logoutModal = useDisclosure();
 
     const permissions = distributor?.permissions;
-    const canGenerate = permissions?.can_generate_cdk ?? true;
-    const canEditNotice = permissions?.can_edit_notice ?? true;
-    const canEditLinks = permissions?.can_edit_links ?? true;
+    const canLogin = permissions?.can_login === true;
+    const canGenerate = permissions?.can_generate_cdk === true;
+    const canEditNotice = permissions?.can_edit_notice === true;
+    const canEditLinks = permissions?.can_edit_links === true;
+    const domains = useMemo(() => normalizeDomains(distributor?.domains), [distributor?.domains]);
+    const selectedPackage = packages.find((item) => String(item.package_id) === genPackageId);
+    const estimatedCost = Number(((selectedPackage?.unit_price || 0) * (genCount || 0)).toFixed(2));
+    const deliverableUnused = Math.max(stats.unused - stats.expired, 0);
+    const disabledCdks = Math.max(stats.total - stats.used - stats.unused, 0);
+    const cdkTotalPages = Math.max(1, Math.ceil(cdkTotal / CDK_PAGE_SIZE));
+    const balanceCoverage = estimatedCost > 0
+        ? Math.min(100, Math.round((balance / estimatedCost) * 100))
+        : 100;
 
-    const selectedPackage = packages.find((p) => String(p.package_id) === genPackageId);
-    const estimatedCost = selectedPackage ? (selectedPackage.unit_price * (Number(genCount) || 0)) : 0;
+    const fetchSettings = useCallback(async () => {
+        const response = await distributorApiService.getSettings();
+        if (response.code !== 20000 || !response.data) {
+            throw new Error(response.msg || '获取账号配置失败');
+        }
+        const info = response.data;
+        setDistributor(info);
+        setNotice(info.notice || '');
+        setPurchaseUrl(info.purchase_url || '');
+        setCustomerServiceUrl(info.customer_service_url || '');
+        setBalance(Number(info.balance || 0));
+        localStorage.setItem('distributor', JSON.stringify(info));
+    }, []);
+
+    const fetchBalance = useCallback(async () => {
+        const response = await distributorApiService.getMyBalance({ current_page: 1, page_size: 20 });
+        if (response.code === 20000 && response.data) {
+            setBalance(Number(response.data.balance || 0));
+            setBalanceLogs(response.data.logs || []);
+        }
+    }, []);
+
+    const fetchPackages = useCallback(async () => {
+        const response = await distributorApiService.getPackages();
+        if (response.code === 20000 && Array.isArray(response.data)) {
+            setPackages(response.data);
+            setGenPackageId((current) => current || String(response.data?.[0]?.package_id || ''));
+        }
+    }, []);
+
+    const fetchStats = useCallback(async () => {
+        const response = await distributorApiService.getCdkStats();
+        if (response.code === 20000 && response.data) setStats(response.data);
+    }, []);
+
+    const loadCdks = useCallback(async (page: number, search: string, status: CdkStatusFilter) => {
+        setCdkLoading(true);
+        try {
+            const response = await distributorApiService.getCdks({
+                current_page: page,
+                page_size: CDK_PAGE_SIZE,
+                querystring: search || undefined,
+                status: status === 'all' ? undefined : status,
+                order_column: 'id',
+                order: 'desc',
+            });
+            if (response.code === 20000) {
+                const totalNum = Number(response.total) || 0;
+                const nextTotalPages = Math.max(1, Math.ceil(totalNum / CDK_PAGE_SIZE));
+                setCdks(Array.isArray(response.data) ? response.data : []);
+                setCdkTotal(totalNum);
+                if (page > nextTotalPages) setCdkPage(nextTotalPages);
+            } else {
+                setCdks([]);
+                setCdkTotal(0);
+                showToast(response.msg || '获取卡密失败', 'error');
+            }
+        } catch (error: any) {
+            setCdks([]);
+            setCdkTotal(0);
+            showToast(error.response?.data?.msg || '获取卡密失败', 'error');
+        } finally {
+            setCdkLoading(false);
+        }
+    }, []);
+
+    const fetchCdks = useCallback(
+        () => loadCdks(cdkPage, cdkSearch, cdkStatus),
+        [cdkPage, cdkSearch, cdkStatus, loadCdks],
+    );
+
+    const loadDashboard = useCallback(async () => {
+        setLoading(true);
+        setPageError('');
+        try {
+            await fetchSettings();
+            await Promise.allSettled([fetchBalance(), fetchPackages(), fetchStats()]);
+        } catch (error: any) {
+            setPageError(error.message || '控制台加载失败，请稍后重试');
+        } finally {
+            setLoading(false);
+        }
+    }, [fetchBalance, fetchPackages, fetchSettings, fetchStats]);
 
     useEffect(() => {
-        // 检查登录状态
         if (!distributorApiService.isLoggedIn()) {
-            navigate('/distributor/login');
+            navigate('/distributor/login', { replace: true });
             return;
         }
+        loadDashboard();
+    }, [loadDashboard, navigate]);
 
-        fetchSettings();
-        fetchBalance();
-        fetchPackages();
-    }, [navigate]);
+    useEffect(() => {
+        if (!loading && distributor) fetchCdks();
+    }, [distributor, fetchCdks, loading]);
 
-    const fetchBalance = async () => {
-        try {
-            const res = await distributorApiService.getMyBalance({ current_page: 1, page_size: 20 });
-            if (res.code === 20000 && res.data) {
-                setBalance(res.data.balance);
-                setBalanceLogs(res.data.logs || []);
-            }
-        } catch (e) { /* 忽略 */ }
-    };
-
-    const fetchPackages = async () => {
-        try {
-            const res = await distributorApiService.getPackages();
-            if (res.code === 20000 && res.data) {
-                setPackages(res.data);
-                if (res.data.length > 0) setGenPackageId(String(res.data[0].package_id));
-            }
-        } catch (e) { /* 忽略 */ }
-    };
-
-    const handleGenerateCdk = async () => {
-        if (!genPackageId) {
+    const openGenerateConfirmation = () => {
+        if (!canGenerate) {
+            showToast('当前账号未开通生成卡密权限', 'warning');
+            return;
+        }
+        if (!selectedPackage) {
             showToast('请选择套餐', 'warning');
             return;
         }
-        const count = Number(genCount);
-        if (!count || count < 1) {
-            showToast('请输入生成数量', 'warning');
+        if (!Number.isInteger(genCount) || genCount < 1 || genCount > 10000) {
+            showToast('单次生成数量需为 1-10000 的整数', 'warning');
+            return;
+        }
+        if (genExpireDays !== undefined && (!Number.isInteger(genExpireDays) || genExpireDays < 0)) {
+            showToast('过期天数必须是大于等于 0 的整数', 'warning');
             return;
         }
         if (estimatedCost > balance) {
-            showToast('余额不足，无法生成', 'error');
+            showToast('余额不足，请联系管理员充值', 'error');
             return;
         }
+        generateModal.onOpen();
+    };
+
+    const handleGenerateCdk = async () => {
+        if (!selectedPackage) return;
         setGenerating(true);
         try {
-            const res = await distributorApiService.generateCdk({
-                package_id: Number(genPackageId),
-                number: count,
-                expires_days: genExpireDays === '' ? null : Number(genExpireDays),
+            const response = await distributorApiService.generateCdk({
+                package_id: selectedPackage.package_id,
+                number: genCount,
+                expires_days: genExpireDays ?? null,
+                remarks: genRemarks.trim() || undefined,
             });
-            if (res.code === 20000 && res.data) {
-                showToast(`成功生成 ${res.data.count} 个CDK，扣款 ¥${res.data.total_cost}`, 'success');
-                setBalance(res.data.balance_after);
-                fetchBalance();
+            if (response.code === 20000 && response.data) {
+                setLastBatchId(response.data.batch_id);
+                setBalance(response.data.balance_after);
+                setCdkPage(1);
+                setCdkSearch('');
+                setCdkSearchInput('');
+                setCdkStatus('all');
+                setGenRemarks('');
+                generateModal.onClose();
+                showToast(`已生成 ${response.data.count} 个卡密，扣款 ¥${response.data.total_cost.toFixed(2)}`, 'success');
+                await Promise.allSettled([
+                    fetchBalance(),
+                    fetchStats(),
+                    loadCdks(1, '', 'all'),
+                ]);
             } else {
-                showToast(res.msg || '生成失败', 'error');
+                showToast(response.msg || '生成失败', 'error');
             }
-        } catch (e: any) {
-            showToast(e.response?.data?.msg || e.message || '生成失败', 'error');
+        } catch (error: any) {
+            showToast(error.response?.data?.msg || error.message || '生成失败', 'error');
         } finally {
             setGenerating(false);
         }
     };
 
-    const fetchSettings = async () => {
-        setLoading(true);
-        try {
-            const response = await distributorApiService.getSettings();
-            if (response.code === 20000 && response.data) {
-                setDistributor(response.data);
-                setNotice(response.data.notice || '');
-                setPurchaseUrl(response.data.purchase_url || '');
-                setCustomerServiceUrl(response.data.customer_service_url || '');
-                if (typeof response.data.balance === 'number') setBalance(response.data.balance);
-                // 更新本地存储
-                localStorage.setItem('distributor', JSON.stringify(response.data));
-            } else {
-                showToast(response.msg || '获取配置失败', 'error');
-            }
-        } catch (error: any) {
-            console.error('获取配置失败:', error);
-            showToast('获取配置失败', 'error');
-        } finally {
-            setLoading(false);
+    const handleSaveSettings = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (canEditLinks && (!isValidHttpUrl(purchaseUrl.trim()) || !isValidHttpUrl(customerServiceUrl.trim()))) {
+            showToast('购买链接和客服链接必须是完整的 http(s) 地址', 'warning');
+            return;
         }
-    };
+        const payload: { notice?: string; purchase_url?: string; customer_service_url?: string } = {};
+        if (canEditNotice) payload.notice = notice.trim();
+        if (canEditLinks) {
+            payload.purchase_url = purchaseUrl.trim();
+            payload.customer_service_url = customerServiceUrl.trim();
+        }
+        if (Object.keys(payload).length === 0) {
+            showToast('当前账号没有可修改的站点配置', 'warning');
+            return;
+        }
 
-    const handleSaveSettings = async () => {
-        setSaving(true);
+        setSavingSettings(true);
         try {
-            // 仅提交有权限的字段，避免后端权限校验拦截整次保存
-            const payload: any = {};
-            if (canEditNotice) payload.notice = notice.trim();
-            if (canEditLinks) {
-                payload.purchase_url = purchaseUrl.trim();
-                payload.customer_service_url = customerServiceUrl.trim();
-            }
-            if (Object.keys(payload).length === 0) {
-                showToast('当前账号无可修改的配置项', 'warning');
-                setSaving(false);
-                return;
-            }
             const response = await distributorApiService.updateSettings(payload);
-
             if (response.code === 20000) {
-                showToast('保存成功', 'success');
-                fetchSettings(); // 重新加载
+                showToast('白牌站点配置已保存', 'success');
+                await fetchSettings();
             } else {
                 showToast(response.msg || '保存失败', 'error');
             }
         } catch (error: any) {
-            console.error('保存失败:', error);
             showToast(error.response?.data?.msg || '保存失败', 'error');
         } finally {
-            setSaving(false);
+            setSavingSettings(false);
         }
     };
 
-    const handleChangePassword = async () => {
+    const handleChangePassword = async (event: React.FormEvent) => {
+        event.preventDefault();
         if (!oldPassword || !newPassword || !confirmPassword) {
             showToast('请填写完整的密码信息', 'warning');
             return;
         }
-
         if (newPassword.length < 8) {
-            showToast('新密码至少8位', 'warning');
+            showToast('新密码至少 8 位', 'warning');
             return;
         }
-
         if (newPassword !== confirmPassword) {
             showToast('两次输入的新密码不一致', 'warning');
             return;
@@ -183,366 +377,540 @@ const DistributorDashboardPage: React.FC = () => {
                 old_password: oldPassword,
                 new_password: newPassword,
             });
-
             if (response.code === 20000) {
-                showToast('密码修改成功，请重新登录', 'success');
-                setTimeout(() => {
-                    distributorApiService.logout();
-                }, 1500);
+                showToast('密码已修改，请重新登录', 'success');
+                distributorApiService.logout();
             } else {
                 showToast(response.msg || '密码修改失败', 'error');
             }
         } catch (error: any) {
-            console.error('密码修改失败:', error);
             showToast(error.response?.data?.msg || '密码修改失败', 'error');
         } finally {
             setChangingPassword(false);
         }
     };
 
-    const handleLogout = () => {
-        if (window.confirm('确定要退出登录吗？')) {
-            distributorApiService.logout();
+    const copyText = async (value: string, successMessage = '已复制') => {
+        try {
+            await navigator.clipboard.writeText(value);
+            showToast(successMessage, 'success');
+        } catch {
+            showToast('复制失败，请手动复制', 'error');
         }
+    };
+
+    const copyVisibleCdks = () => {
+        const values = cdks.filter((item) => item.status === 'unused' && !isExpired(item)).map((item) => item.cdk);
+        if (values.length === 0) {
+            showToast('当前页没有可交付的未使用卡密', 'warning');
+            return;
+        }
+        copyText(values.join('\n'), `已复制当前页 ${values.length} 个可用卡密`);
+    };
+
+    const applyCdkFilters = () => {
+        const nextSearch = cdkSearchInput.trim();
+        if (cdkPage === 1 && cdkSearch === nextSearch) {
+            loadCdks(1, nextSearch, cdkStatus);
+            return;
+        }
+        setCdkPage(1);
+        setCdkSearch(nextSearch);
+    };
+
+    const resetCdkFilters = () => {
+        setCdkSearchInput('');
+        setCdkSearch('');
+        setCdkStatus('all');
+        setCdkPage(1);
+    };
+
+    const renderCdkStatus = (cdk: DistributorCdk) => {
+        if (isExpired(cdk)) return <Chip color="warning" variant="flat" size="sm">已过期</Chip>;
+        const config = {
+            unused: { color: 'success' as const, label: '未使用' },
+            used: { color: 'default' as const, label: '已使用' },
+            disabled: { color: 'danger' as const, label: '已停用' },
+        }[cdk.status];
+        return <Chip color={config?.color || 'default'} variant="flat" size="sm">{config?.label || cdk.status}</Chip>;
     };
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-default-50 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                    <p className="text-default-600">加载中...</p>
-                </div>
-            </div>
+            <main className="flex min-h-screen items-center justify-center bg-default-50">
+                <Spinner size="lg" label="正在加载分销商控制台..." />
+            </main>
         );
     }
 
-    // 域名兼容：后端 /settings 返回的是数组，历史/本地缓存可能是逗号字符串
-    const domains: string[] = Array.isArray(distributor?.domains)
-        ? (distributor!.domains as unknown as string[])
-        : (typeof distributor?.domains === 'string' && distributor.domains
-            ? distributor.domains.split(',').map((d) => d.trim()).filter(Boolean)
-            : []);
+    if (pageError || !distributor) {
+        return (
+            <main className="flex min-h-screen items-center justify-center bg-default-50 p-4">
+                <Alert
+                    isVisible
+                    color="danger"
+                    title="控制台加载失败"
+                    description={pageError || '未获取到分销商信息'}
+                    endContent={<Button color="danger" variant="flat" onPress={loadDashboard}>重新加载</Button>}
+                    className="max-w-xl"
+                />
+            </main>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-default-50">
-            {/* 顶部导航栏 */}
-            <div className="bg-white border-b border-default-200 shadow-sm">
-                <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-500 rounded-lg">
-                                <Settings className="w-6 h-6 text-white" />
-                            </div>
-                            <div>
-                                <h1 className="text-xl font-bold text-default-800">分销商控制面板</h1>
-                                <p className="text-sm text-default-500">
-                                    欢迎，{distributor?.username}
-                                </p>
-                            </div>
+            <Navbar isBordered maxWidth="xl">
+                <NavbarBrand className="gap-2">
+                    <Avatar color="primary" icon={<Settings className="h-5 w-5" />} size="sm" />
+                    <div>
+                        <p className="font-semibold text-foreground">分销商控制台</p>
+                        <p className="text-xs text-default-500">白牌站点与卡密业务</p>
+                    </div>
+                </NavbarBrand>
+                <NavbarContent justify="end">
+                    <NavbarItem className="hidden sm:flex">
+                        <User
+                            name={distributor.username}
+                            description={`等级 L${distributor.level ?? 1}`}
+                            avatarProps={{ fallback: distributor.username.slice(0, 1).toUpperCase() }}
+                        />
+                    </NavbarItem>
+                    <NavbarItem>
+                        <Dropdown placement="bottom-end">
+                            <DropdownTrigger>
+                                <Button variant="flat" endContent={<ChevronDown className="h-4 w-4" />}>
+                                    账号
+                                </Button>
+                            </DropdownTrigger>
+                            <DropdownMenu aria-label="账号操作">
+                                <DropdownItem key="security" startContent={<KeyRound className="h-4 w-4" />} onPress={() => setActiveTab('security')}>
+                                    修改密码
+                                </DropdownItem>
+                                <DropdownItem key="logout" color="danger" startContent={<LogOut className="h-4 w-4" />} onPress={logoutModal.onOpen}>
+                                    退出登录
+                                </DropdownItem>
+                            </DropdownMenu>
+                        </Dropdown>
+                    </NavbarItem>
+                </NavbarContent>
+            </Navbar>
+
+            <main className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+                <section className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h1 className="text-2xl font-semibold text-foreground">你好，{distributor.username}</h1>
+                        <p className="mt-1 text-sm text-default-500">先确认域名和权限，再生成卡密并交付给客户。</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        <Chip color={distributor.status === 1 ? 'success' : 'danger'} variant="flat">
+                            账号{distributor.status === 1 ? '已启用' : '已停用'}
+                        </Chip>
+                        <Chip color="secondary" variant="flat">等级 L{distributor.level ?? 1}</Chip>
+                        <Chip color="success" variant="flat">余额 ¥{balance.toFixed(2)}</Chip>
+                    </div>
+                </section>
+
+                <Accordion variant="splitted" defaultExpandedKeys={['quick-start']}>
+                    <AccordionItem
+                        key="quick-start"
+                        aria-label="基础用法"
+                        startContent={<CircleHelp className="h-5 w-5 text-primary" />}
+                        title="基础用法：从开通到交付"
+                        subtitle="建议首次使用完整走一遍以下流程"
+                    >
+                        <div className="grid gap-4 pb-3 md:grid-cols-2">
+                            <Alert isVisible color="primary" variant="flat" title="1. 确认站点归属" description="绑定域名后，该域名及其子域访问时才会读取你的公告、购买链接和客服链接。没有绑定域名时仍可做卡密业务，但没有专属白牌站点映射。" />
+                            <Alert isVisible color="secondary" variant="flat" title="2. 确认余额与价格" description="管理员充值余额并配置折扣。生成区显示的是当前账号最终折后单价；费用在生成成功时一次性扣除。" />
+                            <Alert isVisible color="success" variant="flat" title="3. 生成并交付卡密" description="选择套餐、数量和有效期，确认扣款后生成。到“我的卡密”复制未使用且未过期的卡密交付客户。每个卡密默认只能使用一次。" />
+                            <Alert isVisible color="warning" variant="flat" title="4. 配置白牌内容" description="公告会在站点展示；购买链接用于引导客户购买卡密；客服链接用于售后。修改后请用绑定域名实际访问确认。" />
                         </div>
-                        <Button
-                            color="danger"
-                            variant="flat"
-                            startContent={<LogOut className="w-4 h-4" />}
-                            onPress={handleLogout}
-                        >
-                            退出登录
-                        </Button>
-                    </div>
-                </div>
-            </div>
+                    </AccordionItem>
+                </Accordion>
 
-            {/* 主内容区 */}
-            <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* 左侧：基本信息 */}
-                    <div className="lg:col-span-1">
-                        <Card>
-                            <CardHeader className="flex gap-3">
-                                <Globe className="w-5 h-5 text-primary" />
-                                <div className="flex flex-col">
-                                    <p className="text-md font-semibold">基本信息</p>
-                                </div>
-                            </CardHeader>
-                            <Divider />
-                            <CardBody className="space-y-4">
-                                <div>
-                                    <p className="text-sm text-default-500 mb-1">账号</p>
-                                    <p className="font-medium">{distributor?.username}</p>
-                                </div>
-                                <div className="p-3 bg-success-50 rounded-lg">
-                                    <p className="text-sm text-default-500 mb-1">账户余额</p>
-                                    <p className="text-2xl font-bold text-success">¥{Number(balance).toFixed(2)}</p>
-                                    {typeof distributor?.level === 'number' && (
-                                        <Chip size="sm" variant="flat" color="secondary" className="mt-1">等级 L{distributor.level}</Chip>
-                                    )}
-                                </div>
-                                <div>
-                                    <p className="text-sm text-default-500 mb-1">状态</p>
-                                    <Chip
-                                        color={distributor?.status === 1 ? 'success' : 'danger'}
-                                        size="sm"
-                                        variant="flat"
-                                    >
-                                        {distributor?.status === 1 ? '已启用' : '已禁用'}
-                                    </Chip>
-                                </div>
-                                <div>
-                                    <p className="text-sm text-default-500 mb-2">绑定域名</p>
-                                    <div className="space-y-2">
-                                        {domains.length === 0 ? (
-                                            <p className="text-sm text-default-400">未绑定独立域名（仅通过通用白牌分销）</p>
-                                        ) : domains.map((domain, index) => (
-                                            <div key={index} className="flex items-center gap-2">
-                                                <Chip size="sm" variant="flat" color="primary">
-                                                    {domain}
-                                                </Chip>
-                                                <a
-                                                    href={`http://${domain}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-primary hover:underline"
+                {domains.length === 0 && (
+                    <Alert
+                        isVisible
+                        color="warning"
+                        title="当前账号没有绑定域名"
+                        description="你仍可生成和管理卡密，但系统无法把某个访问域名识别为你的专属白牌站。请联系管理员绑定域名，并完成 DNS/反向代理配置。"
+                    />
+                )}
+
+                {(!canLogin || !canGenerate || !canEditNotice || !canEditLinks) && (
+                    <Alert
+                        isVisible
+                        color="default"
+                        title="部分能力由管理员控制"
+                        description={`后续登录：${canLogin ? '已允许' : '已禁止（当前会话仍可能有效）'}；生成卡密：${canGenerate ? '已开通' : '未开通'}；修改公告：${canEditNotice ? '已开通' : '未开通'}；修改购买/客服链接：${canEditLinks ? '已开通' : '未开通'}。如需调整请联系管理员。`}
+                    />
+                )}
+
+                <Tabs
+                    aria-label="分销商控制台功能"
+                    selectedKey={activeTab}
+                    onSelectionChange={(key) => setActiveTab(String(key))}
+                    color="primary"
+                    variant="underlined"
+                    className="w-full"
+                >
+                    <Tab key="cdk" title={<span className="flex items-center gap-2"><Ticket className="h-4 w-4" />卡密业务</span>}>
+                        <div className="space-y-6 pt-4">
+                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+                                <Card shadow="sm"><CardBody><p className="text-sm text-default-500">账户余额</p><p className="mt-1 text-2xl font-semibold">¥{balance.toFixed(2)}</p></CardBody></Card>
+                                <Card shadow="sm"><CardBody><p className="text-sm text-default-500">卡密总数</p><p className="mt-1 text-2xl font-semibold">{stats.total}</p></CardBody></Card>
+                                <Card shadow="sm"><CardBody><p className="text-sm text-default-500">可交付未使用</p><p className="mt-1 text-2xl font-semibold text-success">{deliverableUnused}</p></CardBody></Card>
+                                <Card shadow="sm"><CardBody><p className="text-sm text-default-500">已使用</p><p className="mt-1 text-2xl font-semibold">{stats.used}</p></CardBody></Card>
+                                <Card shadow="sm"><CardBody><p className="text-sm text-default-500">已过期未用</p><p className="mt-1 text-2xl font-semibold text-warning">{stats.expired}</p></CardBody></Card>
+                                <Card shadow="sm"><CardBody><p className="text-sm text-default-500">已停用</p><p className="mt-1 text-2xl font-semibold text-danger">{disabledCdks}</p></CardBody></Card>
+                            </div>
+
+                            <div className="grid gap-6 lg:grid-cols-3">
+                                <Card className="lg:col-span-2" shadow="sm">
+                                    <CardHeader className="flex-col items-start gap-1">
+                                        <div className="flex items-center gap-2 font-semibold"><Ticket className="h-5 w-5 text-success" />用余额生成卡密</div>
+                                        <p className="text-sm text-default-500">列表单价已按“专属套餐 → 专属整体 → 等级套餐 → 等级整体 → 原价”的优先级计算。</p>
+                                    </CardHeader>
+                                    <Divider />
+                                    <CardBody>
+                                        {!canGenerate ? (
+                                            <Alert isVisible color="warning" title="未开通生成权限" description="管理员关闭了当前账号的自助生成卡密能力。已有卡密仍可在列表中查看。" />
+                                        ) : packages.length === 0 ? (
+                                            <Alert isVisible color="default" title="暂无可生成套餐" description="只有已上架套餐会出现在这里，请联系管理员检查套餐状态。" />
+                                        ) : (
+                                            <Form className="grid gap-4 md:grid-cols-2" onSubmit={(event) => { event.preventDefault(); openGenerateConfirmation(); }}>
+                                                <Select
+                                                    className="md:col-span-2"
+                                                    label="套餐"
+                                                    selectedKeys={genPackageId ? [genPackageId] : []}
+                                                    onSelectionChange={(keys) => setGenPackageId(String(Array.from(keys)[0] || ''))}
+                                                    isRequired
                                                 >
-                                                    <ExternalLink className="w-4 h-4" />
-                                                </a>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div>
-                                    <p className="text-sm text-default-500 mb-1">创建时间</p>
-                                    <p className="text-sm">
-                                        {dayjs(distributor?.created_at).format('YYYY-MM-DD HH:mm')}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-sm text-default-500 mb-1">更新时间</p>
-                                    <p className="text-sm">
-                                        {dayjs(distributor?.updated_at).format('YYYY-MM-DD HH:mm')}
-                                    </p>
-                                </div>
-                                {distributor?.remarks && (
-                                    <div>
-                                        <p className="text-sm text-default-500 mb-1">备注</p>
-                                        <p className="text-sm">{distributor.remarks}</p>
-                                    </div>
-                                )}
-                            </CardBody>
-                        </Card>
-                    </div>
+                                                    {packages.map((item) => (
+                                                        <SelectItem key={String(item.package_id)} textValue={item.package_name}>
+                                                            {item.package_name} · {(item.discount_rate * 10).toFixed(1)} 折 · ¥{item.unit_price.toFixed(2)}/个
+                                                        </SelectItem>
+                                                    ))}
+                                                </Select>
+                                                <NumberInput
+                                                    label="生成数量"
+                                                    value={genCount}
+                                                    onValueChange={(value) => setGenCount(value)}
+                                                    minValue={1}
+                                                    maxValue={10000}
+                                                    isRequired
+                                                    description="单次最多 10000 个"
+                                                />
+                                                <NumberInput
+                                                    label="有效期（天）"
+                                                    value={genExpireDays}
+                                                    onValueChange={(value) => setGenExpireDays(Number.isNaN(value) ? undefined : value)}
+                                                    minValue={0}
+                                                    placeholder={String(distributor.default_cdk_expire_days ?? 90)}
+                                                    description={`留空用管理员默认 ${distributor.default_cdk_expire_days ?? 90} 天；0 表示永不过期`}
+                                                />
+                                                <Textarea
+                                                    className="md:col-span-2"
+                                                    label="批次备注（可选）"
+                                                    value={genRemarks}
+                                                    onValueChange={setGenRemarks}
+                                                    placeholder="例如：客户名称、渠道或订单号"
+                                                    minRows={2}
+                                                />
+                                                <Alert
+                                                    className="md:col-span-2"
+                                                    isVisible
+                                                    color={estimatedCost > balance ? 'danger' : 'success'}
+                                                    variant="flat"
+                                                    title="本次费用预估"
+                                                    description={(
+                                                        <div className="mt-1 space-y-2">
+                                                            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                                                                <span>折后单价：<strong>¥{(selectedPackage?.unit_price || 0).toFixed(2)}</strong></span>
+                                                                <span>预计扣款：<strong>¥{estimatedCost.toFixed(2)}</strong></span>
+                                                            </div>
+                                                            <Progress
+                                                                aria-label="余额覆盖比例"
+                                                                value={balanceCoverage}
+                                                                color={estimatedCost > balance ? 'danger' : 'success'}
+                                                                size="sm"
+                                                            />
+                                                            <p className="text-xs">当前余额 ¥{balance.toFixed(2)}，生成成功后才会扣款。</p>
+                                                        </div>
+                                                    )}
+                                                />
+                                                <Button className="md:col-span-2" type="submit" color="success" size="lg" startContent={<ShieldCheck className="h-5 w-5" />} isDisabled={!selectedPackage || estimatedCost > balance}>
+                                                    核对并确认生成
+                                                </Button>
+                                            </Form>
+                                        )}
+                                    </CardBody>
+                                </Card>
 
-                    {/* 右侧：配置和修改密码 */}
-                    <div className="lg:col-span-2 space-y-6">
-                        {/* 生成卡密（用余额） */}
-                        {canGenerate && (
-                            <Card>
-                                <CardHeader className="flex gap-3">
-                                    <Ticket className="w-5 h-5 text-success" />
-                                    <div className="flex flex-col">
-                                        <p className="text-md font-semibold">生成卡密</p>
-                                        <p className="text-sm text-default-500">用账户余额生成已上架套餐的卡密</p>
+                                <Card shadow="sm">
+                                    <CardHeader className="flex items-center gap-2 font-semibold"><Wallet className="h-5 w-5 text-primary" />最近余额流水</CardHeader>
+                                    <Divider />
+                                    <CardBody className="gap-3">
+                                        {balanceLogs.length === 0 ? (
+                                            <p className="text-sm text-default-500">暂无余额流水。余额只能由管理员充值或扣减，生成卡密会自动记录扣款。</p>
+                                        ) : (
+                                            <Listbox aria-label="最近余额流水" selectionMode="none" variant="flat">
+                                                {balanceLogs.slice(0, 8).map((log, index) => (
+                                                    <ListboxItem
+                                                        key={log.id}
+                                                        textValue={`${log.remarks || log.type} ${formatDateTime(log.created_at)}`}
+                                                        description={`${log.remarks || log.type} · ${formatDateTime(log.created_at)}`}
+                                                        isReadOnly
+                                                        showDivider={index < Math.min(balanceLogs.length, 8) - 1}
+                                                        startContent={(
+                                                            <strong className={log.change_amount >= 0 ? 'text-success' : 'text-danger'}>
+                                                                {log.change_amount >= 0 ? '+' : ''}{Number(log.change_amount).toFixed(2)}
+                                                            </strong>
+                                                        )}
+                                                        endContent={<span className="whitespace-nowrap text-xs text-default-500">余额 {Number(log.balance_after).toFixed(2)}</span>}
+                                                    />
+                                                ))}
+                                            </Listbox>
+                                        )}
+                                    </CardBody>
+                                    <CardFooter>
+                                        <Button size="sm" variant="flat" startContent={<RefreshCw className="h-4 w-4" />} onPress={fetchBalance}>刷新流水</Button>
+                                    </CardFooter>
+                                </Card>
+                            </div>
+
+                            {lastBatchId && (
+                                <Alert
+                                    isVisible
+                                    color="success"
+                                    title="最近一批卡密已生成"
+                                    description={<span className="flex flex-wrap items-center gap-2">批次 ID：<Snippet hideSymbol size="sm" codeString={lastBatchId}>{lastBatchId}</Snippet> 卡密已显示在下方列表顶部。</span>}
+                                />
+                            )}
+
+                            <Card shadow="sm">
+                                <CardHeader className="flex flex-col items-stretch gap-4">
+                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                        <div>
+                                            <p className="font-semibold">我的卡密</p>
+                                            <p className="text-sm text-default-500">只显示当前分销商名下的卡密，共 {cdkTotal} 条。</p>
+                                        </div>
+                                        <Button variant="flat" color="primary" startContent={<Copy className="h-4 w-4" />} onPress={copyVisibleCdks}>
+                                            复制当前页可用卡密
+                                        </Button>
+                                    </div>
+                                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto]">
+                                        <Input
+                                            value={cdkSearchInput}
+                                            onValueChange={setCdkSearchInput}
+                                            onKeyDown={(event) => event.key === 'Enter' && applyCdkFilters()}
+                                            placeholder="搜索卡密、批次或备注"
+                                            startContent={<Search className="h-4 w-4 text-default-400" />}
+                                            isClearable
+                                            onClear={() => {
+                                                setCdkSearchInput('');
+                                                setCdkSearch('');
+                                                setCdkPage(1);
+                                            }}
+                                        />
+                                        <Select aria-label="卡密状态" selectedKeys={[cdkStatus]} onSelectionChange={(keys) => { setCdkStatus(String(Array.from(keys)[0] || 'all') as CdkStatusFilter); setCdkPage(1); }}>
+                                            <SelectItem key="all">全部状态</SelectItem>
+                                            <SelectItem key="unused">未使用（含已过期）</SelectItem>
+                                            <SelectItem key="used">已使用</SelectItem>
+                                            <SelectItem key="disabled">已停用</SelectItem>
+                                        </Select>
+                                        <div className="flex gap-2">
+                                            <Button color="primary" onPress={applyCdkFilters}>查询</Button>
+                                            <Button variant="flat" onPress={resetCdkFilters}>重置</Button>
+                                        </div>
                                     </div>
                                 </CardHeader>
                                 <Divider />
-                                <CardBody className="space-y-4">
-                                    {packages.length === 0 ? (
-                                        <p className="text-sm text-default-400">暂无可生成的套餐</p>
+                                <CardBody className="p-0">
+                                    <Table aria-label="我的卡密列表" classNames={{ table: 'min-w-[920px]' }}>
+                                        <TableHeader>
+                                            <TableColumn>卡密</TableColumn>
+                                            <TableColumn>套餐</TableColumn>
+                                            <TableColumn>状态</TableColumn>
+                                            <TableColumn>有效期</TableColumn>
+                                            <TableColumn>批次</TableColumn>
+                                            <TableColumn>创建时间</TableColumn>
+                                            <TableColumn>操作</TableColumn>
+                                        </TableHeader>
+                                        <TableBody isLoading={cdkLoading} loadingContent={<Spinner label="加载卡密中..." />} emptyContent="没有符合条件的卡密">
+                                            {cdks.map((cdk) => (
+                                                <TableRow key={cdk.id}>
+                                                    <TableCell><code className="text-xs">{cdk.cdk}</code></TableCell>
+                                                    <TableCell><div><p className="text-sm font-medium">{cdk.package_name || `套餐 #${cdk.package_id}`}</p><p className="text-xs text-default-500">使用 {cdk.use_count || 0}/{cdk.max_uses || 1}</p></div></TableCell>
+                                                    <TableCell>{renderCdkStatus(cdk)}</TableCell>
+                                                    <TableCell>{cdk.expires_at ? formatDateTime(cdk.expires_at) : '永不过期'}</TableCell>
+                                                    <TableCell><span className="block max-w-32 truncate text-xs" title={cdk.batch_id || ''}>{cdk.batch_id || '-'}</span></TableCell>
+                                                    <TableCell>{formatDateTime(cdk.created_at)}</TableCell>
+                                                    <TableCell>
+                                                        <Button isIconOnly size="sm" variant="light" aria-label="复制卡密" onPress={() => copyText(cdk.cdk, '卡密已复制')}>
+                                                            <Copy className="h-4 w-4" />
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </CardBody>
+                                <CardFooter className="flex flex-col gap-3 sm:flex-row sm:justify-between">
+                                    <p className="text-sm text-default-500">第 {cdkPage}/{cdkTotalPages} 页，每页 {CDK_PAGE_SIZE} 条</p>
+                                    <Pagination total={cdkTotalPages} page={cdkPage} onChange={setCdkPage} showControls />
+                                </CardFooter>
+                            </Card>
+                        </div>
+                    </Tab>
+
+                    <Tab key="site" title={<span className="flex items-center gap-2"><Globe className="h-4 w-4" />白牌站点</span>}>
+                        <div className="grid gap-6 pt-4 lg:grid-cols-3">
+                            <Card shadow="sm">
+                                <CardHeader className="flex items-center gap-2 font-semibold"><Globe className="h-5 w-5 text-primary" />站点归属</CardHeader>
+                                <Divider />
+                                <CardBody className="gap-4">
+                                    {domains.length === 0 ? (
+                                        <Alert isVisible color="warning" title="未绑定域名" description="专属公告和链接不会匹配到访问端。请联系管理员处理域名归属。" />
                                     ) : (
-                                        <>
-                                            <Select
-                                                label="选择套餐"
-                                                selectedKeys={genPackageId ? [genPackageId] : []}
-                                                onChange={(e) => setGenPackageId(e.target.value)}
-                                                variant="bordered"
-                                            >
-                                                {packages.map((p) => (
-                                                    <SelectItem key={String(p.package_id)} textValue={p.package_name}>
-                                                        {p.package_name}（{(p.discount_rate * 10).toFixed(1)}折 · ¥{p.unit_price.toFixed(2)}/张）
-                                                    </SelectItem>
-                                                ))}
-                                            </Select>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <Input
-                                                    type="number"
-                                                    label="生成数量"
-                                                    value={genCount}
-                                                    onChange={(e) => setGenCount(e.target.value)}
-                                                    min={1}
-                                                    variant="bordered"
-                                                />
-                                                <Input
-                                                    type="number"
-                                                    label="过期天数"
-                                                    placeholder={String(distributor?.default_cdk_expire_days ?? 90)}
-                                                    value={genExpireDays}
-                                                    onChange={(e) => setGenExpireDays(e.target.value)}
-                                                    min={0}
-                                                    variant="bordered"
-                                                    description={`留空用默认 ${distributor?.default_cdk_expire_days ?? 90} 天，0=永不过期`}
-                                                />
-                                            </div>
-                                            {selectedPackage && (
-                                                <div className="flex items-center justify-between p-3 bg-default-100 rounded-lg text-sm">
-                                                    <span>
-                                                        单价 <span className="font-medium">¥{selectedPackage.unit_price.toFixed(2)}</span>
-                                                        <span className="text-default-400"> × {Number(genCount) || 0}</span>
-                                                    </span>
-                                                    <span>
-                                                        预计扣款：<span className={`font-bold ${estimatedCost > balance ? 'text-danger' : 'text-success'}`}>¥{estimatedCost.toFixed(2)}</span>
-                                                    </span>
-                                                </div>
-                                            )}
-                                            <Button
-                                                color="success"
-                                                size="lg"
-                                                className="w-full"
-                                                onPress={handleGenerateCdk}
-                                                isLoading={generating}
-                                                isDisabled={estimatedCost > balance}
-                                                startContent={!generating && <Ticket className="w-5 h-5" />}
-                                            >
-                                                {estimatedCost > balance ? '余额不足' : (generating ? '生成中...' : '确认生成并扣款')}
-                                            </Button>
-                                            <p className="text-xs text-default-400">
-                                                生成的卡密可在管理员/CDK列表中查看，归属本分销商。
-                                            </p>
-                                        </>
+                                        <Listbox
+                                            aria-label="绑定域名"
+                                            selectionMode="none"
+                                            variant="flat"
+                                            onAction={(key) => window.open(`https://${String(key)}`, '_blank', 'noopener,noreferrer')}
+                                        >
+                                            {domains.map((domain, index) => (
+                                                <ListboxItem
+                                                    key={domain}
+                                                    textValue={domain}
+                                                    showDivider={index < domains.length - 1}
+                                                    startContent={<Globe className="h-4 w-4 text-primary" />}
+                                                    endContent={<ExternalLink className="h-4 w-4 text-default-400" />}
+                                                >
+                                                    {domain}
+                                                </ListboxItem>
+                                            ))}
+                                        </Listbox>
                                     )}
-                                    {balanceLogs.length > 0 && (
-                                        <div className="pt-2">
-                                            <p className="text-sm text-default-500 mb-2">最近余额流水</p>
-                                            <div className="max-h-48 overflow-auto space-y-1">
-                                                {balanceLogs.map((log) => (
-                                                    <div key={log.id} className="flex justify-between text-xs border-b pb-1">
-                                                        <span>
-                                                            <span className={log.change_amount >= 0 ? 'text-success' : 'text-danger'}>
-                                                                {log.change_amount >= 0 ? '+' : ''}{Number(log.change_amount).toFixed(2)}
-                                                            </span>
-                                                            {log.remarks && <span className="text-default-400 ml-2">{log.remarks}</span>}
-                                                        </span>
-                                                        <span className="text-default-400">{dayjs(log.created_at).format('MM-DD HH:mm')}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
+                                    <Divider />
+                                    <div className="space-y-2 text-sm">
+                                        <div className="flex justify-between gap-2"><span className="text-default-500">账号</span><strong>{distributor.username}</strong></div>
+                                        <div className="flex justify-between gap-2"><span className="text-default-500">创建时间</span><span>{formatDateTime(distributor.created_at)}</span></div>
+                                        <div className="flex justify-between gap-2"><span className="text-default-500">更新时间</span><span>{formatDateTime(distributor.updated_at)}</span></div>
+                                    </div>
                                 </CardBody>
                             </Card>
-                        )}
 
-                        {/* 白牌配置 */}
-                        <Card>
-                            <CardHeader className="flex gap-3">
-                                <Bell className="w-5 h-5 text-primary" />
-                                <div className="flex flex-col">
-                                    <p className="text-md font-semibold">白牌站点配置</p>
-                                    <p className="text-sm text-default-500">配置后在您的域名生效</p>
+                            <Card className="lg:col-span-2" shadow="sm">
+                                <CardHeader className="flex-col items-start gap-1">
+                                    <div className="flex items-center gap-2 font-semibold"><Bell className="h-5 w-5 text-primary" />访问端内容配置</div>
+                                    <p className="text-sm text-default-500">保存后由访问端按绑定域名读取；清空字段会隐藏对应内容或入口。</p>
+                                </CardHeader>
+                                <Divider />
+                                <CardBody>
+                                    <Form className="gap-4" onSubmit={handleSaveSettings}>
+                                        <Textarea
+                                            label="公告"
+                                            value={notice}
+                                            onValueChange={setNotice}
+                                            minRows={4}
+                                            maxRows={8}
+                                            isDisabled={!canEditNotice}
+                                            description={canEditNotice ? '公告修改后会生成新的公告 ID，访问端可据此重新展示。' : '管理员未开通公告编辑权限。'}
+                                            placeholder="例如：购买方式、服务时间或重要通知"
+                                        />
+                                        <Input
+                                            label="购买卡密链接"
+                                            value={purchaseUrl}
+                                            onValueChange={setPurchaseUrl}
+                                            startContent={<LinkIcon className="h-4 w-4 text-default-400" />}
+                                            isDisabled={!canEditLinks}
+                                            isInvalid={!isValidHttpUrl(purchaseUrl.trim())}
+                                            errorMessage="请输入完整的 http:// 或 https:// 地址"
+                                            description="访问端的购买入口会跳转到这里；留空则不显示购买入口。"
+                                            placeholder="https://example.com/buy"
+                                        />
+                                        <Input
+                                            label="售后客服链接"
+                                            value={customerServiceUrl}
+                                            onValueChange={setCustomerServiceUrl}
+                                            startContent={<LinkIcon className="h-4 w-4 text-default-400" />}
+                                            isDisabled={!canEditLinks}
+                                            isInvalid={!isValidHttpUrl(customerServiceUrl.trim())}
+                                            errorMessage="请输入完整的 http:// 或 https:// 地址"
+                                            description="白牌站右下角客服入口会跳转到这里；留空则不显示。"
+                                            placeholder="https://example.com/support"
+                                        />
+                                        <Button type="submit" color="primary" size="lg" isLoading={savingSettings} isDisabled={!canEditNotice && !canEditLinks} startContent={!savingSettings && <Save className="h-5 w-5" />}>
+                                            保存站点配置
+                                        </Button>
+                                    </Form>
+                                </CardBody>
+                            </Card>
+                        </div>
+                    </Tab>
+
+                    <Tab key="security" title={<span className="flex items-center gap-2"><Lock className="h-4 w-4" />安全设置</span>}>
+                        <div className="mx-auto max-w-2xl pt-4">
+                            <Card shadow="sm">
+                                <CardHeader className="flex-col items-start gap-1">
+                                    <div className="flex items-center gap-2 font-semibold"><KeyRound className="h-5 w-5 text-warning" />修改登录密码</div>
+                                    <p className="text-sm text-default-500">修改成功后当前登录立即失效，需要使用新密码重新登录。</p>
+                                </CardHeader>
+                                <Divider />
+                                <CardBody>
+                                    <Form className="gap-4" onSubmit={handleChangePassword}>
+                                        <Input label="当前密码" type="password" value={oldPassword} onValueChange={setOldPassword} autoComplete="current-password" isRequired />
+                                        <Input label="新密码" type="password" value={newPassword} onValueChange={setNewPassword} autoComplete="new-password" minLength={8} description="至少 8 位，建议使用字母、数字和符号组合。" isRequired />
+                                        <Input label="确认新密码" type="password" value={confirmPassword} onValueChange={setConfirmPassword} autoComplete="new-password" isInvalid={Boolean(confirmPassword && newPassword !== confirmPassword)} errorMessage="两次输入的新密码不一致" isRequired />
+                                        <Button type="submit" color="warning" size="lg" isLoading={changingPassword} startContent={!changingPassword && <Lock className="h-5 w-5" />}>修改密码并重新登录</Button>
+                                    </Form>
+                                </CardBody>
+                            </Card>
+                        </div>
+                    </Tab>
+                </Tabs>
+            </main>
+
+            <Modal isOpen={generateModal.isOpen} onOpenChange={generateModal.onOpenChange} placement="center">
+                <ModalContent>
+                    {(onClose) => (
+                        <>
+                            <ModalHeader>确认生成卡密</ModalHeader>
+                            <ModalBody className="gap-3">
+                                <Alert isVisible color="warning" title="生成成功后费用不可自动退回" description="请确认套餐、数量、有效期和客户信息无误。" />
+                                <div className="grid grid-cols-2 gap-3 text-sm">
+                                    <span className="text-default-500">套餐</span><strong className="text-right">{selectedPackage?.package_name || '-'}</strong>
+                                    <span className="text-default-500">数量</span><strong className="text-right">{genCount} 个</strong>
+                                    <span className="text-default-500">有效期</span><strong className="text-right">{genExpireDays === undefined ? `默认 ${distributor.default_cdk_expire_days ?? 90} 天` : genExpireDays === 0 ? '永不过期' : `${genExpireDays} 天`}</strong>
+                                    <span className="text-default-500">折后单价</span><strong className="text-right">¥{(selectedPackage?.unit_price || 0).toFixed(2)}</strong>
+                                    <span className="text-default-500">本次扣款</span><strong className="text-right text-danger">¥{estimatedCost.toFixed(2)}</strong>
+                                    <span className="text-default-500">扣款后余额</span><strong className="text-right">¥{Math.max(0, balance - estimatedCost).toFixed(2)}</strong>
                                 </div>
-                            </CardHeader>
-                            <Divider />
-                            <CardBody className="space-y-4">
-                                <Textarea
-                                    label="公告文字"
-                                    placeholder="输入要在白牌站点显示的公告..."
-                                    value={notice}
-                                    onChange={(e) => setNotice(e.target.value)}
-                                    minRows={3}
-                                    maxRows={6}
-                                    variant="bordered"
-                                    isDisabled={!canEditNotice}
-                                    description={canEditNotice ? '留空则不显示公告' : '当前账号无自定义公告权限'}
-                                />
+                            </ModalBody>
+                            <ModalFooter>
+                                <Button variant="light" onPress={onClose}>返回检查</Button>
+                                <Button color="success" isLoading={generating} onPress={handleGenerateCdk}>确认生成并扣款</Button>
+                            </ModalFooter>
+                        </>
+                    )}
+                </ModalContent>
+            </Modal>
 
-                                <Input
-                                    label="购买按钮链接"
-                                    placeholder="https://your-domain.com/buy-cdk"
-                                    value={purchaseUrl}
-                                    onChange={(e) => setPurchaseUrl(e.target.value)}
-                                    startContent={<LinkIcon className="w-4 h-4 text-default-400" />}
-                                    variant="bordered"
-                                    isDisabled={!canEditLinks}
-                                    description={canEditLinks ? '订阅页面"购买激活码"按钮跳转链接' : '当前账号无修改链接权限'}
-                                />
-
-                                <Input
-                                    label="客服icon链接"
-                                    placeholder="https://your-domain.com/support"
-                                    value={customerServiceUrl}
-                                    onChange={(e) => setCustomerServiceUrl(e.target.value)}
-                                    startContent={<LinkIcon className="w-4 h-4 text-default-400" />}
-                                    variant="bordered"
-                                    isDisabled={!canEditLinks}
-                                    description={canEditLinks ? '右下角客服icon跳转链接' : '当前账号无修改链接权限'}
-                                />
-
-                                <Button
-                                    color="primary"
-                                    size="lg"
-                                    className="w-full"
-                                    onPress={handleSaveSettings}
-                                    isLoading={saving}
-                                    isDisabled={!canEditNotice && !canEditLinks}
-                                    startContent={!saving && <Save className="w-5 h-5" />}
-                                >
-                                    {saving ? '保存中...' : '保存配置'}
-                                </Button>
-                            </CardBody>
-                        </Card>
-
-                        {/* 修改密码 */}
-                        <Card>
-                            <CardHeader className="flex gap-3">
-                                <Lock className="w-5 h-5 text-warning" />
-                                <div className="flex flex-col">
-                                    <p className="text-md font-semibold">修改密码</p>
-                                    <p className="text-sm text-default-500">定期修改密码保障账号安全</p>
-                                </div>
-                            </CardHeader>
-                            <Divider />
-                            <CardBody className="space-y-4">
-                                <Input
-                                    label="当前密码"
-                                    type="password"
-                                    placeholder="请输入当前密码"
-                                    value={oldPassword}
-                                    onChange={(e) => setOldPassword(e.target.value)}
-                                    variant="bordered"
-                                />
-
-                                <Input
-                                    label="新密码"
-                                    type="password"
-                                    placeholder="至少8位"
-                                    value={newPassword}
-                                    onChange={(e) => setNewPassword(e.target.value)}
-                                    variant="bordered"
-                                />
-
-                                <Input
-                                    label="确认新密码"
-                                    type="password"
-                                    placeholder="再次输入新密码"
-                                    value={confirmPassword}
-                                    onChange={(e) => setConfirmPassword(e.target.value)}
-                                    variant="bordered"
-                                />
-
-                                <Button
-                                    color="warning"
-                                    size="lg"
-                                    className="w-full"
-                                    onPress={handleChangePassword}
-                                    isLoading={changingPassword}
-                                    startContent={!changingPassword && <Lock className="w-5 h-5" />}
-                                >
-                                    {changingPassword ? '修改中...' : '修改密码'}
-                                </Button>
-                            </CardBody>
-                        </Card>
-                    </div>
-                </div>
-            </div>
+            <Modal isOpen={logoutModal.isOpen} onOpenChange={logoutModal.onOpenChange} placement="center">
+                <ModalContent>
+                    {(onClose) => (
+                        <>
+                            <ModalHeader>退出分销商控制台</ModalHeader>
+                            <ModalBody><p>确定要退出当前账号吗？未提交的表单内容不会保留。</p></ModalBody>
+                            <ModalFooter>
+                                <Button variant="light" onPress={onClose}>取消</Button>
+                                <Button color="danger" onPress={() => distributorApiService.logout()}>退出登录</Button>
+                            </ModalFooter>
+                        </>
+                    )}
+                </ModalContent>
+            </Modal>
         </div>
     );
 };

@@ -1,7 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardBody, Input, Button } from '@heroui/react';
-import { Lock, User, LogIn } from 'lucide-react';
+import {
+    Alert,
+    Avatar,
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    Divider,
+    Form,
+    Input,
+} from '@heroui/react';
+import { Eye, EyeOff, Lock, LogIn, User } from 'lucide-react';
 import distributorApiService from '../../services/distributorApi';
 import { showToast } from '../../components/Toast';
 
@@ -9,18 +19,19 @@ const DistributorLoginPage: React.FC = () => {
     const navigate = useNavigate();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [passwordVisible, setPasswordVisible] = useState(false);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        // 如果已登录，跳转到控制面板
         if (distributorApiService.isLoggedIn()) {
-            navigate('/distributor/dashboard');
+            navigate('/distributor/dashboard', { replace: true });
         }
     }, [navigate]);
 
-    const handleLogin = async () => {
-        if (!username || !password) {
-            showToast('请输入账号和密码', 'warning');
+    const handleLogin = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!username.trim() || !password) {
+            showToast('请输入分销商账号和密码', 'warning');
             return;
         }
 
@@ -28,101 +39,89 @@ const DistributorLoginPage: React.FC = () => {
         try {
             const response = await distributorApiService.login({
                 username: username.trim(),
-                password: password,
+                password,
             });
-
             if (response.code === 20000 && response.data) {
-                // 保存 dtoken 和分销商信息
                 localStorage.setItem('dtoken', response.data.dtoken);
                 localStorage.setItem('distributor', JSON.stringify(response.data));
-
                 showToast('登录成功', 'success');
-
-                // 跳转到控制面板
-                setTimeout(() => {
-                    navigate('/distributor/dashboard');
-                }, 500);
+                navigate('/distributor/dashboard', { replace: true });
             } else {
                 showToast(response.msg || '登录失败', 'error');
             }
         } catch (error: any) {
-            console.error('登录失败:', error);
             showToast(error.response?.data?.msg || error.message || '登录失败，请检查网络', 'error');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            handleLogin();
-        }
-    };
-
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
-            <div className="w-full max-w-md">
-                {/* Logo 和标题 */}
-                <div className="text-center mb-8">
-                    <div className="inline-block p-4 bg-blue-500 rounded-2xl mb-4">
-                        <LogIn className="w-12 h-12 text-white" />
-                    </div>
-                    <h1 className="text-3xl font-bold text-default-800 mb-2">分销商登录</h1>
-                    <p className="text-default-500">登录后管理您的白牌站点配置</p>
-                </div>
-
-                {/* 登录卡片 */}
-                <Card className="shadow-lg">
-                    <CardBody className="p-8">
-                        <div className="space-y-6">
+        <main className="flex min-h-screen items-center justify-center bg-default-50 p-4">
+            <div className="w-full max-w-md space-y-4">
+                <Card shadow="lg">
+                    <CardHeader className="flex-col gap-3 pb-5 text-center">
+                        <Avatar color="primary" icon={<LogIn className="h-7 w-7" />} size="lg" />
+                        <div>
+                            <h1 className="text-2xl font-semibold text-foreground">分销商登录</h1>
+                            <p className="mt-1 text-sm text-default-500">管理卡密、余额和白牌站点内容</p>
+                        </div>
+                    </CardHeader>
+                    <Divider />
+                    <CardBody className="py-6">
+                        <Form className="gap-5" onSubmit={handleLogin}>
                             <Input
                                 label="分销商账号"
-                                placeholder="请输入您的账号"
                                 value={username}
-                                onChange={(e) => setUsername(e.target.value)}
-                                onKeyPress={handleKeyPress}
-                                startContent={<User className="w-4 h-4 text-default-400" />}
-                                variant="bordered"
-                                size="lg"
+                                onValueChange={setUsername}
+                                startContent={<User className="h-4 w-4 text-default-400" />}
+                                autoComplete="username"
                                 autoFocus
+                                isRequired
                             />
-
                             <Input
                                 label="登录密码"
-                                type="password"
-                                placeholder="请输入密码"
+                                type={passwordVisible ? 'text' : 'password'}
                                 value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                onKeyPress={handleKeyPress}
-                                startContent={<Lock className="w-4 h-4 text-default-400" />}
-                                variant="bordered"
-                                size="lg"
+                                onValueChange={setPassword}
+                                startContent={<Lock className="h-4 w-4 text-default-400" />}
+                                endContent={(
+                                    <Button
+                                        isIconOnly
+                                        size="sm"
+                                        variant="light"
+                                        aria-label={passwordVisible ? '隐藏密码' : '显示密码'}
+                                        onPress={() => setPasswordVisible((visible) => !visible)}
+                                    >
+                                        {passwordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                    </Button>
+                                )}
+                                autoComplete="current-password"
+                                isRequired
                             />
-
                             <Button
+                                className="w-full"
+                                type="submit"
                                 color="primary"
                                 size="lg"
-                                className="w-full"
-                                onPress={handleLogin}
                                 isLoading={loading}
-                                startContent={!loading && <LogIn className="w-5 h-5" />}
+                                startContent={!loading && <LogIn className="h-5 w-5" />}
                             >
-                                {loading ? '登录中...' : '登录'}
+                                登录控制台
                             </Button>
-
-                            <div className="text-center text-sm text-default-500">
-                                <p>忘记密码？请联系管理员重置</p>
-                            </div>
-                        </div>
+                        </Form>
                     </CardBody>
                 </Card>
 
-                {/* 底部提示 */}
-                <div className="text-center mt-6 text-sm text-default-400">
-                    <p>© 2024 白牌分销商系统</p>
-                </div>
+                <Alert
+                    isVisible
+                    color="default"
+                    variant="flat"
+                    title="无法登录或忘记密码？"
+                    description="分销商账号、登录权限、余额、折扣和域名均由平台管理员配置，请联系管理员处理。"
+                />
             </div>
-        </div>
+        </main>
     );
 };
 

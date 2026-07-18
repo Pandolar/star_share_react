@@ -1,89 +1,17 @@
-/**
- * 通知提示工具函数
- * 提供统一的消息提示功能
- */
+import { showToast, ToastType } from '../components/Toast';
 
 export interface ToastOptions {
-  /** 持续时间（毫秒） */
   duration?: number;
-  /** 是否可关闭 */
   closable?: boolean;
-  /** 自定义样式 */
   className?: string;
 }
 
-export interface ToastInstance {
-  id: string;
-  type: 'success' | 'error' | 'warning' | 'info';
-  message: string;
-  duration: number;
-  closable: boolean;
-  timestamp: number;
-}
+const notify = (type: ToastType, message: string) => showToast(message, type);
 
-// 简单的事件发射器
-class ToastEmitter {
-  private listeners: Array<(toast: ToastInstance) => void> = [];
-
-  subscribe(listener: (toast: ToastInstance) => void) {
-    this.listeners.push(listener);
-    return () => {
-      this.listeners = this.listeners.filter(l => l !== listener);
-    };
-  }
-
-  emit(toast: ToastInstance) {
-    this.listeners.forEach(listener => listener(toast));
-  }
-}
-
-const emitter = new ToastEmitter();
-
-// 生成唯一ID
-const generateId = () => Math.random().toString(36).substr(2, 9);
-
-// 创建通知实例
-const createToast = (
-  type: ToastInstance['type'],
-  message: string,
-  options: ToastOptions = {}
-): ToastInstance => ({
-  id: generateId(),
-  type,
-  message,
-  duration: options.duration ?? 3000,
-  closable: options.closable ?? true,
-  timestamp: Date.now()
-});
-
-// 通知方法
+/** Compatibility facade for existing call sites, rendered by HeroUI. */
 export const toast = {
-  success: (message: string, options?: ToastOptions) => {
-    const toastInstance = createToast('success', message, options);
-    emitter.emit(toastInstance);
-    return toastInstance.id;
-  },
-
-  error: (message: string, options?: ToastOptions) => {
-    const toastInstance = createToast('error', message, { duration: 4000, ...options });
-    emitter.emit(toastInstance);
-    return toastInstance.id;
-  },
-
-  warning: (message: string, options?: ToastOptions) => {
-    const toastInstance = createToast('warning', message, { duration: 5000, ...options });
-    emitter.emit(toastInstance);
-    return toastInstance.id;
-  },
-
-  info: (message: string, options?: ToastOptions) => {
-    const toastInstance = createToast('info', message, options);
-    emitter.emit(toastInstance);
-    return toastInstance.id;
-  },
-
-  // 订阅通知事件
-  subscribe: (listener: (toast: ToastInstance) => void) => {
-    return emitter.subscribe(listener);
-  }
+  success: (message: string, _options?: ToastOptions) => notify('success', message),
+  error: (message: string, _options?: ToastOptions) => notify('error', message),
+  warning: (message: string, _options?: ToastOptions) => notify('warning', message),
+  info: (message: string, _options?: ToastOptions) => notify('info', message),
 };

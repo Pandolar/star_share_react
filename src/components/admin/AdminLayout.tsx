@@ -16,8 +16,8 @@ import {
     DropdownMenu,
     DropdownItem,
     User,
-    Tabs,
-    Tab,
+    Listbox,
+    ListboxItem,
 } from '@heroui/react';
 import {
     Users,
@@ -125,7 +125,6 @@ const AdminLayout: React.FC = () => {
                 isBordered
                 isMenuOpen={isMenuOpen}
                 onMenuOpenChange={setIsMenuOpen}
-                className="bg-white shadow-sm"
                 maxWidth="full"
             >
                 {/* 左侧品牌区域 */}
@@ -139,7 +138,7 @@ const AdminLayout: React.FC = () => {
                 <NavbarContent className="hidden sm:flex gap-4" justify="start">
                     <NavbarBrand>
                         <div className="flex items-center gap-2">
-                            <Shield className="w-6 h-6 text-blue-600" />
+                            <Shield className="w-6 h-6 text-primary" />
                             <span className="font-bold text-lg text-default-800">
                                 Star Share 管理后台
                             </span>
@@ -152,9 +151,9 @@ const AdminLayout: React.FC = () => {
                     <NavbarItem>
                         <Button
                             variant="light"
+                            color="primary"
                             startContent={<Home className="w-4 h-4" />}
                             onPress={() => window.open('/', '_blank')}
-                            className="text-default-600 hover:text-blue-600"
                         >
                             前台首页
                         </Button>
@@ -168,7 +167,7 @@ const AdminLayout: React.FC = () => {
                                     avatarProps={{
                                         src: "",
                                         fallback: "Admin",
-                                        className: "bg-blue-100 text-blue-600",
+                                        color: "primary",
                                     }}
                                     className="cursor-pointer"
                                 />
@@ -188,7 +187,7 @@ const AdminLayout: React.FC = () => {
                 </NavbarContent>
 
                 {/* 移动端菜单 */}
-                <NavbarMenu className="bg-white pt-6">
+                <NavbarMenu className="pt-6">
                     {menuItems.map((item) => (
                         <NavbarMenuItem key={item.key}>
                             <Button
@@ -208,58 +207,44 @@ const AdminLayout: React.FC = () => {
                 </NavbarMenu>
             </Navbar>
 
-            {/* 主要内容区域：左侧垂直Tabs + 右侧页面内容 */}
+            {/* 主要内容区域：左侧导航 + 右侧页面内容 */}
             <div className="mx-auto px-4 py-6 w-full max-w-[1600px]">
                 <div className="hidden sm:flex gap-6">
-                    {/* 左侧导航（垂直 Tabs） */}
-                    <Card className="bg-white shadow-sm w-64 shrink-0 h-fit">
-                        <CardBody className="p-0">
-                            <Tabs
+                    {/* 左侧导航 */}
+                    <Card shadow="sm" className="w-64 shrink-0 h-fit">
+                        <CardBody>
+                            <Listbox
                                 aria-label="管理后台导航"
-                                placement="start"
-                                selectedKey={getCurrentTab()}
-                                onSelectionChange={(key) => handleTabChange(key as string)}
-                                variant="light"
-                                className="w-full"
-                                classNames={{
-                                    tabList: "gap-2 p-3",
-                                    tab: "justify-start h-10 px-3",
-                                    tabContent: "gap-2 text-default-700 group-data-[selected=true]:text-blue-600",
-                                    cursor: "bg-blue-100",
+                                selectionMode="single"
+                                selectedKeys={[getCurrentTab()]}
+                                onSelectionChange={(keys) => {
+                                    if (keys !== 'all') handleTabChange(String(Array.from(keys)[0] || 'overview'));
                                 }}
+                                variant="flat"
+                                color="primary"
                             >
                                 {menuItems.map((item) => (
-                                    <Tab
+                                    <ListboxItem
                                         key={item.key}
-                                        title={
-                                            <div className="flex items-center gap-2">
-                                                {item.icon}
-                                                <span>{item.label}</span>
-                                            </div>
-                                        }
-                                    />
+                                        startContent={item.icon}
+                                        textValue={item.label}
+                                    >
+                                        {item.label}
+                                    </ListboxItem>
                                 ))}
-                            </Tabs>
+                            </Listbox>
                         </CardBody>
                     </Card>
 
                     {/* 右侧内容 */}
                     <div className="flex-1 min-w-0">
-                        <Card className="bg-white shadow-sm min-h-[600px]">
-                            <CardBody className="p-6">
-                                <Outlet />
-                            </CardBody>
-                        </Card>
+                        <Outlet />
                     </div>
                 </div>
 
                 {/* 移动端：保留顶部菜单 + 内容 */}
                 <div className="sm:hidden">
-                    <Card className="bg-white shadow-sm min-h-[600px]">
-                        <CardBody className="p-6">
-                            <Outlet />
-                        </CardBody>
-                    </Card>
+                    <Outlet />
                 </div>
             </div>
         </div>

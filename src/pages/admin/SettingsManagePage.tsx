@@ -4,7 +4,7 @@ import {
     Button,
     Card,
     CardBody,
-    CardHeader,
+    Alert,
     Textarea,
     Switch,
     Divider,
@@ -16,6 +16,7 @@ import {
     ModalHeader,
     ModalBody,
     ModalFooter,
+    NumberInput,
     useDisclosure,
 } from '@heroui/react';
 import {
@@ -66,8 +67,7 @@ const SettingsManagePage: React.FC = () => {
             } else {
                 showToast(response.msg || '获取系统配置失败', 'error');
             }
-        } catch (error) {
-            console.error('获取系统配置失败:', error);
+        } catch {
             showToast('获取系统配置失败', 'error');
         } finally {
             setLoading(false);
@@ -83,11 +83,11 @@ const SettingsManagePage: React.FC = () => {
     useEffect(() => {
         (async () => {
             try {
-                const resp = await adminApiService.getPackages({ page_size: 1000 } as any);
+                const resp = await adminApiService.getPackages({ page_size: 1000 });
                 if (resp.code === 20000 && Array.isArray(resp.data)) {
                     const seen = new Set<string>();
                     const levels: Array<{ level: string; category: string }> = [];
-                    resp.data.forEach((p: any) => {
+                    resp.data.forEach((p) => {
                         const key = `${p.level}|${p.category}`;
                         if (p.level && p.category && !seen.has(key)) {
                             seen.add(key);
@@ -96,8 +96,8 @@ const SettingsManagePage: React.FC = () => {
                     });
                     setPackageLevels(levels);
                 }
-            } catch (e) {
-                console.error('加载套餐等级失败:', e);
+            } catch {
+                showToast('加载补偿套餐选项失败', 'error');
             }
         })();
     }, []);
@@ -121,8 +121,7 @@ const SettingsManagePage: React.FC = () => {
             } else {
                 showToast(response.msg || '配置保存失败', 'error');
             }
-        } catch (error) {
-            console.error('配置保存失败:', error);
+        } catch {
             showToast('配置保存失败', 'error');
         }
     };
@@ -166,8 +165,7 @@ const SettingsManagePage: React.FC = () => {
             } else {
                 showToast(`保存完成，${failedCount}个配置保存失败`, 'warning');
             }
-        } catch (error) {
-            console.error('批量保存配置失败:', error);
+        } catch {
             showToast('批量保存配置失败', 'error');
         } finally {
             setSaving(false);
@@ -295,7 +293,7 @@ const SettingsManagePage: React.FC = () => {
                 {(config.key === 'NOTICE' || config.key.startsWith('SUBSCRIPTION_NOTICE_')) ? (
                     <Textarea
                         value={value}
-                        onChange={(e) => updateConfigValue(config.key, e.target.value)}
+                        onValueChange={(nextValue) => updateConfigValue(config.key, nextValue)}
                         isDisabled={!config.editable}
                         variant={isChanged ? 'bordered' : 'flat'}
                         color={isChanged ? 'warning' : 'default'}
@@ -313,7 +311,7 @@ const SettingsManagePage: React.FC = () => {
                 ) : isJson ? (
                     <Textarea
                         value={value}
-                        onChange={(e) => updateConfigValue(config.key, e.target.value)}
+                        onValueChange={(nextValue) => updateConfigValue(config.key, nextValue)}
                         isDisabled={!config.editable}
                         variant="bordered"
                         className="font-mono"
@@ -323,10 +321,9 @@ const SettingsManagePage: React.FC = () => {
                         minRows={6}
                     />
                 ) : config.type === 'int' ? (
-                    <Input
-                        type="number"
-                        value={value}
-                        onChange={(e) => updateConfigValue(config.key, e.target.value)}
+                    <NumberInput
+                        value={value === '' || Number.isNaN(Number(value)) ? undefined : Number(value)}
+                        onValueChange={(nextValue) => updateConfigValue(config.key, Number.isNaN(nextValue) ? '' : String(nextValue))}
                         isDisabled={!config.editable}
                         variant={isChanged ? 'bordered' : 'flat'}
                         color={isChanged ? 'warning' : 'default'}
@@ -336,7 +333,7 @@ const SettingsManagePage: React.FC = () => {
                     <Input
                         type="text"
                         value={value}
-                        onChange={(e) => updateConfigValue(config.key, e.target.value)}
+                        onValueChange={(nextValue) => updateConfigValue(config.key, nextValue)}
                         isDisabled={!config.editable}
                         variant={isChanged ? 'bordered' : 'flat'}
                         color={isChanged ? 'warning' : 'default'}
@@ -371,7 +368,7 @@ const SettingsManagePage: React.FC = () => {
             {/* 页面标题 */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <Settings className="w-6 h-6 text-blue-600" />
+                    <Settings className="w-6 h-6 text-primary" />
                     <h1 className="text-2xl font-bold text-default-800">系统配置</h1>
                 </div>
 
@@ -396,15 +393,12 @@ const SettingsManagePage: React.FC = () => {
             </div>
 
             {/* 配置说明 */}
-            <Card>
-                <CardBody>
-                    <div className="text-sm text-default-600">
-                        <p>🔧 这里是系统的核心配置管理，请谨慎修改。</p>
-                        <p>💡 标记为黄色边框的配置表示已修改但未保存。</p>
-                        <p>🔒 灰色背景的配置表示不可编辑。</p>
-                    </div>
-                </CardBody>
-            </Card>
+            <Alert
+                isVisible
+                color="warning"
+                title="谨慎修改系统配置"
+                description="黄色输入框表示已修改但未保存；禁用的输入框不可编辑。保存只作用于当前分类，JSON 配置会在提交前校验格式。"
+            />
 
             {/* 二级Tab：配置分组 */}
             <Card>
@@ -414,12 +408,7 @@ const SettingsManagePage: React.FC = () => {
                         selectedKey={selectedGroup}
                         onSelectionChange={(key) => setSelectedGroup(key as string)}
                         variant="underlined"
-                        classNames={{
-                            tabList: "gap-6 w-full relative rounded-none p-0 border-b border-divider",
-                            cursor: "w-full bg-blue-600",
-                            tab: "max-w-fit px-0 h-12",
-                            tabContent: "group-data-[selected=true]:text-blue-600"
-                        }}
+                        color="primary"
                     >
                         {groupKeys.map((group) => (
                             <Tab
@@ -449,16 +438,13 @@ const SettingsManagePage: React.FC = () => {
 
             {/* 操作提示 */}
             {hasChanges && (
-                <Card className="border-warning-200 bg-warning-50">
-                    <CardBody>
-                        <div className="flex items-center gap-2 text-warning-700">
-                            <Bell className="w-4 h-4" />
-                            <span className="text-sm">
-                                当前分类有未保存的配置更改，请及时保存以避免数据丢失。
-                            </span>
-                        </div>
-                    </CardBody>
-                </Card>
+                <Alert
+                    isVisible
+                    color="warning"
+                    icon={<Bell className="w-4 h-4" />}
+                    title="当前分类有未保存的更改"
+                    description="切换分类前请保存，否则本页刷新后更改会丢失。"
+                />
             )}
 
             {/* 确认提交弹窗 */}
