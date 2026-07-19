@@ -30,7 +30,8 @@ export const SubscriptionTab: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedPackage, setSelectedPackage] = useState<PackageInfo | null>(null);
-  const [orderInfo, setOrderInfo] = useState<OrderInfo | null>(null);
+  const [ordinaryOrder, setOrdinaryOrder] = useState<OrderInfo | null>(null);
+  const [invoiceOrder, setInvoiceOrder] = useState<OrderInfo | null>(null);
   const [orderLoading, setOrderLoading] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<SubscriptionType>('yearly');
@@ -110,18 +111,13 @@ export const SubscriptionTab: React.FC = () => {
       setOrderLoading(true);
       setSelectedPackage(pkg);
 
-      const isAndroid = /android/i.test(navigator.userAgent);
       const requestData = isMobileDevice ? { device: 'mobile' as const } : {};
       const response = await orderUserApi.createOrder(pkg.id, requestData);
 
       if (response.code === 20000) {
-        setOrderInfo({ ...response.data, invoice_snapshot: response.data.invoice_snapshot || null });
+        setOrdinaryOrder({ ...response.data, invoice_snapshot: response.data.invoice_snapshot || null });
         setPaymentModalOpen(true);
 
-        // 仅 Android 尝试弹出支付页（Android 浏览器通常不拦截）
-        if (isAndroid && response.data.payment_url) {
-          window.open(response.data.payment_url, '_blank');
-        }
       } else {
         toast.error(response.msg || '创建订单失败');
       }
@@ -132,22 +128,25 @@ export const SubscriptionTab: React.FC = () => {
     }
   };
 
-  const replaceOrder = async (invoiceRequested: boolean) => {
-    if (!selectedPackage || !orderInfo) return;
+  const createInvoiceOrder = async () => {
+    if (!selectedPackage || !ordinaryOrder?.checkout_id || invoiceOrder) return null;
     setOrderLoading(true);
     try {
       const response = await orderUserApi.createOrder(selectedPackage.id, {
         ...(isMobileDevice ? { device: 'mobile' } : {}),
-        invoice_requested: invoiceRequested,
-        replaced_order_id: orderInfo.order_id,
+        invoice_requested: true,
+        checkout_id: ordinaryOrder.checkout_id,
       });
       if (response.code === 20000) {
-        setOrderInfo({ ...response.data, invoice_snapshot: response.data.invoice_snapshot || null });
+        setInvoiceOrder({ ...response.data, invoice_snapshot: response.data.invoice_snapshot || null });
+        return { ...response.data, invoice_snapshot: response.data.invoice_snapshot || null };
       } else {
-        toast.error(response.msg || '切换开票选项失败');
+        toast.error(response.msg || '创建开票订单失败');
+        return null;
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : '切换开票选项失败');
+      toast.error(err instanceof Error ? err.message : '创建开票订单失败');
+      return null;
     } finally {
       setOrderLoading(false);
     }
@@ -689,12 +688,14 @@ export const SubscriptionTab: React.FC = () => {
       <PaymentModal
         isOpen={paymentModalOpen}
         selectedPackage={selectedPackage}
-        orderInfo={orderInfo}
-        replacingOrder={orderLoading}
-        onInvoiceOptionChange={replaceOrder}
+        ordinaryOrder={ordinaryOrder}
+        invoiceOrder={invoiceOrder}
+        creatingInvoiceOrder={orderLoading}
+        onCreateInvoiceOrder={createInvoiceOrder}
         onClose={() => {
           setPaymentModalOpen(false);
-          setOrderInfo(null);
+          setOrdinaryOrder(null);
+          setInvoiceOrder(null);
           setSelectedPackage(null);
         }}
       />

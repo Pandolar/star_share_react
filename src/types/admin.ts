@@ -242,7 +242,7 @@ export interface Order {
     way?: string;
     remarks?: string;
     invoice_requested?: boolean;
-    invoice_status?: 'not_requested' | 'awaiting_payment' | 'pending_issue' | 'issued' | null;
+    invoice_status?: 'not_requested' | 'awaiting_payment' | 'pending_issue' | 'issued' | 'cancelled' | 'payment_exception' | null;
     base_amount?: number | null;
     payable_amount?: number | null;
     paid_amount?: number | null;
@@ -273,7 +273,7 @@ export interface InvoiceRecord {
     user_email: string;
     package_name: string;
     order_status: 'pending' | 'paid' | 'failed';
-    invoice_status: 'awaiting_payment' | 'pending_issue' | 'issued';
+    invoice_status: 'awaiting_payment' | 'pending_issue' | 'issued' | 'cancelled' | 'payment_exception';
     base_amount: number;
     surcharge_amount: number;
     payable_amount: number;

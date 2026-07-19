@@ -12,6 +12,8 @@ const statusLabels: Record<string, string> = {
   awaiting_payment: '待支付',
   pending_issue: '待开票',
   issued: '已开票',
+  cancelled: '已取消',
+  payment_exception: '异常到账',
 };
 
 const InvoicesManagePage: React.FC = () => {
@@ -105,6 +107,8 @@ const InvoicesManagePage: React.FC = () => {
           <SelectItem key="awaiting_payment">待支付</SelectItem>
           <SelectItem key="pending_issue">待开票</SelectItem>
           <SelectItem key="issued">已开票</SelectItem>
+          <SelectItem key="cancelled">已取消</SelectItem>
+          <SelectItem key="payment_exception">异常到账</SelectItem>
         </Select>
         <Button color="primary" onPress={() => { setPage(1); setQuery(queryInput.trim()); }}>搜索</Button>
         <Button isIconOnly variant="flat" onPress={load} aria-label="刷新"><RefreshCw size={16} /></Button>

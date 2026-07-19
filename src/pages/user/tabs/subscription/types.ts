@@ -17,6 +17,7 @@ export interface OrderInfo {
   success: boolean;
   trade_no: string;
   order_id: string;
+  checkout_id: string;
   payment_url: string | null;
   qr_code: string;
   channel: string;

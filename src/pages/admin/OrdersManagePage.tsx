@@ -240,7 +240,7 @@ const OrdersManagePage: React.FC = () => {
 
     const renderInvoiceStatus = (order: Order) => {
         if (!order.invoice_requested) return <Chip size="sm" variant="flat">未申请</Chip>;
-        const labels: Record<string, string> = { not_requested: '未申请', awaiting_payment: '待支付', pending_issue: '待开票', issued: '已开票' };
+        const labels: Record<string, string> = { not_requested: '未申请', awaiting_payment: '待支付', pending_issue: '待开票', issued: '已开票', cancelled: '已取消', payment_exception: '异常到账' };
         const color = order.invoice_status === 'issued' ? 'success' : order.invoice_status === 'pending_issue' ? 'warning' : 'default';
         return <Chip size="sm" color={color} variant="flat">{labels[order.invoice_status || 'awaiting_payment']}</Chip>;
     };

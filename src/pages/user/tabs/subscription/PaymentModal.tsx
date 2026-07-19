@@ -22,20 +22,31 @@ import { getDurationText, PackageInfo, OrderInfo } from './types';
 interface PaymentModalProps {
   isOpen: boolean;
   selectedPackage: PackageInfo | null;
-  orderInfo: OrderInfo | null;
-  replacingOrder: boolean;
-  onInvoiceOptionChange: (requested: boolean) => Promise<void>;
+  ordinaryOrder: OrderInfo | null;
+  invoiceOrder: OrderInfo | null;
+  creatingInvoiceOrder: boolean;
+  onCreateInvoiceOrder: () => Promise<OrderInfo | null>;
   onClose: () => void;
 }
 
 type PaymentStatus = 'pending' | 'checking' | 'success' | 'failed';
+const CHECKOUT_EXPIRY_MS = 60 * 60 * 1000;
+const getInvoiceUnavailableText = (reason?: string | null) => ({
+  invoice_disabled: '开票功能暂未开放',
+  below_threshold: '当前套餐金额未达到开票门槛',
+  email_unbound: '请先绑定邮箱后再开票',
+  email_not_allowed: '当前邮箱不符合开票要求，请联系客服',
+  billing_profile_missing: '请先完善开票主体信息',
+  non_self_site: '开票仅在自营站点可用',
+}[reason || 'invoice_disabled'] || '当前账户暂不满足开票条件');
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({
   isOpen,
   selectedPackage,
-  orderInfo,
-  replacingOrder,
-  onInvoiceOptionChange,
+  ordinaryOrder,
+  invoiceOrder,
+  creatingInvoiceOrder,
+  onCreateInvoiceOrder,
   onClose,
 }) => {
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('pending');
@@ -43,89 +54,108 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [manualCheckLoading, setManualCheckLoading] = useState(false);
   const [eligibility, setEligibility] = useState<InvoiceEligibility | null>(null);
   const [eligibilityLoading, setEligibilityLoading] = useState(false);
+  const [invoiceSelected, setInvoiceSelected] = useState(false);
+  const [invoiceConfirmed, setInvoiceConfirmed] = useState(false);
 
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const qrTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const getQRCodeValue = (info?: OrderInfo | null) => {
-    if (!info) return '';
-    return info.qr_code || info.payment_url || '';
-  };
+  const activeOrder = invoiceSelected && invoiceOrder ? invoiceOrder : ordinaryOrder;
+  const checkoutId = ordinaryOrder?.checkout_id;
 
   const cleanup = () => {
-    if (checkIntervalRef.current) {
-      clearInterval(checkIntervalRef.current);
-      checkIntervalRef.current = null;
-    }
-    if (qrTimerRef.current) {
-      clearTimeout(qrTimerRef.current);
-      qrTimerRef.current = null;
-    }
+    if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
+    if (qrTimerRef.current) clearTimeout(qrTimerRef.current);
+    checkIntervalRef.current = null;
+    qrTimerRef.current = null;
   };
 
   useEffect(() => {
-    if (!isOpen || !orderInfo?.order_id) return;
-
+    if (!isOpen || !checkoutId) return;
     setPaymentStatus('pending');
     setQrCodeExpired(false);
+    setInvoiceSelected(false);
+    setInvoiceConfirmed(false);
+    setEligibility(null);
 
     qrTimerRef.current = setTimeout(() => {
       setQrCodeExpired(true);
-      if (checkIntervalRef.current) {
-        clearInterval(checkIntervalRef.current);
-        checkIntervalRef.current = null;
-      }
-    }, 5 * 60 * 1000);
+      if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
+      checkIntervalRef.current = null;
+    }, CHECKOUT_EXPIRY_MS);
 
     checkIntervalRef.current = setInterval(async () => {
       try {
-        const response = await orderUserApi.getPayStatus(orderInfo.order_id);
-        const data = response.data as { success?: boolean } | undefined;
-        if (data && data.success === true) {
+        const response = await orderUserApi.getCheckoutStatus(checkoutId);
+        if (response.code === 20000 && response.data?.paid) {
           setPaymentStatus('success');
           cleanup();
           setTimeout(() => window.location.reload(), 2000);
+        } else if (response.code === 20000 && response.data?.orders?.length && response.data.orders.every((order) => order.status === 'failed')) {
+          setQrCodeExpired(true);
+          cleanup();
         }
       } catch {
-        // 网络异常时继续轮询
+        // Transient failures do not stop checkout polling.
       }
     }, 1500);
 
     return cleanup;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, orderInfo?.order_id]);
+  }, [isOpen, checkoutId]);
 
-  const selectedPackageId = selectedPackage?.id;
-
-  useEffect(() => {
-    if (!isOpen || !selectedPackageId || orderInfo?.invoice_requested) return;
-    let cancelled = false;
-    setEligibility(null);
+  const loadEligibility = async () => {
+    if (!selectedPackage) return;
     setEligibilityLoading(true);
-    orderUserApi.getInvoiceEligibility(selectedPackageId)
-      .then((response) => {
-        if (!cancelled && response.code === 20000) setEligibility(response.data || null);
-      })
-      .finally(() => {
-        if (!cancelled) setEligibilityLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [isOpen, selectedPackageId, orderInfo?.invoice_requested]);
+    try {
+      const response = await orderUserApi.getInvoiceEligibility(selectedPackage.id);
+      if (response.code === 20000) {
+        setEligibility(response.data || null);
+      } else {
+        toast.warning(response.msg || '无法查询开票资格');
+      }
+    } catch {
+      toast.error('无法查询开票资格，请稍后重试');
+    } finally {
+      setEligibilityLoading(false);
+    }
+  };
+
+  const handleInvoiceSwitch = async (selected: boolean) => {
+    setInvoiceSelected(selected);
+    if (!selected || invoiceOrder) return;
+    setInvoiceConfirmed(false);
+    if (!eligibility) await loadEligibility();
+  };
+
+  const confirmInvoice = async () => {
+    if (!eligibility?.eligible) {
+      toast.warning(getInvoiceUnavailableText(eligibility?.reason));
+      return;
+    }
+    const createdOrder = await onCreateInvoiceOrder();
+    if (createdOrder) setInvoiceConfirmed(true);
+  };
 
   const handleManualCheck = async () => {
-    if (!orderInfo?.order_id) return;
+    if (!checkoutId) return;
+    setManualCheckLoading(true);
+    setPaymentStatus('checking');
     try {
-      setManualCheckLoading(true);
-      setPaymentStatus('checking');
-      const response = await orderUserApi.forceGetPayStatus(orderInfo.order_id);
-      const data = response.data as { success?: boolean } | undefined;
-      if (data && data.success === true) {
+      for (const order of [ordinaryOrder, invoiceOrder]) {
+        if (order?.order_id) await orderUserApi.forceGetPayStatus(order.order_id);
+      }
+      const response = await orderUserApi.getCheckoutStatus(checkoutId);
+      if (response.code === 20000 && response.data?.paid) {
         setPaymentStatus('success');
         cleanup();
         setTimeout(() => window.location.reload(), 2000);
+      } else if (response.code === 20000 && response.data?.orders?.length && response.data.orders.every((order) => order.status === 'failed')) {
+        setPaymentStatus('pending');
+        setQrCodeExpired(true);
+        cleanup();
+        toast.warning('本次结账已过期，请重新下单。');
       } else {
         setPaymentStatus('pending');
-        toast.warning('未检测到支付成功，请确认是否已完成付款。若已支付但仍无反应，请联系客服处理。');
+        toast.warning('未检测到支付成功，请确认是否已完成付款。');
       }
     } catch {
       setPaymentStatus('pending');
@@ -139,256 +169,57 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     cleanup();
     setPaymentStatus('pending');
     setQrCodeExpired(false);
-    setManualCheckLoading(false);
+    setInvoiceSelected(false);
+    setInvoiceConfirmed(false);
     onClose();
   };
 
-  const qrCodeValue = getQRCodeValue(orderInfo);
-
-  const handleInvoiceChange = async (requested: boolean) => {
-    if (!selectedPackage || !orderInfo) return;
-    if (requested && !eligibility?.eligible) {
-      const reasonText = {
-        invoice_disabled: '开票功能暂未开放',
-        below_threshold: '当前套餐金额未达到开票门槛',
-        email_unbound: '请先绑定邮箱后再开票',
-        email_not_allowed: '当前邮箱不符合开票要求，请联系客服',
-        billing_profile_missing: '请先完善开票主体信息',
-        non_self_site: '开票仅在自营站点可用',
-      }[eligibility?.reason || 'invoice_disabled'];
-      toast.warning(reasonText);
-      return;
-    }
-    cleanup();
-    await onInvoiceOptionChange(requested);
-  };
+  const qrCodeValue = activeOrder?.qr_code || activeOrder?.payment_url || '';
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={handleClose}
-      size="lg"
-      scrollBehavior="inside"
-      hideCloseButton={paymentStatus === 'success'}
-      classNames={{
-        base: 'max-h-[92vh] mx-2 sm:mx-0',
-        body: 'py-4 sm:py-6 overflow-y-auto',
-        footer: 'border-t border-divider bg-background sticky bottom-0',
-      }}
-    >
+    <Modal isOpen={isOpen} onClose={handleClose} size="lg" scrollBehavior="inside" hideCloseButton={paymentStatus === 'success'} classNames={{ base: 'max-h-[92vh] mx-2 sm:mx-0', body: 'py-4 sm:py-6 overflow-y-auto', footer: 'border-t border-divider bg-background sticky bottom-0' }}>
       <ModalContent>
-        <ModalHeader>
-          <div>
-            <h2 className="text-xl font-bold">完成支付</h2>
-            {selectedPackage && (
-              <p className="text-sm text-default-500 mt-1">{selectedPackage.package_name}</p>
-            )}
-          </div>
-        </ModalHeader>
-
+        <ModalHeader><div><h2 className="text-xl font-bold">完成支付</h2>{selectedPackage && <p className="text-sm text-default-500 mt-1">{selectedPackage.package_name}</p>}</div></ModalHeader>
         <ModalBody>
-          {orderInfo && (
+          {activeOrder && (
             <div className="space-y-6">
-              {/* 订单摘要 */}
-              <Card>
-                <CardBody className="p-4">
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-default-500">订单号</span>
-                      <code className="text-xs bg-default-100 px-2 py-1 rounded font-mono">
-                        {orderInfo.order_id}
-                      </code>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-default-500">支付金额</span>
-                      <span className="text-2xl font-bold text-primary">¥{orderInfo.payable_amount || selectedPackage?.price}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-default-500">套餐时长</span>
-                      <span className="font-medium">
-                        {selectedPackage ? getDurationText(selectedPackage.duration) : ''}
-                      </span>
-                    </div>
-                    {orderInfo.invoice_requested && orderInfo.invoice_snapshot && (
-                      <>
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-default-500">套餐金额</span>
-                          <span>¥{orderInfo.base_amount}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-default-500">开票服务费</span>
-                          <span>¥{orderInfo.invoice_snapshot.surcharge_amount}</span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </CardBody>
-              </Card>
+              <Card><CardBody className="p-4 space-y-3">
+                <div className="flex justify-between items-center"><span className="text-default-500">支付方式</span><Chip size="sm" color={activeOrder.invoice_requested ? 'primary' : 'default'} variant="flat">{activeOrder.invoice_requested ? '开票订单' : '普通订单'}</Chip></div>
+                <div className="flex justify-between items-center"><span className="text-default-500">订单号</span><code className="text-xs bg-default-100 px-2 py-1 rounded font-mono">{activeOrder.order_id}</code></div>
+                <div className="flex justify-between items-center"><span className="text-default-500">支付金额</span><span className="text-2xl font-bold text-primary">¥{activeOrder.payable_amount || selectedPackage?.price}</span></div>
+                <div className="flex justify-between items-center"><span className="text-default-500">套餐时长</span><span className="font-medium">{selectedPackage ? getDurationText(selectedPackage.duration) : ''}</span></div>
+              </CardBody></Card>
 
               {paymentStatus === 'pending' && !qrCodeExpired && (
-                <Card className="border border-primary/20">
-                  <CardBody className="p-4 space-y-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <ReceiptText className="w-5 h-5 text-primary" />
-                        <div>
-                          <p className="font-medium">需要开票</p>
-                          <p className="text-xs text-default-500">切换后会生成新支付二维码，原二维码立即失效。</p>
-                        </div>
-                      </div>
-                      <Switch
-                        isSelected={Boolean(orderInfo.invoice_requested)}
-                        isDisabled={replacingOrder || eligibilityLoading}
-                        onValueChange={handleInvoiceChange}
-                        aria-label="需要开票"
-                      />
+                <Card className="border border-primary/20"><CardBody className="p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2"><ReceiptText className="w-5 h-5 text-primary" /><div><p className="font-medium">需要开票</p><p className="text-xs text-default-500">确认后生成开票二维码，可随时切回普通二维码。</p></div></div>
+                    <Switch isSelected={invoiceSelected} isDisabled={creatingInvoiceOrder || eligibilityLoading} onValueChange={handleInvoiceSwitch} aria-label="需要开票" />
+                  </div>
+                  {invoiceSelected && invoiceOrder ? (
+                    <div className="rounded-lg bg-primary/5 p-3 text-sm space-y-1"><p>套餐原价：¥{invoiceOrder.base_amount}</p><p>开票服务费：¥{invoiceOrder.invoice_snapshot?.surcharge_amount}</p><p>最终支付：¥{invoiceOrder.payable_amount}</p><p>抬头：{invoiceOrder.invoice_snapshot?.title}</p><p>税号：{invoiceOrder.invoice_snapshot?.tax_number}</p><p>接收邮箱：{invoiceOrder.invoice_snapshot?.email}</p></div>
+                  ) : invoiceSelected && eligibilityLoading ? <Spinner size="sm" /> : invoiceSelected && eligibility ? (
+                    <div className="rounded-lg bg-primary/5 p-3 text-sm space-y-2">
+                      <p>套餐原价：¥{eligibility.base_amount}</p><p>开票服务费：¥{eligibility.surcharge_amount}</p><p>最终支付：¥{eligibility.payable_amount}</p><p>抬头：{eligibility.billing_profile?.title || '-'}</p><p>税号：{eligibility.billing_profile?.tax_number || '-'}</p><p>接收邮箱：{eligibility.email || '-'}</p>
+                      {!eligibility.eligible && <p className="text-warning-700">{getInvoiceUnavailableText(eligibility.reason)}</p>}
+                      {eligibility.eligible && <Button color="primary" size="sm" onPress={confirmInvoice} isLoading={creatingInvoiceOrder}>确认并生成开票二维码</Button>}
                     </div>
-                    {orderInfo.invoice_requested && orderInfo.invoice_snapshot ? (
-                      <div className="rounded-lg bg-primary/5 p-3 text-sm space-y-1">
-                        <p>抬头：{orderInfo.invoice_snapshot.title}</p>
-                        <p>接收邮箱：{orderInfo.invoice_snapshot.email}</p>
-                        <p>预计在支付完成后 {orderInfo.invoice_snapshot.delivery_workdays} 个工作日内发送。</p>
-                      </div>
-                    ) : eligibility && !eligibility.eligible ? (
-                      <p className="text-xs text-warning-700">
-                        当前账户暂不满足开票条件；
-                        {(eligibility.reason === 'email_unbound' || eligibility.reason === 'billing_profile_missing') && (
-                          <a
-                            href={`/user-center?tab=profile&openEdit=${eligibility.reason === 'email_unbound' ? 'email' : 'billing_profile'}`}
-                            className="text-primary hover:underline"
-                          >
-                            {eligibility.reason === 'email_unbound' ? '去绑定邮箱' : '去完善主体信息'}
-                          </a>
-                        )}
-                      </p>
-                    ) : eligibility?.eligible ? (
-                      <p className="text-xs text-default-500">开启后应付 ¥{eligibility.payable_amount}，含服务费 ¥{eligibility.surcharge_amount}。</p>
-                    ) : null}
-                  </CardBody>
-                </Card>
+                  ) : null}
+                  {invoiceConfirmed && <p className="text-xs text-success">开票二维码已生成。</p>}
+                </CardBody></Card>
               )}
 
-              {/* 支付区域 */}
               <div className="text-center">
-                {paymentStatus === 'pending' && !qrCodeExpired && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-center gap-2">
-                      <QrCode className="w-5 h-5 text-primary" />
-                      <span className="text-base font-medium">
-                        {orderInfo.pay_type === 'wxpay' ? '请使用微信扫码支付' : '请扫码支付'}
-                      </span>
-                    </div>
-                    <p className="text-sm text-default-500">二维码 5 分钟内有效，请尽快完成支付</p>
-
-                    {/* 二维码 */}
-                    {qrCodeValue && (
-                      <div className="flex justify-center">
-                        <Card className="p-4 sm:p-6 relative shadow-sm">
-                          <motion.img
-                            src={generateQRCodeDataUrl(qrCodeValue)}
-                            alt="支付二维码"
-                            className="w-44 h-44 sm:w-52 sm:h-52"
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: 0.2 }}
-                          />
-                        </Card>
-                      </div>
-                    )}
-
-
-                    {/* 备选：跳转支付页链接 */}
-                    {orderInfo.payment_url && (
-                      <a
-                        href={orderInfo.payment_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-                      >
-                        <ExternalLink size={14} />
-                        无法扫码？点击跳转支付页面
-                      </a>
-                    )}
-                  </div>
-                )}
-
-                {paymentStatus === 'pending' && qrCodeExpired && (
-                  <div className="space-y-4">
-                    <div className="flex justify-center">
-                      <Card className="p-4 sm:p-6 relative shadow-sm">
-                        {qrCodeValue && (
-                          <img
-                            src={generateQRCodeDataUrl(qrCodeValue)}
-                            alt="支付二维码（已过期）"
-                            className="w-44 h-44 sm:w-52 sm:h-52 opacity-20 grayscale"
-                          />
-                        )}
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <Chip color="danger" variant="solid" size="lg" className="shadow-lg">
-                            已过期
-                          </Chip>
-                        </div>
-                      </Card>
-                    </div>
-                    <p className="text-danger font-medium">二维码已过期</p>
-                    <Button color="primary" onPress={handleClose}>
-                      重新下单
-                    </Button>
-                  </div>
-                )}
-
-                {paymentStatus === 'checking' && (
-                  <div className="space-y-4">
-                    <Spinner size="lg" color="primary" />
-                    <p className="text-default-600">正在确认支付结果...</p>
-                  </div>
-                )}
-
-                {paymentStatus === 'success' && (
-                  <div className="space-y-6">
-                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', duration: 0.6 }}>
-                      <CheckCircle className="w-20 h-20 mx-auto text-success" />
-                    </motion.div>
-                    <div>
-                      <h3 className="text-2xl font-bold text-success mb-2">支付成功！</h3>
-                      <p className="text-default-500">页面即将刷新，请稍等...</p>
-                    </div>
-                  </div>
-                )}
-
-                {paymentStatus === 'failed' && (
-                  <div className="space-y-4">
-                    <AlertCircle className="w-12 h-12 mx-auto text-danger" />
-                    <div>
-                      <h3 className="text-lg font-semibold text-danger mb-2">支付异常</h3>
-                      <p className="text-default-500 text-sm">请联系客服处理</p>
-                    </div>
-                    <Button color="primary" variant="flat" onPress={handleClose}>
-                      关闭
-                    </Button>
-                  </div>
-                )}
+                {paymentStatus === 'pending' && !qrCodeExpired && <div className="space-y-4"><div className="flex items-center justify-center gap-2"><QrCode className="w-5 h-5 text-primary" /><span className="text-base font-medium">{activeOrder.pay_type === 'wxpay' ? '请使用微信扫码支付' : '请扫码支付'}</span></div><p className="text-sm text-default-500">本次结账 60 分钟内有效，请尽快完成支付</p>{qrCodeValue && <div className="flex justify-center"><Card className="p-4 sm:p-6 relative shadow-sm"><motion.img key={activeOrder.order_id} src={generateQRCodeDataUrl(qrCodeValue)} alt="支付二维码" className="w-44 h-44 sm:w-52 sm:h-52" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} /></Card></div>}{activeOrder.payment_url && <a href={activeOrder.payment_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm text-primary hover:underline"><ExternalLink size={14} />无法扫码？点击跳转支付页面</a>}</div>}
+                {paymentStatus === 'pending' && qrCodeExpired && <div className="space-y-4"><AlertCircle className="w-12 h-12 mx-auto text-danger" /><p className="text-danger font-medium">本次结账已过期，请重新下单</p><Button color="primary" onPress={handleClose}>重新下单</Button></div>}
+                {paymentStatus === 'checking' && <div className="space-y-4"><Spinner size="lg" color="primary" /><p>正在确认支付结果...</p></div>}
+                {paymentStatus === 'success' && <div className="space-y-6"><CheckCircle className="w-20 h-20 mx-auto text-success" /><div><h3 className="text-2xl font-bold text-success mb-2">支付成功！</h3><p className="text-default-500">页面即将刷新，请稍等...</p></div></div>}
+                {paymentStatus === 'failed' && <div className="space-y-4"><AlertCircle className="w-12 h-12 mx-auto text-danger" /><p>支付异常，请联系客服处理</p></div>}
               </div>
             </div>
           )}
         </ModalBody>
-
-        <ModalFooter>
-          {paymentStatus === 'pending' && !qrCodeExpired && (
-            <div className="flex w-full justify-between items-center">
-              <Button color="default" variant="light" onPress={handleClose}>
-                取消支付
-              </Button>
-              <Button
-                color="success"
-                onPress={handleManualCheck}
-                isLoading={manualCheckLoading}
-              >
-                我已完成支付
-              </Button>
-            </div>
-          )}
-        </ModalFooter>
+        <ModalFooter>{paymentStatus === 'pending' && !qrCodeExpired && <div className="flex w-full justify-between items-center"><Button variant="light" onPress={handleClose}>取消支付</Button><Button color="success" onPress={handleManualCheck} isLoading={manualCheckLoading}>我已完成支付</Button></div>}</ModalFooter>
       </ModalContent>
     </Modal>
   );

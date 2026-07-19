@@ -318,7 +318,7 @@ export const packageUserApi = {
 export interface CreateOrderOptions {
     device?: 'mobile' | 'pc';
     invoice_requested?: boolean;
-    replaced_order_id?: string;
+    checkout_id?: string;
 }
 
 export interface InvoiceOrderSnapshot {
@@ -338,6 +338,7 @@ export const orderUserApi = {
         success: boolean;
         trade_no: string;
         order_id: string;
+        checkout_id: string;
         payment_url: string | null;
         qr_code: string;
         channel: string;
@@ -355,6 +356,17 @@ export const orderUserApi = {
 
     getInvoiceEligibility: async (package_id: number): Promise<ApiResponse<InvoiceEligibility>> => {
         return createUserRequest(getUserApiUrl(`/u/invoice/eligibility?package_id=${package_id}`), {
+            method: 'GET',
+        });
+    },
+
+    getCheckoutStatus: async (checkout_id: string): Promise<ApiResponse<{
+        paid: boolean;
+        winning_order_id: string | null;
+        invoice_requested: boolean | null;
+        orders: Array<{ order_id: string; invoice_requested: boolean; status: string }>;
+    }>> => {
+        return createUserRequest(getUserApiUrl(`/u/checkout_status?checkout_id=${encodeURIComponent(checkout_id)}`), {
             method: 'GET',
         });
     },

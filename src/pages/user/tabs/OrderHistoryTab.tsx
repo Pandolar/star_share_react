@@ -189,6 +189,8 @@ export const OrderHistoryTab: React.FC = () => {
       awaiting_payment: '支付后待开票',
       pending_issue: '待开票',
       issued: '已开票',
+      cancelled: '已取消',
+      payment_exception: '异常到账',
     };
     const color = order.invoice_status === 'issued' ? 'success' : order.invoice_status === 'pending_issue' ? 'warning' : 'default';
     return <Chip size="sm" color={color} variant="flat">{labels[order.invoice_status || ''] || '开票处理中'}</Chip>;
