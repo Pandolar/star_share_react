@@ -98,6 +98,7 @@ interface DistributorFormState {
     status: number;
     domainsText: string;
     remarks: string;
+    resetPassword: boolean;
     level: number;
     defaultCdkExpireDays: number;
     can_login: boolean;
@@ -127,6 +128,7 @@ const DEFAULT_FORM: DistributorFormState = {
     password: '',
     status: 1,
     domainsText: '',
+    resetPassword: false,
     remarks: '',
     level: 1,
     defaultCdkExpireDays: 90,
@@ -135,9 +137,8 @@ const DEFAULT_FORM: DistributorFormState = {
     can_edit_notice: true,
     can_edit_links: true,
 };
-
 const PERMISSIONS: Array<{ key: PermissionKey; label: string; description: string }> = [
-    { key: 'can_login', label: '登录分销商后台', description: '只控制后续登录；如需立即停止现有会话，请停用账号。' },
+    { key: 'can_login', label: '登录分销商后台', description: '关闭后立即终止所有设备会话，并阻止后续登录。' },
     { key: 'can_generate_cdk', label: '余额生成卡密', description: '允许按最终折后价扣减余额并生成当前账号名下的卡密。' },
     { key: 'can_edit_notice', label: '修改站点公告', description: '允许分销商在后台修改其绑定域名显示的公告。' },
     { key: 'can_edit_links', label: '修改购买/客服链接', description: '允许修改白牌访问端的购买入口和客服入口。' },
@@ -291,6 +292,7 @@ const DistributorsManagePage: React.FC = () => {
             username: distributor.username,
             password: '',
             status: distributor.status,
+            resetPassword: false,
             domainsText: parseStoredDomains(distributor).join('\n'),
             remarks: distributor.remarks || '',
             level: distributor.level || 1,
@@ -333,8 +335,8 @@ const DistributorsManagePage: React.FC = () => {
             showToast('初始密码至少 8 位', 'warning');
             return null;
         }
-        if (!isCreate && formData.password && formData.password.length < 8) {
-            showToast('新密码至少 8 位，或留空保持不变', 'warning');
+        if (!isCreate && formData.resetPassword && formData.password.length < 8) {
+            showToast('新密码至少 8 位', 'warning');
             return null;
         }
         if (!Number.isInteger(formData.level) || formData.level < 1) {
@@ -395,7 +397,7 @@ const DistributorsManagePage: React.FC = () => {
             if (!domains) return;
             const response = await adminApiService.updateDistributor({
                 id: selectedDistributor.id,
-                password: formData.password || undefined,
+                password: formData.resetPassword ? formData.password : undefined,
                 status: formData.status,
                 domains,
                 remarks: formData.remarks.trim(),
@@ -699,7 +701,7 @@ const DistributorsManagePage: React.FC = () => {
                 title={mode === 'create' ? '创建后默认启用' : '账号名创建后不可修改'}
                 description={mode === 'create'
                     ? '建议先绑定域名、设置权限和默认有效期，再充值并配置折扣。'
-                    : '停用账号会让域名映射和鉴权立即失效；“禁止登录后台”仅阻止后续登录。'}
+                    : '保存普通配置不会修改密码；只有主动开启“重置登录密码”并填写新密码才会重置。'}
             />
             <div className="grid gap-4 sm:grid-cols-2">
                 <Input
@@ -710,15 +712,37 @@ const DistributorsManagePage: React.FC = () => {
                     isRequired
                     autoComplete="off"
                 />
-                <Input
-                    label={mode === 'create' ? '初始密码' : '重置密码（可选）'}
-                    type="password"
-                    value={formData.password}
-                    onValueChange={(value) => setFormData((current) => ({ ...current, password: value }))}
-                    description={mode === 'create' ? '至少 8 位' : '留空则保持原密码'}
-                    isRequired={mode === 'create'}
-                    autoComplete="new-password"
-                />
+                {mode === 'create' ? (
+                    <Input
+                        label="初始密码"
+                        type="password"
+                        value={formData.password}
+                        onValueChange={(value) => setFormData((current) => ({ ...current, password: value }))}
+                        description="至少 8 位"
+                        isRequired
+                        autoComplete="new-password"
+                    />
+                ) : (
+                    <div className="space-y-3">
+                        <Switch
+                            isSelected={formData.resetPassword}
+                            onValueChange={(resetPassword) => setFormData((current) => ({ ...current, resetPassword, password: '' }))}
+                        >
+                            重置登录密码
+                        </Switch>
+                        {formData.resetPassword && (
+                            <Input
+                                label="新登录密码"
+                                type="password"
+                                value={formData.password}
+                                onValueChange={(value) => setFormData((current) => ({ ...current, password: value }))}
+                                description="至少 8 位；保存后所有设备需要用新密码重新登录"
+                                isRequired
+                                autoComplete="new-password"
+                            />
+                        )}
+                    </div>
+                )}
                 {mode === 'edit' && (
                     <Select
                         label="账号状态"
@@ -949,7 +973,7 @@ const DistributorsManagePage: React.FC = () => {
                     </Form>
                     <Divider />
                     <div><div className="mb-3 flex items-center justify-between"><p className="font-medium">最近余额流水</p><Button size="sm" variant="flat" startContent={<RefreshCw className="h-4 w-4" />} onPress={() => selectedDistributor && loadBalanceLogs(selectedDistributor)}>刷新</Button></div>
-                        <Table aria-label="分销商余额流水"><TableHeader><TableColumn>变动</TableColumn><TableColumn>操作后余额</TableColumn><TableColumn>说明</TableColumn><TableColumn>时间</TableColumn></TableHeader><TableBody isLoading={balanceLoading} loadingContent={<Spinner label="加载流水中..." />} emptyContent="暂无余额流水">{balanceLogs.map((log) => <TableRow key={log.id}><TableCell><strong className={log.change_amount >= 0 ? 'text-success' : 'text-danger'}>{log.change_amount >= 0 ? '+' : ''}{Number(log.change_amount).toFixed(2)}</strong></TableCell><TableCell>¥{Number(log.balance_after).toFixed(2)}</TableCell><TableCell><span className="block max-w-72 truncate" title={log.remarks || log.type}>{log.remarks || log.type}</span></TableCell><TableCell>{dayjs(log.created_at).format('YYYY-MM-DD HH:mm')}</TableCell></TableRow>)}</TableBody></Table>
+                        <Table aria-label="分销商余额流水"><TableHeader><TableColumn>变动</TableColumn><TableColumn>操作后余额</TableColumn><TableColumn>说明</TableColumn><TableColumn>时间</TableColumn></TableHeader><TableBody isLoading={balanceLoading} loadingContent={<Spinner label="加载流水中..." />} emptyContent="暂无余额流水">{balanceLogs.map((log) => <TableRow key={log.id}><TableCell><strong className={log.change_amount >= 0 ? 'text-success' : 'text-danger'}>{log.change_amount >= 0 ? '+' : ''}{Number(log.change_amount).toFixed(2)}</strong></TableCell><TableCell>¥{Number(log.balance_after).toFixed(2)}</TableCell><TableCell><span className="block max-w-72 truncate" title={log.remarks || log.type}>{log.remarks || log.type}</span></TableCell><TableCell>{dayjs(log.created_at).format('YYYY-MM-DD HH:mm:ss')}</TableCell></TableRow>)}</TableBody></Table>
                     </div>
                 </ModalBody><ModalFooter><Button onPress={onClose}>关闭</Button></ModalFooter></>}</ModalContent>
             </Modal>
@@ -973,8 +997,8 @@ const DistributorsManagePage: React.FC = () => {
                         color={selectedDistributor?.status === 1 ? 'warning' : 'success'}
                         title={selectedDistributor?.username || '未选择账号'}
                         description={selectedDistributor?.status === 1
-                            ? '停用会立即让现有 token 校验、域名映射和该分销商卡密的后续兑换失效；历史卡密与流水仍会保留。'
-                            : '启用后会恢复 token 校验、域名映射和名下有效卡密的兑换；能否重新登录还取决于“登录分销商后台”权限。'}
+                            ? '停用会立即终止所有设备会话，并让域名映射和该分销商卡密的后续兑换失效；历史卡密与流水仍会保留。'
+                            : '启用后会恢复域名映射和名下有效卡密的兑换；能否重新登录还取决于“登录分销商后台”权限。'}
                     />
                     <p className="text-sm text-default-600">确认执行此状态变更吗？</p>
                 </ModalBody><ModalFooter><Button variant="light" onPress={onClose}>取消</Button><Button color={selectedDistributor?.status === 1 ? 'warning' : 'success'} isLoading={statusSubmitting} onPress={handleToggleStatus}>确认{selectedDistributor?.status === 1 ? '停用' : '启用'}</Button></ModalFooter></>}</ModalContent>

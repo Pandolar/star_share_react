@@ -372,8 +372,7 @@ const DistributorDashboardPage: React.FC = () => {
                 new_password: newPassword,
             });
             if (response.code === 20000) {
-                showToast('密码已修改，请重新登录', 'success');
-                distributorApiService.logout();
+                distributorApiService.clearLocalSession('密码已修改，请使用新密码重新登录');
             } else {
                 showToast(response.msg || '密码修改失败', 'error');
             }
@@ -905,7 +904,7 @@ const DistributorDashboardPage: React.FC = () => {
                             <ModalBody><p>确定要退出当前账号吗？未提交的表单内容不会保留。</p></ModalBody>
                             <ModalFooter>
                                 <Button variant="light" onPress={onClose}>取消</Button>
-                                <Button color="danger" onPress={() => distributorApiService.logout()}>退出登录</Button>
+                                <Button color="danger" onPress={() => { void distributorApiService.logout(); }}>退出登录</Button>
                             </ModalFooter>
                         </>
                     )}

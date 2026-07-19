@@ -170,6 +170,7 @@ export interface DistributorCdkQuery {
 class DistributorApiService {
     private api: AxiosInstance;
 
+    private redirectingToLogin = false;
     constructor() {
         this.api = axios.create({
             baseURL: '/star/distributor',
@@ -183,7 +184,8 @@ class DistributorApiService {
         this.api.interceptors.request.use(
             (config) => {
                 const dtoken = localStorage.getItem('dtoken');
-                if (dtoken) {
+                const isPublicLogin = config.url === '/login';
+                if (dtoken && !isPublicLogin) {
                     config.headers['dtoken'] = dtoken;
                 }
                 return config;
@@ -193,19 +195,38 @@ class DistributorApiService {
             }
         );
 
+        // Business responses use HTTP 200; normalize expired sessions before callers render stale errors.
+        this.api.interceptors.response.use((response) => {
+            if (Number(response.data?.code) === 20009) {
+                this.handleExpiredSession(response.data?.msg);
+                return Promise.reject(new Error('登录状态已失效，请重新登录'));
+            }
+            return response;
+        });
+
         // 响应拦截器：处理401未授权
         this.api.interceptors.response.use(
             (response) => response,
             (error) => {
                 if (error.response?.status === 401) {
-                    // dtoken 失效，清除并跳转登录
-                    localStorage.removeItem('dtoken');
-                    localStorage.removeItem('distributor');
-                    window.location.href = '/distributor/login';
+                    this.handleExpiredSession(error.response?.data?.msg);
+                    return Promise.reject(new Error('登录状态已失效，请重新登录'));
                 }
                 return Promise.reject(error);
             }
         );
+    }
+
+    private clearSession(): void {
+        localStorage.removeItem('dtoken');
+        localStorage.removeItem('distributor');
+    }
+    private handleExpiredSession(serverMessage?: string): void {
+        this.clearSession();
+        if (this.redirectingToLogin || window.location.pathname === '/distributor/login') return;
+        this.redirectingToLogin = true;
+        sessionStorage.setItem('distributorLoginNotice', serverMessage || '登录状态已失效，请重新登录');
+        window.location.assign('/distributor/login');
     }
 
     /**
@@ -281,12 +302,23 @@ class DistributorApiService {
     }
 
     /**
-     * 登出
+     * 登出当前设备
      */
-    logout() {
-        localStorage.removeItem('dtoken');
-        localStorage.removeItem('distributor');
-        window.location.href = '/distributor/login';
+    async logout(): Promise<void> {
+        try {
+            await this.api.post('/logout');
+        } catch {
+            // Local logout still completes if the session already expired or the network is unavailable.
+        } finally {
+            this.clearSession();
+            window.location.assign('/distributor/login');
+        }
+    }
+
+    clearLocalSession(notice?: string): void {
+        this.clearSession();
+        if (notice) sessionStorage.setItem('distributorLoginNotice', notice);
+        window.location.assign('/distributor/login');
     }
 
     /**

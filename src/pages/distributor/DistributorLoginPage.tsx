@@ -21,10 +21,17 @@ const DistributorLoginPage: React.FC = () => {
     const [password, setPassword] = useState('');
     const [passwordVisible, setPasswordVisible] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [sessionNotice, setSessionNotice] = useState('');
 
     useEffect(() => {
         if (distributorApiService.isLoggedIn()) {
             navigate('/distributor/dashboard', { replace: true });
+            return;
+        }
+        const notice = sessionStorage.getItem('distributorLoginNotice') || '';
+        if (notice) {
+            sessionStorage.removeItem('distributorLoginNotice');
+            setSessionNotice(notice);
         }
     }, [navigate]);
 
@@ -50,7 +57,8 @@ const DistributorLoginPage: React.FC = () => {
                 showToast(response.msg || '登录失败', 'error');
             }
         } catch (error: any) {
-            showToast(error.response?.data?.msg || error.message || '登录失败，请检查网络', 'error');
+            const message = error.response?.data?.msg || error.message || '';
+            showToast(message === 'Network Error' ? '登录服务暂时不可用，请稍后重试' : (message || '登录失败，请稍后重试'), 'error');
         } finally {
             setLoading(false);
         }
@@ -59,6 +67,15 @@ const DistributorLoginPage: React.FC = () => {
     return (
         <main className="flex min-h-screen items-center justify-center bg-default-50 p-4">
             <div className="w-full max-w-md space-y-4">
+                {sessionNotice && (
+                    <Alert
+                        isVisible
+                        color="warning"
+                        variant="flat"
+                        title={sessionNotice}
+                        description="这不是账号或密码错误，请重新提交正确账密即可。"
+                    />
+                )}
                 <Card shadow="lg">
                     <CardHeader className="flex-col gap-3 pb-5 text-center">
                         <Avatar color="primary" icon={<LogIn className="h-7 w-7" />} size="lg" />
@@ -73,6 +90,7 @@ const DistributorLoginPage: React.FC = () => {
                             <Input
                                 label="分销商账号"
                                 value={username}
+                                onKeyDown={() => setSessionNotice('')}
                                 onValueChange={setUsername}
                                 startContent={<User className="h-4 w-4 text-default-400" />}
                                 autoComplete="username"
@@ -84,6 +102,7 @@ const DistributorLoginPage: React.FC = () => {
                                 type={passwordVisible ? 'text' : 'password'}
                                 value={password}
                                 onValueChange={setPassword}
+                                onKeyDown={() => setSessionNotice('')}
                                 startContent={<Lock className="h-4 w-4 text-default-400" />}
                                 endContent={(
                                     <Button
