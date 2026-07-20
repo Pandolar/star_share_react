@@ -32,6 +32,7 @@ import {
     BarChart3,
     Gift,
     ReceiptText,
+    ScrollText,
 } from 'lucide-react';
 import adminApiService from '../../services/adminApi';
 
@@ -110,6 +111,12 @@ const AdminLayout: React.FC = () => {
             label: '分销商管理',
             icon: <Users className="w-5 h-5" />,
             path: '/star-admin/distributors',
+        },
+        {
+            key: 'audit-logs',
+            label: '审计日志',
+            icon: <ScrollText className="w-5 h-5" />,
+            path: '/star-admin/audit-logs',
         },
         {
             key: 'settings',

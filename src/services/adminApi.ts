@@ -30,6 +30,10 @@ import {
     UpdateWorkOrderRequest,
     InvoiceRecord,
     InvoiceQueryParams,
+    AuditLogQueryParams,
+    AuditLogResponseData,
+    DashboardData,
+    DashboardQueryParams,
 } from '../types/admin';
 
 /**
@@ -366,6 +370,15 @@ class AdminApiService {
         return response.data;
     }
 
+    /**
+     * 统一审计日志：支持类型、用户、关联ID和全文筛选。
+     */
+    async getAuditLogs(params: AuditLogQueryParams = {}): Promise<AdminApiResponse<AuditLogResponseData>> {
+        const queryString = this.buildQueryString(params);
+        const response = await this.api.get(`/star/audit_logs?${queryString}`);
+        return response.data;
+    }
+
     // ==================== 系统配置管理 ====================
 
     /**
@@ -486,8 +499,9 @@ class AdminApiService {
     /**
      * 获取仪表盘汇总数据
      */
-    async getDashboard(): Promise<AdminApiResponse<import('../types/admin').DashboardData>> {
-        const response = await this.api.get('/star/dashboard');
+    async getDashboard(params: DashboardQueryParams = {}): Promise<AdminApiResponse<DashboardData>> {
+        const queryString = this.buildQueryString(params);
+        const response = await this.api.get(`/star/dashboard?${queryString}`);
         return response.data;
     }
 

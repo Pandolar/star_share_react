@@ -19,6 +19,35 @@ export interface CommonQueryParams {
     order?: 'asc' | 'desc';
 }
 
+export interface AuditLogCatalogItem {
+    type: string;
+    label: string;
+    group: string;
+    description: string;
+    count: number;
+}
+
+export interface AuditLogRecord {
+    id: number;
+    type: string;
+    type_label: string;
+    user_id: number | null;
+    ref_id: number | null;
+    created_at: string | null;
+    data: Record<string, unknown>;
+}
+
+export interface AuditLogQueryParams extends CommonQueryParams {
+    type?: string;
+    user_id?: number;
+    ref_id?: number;
+}
+
+export interface AuditLogResponseData {
+    list: AuditLogRecord[];
+    catalog: AuditLogCatalogItem[];
+}
+
 // 套餐管理相关类型
 export interface Package {
     id: number;
@@ -133,6 +162,39 @@ export interface UserQueryParams extends CommonQueryParams {
     remarks?: string;
 }
 
+export interface AdminUserSummary {
+    id: number;
+    username?: string | null;
+    email?: string | null;
+    tel?: string | null;
+    status: 0 | 1;
+    created_at?: string | null;
+}
+
+export interface AdminPackageSummary {
+    id: number;
+    package_name: string;
+    category: string;
+    level: string;
+    price: number;
+    duration: number;
+    priority: number;
+    status: 0 | 1;
+    introduce?: string | null;
+    remarks?: string | null;
+}
+
+export interface RelatedOrderSummary {
+    id: number;
+    order_id: string;
+    trade_no?: string | null;
+    status: 'pending' | 'paid' | 'failed';
+    base_amount?: number | null;
+    payable_amount?: number | null;
+    paid_amount?: number | null;
+    paid_at?: string | null;
+}
+
 // 用户套餐记录类型
 export interface UserPackage {
     id: number;
@@ -144,6 +206,9 @@ export interface UserPackage {
     way?: string;
     remaining_duration?: number;
     remarks?: string;
+    user?: AdminUserSummary | null;
+    package?: AdminPackageSummary | null;
+    related_order?: RelatedOrderSummary | null;
 }
 
 export interface UserPackageQueryParams extends CommonQueryParams {
@@ -247,6 +312,8 @@ export interface Order {
     payable_amount?: number | null;
     paid_amount?: number | null;
     invoice_snapshot?: Record<string, unknown> | null;
+    user?: AdminUserSummary | null;
+    package?: AdminPackageSummary | null;
 }
 
 export interface UpdateOrderRequest {
@@ -305,78 +372,104 @@ export interface PaginatedData<T> {
     page_size: number;
 } 
 
-// 仪表盘数据类型
-export interface DashboardUsers {
-    total: number;
-    active: number;
-    disabled: number;
-    with_inviter: number;
-    new_today: number;
-    new_yesterday: number;
-    new_7d: number;
-    new_30d: number;
-    first_paid_users_today: number;
-    first_paid_users_7d: number;
-    timeseries_7d_hourly: Array<{ ts: string; count: number }>;
-    timeseries_30d_daily: Array<{ date: string; count: number }>;
+// 可筛选运营总览
+export interface DashboardQueryParams {
+    start_date?: string;
+    end_date?: string;
+    granularity?: 'auto' | 'hour' | 'day';
+    package_id?: number;
+    user_status?: 'all' | 'active' | 'disabled';
 }
 
-export interface DashboardOrders {
-    total: number;
-    pending: number;
-    paid: number;
-    failed: number;
-    paid_today: number;
-    paid_yesterday: number;
-    paid_7d: number;
-    paid_30d: number;
-    by_hour_7d: Array<{ ts: string; count: number }>;
-    by_day_30d: Array<{ date: string; count: number }>;
+export interface DashboardPeriod {
+    start_date: string;
+    end_date: string;
+    previous_start_date: string;
+    previous_end_date: string;
+    granularity: 'hour' | 'day';
+    package_id: number | null;
+    user_status: 'all' | 'active' | 'disabled';
+    timezone: string;
 }
 
-export interface DashboardRevenue {
-    total: number;
-    today: number;
-    yesterday: number;
-    last_7d: number;
-    last_30d: number;
-    by_hour_7d: Array<{ ts: string; amount: number }>;
-    by_day_30d: Array<{ date: string; amount: number }>;
-    paid_user_count: number;
-    arpu: number;
+export interface DashboardSummary {
+    new_users: number;
+    paid_orders: number;
+    revenue: number;
+    paid_users: number;
+    first_paid_users: number;
+    package_grants: number;
+    cdk_redemptions: number;
+    average_order_value: number;
     arppu: number;
-    conversion_rate: number; // 0 ~ 1
+    payment_success_rate: number;
+    repeat_purchase_rate: number;
+    new_user_paid_conversion: number;
 }
 
-export interface DashboardPackages {
-    active_count: number;
-    frozen_count: number;
-    expired_count: number;
-    ways: { purchase?: number; exchange?: number; other?: number };
-    active_users_distinct: number;
-    top_by_sales: Array<{ package_id: number; package_name: string; count: number }>;
-    top_by_revenue: Array<{ package_id: number; package_name: string; amount: number }>;
+export interface DashboardTrendPoint {
+    bucket: string;
+    new_users: number;
+    paid_orders: number;
+    revenue: number;
+    paid_users: number;
+    first_paid_users: number;
+    package_grants: number;
+    cdk_redemptions: number;
+    average_order_value: number;
 }
 
-export interface DashboardCDK {
-    unused: number;
-    used: number;
-    disabled: number;
-    used_today: number;
-    used_7d: number;
+export interface DashboardPackagePerformance {
+    package_id: number;
+    package_name: string;
+    category: string;
+    level: string;
+    paid_orders: number;
+    revenue: number;
+    average_order_value: number;
 }
 
-export interface DashboardMeta {
-    generated_at: string; // ISO Asia/Shanghai
+export interface DashboardInventory {
+    total_users: number;
+    active_users: number;
+    disabled_users: number;
+    active_package_records: number;
+    active_package_users: number;
+    frozen_package_records: number;
+    unused_cdks: number;
+    disabled_cdks: number;
+    pending_orders: number;
+    packages_on_sale: number;
+    lifetime_paid_orders: number;
+    lifetime_paid_users: number;
+    lifetime_revenue: number;
 }
 
 export interface DashboardData {
-    users: DashboardUsers;
-    orders: DashboardOrders;
-    revenue: DashboardRevenue;
-    packages: DashboardPackages;
-    cdk: DashboardCDK;
-    meta: DashboardMeta;
+    period: DashboardPeriod;
+    summary: DashboardSummary;
+    previous_summary: DashboardSummary;
+    trend: DashboardTrendPoint[];
+    previous_trend: DashboardTrendPoint[];
+    dimensions: {
+        order_status: Array<{ key: 'pending' | 'paid' | 'failed'; label: string; count: number }>;
+        acquisition_sources: Array<{ key: 'purchase' | 'exchange' | 'other'; label: string; count: number }>;
+        top_packages: DashboardPackagePerformance[];
+    };
+    inventory: DashboardInventory;
+    package_options: Array<{
+        id: number;
+        package_name: string;
+        category: string;
+        level: string;
+        status: 0 | 1;
+    }>;
+    meta: {
+        generated_at: string;
+        max_range_days: number;
+        revenue_definition: string;
+        package_filter_note: string;
+    };
 }
 
 

@@ -177,7 +177,7 @@ const UserCenter: React.FC = () => {
     if (!urlTab && searchParams.get('action') === 'reset_quota' && activeTab !== 'profile') {
       setActiveTab('profile');
     }
-  }, [searchParams, activeTab, tabConfigs]);
+  }, [searchParams, activeTab, tabConfigs, isWhiteLabel, setSearchParams]);
 
   // 切换 Tab 并将 tab 写入 URL 查询参数
   const switchTab = (key: string, isMobile = false) => {
@@ -197,7 +197,7 @@ const UserCenter: React.FC = () => {
     return <Component />;
   };
 
-  // 处理退出登录：先调用后端接口，再清理本地状态并跳转
+  // 后端先撤销 token 并清除套餐/会话快照；本地状态无论请求结果都清理。
   const handleLogout = async () => {
     // 准备鉴权参数（从cookie中读取）
     const xuserid = getCookie('xuserid') || '';

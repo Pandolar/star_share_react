@@ -64,7 +64,7 @@ export const LogoutConfirmModal: React.FC<LogoutConfirmModalProps> = ({
                   您确定要退出登录吗？
                 </p>
                 <p className="text-sm text-default-500">
-                  这将清除您的登录状态并跳转到主页
+                  这将清除登录状态和本次会话缓存；下次登录会重新获取最新套餐信息
                 </p>
               </motion.div>
             </ModalBody>

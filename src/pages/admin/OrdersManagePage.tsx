@@ -38,25 +38,26 @@ import {
     ShoppingCart,
     Filter,
     RefreshCw,
-    DollarSign,
-    User,
-    Calendar,
 } from 'lucide-react';
 import dayjs from 'dayjs';
+import { useSearchParams } from 'react-router-dom';
 import adminApiService from '../../services/adminApi';
 import { Order, UpdateOrderRequest, OrderQueryParams } from '../../types/admin';
 import { showToast } from '../../components/Toast';
+import { PackageSummary, UserSummary } from '../../components/admin/AdminEntitySummary';
 
 /**
  * 订单管理页面
  * 提供订单的查看、编辑、删除功能
  */
 const OrdersManagePage: React.FC = () => {
+    const [urlSearchParams, setUrlSearchParams] = useSearchParams();
+    const urlQuery = (urlSearchParams.get('query') || '').trim();
     // 状态管理
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(false);
-    const [searchInput, setSearchInput] = useState('');
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchInput, setSearchInput] = useState(urlQuery);
+    const [searchQuery, setSearchQuery] = useState(urlQuery);
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
@@ -128,9 +129,16 @@ const OrdersManagePage: React.FC = () => {
         fetchOrders();
     }, [fetchOrders]);
 
+    useEffect(() => {
+        setSearchInput(urlQuery);
+        setSearchQuery(urlQuery);
+        setCurrentPage(1);
+    }, [urlQuery]);
+
     // 处理搜索
     const handleSearch = () => {
         const nextQuery = searchInput.trim();
+        setUrlSearchParams(nextQuery ? { query: nextQuery } : {}, { replace: true });
         if (currentPage === 1 && searchQuery === nextQuery) {
             fetchOrders();
             return;
@@ -145,6 +153,7 @@ const OrdersManagePage: React.FC = () => {
         setSearchQuery('');
         setStatusFilter('all');
         setCurrentPage(1);
+        setUrlSearchParams({}, { replace: true });
     };
 
     // 处理编辑订单
@@ -303,7 +312,7 @@ const OrdersManagePage: React.FC = () => {
                 <CardBody>
                     <div className="flex flex-col sm:flex-row gap-4">
                         <Input
-                            placeholder="搜索订单号..."
+                            placeholder="搜索订单号、交易号、用户、邮箱或套餐..."
                             value={searchInput}
                             onValueChange={setSearchInput}
                             startContent={<Search className="w-4 h-4 text-default-400" />}
@@ -359,18 +368,16 @@ const OrdersManagePage: React.FC = () => {
                         aria-label="订单列表"
                         isHeaderSticky
                         classNames={{
-                            wrapper: "max-h-[600px] overflow-x-auto",
-                            table: "min-w-[1100px]",
+                            wrapper: "max-h-[640px] overflow-x-auto",
+                            table: "min-w-[1120px]",
                         }}
                     >
                         <TableHeader>
-                            <TableColumn width={100}>ID</TableColumn>
-                            <TableColumn>订单信息</TableColumn>
-                            <TableColumn>用户信息</TableColumn>
-                            <TableColumn>套餐信息</TableColumn>
-                            <TableColumn>状态</TableColumn>
-                            <TableColumn>开票</TableColumn>
-                            <TableColumn>创建时间</TableColumn>
+                            <TableColumn width={280}>订单 / 交易号</TableColumn>
+                            <TableColumn width={250}>用户</TableColumn>
+                            <TableColumn width={280}>套餐</TableColumn>
+                            <TableColumn width={150}>支付</TableColumn>
+                            <TableColumn width={130}>开票</TableColumn>
                             <TableColumn>备注</TableColumn>
                             <TableColumn width={80}>操作</TableColumn>
                         </TableHeader>
@@ -381,41 +388,34 @@ const OrdersManagePage: React.FC = () => {
                         >
                             {orders.map((order) => (
                                 <TableRow key={order.id} onDoubleClick={() => openEditModal(order)}>
-                                    <TableCell>{order.id}</TableCell>
                                     <TableCell>
-                                        <div className="space-y-1">
-                                            <div className="font-medium">{order.order_id}</div>
-                                            {order.trade_no && (
-                                                <div className="text-xs text-default-500">交易号: {order.trade_no}</div>
-                                            )}
+                                        <div className="max-w-72 space-y-1">
+                                            <p className="break-all text-sm font-medium" title={order.order_id}>{order.order_id}</p>
+                                            <p className="break-all text-xs text-default-500" title={order.trade_no || ''}>交易号：{order.trade_no || '渠道未返回'}</p>
+                                            <p className="text-[11px] text-default-400">订单 #{order.id} · {dayjs(order.created_at).format('YYYY-MM-DD HH:mm')}</p>
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <User className="w-4 h-4 text-default-400" />
-                                            <span className="text-sm">用户ID: {order.user_id}</span>
-                                        </div>
+                                        <UserSummary user={order.user} userId={order.user_id} />
                                     </TableCell>
                                     <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <DollarSign className="w-4 h-4 text-default-400" />
-                                            <span className="text-sm">套餐ID: {order.package_id}</span>
+                                        <PackageSummary packageInfo={order.package} packageId={order.package_id} />
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="space-y-1.5">
+                                            {renderStatus(order.status)}
+                                            <p className="text-xs text-default-500">
+                                                {order.paid_amount != null
+                                                    ? `实付 ¥${Number(order.paid_amount).toFixed(2)}`
+                                                    : order.payable_amount != null
+                                                        ? `应付 ¥${Number(order.payable_amount).toFixed(2)}`
+                                                        : '金额未记录'}
+                                            </p>
                                         </div>
                                     </TableCell>
-                                    <TableCell>{renderStatus(order.status)}</TableCell>
                                     <TableCell>{renderInvoiceStatus(order)}</TableCell>
                                     <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <Calendar className="w-4 h-4 text-default-400" />
-                                            <span className="text-sm">
-                                                {dayjs(order.created_at).format('YYYY-MM-DD HH:mm')}
-                                            </span>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="max-w-40 truncate text-sm text-default-600">
-                                            {order.remarks || '-'}
-                                        </div>
+                                        <p className="max-w-52 whitespace-normal text-sm text-default-600">{order.remarks || '-'}</p>
                                     </TableCell>
                                     <TableCell>{renderActions(order)}</TableCell>
                                 </TableRow>
@@ -514,49 +514,43 @@ const OrdersManagePage: React.FC = () => {
                     <ModalBody>
                         {selectedOrder && (
                             <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <span className="text-sm text-default-500">订单ID</span>
-                                        <div className="font-medium">{selectedOrder.id}</div>
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <div className="rounded-xl border border-divider p-3 sm:col-span-2">
+                                        <p className="mb-2 text-sm text-default-500">用户</p>
+                                        <UserSummary user={selectedOrder.user} userId={selectedOrder.user_id} />
                                     </div>
-                                    <div>
+                                    <div className="rounded-xl border border-divider p-3 sm:col-span-2">
+                                        <p className="mb-2 text-sm text-default-500">套餐</p>
+                                        <PackageSummary packageInfo={selectedOrder.package} packageId={selectedOrder.package_id} />
+                                    </div>
+                                    <div className="sm:col-span-2">
                                         <span className="text-sm text-default-500">订单号</span>
-                                        <div className="font-medium">{selectedOrder.order_id}</div>
+                                        <div className="break-all font-medium">{selectedOrder.order_id}</div>
+                                    </div>
+                                    <div className="sm:col-span-2">
+                                        <span className="text-sm text-default-500">交易号</span>
+                                        <div className="break-all font-medium">{selectedOrder.trade_no || '渠道未返回'}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-default-500">用户ID</span>
-                                        <div className="font-medium">{selectedOrder.user_id}</div>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-default-500">套餐ID</span>
-                                        <div className="font-medium">{selectedOrder.package_id}</div>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-default-500">状态</span>
-                                        <div>{renderStatus(selectedOrder.status)}</div>
+                                        <span className="text-sm text-default-500">订单状态</span>
+                                        <div className="mt-1">{renderStatus(selectedOrder.status)}</div>
                                     </div>
                                     <div>
                                         <span className="text-sm text-default-500">开票状态</span>
-                                        <div>{renderInvoiceStatus(selectedOrder)}</div>
+                                        <div className="mt-1">{renderInvoiceStatus(selectedOrder)}</div>
                                     </div>
-                                    {selectedOrder.payable_amount != null && (
-                                        <div>
-                                            <span className="text-sm text-default-500">应付金额</span>
-                                            <div className="font-medium">¥{selectedOrder.payable_amount}</div>
-                                        </div>
-                                    )}
+                                    <div>
+                                        <span className="text-sm text-default-500">基础 / 应付</span>
+                                        <div className="font-medium">¥{Number(selectedOrder.base_amount || 0).toFixed(2)} / ¥{Number(selectedOrder.payable_amount || 0).toFixed(2)}</div>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm text-default-500">实付金额</span>
+                                        <div className="font-medium">{selectedOrder.paid_amount != null ? `¥${Number(selectedOrder.paid_amount).toFixed(2)}` : '-'}</div>
+                                    </div>
                                     <div>
                                         <span className="text-sm text-default-500">创建时间</span>
-                                        <div className="font-medium">
-                                            {dayjs(selectedOrder.created_at).format('YYYY-MM-DD HH:mm:ss')}
-                                        </div>
+                                        <div className="font-medium">{dayjs(selectedOrder.created_at).format('YYYY-MM-DD HH:mm:ss')}</div>
                                     </div>
-                                    {selectedOrder.trade_no && (
-                                        <div>
-                                            <span className="text-sm text-default-500">交易号</span>
-                                            <div className="font-medium">{selectedOrder.trade_no}</div>
-                                        </div>
-                                    )}
                                     {selectedOrder.way && (
                                         <div>
                                             <span className="text-sm text-default-500">支付方式</span>

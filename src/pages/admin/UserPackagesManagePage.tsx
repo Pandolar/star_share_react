@@ -30,21 +30,27 @@ import {
     UserCheck,
     Filter,
     RefreshCw,
-    User,
-    Package,
-    Calendar,
-    Clock,
+    ExternalLink,
 } from 'lucide-react';
 import dayjs from 'dayjs';
+import { useNavigate } from 'react-router-dom';
 import adminApiService from '../../services/adminApi';
 import { UserPackage, UserPackageQueryParams } from '../../types/admin';
 import { showToast } from '../../components/Toast';
+import { PackageSummary, UserSummary } from '../../components/admin/AdminEntitySummary';
+
+const WAY_LABELS: Record<string, string> = {
+    purchase: '购买',
+    exchange: 'CDK兑换',
+    other: '其他',
+};
 
 /**
  * 用户套餐记录管理页面
  * 提供用户套餐记录的查看功能
  */
 const UserPackagesManagePage: React.FC = () => {
+    const navigate = useNavigate();
     // 状态管理
     const [userPackages, setUserPackages] = useState<UserPackage[]>([]);
     const [loading, setLoading] = useState(false);
@@ -168,6 +174,19 @@ const UserPackagesManagePage: React.FC = () => {
         );
     };
 
+    const renderOrderStatus = (status: 'pending' | 'paid' | 'failed') => {
+        const config = {
+            pending: { label: '待支付', color: 'warning' },
+            paid: { label: '已支付', color: 'success' },
+            failed: { label: '支付失败', color: 'danger' },
+        } as const;
+        return <Chip size="sm" variant="flat" color={config[status].color}>{config[status].label}</Chip>;
+    };
+
+    const openRelatedOrder = (orderId: string) => {
+        navigate(`/star-admin/orders?query=${encodeURIComponent(orderId)}`);
+    };
+
     // 剩余时长格式化
     const formatRemainingDuration = (duration?: number) => {
         if (!duration) return '-';
@@ -254,19 +273,16 @@ const UserPackagesManagePage: React.FC = () => {
                         aria-label="用户套餐记录列表"
                         isHeaderSticky
                         classNames={{
-                            wrapper: "max-h-[600px] overflow-x-auto",
-                            table: "min-w-[1100px]",
+                            wrapper: "max-h-[640px] overflow-x-auto",
+                            table: "min-w-[1120px]",
                         }}
                     >
                         <TableHeader>
-                            <TableColumn width={100}>记录ID</TableColumn>
-                            <TableColumn>记录信息</TableColumn>
-                            <TableColumn>用户信息</TableColumn>
-                            <TableColumn>套餐信息</TableColumn>
-                            <TableColumn>订单信息</TableColumn>
-                            <TableColumn>状态</TableColumn>
-                            <TableColumn>剩余时长</TableColumn>
-                            <TableColumn>创建时间</TableColumn>
+                            <TableColumn width={160}>记录</TableColumn>
+                            <TableColumn width={250}>用户</TableColumn>
+                            <TableColumn width={280}>套餐</TableColumn>
+                            <TableColumn width={260}>关联订单 / 交易号</TableColumn>
+                            <TableColumn width={150}>权益状态</TableColumn>
                             <TableColumn>备注</TableColumn>
                             <TableColumn width={80}>操作</TableColumn>
                         </TableHeader>
@@ -277,56 +293,66 @@ const UserPackagesManagePage: React.FC = () => {
                         >
                             {userPackages.map((userPackage) => (
                                 <TableRow key={userPackage.id}>
-                                    <TableCell>{userPackage.id}</TableCell>
                                     <TableCell>
                                         <div className="space-y-1">
-                                            <div className="font-medium">{userPackage.way ? `获取方式: ${userPackage.way}` : '记录'}</div>
+                                            <p className="font-medium">记录 #{userPackage.id}</p>
+                                            <Chip size="sm" variant="flat" color={userPackage.way === 'exchange' ? 'secondary' : 'primary'}>
+                                                {WAY_LABELS[userPackage.way || ''] || userPackage.way || '未知来源'}
+                                            </Chip>
+                                            <p className="text-xs text-default-400">{dayjs(userPackage.created_at).format('YYYY-MM-DD HH:mm')}</p>
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <User className="w-4 h-4 text-default-400" />
-                                            <span className="text-sm">用户ID: {userPackage.user_id}</span>
+                                        <UserSummary user={userPackage.user} userId={userPackage.user_id} />
+                                    </TableCell>
+                                    <TableCell>
+                                        <PackageSummary packageInfo={userPackage.package} packageId={userPackage.package_id} />
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="max-w-64 space-y-1.5">
+                                            <p className="break-all text-sm font-medium" title={userPackage.order_id || ''}>{userPackage.order_id || '-'}</p>
+                                            {userPackage.related_order ? (
+                                                <>
+                                                    <p className="break-all text-xs text-default-500" title={userPackage.related_order.trade_no || ''}>
+                                                        交易号：{userPackage.related_order.trade_no || '渠道未返回'}
+                                                    </p>
+                                                    <div className="flex items-center gap-1">
+                                                        {renderOrderStatus(userPackage.related_order.status)}
+                                                        <Button
+                                                            isIconOnly
+                                                            size="sm"
+                                                            variant="light"
+                                                            aria-label={`在订单管理查看 ${userPackage.order_id}`}
+                                                            onPress={() => openRelatedOrder(userPackage.order_id || userPackage.related_order!.order_id)}
+                                                        >
+                                                            <ExternalLink className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <p className="text-xs text-default-400">无对应的订单管理记录</p>
+                                            )}
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <Package className="w-4 h-4 text-default-400" />
-                                            <span className="text-sm">套餐ID: {userPackage.package_id}</span>
+                                        <div className="space-y-1.5">
+                                            {renderStatus(userPackage.status)}
+                                            <p className="text-xs text-default-500">
+                                                {userPackage.status === 'frozen'
+                                                    ? `剩余 ${formatRemainingDuration(userPackage.remaining_duration)}`
+                                                    : userPackage.status === 'active' ? '权益生效中' : '权益已结束'}
+                                            </p>
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="text-sm">
-                                            {userPackage.order_id || '-'}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>{renderStatus(userPackage.status)}</TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <Clock className="w-4 h-4 text-default-400" />
-                                            <span className="text-sm">
-                                                {formatRemainingDuration(userPackage.remaining_duration)}
-                                            </span>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <Calendar className="w-4 h-4 text-default-400" />
-                                            <span className="text-sm">
-                                                {dayjs(userPackage.created_at).format('YYYY-MM-DD HH:mm')}
-                                            </span>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="max-w-40 truncate text-sm text-default-600">
-                                            {userPackage.remarks || '-'}
-                                        </div>
+                                        <p className="max-w-48 whitespace-normal text-sm text-default-600">{userPackage.remarks || '-'}</p>
                                     </TableCell>
                                     <TableCell>
                                         <Button
                                             isIconOnly
                                             variant="light"
                                             size="sm"
+                                            aria-label={`查看用户套餐记录 ${userPackage.id}`}
                                             onPress={() => openViewModal(userPackage)}
                                         >
                                             <Eye className="w-4 h-4" />
@@ -385,42 +411,42 @@ const UserPackagesManagePage: React.FC = () => {
                     <ModalBody>
                         {selectedUserPackage && (
                             <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <span className="text-sm text-default-500">记录ID</span>
-                                        <div className="font-medium">{selectedUserPackage.id}</div>
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <div className="rounded-xl border border-divider p-3 sm:col-span-2">
+                                        <p className="mb-2 text-sm text-default-500">用户</p>
+                                        <UserSummary user={selectedUserPackage.user} userId={selectedUserPackage.user_id} />
+                                    </div>
+                                    <div className="rounded-xl border border-divider p-3 sm:col-span-2">
+                                        <p className="mb-2 text-sm text-default-500">套餐</p>
+                                        <PackageSummary packageInfo={selectedUserPackage.package} packageId={selectedUserPackage.package_id} />
                                     </div>
                                     <div>
-                                        <span className="text-sm text-default-500">用户ID</span>
-                                        <div className="font-medium">{selectedUserPackage.user_id}</div>
+                                        <span className="text-sm text-default-500">记录 / 获取方式</span>
+                                        <div className="font-medium">#{selectedUserPackage.id} · {WAY_LABELS[selectedUserPackage.way || ''] || selectedUserPackage.way || '-'}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-default-500">套餐ID</span>
-                                        <div className="font-medium">{selectedUserPackage.package_id}</div>
+                                        <span className="text-sm text-default-500">权益状态</span>
+                                        <div className="mt-1 flex items-center gap-2">{renderStatus(selectedUserPackage.status)}<span className="text-sm">{formatRemainingDuration(selectedUserPackage.remaining_duration)}</span></div>
                                     </div>
-                                    <div>
+                                    <div className="sm:col-span-2">
                                         <span className="text-sm text-default-500">订单号</span>
-                                        <div className="font-medium">{selectedUserPackage.order_id || '-'}</div>
+                                        <div className="break-all font-medium">{selectedUserPackage.order_id || '-'}</div>
                                     </div>
-                                    <div>
-                                        <span className="text-sm text-default-500">状态</span>
-                                        <div>{renderStatus(selectedUserPackage.status)}</div>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-default-500">获取方式</span>
-                                        <div className="font-medium">{selectedUserPackage.way || '-'}</div>
-                                    </div>
-                                    <div>
-                                        <span className="text-sm text-default-500">剩余时长</span>
-                                        <div className="font-medium">
-                                            {formatRemainingDuration(selectedUserPackage.remaining_duration)}
-                                        </div>
+                                    <div className="sm:col-span-2">
+                                        <span className="text-sm text-default-500">交易号</span>
+                                        <div className="break-all font-medium">{selectedUserPackage.related_order?.trade_no || '无对应订单或渠道未返回'}</div>
+                                        {selectedUserPackage.related_order && (
+                                            <div className="mt-2 flex items-center gap-2">
+                                                {renderOrderStatus(selectedUserPackage.related_order.status)}
+                                                <Button size="sm" variant="flat" endContent={<ExternalLink className="h-3.5 w-3.5" />} onPress={() => openRelatedOrder(selectedUserPackage.order_id || selectedUserPackage.related_order!.order_id)}>
+                                                    前往订单管理
+                                                </Button>
+                                            </div>
+                                        )}
                                     </div>
                                     <div>
                                         <span className="text-sm text-default-500">创建时间</span>
-                                        <div className="font-medium">
-                                            {dayjs(selectedUserPackage.created_at).format('YYYY-MM-DD HH:mm:ss')}
-                                        </div>
+                                        <div className="font-medium">{dayjs(selectedUserPackage.created_at).format('YYYY-MM-DD HH:mm:ss')}</div>
                                     </div>
                                 </div>
                                 {selectedUserPackage.remarks && (
