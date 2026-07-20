@@ -10,6 +10,8 @@ import {
   Input,
   Spinner,
   Checkbox,
+  Button,
+  Alert,
 } from '@heroui/react';
 import { Edit3, User, Mail, Shield, AlertCircle, Send, Eye, EyeOff, Wallet, ReceiptText } from 'lucide-react';
 import { userInfoApi } from '../../../../services/userApi';
@@ -344,7 +346,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const sendPwdCodeDisabled = pwdCodeSending || pwdCountdown > 0 || !userInfo?.email || userInfo.email.endsWith('@default.com');
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} placement="center" size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} placement="center" size="2xl" scrollBehavior="inside">
       <ModalContent>
         <ModalHeader className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
@@ -352,7 +354,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
             <span>修改资料</span>
           </div>
         </ModalHeader>
-        <ModalBody>
+        <ModalBody className="overflow-x-hidden px-3 sm:px-6">
           <Tabs
             selectedKey={activeTab}
             onSelectionChange={(key) => {
@@ -362,7 +364,12 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
               setEmailCode('');
               setCountdown(0);
             }}
-            className="w-full"
+            classNames={{
+              base: 'w-full',
+              tabList: 'w-full flex-wrap gap-1 overflow-visible p-1',
+              tab: 'h-9 min-w-fit flex-1 px-2 sm:px-3',
+              panel: 'px-0',
+            }}
           >
             <Tab key="username" title={<div className="flex items-center space-x-2"><User size={16} /><span>用户名</span></div>}>
               <div className="space-y-4 mt-4">
@@ -645,12 +652,18 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 </div>
               </div>
             </Tab>
-            <Tab key="billing_profile" title={<div className="flex items-center space-x-2"><ReceiptText size={16} /><span>主体信息</span></div>}>
+            <Tab key="billing_profile" title={<div className="flex items-center gap-1.5"><ReceiptText size={16} /><span>开票主体</span></div>}>
               <div className="space-y-4 mt-4">
-                <div className="p-3 bg-warning/10 border border-warning/20 rounded-lg">
-                  <p className="text-sm text-warning-700">开票资料</p>
-                  <p className="text-xs text-default-500 mt-1">提交订单时会保存当前资料快照，后续修改不会影响历史订单。</p>
-                </div>
+                {userInfo?.preferences?.billing_profile ? (
+                  <Alert
+                    color="warning"
+                    variant="flat"
+                    title="您正在修改已保存的开票主体"
+                    description="新资料只用于之后创建的开票订单，历史订单仍保留提交时的抬头和税号。请再次核对后保存。"
+                  />
+                ) : (
+                  <Alert color="primary" variant="flat" title="设置开票主体" description="提交订单时会保存当前资料快照，后续修改不会影响历史订单。" />
+                )}
                 <Input
                   label="发票抬头"
                   value={billingTitle}
@@ -686,38 +699,12 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           )}
         </ModalBody>
         <ModalFooter>
-          <button
-            onClick={onClose}
-            disabled={editLoading}
-            style={{
-              backgroundColor: '#ffffff',
-              color: '#404040',
-              border: '1px solid #d4d4d8',
-              borderRadius: '6px',
-              padding: '8px 16px',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: editLoading ? 'not-allowed' : 'pointer',
-            }}
-          >
+          <Button variant="light" onPress={onClose} isDisabled={editLoading}>
             取消
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitDisabled}
-            style={{
-              backgroundColor: isSubmitDisabled ? '#d1d5db' : '#006FEE',
-              color: '#ffffff',
-              border: '1px solid #006FEE',
-              borderRadius: '6px',
-              padding: '8px 16px',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: isSubmitDisabled ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {editLoading ? '保存中...' : '保存修改'}
-          </button>
+          </Button>
+          <Button color="primary" onPress={handleSubmit} isDisabled={isSubmitDisabled} isLoading={editLoading}>
+            保存修改
+          </Button>
         </ModalFooter>
       </ModalContent>
     </Modal>

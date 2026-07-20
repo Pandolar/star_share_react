@@ -585,62 +585,45 @@ const CDKManagePage: React.FC = () => {
             </Card>
 
             {/* 操作区域 */}
-            <div className="flex justify-between items-center">
-                <div className="text-sm text-default-600">
-                    共 {total} 个CDK
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2 text-sm text-default-600">
+                    <span>共 {total} 个CDK</span>
+                    {crossPageSelection.size > 0 && <Chip size="sm" color="primary" variant="flat">已选 {crossPageSelection.size}</Chip>}
                 </div>
-                <div className="flex gap-2">
-                    <Button
-                        variant="flat"
-                        color="secondary"
-                        startContent={<Download className="w-4 h-4" />}
-                        onPress={() => handleExport('full')}
-                    >
-                        导出(完整)
-                    </Button>
-                    <Button
-                        variant="flat"
-                        color="secondary"
-                        startContent={<Download className="w-4 h-4" />}
-                        onPress={() => handleExport('distribute')}
-                    >
-                        导出(分发)
-                    </Button>
-                    <Button
-                        color="primary"
-                        startContent={<Plus className="w-4 h-4" />}
-                        onPress={onCreateOpen}
-                    >
-                        批量生成CDK
+                <div className="flex flex-wrap items-center gap-2">
+                    {crossPageSelection.size > 0 && (
+                        <Button
+                            variant="flat"
+                            color="primary"
+                            startContent={<Copy className="w-4 h-4" />}
+                            onPress={handleCopySelectedCDKs}
+                        >
+                            复制选中
+                        </Button>
+                    )}
+                    <Dropdown>
+                        <DropdownTrigger>
+                            <Button variant="flat" startContent={<Download className="w-4 h-4" />}>导出 / 复制</Button>
+                        </DropdownTrigger>
+                        <DropdownMenu aria-label="CDK导出与复制操作">
+                            <DropdownItem key="copy-filtered" startContent={<Copy className="w-4 h-4" />} onPress={handleCopyAllFiltered}>
+                                复制全部筛选结果
+                            </DropdownItem>
+                            <DropdownItem key="export-page" startContent={<Download className="w-4 h-4" />} onPress={handleExportTxt}>
+                                导出当前页 TXT
+                            </DropdownItem>
+                            <DropdownItem key="export-distribute" startContent={<Download className="w-4 h-4" />} onPress={() => handleExport('distribute')}>
+                                导出分发版
+                            </DropdownItem>
+                            <DropdownItem key="export-full" startContent={<Download className="w-4 h-4" />} onPress={() => handleExport('full')}>
+                                导出完整版
+                            </DropdownItem>
+                        </DropdownMenu>
+                    </Dropdown>
+                    <Button color="primary" startContent={<Plus className="w-4 h-4" />} onPress={onCreateOpen}>
+                        批量生成
                     </Button>
                 </div>
-            </div>
-            <div className="flex justify-end mt-2 gap-2 flex-wrap">
-                <Button
-                    variant="flat"
-                    color="primary"
-                    startContent={<Copy className="w-4 h-4" />}
-                    onPress={handleCopySelectedCDKs}
-                    isDisabled={crossPageSelection.size === 0}
-                >
-                    复制选中 ({crossPageSelection.size})
-                </Button>
-                <Button
-                    variant="flat"
-                    color="secondary"
-                    startContent={<Copy className="w-4 h-4" />}
-                    onPress={handleCopyAllFiltered}
-                >
-                    复制全部筛选结果
-                </Button>
-                <Button
-                    variant="flat"
-                    color="default"
-                    startContent={<Download className="w-4 h-4" />}
-                    onPress={handleExportTxt}
-                >
-                    导出当前页 .txt
-                </Button>
             </div>
 
             {/* CDK表格 */}

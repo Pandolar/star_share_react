@@ -115,6 +115,7 @@ const TrendChart: React.FC<{
   metric: ChartMetric;
   granularity: 'hour' | 'day';
 }> = ({ data, metric, granularity }) => {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const width = Math.max(760, data.length * (granularity === 'hour' ? 38 : 54));
   const height = 320;
   const margins = { top: 22, right: 26, bottom: 56, left: 74 };
@@ -138,52 +139,48 @@ const TrendChart: React.FC<{
     : Math.round(value).toLocaleString('zh-CN');
   const tooltipValue = (value: number) => metric.format === 'currency' ? currency(value) : integer(value);
 
+  const hoveredPoint = hoveredIndex === null ? null : points[hoveredIndex];
   if (!data.length) return <div className="flex h-72 items-center justify-center text-sm text-default-400">当前筛选暂无趋势数据</div>;
 
   return (
-    <div className="w-full overflow-x-auto">
-      <svg width={width} height={height} role="img" aria-label={`${metric.label}趋势图`}>
-        <defs>
-          <linearGradient id={`fill-${metric.key}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={metric.color} stopOpacity="0.24" />
-            <stop offset="100%" stopColor={metric.color} stopOpacity="0.02" />
-          </linearGradient>
-        </defs>
-        {ticks.map((tick, index) => {
-          const y = margins.top + index * innerHeight / 4;
-          return (
-            <g key={index}>
-              <line x1={margins.left} x2={width - margins.right} y1={y} y2={y} stroke="#e4e4e7" strokeDasharray="4 4" />
-              <text x={margins.left - 10} y={y + 4} textAnchor="end" fontSize="11" fill="#71717a">{axisValue(tick)}</text>
+    <div className="relative w-full overflow-x-auto" onMouseLeave={() => setHoveredIndex(null)}>
+      <div className="relative" style={{ width, height }}>
+        {hoveredPoint && (
+          <div
+            className="pointer-events-none absolute z-20 min-w-36 -translate-x-1/2 -translate-y-full rounded-lg border border-divider bg-content1 px-3 py-2 text-xs shadow-lg"
+            style={{ left: hoveredPoint.x, top: Math.max(74, hoveredPoint.y - 10) }}
+          >
+            <p className="text-default-500">{dayjs(hoveredPoint.bucket).format(granularity === 'hour' ? 'YYYY-MM-DD HH:mm' : 'YYYY-MM-DD')}</p>
+            <p className="mt-1 text-sm font-semibold" style={{ color: metric.color }}>{metric.label}：{tooltipValue(hoveredPoint.value)}</p>
+          </div>
+        )}
+        <svg width={width} height={height} role="img" aria-label={`${metric.label}趋势图`}>
+          <defs>
+            <linearGradient id={`fill-${metric.key}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={metric.color} stopOpacity="0.24" />
+              <stop offset="100%" stopColor={metric.color} stopOpacity="0.02" />
+            </linearGradient>
+          </defs>
+          {ticks.map((tick, index) => {
+            const y = margins.top + index * innerHeight / 4;
+            return <g key={index}><line x1={margins.left} x2={width - margins.right} y1={y} y2={y} stroke="#e4e4e7" strokeDasharray="4 4" /><text x={margins.left - 10} y={y + 4} textAnchor="end" fontSize="11" fill="#71717a">{axisValue(tick)}</text></g>;
+          })}
+          <line x1={margins.left} x2={margins.left} y1={margins.top} y2={height - margins.bottom} stroke="#a1a1aa" />
+          <line x1={margins.left} x2={width - margins.right} y1={height - margins.bottom} y2={height - margins.bottom} stroke="#a1a1aa" />
+          <polygon points={`${margins.left},${height - margins.bottom} ${line} ${width - margins.right},${height - margins.bottom}`} fill={`url(#fill-${metric.key})`} />
+          <polyline points={line} fill="none" stroke={metric.color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+          {points.map((point, index) => (
+            <g key={`${point.bucket}-${index}`} onMouseEnter={() => setHoveredIndex(index)} className="cursor-crosshair">
+              <rect x={point.x - Math.max(12, stepX / 2)} y={margins.top} width={Math.max(24, stepX)} height={innerHeight} fill="transparent" />
+              {hoveredIndex === index && <line x1={point.x} x2={point.x} y1={margins.top} y2={height - margins.bottom} stroke={metric.color} strokeDasharray="3 3" opacity="0.55" />}
+              <circle cx={point.x} cy={point.y} r={hoveredIndex === index ? 6 : 4} fill="white" stroke={metric.color} strokeWidth="2" />
+              {(index % labelEvery === 0 || index === points.length - 1) && <text x={point.x} y={height - margins.bottom + 22} textAnchor="middle" fontSize="10" fill="#71717a">{dayjs(point.bucket).format(granularity === 'hour' ? 'MM-DD HH:mm' : 'MM-DD')}</text>}
             </g>
-          );
-        })}
-        <line x1={margins.left} x2={margins.left} y1={margins.top} y2={height - margins.bottom} stroke="#a1a1aa" />
-        <line x1={margins.left} x2={width - margins.right} y1={height - margins.bottom} y2={height - margins.bottom} stroke="#a1a1aa" />
-        <polygon
-          points={`${margins.left},${height - margins.bottom} ${line} ${width - margins.right},${height - margins.bottom}`}
-          fill={`url(#fill-${metric.key})`}
-        />
-        <polyline points={line} fill="none" stroke={metric.color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-        {points.map((point, index) => (
-          <g key={`${point.bucket}-${index}`}>
-            <circle cx={point.x} cy={point.y} r="4" fill="white" stroke={metric.color} strokeWidth="2">
-              <title>{`${point.bucket} · ${metric.label} ${tooltipValue(point.value)}`}</title>
-            </circle>
-            {(index % labelEvery === 0 || index === points.length - 1) && (
-              <text x={point.x} y={height - margins.bottom + 22} textAnchor="middle" fontSize="10" fill="#71717a">
-                {dayjs(point.bucket).format(granularity === 'hour' ? 'MM-DD HH:mm' : 'MM-DD')}
-              </text>
-            )}
-          </g>
-        ))}
-        <text x={18} y={margins.top + innerHeight / 2} textAnchor="middle" fontSize="11" fill="#52525b" transform={`rotate(-90 18 ${margins.top + innerHeight / 2})`}>
-          {metric.label}{metric.format === 'currency' ? '（元）' : '（个）'}
-        </text>
-        <text x={margins.left + innerWidth / 2} y={height - 8} textAnchor="middle" fontSize="11" fill="#52525b">
-          时间（Asia/Shanghai）
-        </text>
-      </svg>
+          ))}
+          <text x={18} y={margins.top + innerHeight / 2} textAnchor="middle" fontSize="11" fill="#52525b" transform={`rotate(-90 18 ${margins.top + innerHeight / 2})`}>{metric.label}{metric.format === 'currency' ? '（元）' : '（个）'}</text>
+          <text x={margins.left + innerWidth / 2} y={height - 8} textAnchor="middle" fontSize="11" fill="#52525b">时间（Asia/Shanghai）</text>
+        </svg>
+      </div>
     </div>
   );
 };
