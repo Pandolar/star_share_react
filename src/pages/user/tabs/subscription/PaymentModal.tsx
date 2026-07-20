@@ -56,6 +56,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [eligibilityLoading, setEligibilityLoading] = useState(false);
   const [invoiceSelected, setInvoiceSelected] = useState(false);
   const [invoiceConfirmed, setInvoiceConfirmed] = useState(false);
+  const [invoiceFeatureAvailable, setInvoiceFeatureAvailable] = useState(false);
 
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const qrTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -76,6 +77,19 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setInvoiceSelected(false);
     setInvoiceConfirmed(false);
     setEligibility(null);
+    setInvoiceFeatureAvailable(false);
+    void (async () => {
+      if (!selectedPackage) return;
+      try {
+        const response = await orderUserApi.getInvoiceEligibility(selectedPackage.id);
+        if (response.code === 20000 && response.data) {
+          setEligibility(response.data);
+          setInvoiceFeatureAvailable(response.data.reason !== 'invoice_disabled' && response.data.reason !== 'non_self_site');
+        }
+      } catch {
+        setInvoiceFeatureAvailable(false);
+      }
+    })();
 
     qrTimerRef.current = setTimeout(() => {
       setQrCodeExpired(true);
@@ -100,7 +114,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     }, 1500);
 
     return cleanup;
-  }, [isOpen, checkoutId]);
+  }, [isOpen, checkoutId, selectedPackage]);
 
   const loadEligibility = async () => {
     if (!selectedPackage) return;
@@ -109,6 +123,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       const response = await orderUserApi.getInvoiceEligibility(selectedPackage.id);
       if (response.code === 20000) {
         setEligibility(response.data || null);
+        setInvoiceFeatureAvailable(Boolean(response.data && response.data.reason !== 'invoice_disabled' && response.data.reason !== 'non_self_site'));
       } else {
         toast.warning(response.msg || '无法查询开票资格');
       }
@@ -190,27 +205,40 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <div className="flex justify-between items-center"><span className="text-default-500">套餐时长</span><span className="font-medium">{selectedPackage ? getDurationText(selectedPackage.duration) : ''}</span></div>
               </CardBody></Card>
 
-              {paymentStatus === 'pending' && !qrCodeExpired && (
-                <Card className="border border-primary/20"><CardBody className="p-4 space-y-3">
+
+              <div className="text-center">
+                {paymentStatus === 'pending' && !qrCodeExpired && <div className="space-y-4"><div className="flex items-center justify-center gap-2"><QrCode className="w-5 h-5 text-primary" /><span className="text-base font-medium">{activeOrder.pay_type === 'wxpay' ? '请使用微信扫码支付' : '请扫码支付'}</span></div><p className="text-sm text-default-500">本次结账 60 分钟内有效，请尽快完成支付</p>{qrCodeValue && <div className="flex justify-center"><Card className="p-4 sm:p-6 relative shadow-sm"><motion.img key={activeOrder.order_id} src={generateQRCodeDataUrl(qrCodeValue)} alt="支付二维码" className="w-44 h-44 sm:w-52 sm:h-52" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} /></Card></div>}{activeOrder.payment_url && <a href={activeOrder.payment_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm text-primary hover:underline"><ExternalLink size={14} />无法扫码？点击跳转支付页面</a>}</div>}
+
+              {paymentStatus === 'pending' && !qrCodeExpired && invoiceFeatureAvailable && (
+                <div className="rounded-lg border border-divider bg-default-50 px-3 py-2.5 text-left">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2"><ReceiptText className="w-5 h-5 text-primary" /><div><p className="font-medium">需要开票</p><p className="text-xs text-default-500">确认后生成开票二维码，可随时切回普通二维码。</p></div></div>
-                    <Switch isSelected={invoiceSelected} isDisabled={creatingInvoiceOrder || eligibilityLoading} onValueChange={handleInvoiceSwitch} aria-label="需要开票" />
+                    <div className="flex items-center gap-2">
+                      <ReceiptText className="h-4 w-4 text-default-500" />
+                      <div>
+                        <p className="text-sm font-medium text-default-700">需要开票</p>
+                        {eligibility && (
+                          <p className="text-xs text-default-500">
+                            服务费率 {(Number(eligibility.surcharge_rate || 0) * 100).toFixed(1)}%，预计 {eligibility.delivery_workdays} 个工作日内发送至邮箱
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <Switch size="sm" isSelected={invoiceSelected} isDisabled={creatingInvoiceOrder || eligibilityLoading} onValueChange={handleInvoiceSwitch} aria-label="需要开票" />
                   </div>
                   {invoiceSelected && invoiceOrder ? (
-                    <div className="rounded-lg bg-primary/5 p-3 text-sm space-y-1"><p>套餐原价：¥{invoiceOrder.base_amount}</p><p>开票服务费：¥{invoiceOrder.invoice_snapshot?.surcharge_amount}</p><p>最终支付：¥{invoiceOrder.payable_amount}</p><p>抬头：{invoiceOrder.invoice_snapshot?.title}</p><p>税号：{invoiceOrder.invoice_snapshot?.tax_number}</p><p>接收邮箱：{invoiceOrder.invoice_snapshot?.email}</p></div>
-                  ) : invoiceSelected && eligibilityLoading ? <Spinner size="sm" /> : invoiceSelected && eligibility ? (
-                    <div className="rounded-lg bg-primary/5 p-3 text-sm space-y-2">
-                      <p>套餐原价：¥{eligibility.base_amount}</p><p>开票服务费：¥{eligibility.surcharge_amount}</p><p>最终支付：¥{eligibility.payable_amount}</p><p>抬头：{eligibility.billing_profile?.title || '-'}</p><p>税号：{eligibility.billing_profile?.tax_number || '-'}</p><p>接收邮箱：{eligibility.email || '-'}</p>
+                    <div className="mt-2 rounded-lg bg-primary/5 p-3 text-sm space-y-1">
+                      <p>套餐原价：¥{invoiceOrder.base_amount}</p><p>开票服务费：¥{invoiceOrder.invoice_snapshot?.surcharge_amount}</p><p>最终支付：¥{invoiceOrder.payable_amount}</p><p>抬头：{invoiceOrder.invoice_snapshot?.title}</p><p>税号：{invoiceOrder.invoice_snapshot?.tax_number}</p><p>接收邮箱：{invoiceOrder.invoice_snapshot?.email}</p><p>预计 {invoiceOrder.invoice_snapshot?.delivery_workdays} 个工作日内发送</p>
+                    </div>
+                  ) : invoiceSelected && eligibilityLoading ? <div className="mt-2"><Spinner size="sm" /></div> : invoiceSelected && eligibility ? (
+                    <div className="mt-2 rounded-lg bg-primary/5 p-3 text-sm space-y-2">
+                      <p>套餐原价：¥{eligibility.base_amount}</p><p>开票服务费：¥{eligibility.surcharge_amount}（{(Number(eligibility.surcharge_rate || 0) * 100).toFixed(1)}%）</p><p>最终支付：¥{eligibility.payable_amount}</p><p>抬头：{eligibility.billing_profile?.title || '-'}</p><p>税号：{eligibility.billing_profile?.tax_number || '-'}</p><p>接收邮箱：{eligibility.email || '-'}</p><p>预计 {eligibility.delivery_workdays} 个工作日内发送至上述邮箱</p>
                       {!eligibility.eligible && <p className="text-warning-700">{getInvoiceUnavailableText(eligibility.reason)}</p>}
                       {eligibility.eligible && <Button color="primary" size="sm" onPress={confirmInvoice} isLoading={creatingInvoiceOrder}>确认并生成开票二维码</Button>}
                     </div>
                   ) : null}
-                  {invoiceConfirmed && <p className="text-xs text-success">开票二维码已生成。</p>}
-                </CardBody></Card>
+                  {invoiceConfirmed && <p className="mt-2 text-xs text-success">开票二维码已生成。</p>}
+                </div>
               )}
-
-              <div className="text-center">
-                {paymentStatus === 'pending' && !qrCodeExpired && <div className="space-y-4"><div className="flex items-center justify-center gap-2"><QrCode className="w-5 h-5 text-primary" /><span className="text-base font-medium">{activeOrder.pay_type === 'wxpay' ? '请使用微信扫码支付' : '请扫码支付'}</span></div><p className="text-sm text-default-500">本次结账 60 分钟内有效，请尽快完成支付</p>{qrCodeValue && <div className="flex justify-center"><Card className="p-4 sm:p-6 relative shadow-sm"><motion.img key={activeOrder.order_id} src={generateQRCodeDataUrl(qrCodeValue)} alt="支付二维码" className="w-44 h-44 sm:w-52 sm:h-52" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} /></Card></div>}{activeOrder.payment_url && <a href={activeOrder.payment_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm text-primary hover:underline"><ExternalLink size={14} />无法扫码？点击跳转支付页面</a>}</div>}
                 {paymentStatus === 'pending' && qrCodeExpired && <div className="space-y-4"><AlertCircle className="w-12 h-12 mx-auto text-danger" /><p className="text-danger font-medium">本次结账已过期，请重新下单</p><Button color="primary" onPress={handleClose}>重新下单</Button></div>}
                 {paymentStatus === 'checking' && <div className="space-y-4"><Spinner size="lg" color="primary" /><p>正在确认支付结果...</p></div>}
                 {paymentStatus === 'success' && <div className="space-y-6"><CheckCircle className="w-20 h-20 mx-auto text-success" /><div><h3 className="text-2xl font-bold text-success mb-2">支付成功！</h3><p className="text-default-500">页面即将刷新，请稍等...</p></div></div>}
