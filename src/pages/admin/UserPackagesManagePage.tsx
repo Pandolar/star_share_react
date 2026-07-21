@@ -37,7 +37,7 @@ import { useNavigate } from 'react-router-dom';
 import adminApiService from '../../services/adminApi';
 import { UserPackage, UserPackageQueryParams } from '../../types/admin';
 import { showToast } from '../../components/Toast';
-import { PackageSummary, UserSummary } from '../../components/admin/AdminEntitySummary';
+import { LongTextPreview, PackageSummary, UserSummary } from '../../components/admin/AdminEntitySummary';
 
 const WAY_LABELS: Record<string, string> = {
     purchase: '购买',
@@ -283,7 +283,7 @@ const UserPackagesManagePage: React.FC = () => {
                             <TableColumn width={280}>套餐</TableColumn>
                             <TableColumn width={260}>关联订单 / 交易号</TableColumn>
                             <TableColumn width={150}>权益状态</TableColumn>
-                            <TableColumn>备注</TableColumn>
+                            <TableColumn width={220}>备注</TableColumn>
                             <TableColumn width={80}>操作</TableColumn>
                         </TableHeader>
                         <TableBody
@@ -345,7 +345,7 @@ const UserPackagesManagePage: React.FC = () => {
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <p className="max-w-48 whitespace-normal text-sm text-default-600">{userPackage.remarks || '-'}</p>
+                                        <LongTextPreview value={userPackage.remarks} className="max-w-52" />
                                     </TableCell>
                                     <TableCell>
                                         <Button

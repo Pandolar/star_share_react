@@ -44,7 +44,7 @@ import { useSearchParams } from 'react-router-dom';
 import adminApiService from '../../services/adminApi';
 import { Order, UpdateOrderRequest, OrderQueryParams } from '../../types/admin';
 import { showToast } from '../../components/Toast';
-import { PackageSummary, UserSummary } from '../../components/admin/AdminEntitySummary';
+import { LongTextPreview, PackageSummary, UserSummary } from '../../components/admin/AdminEntitySummary';
 
 /**
  * 订单管理页面
@@ -378,7 +378,7 @@ const OrdersManagePage: React.FC = () => {
                             <TableColumn width={280}>套餐</TableColumn>
                             <TableColumn width={150}>支付</TableColumn>
                             <TableColumn width={130}>开票</TableColumn>
-                            <TableColumn>备注</TableColumn>
+                            <TableColumn width={240}>备注</TableColumn>
                             <TableColumn width={80}>操作</TableColumn>
                         </TableHeader>
                         <TableBody
@@ -415,7 +415,7 @@ const OrdersManagePage: React.FC = () => {
                                     </TableCell>
                                     <TableCell>{renderInvoiceStatus(order)}</TableCell>
                                     <TableCell>
-                                        <p className="max-w-52 whitespace-normal text-sm text-default-600">{order.remarks || '-'}</p>
+                                        <LongTextPreview value={order.remarks} className="max-w-56" />
                                     </TableCell>
                                     <TableCell>{renderActions(order)}</TableCell>
                                 </TableRow>

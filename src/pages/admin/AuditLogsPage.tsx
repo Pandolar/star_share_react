@@ -4,6 +4,7 @@ import {
   Card,
   CardBody,
   Chip,
+  Divider,
   Input,
   Modal,
   ModalBody,
@@ -20,13 +21,28 @@ import {
   TableColumn,
   TableHeader,
   TableRow,
+  Tooltip,
 } from '@heroui/react';
-import { Eye, FileClock, RefreshCw, Search, ShieldCheck } from 'lucide-react';
+import { Eye, FileClock, RefreshCw, Save, Search, Settings2, ShieldCheck } from 'lucide-react';
 import adminApiService from '../../services/adminApi';
 import { showToast } from '../../components/Toast';
-import type { AuditLogCatalogItem, AuditLogRecord } from '../../types/admin';
+import type { AuditLogCatalogItem, AuditLogRecord, AuditLogRetentionMode, AuditLogRetentionPolicy } from '../../types/admin';
 
 const PAGE_SIZE = 20;
+
+const RETENTION_OPTIONS: Array<{ key: AuditLogRetentionMode; label: string }> = [
+  { key: 'forever', label: '永久保留' },
+  { key: 'days', label: '按时间保留' },
+  { key: 'count', label: '按最新条数保留' },
+];
+
+const retentionMode = (policy: AuditLogRetentionPolicy, logType: string): AuditLogRetentionMode => policy[logType]?.mode || 'forever';
+
+const retentionLabel = (policy: AuditLogRetentionPolicy, logType: string): string => {
+  const rule = policy[logType];
+  if (!rule) return '永久保留';
+  return rule.mode === 'days' ? `保留近 ${rule.value} 天` : `保留最新 ${rule.value.toLocaleString('zh-CN')} 条`;
+};
 
 const RESULT_LABELS: Record<string, string> = {
   success: '成功',
@@ -94,6 +110,10 @@ const AuditLogsPage: React.FC = () => {
   const [userId, setUserId] = useState<number | undefined>();
   const [refId, setRefId] = useState<number | undefined>();
   const [selected, setSelected] = useState<AuditLogRecord | null>(null);
+  const [retention, setRetention] = useState<AuditLogRetentionPolicy>({});
+  const [retentionDraft, setRetentionDraft] = useState<AuditLogRetentionPolicy>({});
+  const [retentionOpen, setRetentionOpen] = useState(false);
+  const [retentionSaving, setRetentionSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -113,12 +133,15 @@ const AuditLogsPage: React.FC = () => {
       setRows(Array.isArray(response.data.list) ? response.data.list : []);
       setCatalog(Array.isArray(response.data.catalog) ? response.data.catalog : []);
       setTotal(Number(response.total) || 0);
+      const nextRetention = response.data.retention || {};
+      setRetention(nextRetention);
+      if (!retentionOpen) setRetentionDraft(nextRetention);
     } catch (error: any) {
       showToast(error.response?.data?.msg || '获取审计日志失败', 'error');
     } finally {
       setLoading(false);
     }
-  }, [page, query, refId, type, userId]);
+  }, [page, query, refId, retentionOpen, type, userId]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -155,6 +178,61 @@ const AuditLogsPage: React.FC = () => {
     setRefId(undefined);
   };
 
+  const openRetention = () => {
+    setRetentionDraft(retention);
+    setRetentionOpen(true);
+  };
+
+  const setRetentionMode = (logType: string, mode: AuditLogRetentionMode) => {
+    setRetentionDraft((current) => {
+      if (mode === 'forever') {
+        const next = { ...current };
+        delete next[logType];
+        return next;
+      }
+      return {
+        ...current,
+        [logType]: { mode, value: mode === 'days' ? 30 : 10000 },
+      };
+    });
+  };
+
+  const setRetentionValue = (logType: string, value: string) => {
+    setRetentionDraft((current) => {
+      const rule = current[logType];
+      if (!rule) return current;
+      return { ...current, [logType]: { ...rule, value: Number(value) } };
+    });
+  };
+
+  const saveRetention = async () => {
+    for (const [logType, rule] of Object.entries(retentionDraft)) {
+      const maximum = rule.mode === 'days' ? 3650 : 10000000;
+      if (!Number.isInteger(rule.value) || rule.value < 1 || rule.value > maximum) {
+        showToast(`${catalog.find((item) => item.type === logType)?.label || logType}的保留数值必须是 1-${maximum.toLocaleString('zh-CN')} 的整数`, 'warning');
+        return;
+      }
+    }
+    setRetentionSaving(true);
+    try {
+      const response = await adminApiService.updateAuditLogRetention(retentionDraft);
+      if (response.code !== 20000) {
+        showToast(response.msg || '保存日志保留策略失败', 'error');
+        return;
+      }
+      const nextRetention = response.data.retention || {};
+      setRetention(nextRetention);
+      setRetentionDraft(nextRetention);
+      setRetentionOpen(false);
+      showToast(`保留策略已保存，本次清理 ${Number(response.data.deleted || 0).toLocaleString('zh-CN')} 条历史日志`, 'success');
+      await load();
+    } catch (error: any) {
+      showToast(error.response?.data?.msg || '保存日志保留策略失败', 'error');
+    } finally {
+      setRetentionSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -165,7 +243,7 @@ const AuditLogsPage: React.FC = () => {
             <p className="text-sm text-default-500">统一查看安全审计、资金流水和关键业务记录</p>
           </div>
         </div>
-        <Button variant="flat" startContent={<RefreshCw size={16} />} onPress={load} isLoading={loading}>刷新</Button>
+        <div className="flex gap-2"><Tooltip content="按日志类型设置永久、按天或按最新条数保留"><Button variant="flat" startContent={<Settings2 size={16} />} onPress={openRetention}>保留策略</Button></Tooltip><Button variant="flat" startContent={<RefreshCw size={16} />} onPress={load} isLoading={loading}>刷新</Button></div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -183,6 +261,7 @@ const AuditLogsPage: React.FC = () => {
                 <Chip size="sm" variant="flat" color={TYPE_COLORS[item.type] || 'default'}>{item.count}</Chip>
               </div>
               <p className="text-xs text-default-500 line-clamp-2">{item.description}</p>
+              <p className="text-[11px] text-primary-600">{retentionLabel(retention, item.type)}</p>
             </CardBody>
           </Card>
         ))}
@@ -229,6 +308,32 @@ const AuditLogsPage: React.FC = () => {
         <p className="text-sm text-default-500">共 {total} 条，当前第 {page}/{Math.max(1, Math.ceil(total / PAGE_SIZE))} 页</p>
         {total > PAGE_SIZE && <Pagination page={page} total={Math.ceil(total / PAGE_SIZE)} onChange={setPage} showControls />}
       </div>
+
+      <Modal isOpen={retentionOpen} onClose={() => setRetentionOpen(false)} size="3xl" scrollBehavior="inside">
+        <ModalContent>
+          <ModalHeader className="flex items-center gap-2"><Settings2 className="h-5 w-5 text-primary" />审计日志保留策略</ModalHeader>
+          <ModalBody className="gap-3">
+            <p className="text-sm text-default-500">每种日志独立设置。保存后立即清理一次，系统每天 03:20 自动执行；永久保留不会删除历史数据。</p>
+            <Divider />
+            {catalog.map((item) => {
+              const mode = retentionMode(retentionDraft, item.type);
+              const rule = retentionDraft[item.type];
+              return (
+                <Card key={item.type} shadow="none" className="border border-divider">
+                  <CardBody className="grid items-center gap-3 md:grid-cols-[minmax(12rem,1fr)_12rem_13rem]">
+                    <div><div className="flex items-center gap-2"><p className="font-medium">{item.label}</p><Chip size="sm" variant="flat">当前 {item.count.toLocaleString('zh-CN')} 条</Chip></div><p className="mt-1 text-xs text-default-500">{item.description}</p></div>
+                    <Select aria-label={`${item.label}保留方式`} selectedKeys={[mode]} onSelectionChange={(keys) => setRetentionMode(item.type, String(Array.from(keys)[0] || 'forever') as AuditLogRetentionMode)}>
+                      {RETENTION_OPTIONS.map((option) => <SelectItem key={option.key}>{option.label}</SelectItem>)}
+                    </Select>
+                    {mode === 'forever' ? <p className="text-sm text-default-500">不自动删除</p> : <Input type="number" min={1} max={mode === 'days' ? 3650 : 10000000} value={String(rule?.value || '')} onValueChange={(value) => setRetentionValue(item.type, value)} endContent={<span className="whitespace-nowrap text-xs text-default-400">{mode === 'days' ? '天' : '条'}</span>} aria-label={`${item.label}保留${mode === 'days' ? '天数' : '条数'}`} />}
+                  </CardBody>
+                </Card>
+              );
+            })}
+          </ModalBody>
+          <ModalFooter><Button variant="light" onPress={() => setRetentionOpen(false)}>取消</Button><Button color="primary" startContent={<Save size={16} />} isLoading={retentionSaving} onPress={saveRetention}>保存并立即清理</Button></ModalFooter>
+        </ModalContent>
+      </Modal>
 
       <Modal isOpen={Boolean(selected)} onClose={() => setSelected(null)} size="2xl" scrollBehavior="inside">
         <ModalContent>{(onClose) => <>

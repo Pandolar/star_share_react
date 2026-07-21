@@ -27,6 +27,15 @@ export interface AuditLogCatalogItem {
     count: number;
 }
 
+export type AuditLogRetentionMode = 'forever' | 'days' | 'count';
+
+export interface AuditLogRetentionRule {
+    mode: Exclude<AuditLogRetentionMode, 'forever'>;
+    value: number;
+}
+
+export type AuditLogRetentionPolicy = Record<string, AuditLogRetentionRule>;
+
 export interface AuditLogRecord {
     id: number;
     type: string;
@@ -46,6 +55,7 @@ export interface AuditLogQueryParams extends CommonQueryParams {
 export interface AuditLogResponseData {
     list: AuditLogRecord[];
     catalog: AuditLogCatalogItem[];
+    retention: AuditLogRetentionPolicy;
 }
 
 // 套餐管理相关类型

@@ -8,7 +8,6 @@ import {
   Button,
   Card,
   CardBody,
-  Chip,
   Spinner,
   Switch,
 } from '@heroui/react';
@@ -199,7 +198,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           {activeOrder && (
             <div className="space-y-6">
               <Card><CardBody className="p-4 space-y-3">
-                <div className="flex justify-between items-center"><span className="text-default-500">支付方式</span><Chip size="sm" color={activeOrder.invoice_requested ? 'primary' : 'default'} variant="flat">{activeOrder.invoice_requested ? '开票订单' : '普通订单'}</Chip></div>
                 <div className="flex justify-between items-center"><span className="text-default-500">订单号</span><code className="text-xs bg-default-100 px-2 py-1 rounded font-mono">{activeOrder.order_id}</code></div>
                 <div className="flex justify-between items-center"><span className="text-default-500">支付金额</span><span className="text-2xl font-bold text-primary">¥{activeOrder.payable_amount || selectedPackage?.price}</span></div>
                 <div className="flex justify-between items-center"><span className="text-default-500">套餐时长</span><span className="font-medium">{selectedPackage ? getDurationText(selectedPackage.duration) : ''}</span></div>

@@ -32,6 +32,7 @@ import {
     InvoiceQueryParams,
     AuditLogQueryParams,
     AuditLogResponseData,
+    AuditLogRetentionPolicy,
     DashboardData,
     DashboardQueryParams,
 } from '../types/admin';
@@ -376,6 +377,15 @@ class AdminApiService {
     async getAuditLogs(params: AuditLogQueryParams = {}): Promise<AdminApiResponse<AuditLogResponseData>> {
         const queryString = this.buildQueryString(params);
         const response = await this.api.get(`/star/audit_logs?${queryString}`);
+        return response.data;
+    }
+
+    async updateAuditLogRetention(retention: AuditLogRetentionPolicy): Promise<AdminApiResponse<{
+        retention: AuditLogRetentionPolicy;
+        deleted: number;
+        deleted_by_type: Record<string, number>;
+    }>> {
+        const response = await this.api.put('/star/audit_logs/retention', { retention });
         return response.data;
     }
 

@@ -29,6 +29,7 @@ import {
     Select,
     SelectItem,
     Spinner,
+    Switch,
 } from '@heroui/react';
 import {
     Search,
@@ -66,6 +67,7 @@ const PackagesManagePage: React.FC = () => {
     const [total, setTotal] = useState(0);
     const [selectedPackage, setSelectedPackage] = useState<PackageType | null>(null);
     const [formData, setFormData] = useState<Partial<CreatePackageRequest | UpdatePackageRequest>>({});
+    const [statusUpdatingId, setStatusUpdatingId] = useState<number | null>(null);
 
     // Modal控制
     const { isOpen: isCreateOpen, onOpen: onCreateOpen, onClose: onCreateClose } = useDisclosure();
@@ -162,6 +164,11 @@ const PackagesManagePage: React.FC = () => {
         setCurrentPage(1);
     };
 
+    const openCreateModal = () => {
+        setFormData({ status: 1 });
+        onCreateOpen();
+    };
+
     // 处理创建套餐
     const handleCreate = async () => {
         try {
@@ -211,6 +218,24 @@ const PackagesManagePage: React.FC = () => {
             }
         } catch {
             showToast('更新套餐失败', 'error');
+        }
+    };
+
+    const handleStatusChange = async (pkg: PackageType, status: 0 | 1) => {
+        if (pkg.status === status || statusUpdatingId !== null) return;
+        setStatusUpdatingId(pkg.id);
+        try {
+            const response = await adminApiService.updatePackage({ id: pkg.id, status });
+            if (response.code !== 20000) {
+                showToast(response.msg || `${status === 1 ? '上架' : '下架'}套餐失败`, 'error');
+                return;
+            }
+            showToast(`套餐已${status === 1 ? '上架' : '下架'}`, 'success');
+            await fetchPackages();
+        } catch {
+            showToast(`${status === 1 ? '上架' : '下架'}套餐失败`, 'error');
+        } finally {
+            setStatusUpdatingId(null);
         }
     };
 
@@ -403,7 +428,7 @@ const PackagesManagePage: React.FC = () => {
                 <Button
                     color="primary"
                     startContent={<Plus className="w-4 h-4" />}
-                    onPress={onCreateOpen}
+                    onPress={openCreateModal}
                 >
                     添加套餐
                 </Button>
@@ -463,7 +488,20 @@ const PackagesManagePage: React.FC = () => {
                                             {pkg.priority}
                                         </Chip>
                                     </TableCell>
-                                    <TableCell>{renderStatus(pkg.status)}</TableCell>
+                                    <TableCell>
+                                        <Switch
+                                            size="sm"
+                                            color="success"
+                                            isSelected={pkg.status === 1}
+                                            isDisabled={statusUpdatingId !== null}
+                                            onValueChange={(selected) => void handleStatusChange(pkg, selected ? 1 : 0)}
+                                            aria-label={`${pkg.package_name}${pkg.status === 1 ? '下架' : '上架'}`}
+                                        >
+                                            <span className={pkg.status === 1 ? 'text-success-700' : 'text-default-500'}>
+                                                {statusUpdatingId === pkg.id ? '更新中' : pkg.status === 1 ? '已上架' : '已下架'}
+                                            </span>
+                                        </Switch>
+                                    </TableCell>
                                     <TableCell>
                                         <div className="max-w-40 truncate text-sm text-default-600">
                                             {pkg.remarks || '-'}
@@ -692,6 +730,15 @@ const PackagesManagePage: React.FC = () => {
                                 minValue={0}
                                 step={1}
                             />
+                            <Select
+                                label="上架状态"
+                                description="下架后用户端不可购买或兑换该套餐，历史订单和套餐记录不受影响。"
+                                selectedKeys={formData.status !== undefined ? [String(formData.status)] : []}
+                                onSelectionChange={(keys) => setFormData({ ...formData, status: Number(Array.from(keys)[0] || 0) as 0 | 1 })}
+                            >
+                                <SelectItem key="1">上架</SelectItem>
+                                <SelectItem key="0">下架</SelectItem>
+                            </Select>
                         </div>
                         <Textarea
                             label="套餐介绍"

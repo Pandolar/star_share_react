@@ -16,7 +16,30 @@ interface PackageSummaryProps {
     className?: string;
 }
 
+interface LongTextPreviewProps {
+    value?: string | null;
+    className?: string;
+}
+
 const money = (value?: number | null) => `¥${Number(value || 0).toFixed(2)}`;
+
+export const LongTextPreview: React.FC<LongTextPreviewProps> = ({ value, className = '' }) => {
+    const text = String(value || '').trim();
+    if (!text) return <span className="text-default-400">-</span>;
+
+    return (
+        <Tooltip
+            content={<div className="max-h-64 w-96 overflow-y-auto whitespace-pre-wrap break-words p-1 text-sm">{text}</div>}
+            placement="top-start"
+            delay={250}
+            closeDelay={50}
+        >
+            <p className={`line-clamp-2 min-w-0 cursor-help whitespace-pre-wrap break-all text-sm text-default-600 ${className}`} title={text}>
+                {text}
+            </p>
+        </Tooltip>
+    );
+};
 
 export const UserSummary: React.FC<UserSummaryProps> = ({ user, userId, className = '' }) => {
     const primary = user?.username || user?.email || `用户 #${userId}`;
