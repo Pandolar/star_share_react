@@ -83,6 +83,8 @@ interface Distributor {
     balance?: number;
     level?: number;
     default_cdk_expire_days?: number;
+    expires_at?: string | null;
+    discount_active?: boolean;
     can_login?: boolean;
     can_generate_cdk?: boolean;
     can_edit_notice?: boolean;
@@ -101,6 +103,7 @@ interface DistributorFormState {
     resetPassword: boolean;
     level: number;
     defaultCdkExpireDays: number;
+    expiresAt: string;
     can_login: boolean;
     can_generate_cdk: boolean;
     can_edit_notice: boolean;
@@ -132,6 +135,7 @@ const DEFAULT_FORM: DistributorFormState = {
     remarks: '',
     level: 1,
     defaultCdkExpireDays: 90,
+    expiresAt: dayjs().add(365, 'day').format('YYYY-MM-DD'),
     can_login: true,
     can_generate_cdk: true,
     can_edit_notice: true,
@@ -277,7 +281,7 @@ const DistributorsManagePage: React.FC = () => {
     };
 
     const resetForm = () => {
-        setFormData(DEFAULT_FORM);
+        setFormData({ ...DEFAULT_FORM, expiresAt: dayjs().add(365, 'day').format('YYYY-MM-DD') });
         setSelectedDistributor(null);
     };
 
@@ -297,6 +301,7 @@ const DistributorsManagePage: React.FC = () => {
             remarks: distributor.remarks || '',
             level: distributor.level || 1,
             defaultCdkExpireDays: distributor.default_cdk_expire_days ?? 90,
+            expiresAt: distributor.expires_at ? dayjs(distributor.expires_at).format('YYYY-MM-DD') : '',
             can_login: distributor.can_login !== false,
             can_generate_cdk: distributor.can_generate_cdk !== false,
             can_edit_notice: distributor.can_edit_notice !== false,
@@ -347,6 +352,10 @@ const DistributorsManagePage: React.FC = () => {
             showToast('默认卡密有效期必须是大于等于 0 的整数', 'warning');
             return null;
         }
+        if (formData.expiresAt && !dayjs(formData.expiresAt).isValid()) {
+            showToast('请选择有效的分销商有效期', 'warning');
+            return null;
+        }
 
         const parsed = parseDomainText(formData.domainsText);
         if (parsed.invalid.length > 0) {
@@ -369,6 +378,7 @@ const DistributorsManagePage: React.FC = () => {
                 remarks: formData.remarks.trim(),
                 level: formData.level,
                 default_cdk_expire_days: formData.defaultCdkExpireDays,
+                expires_at: formData.expiresAt || null,
                 can_login: formData.can_login,
                 can_generate_cdk: formData.can_generate_cdk,
                 can_edit_notice: formData.can_edit_notice,
@@ -403,6 +413,7 @@ const DistributorsManagePage: React.FC = () => {
                 remarks: formData.remarks.trim(),
                 level: formData.level,
                 default_cdk_expire_days: formData.defaultCdkExpireDays,
+                expires_at: formData.expiresAt || null,
                 can_login: formData.can_login,
                 can_generate_cdk: formData.can_generate_cdk,
                 can_edit_notice: formData.can_edit_notice,
@@ -762,6 +773,13 @@ const DistributorsManagePage: React.FC = () => {
                     description="用于匹配等级默认折扣。"
                     isRequired
                 />
+                <Input
+                    type="date"
+                    label="分销商有效期"
+                    value={formData.expiresAt}
+                    onValueChange={(expiresAt) => setFormData((current) => ({ ...current, expiresAt }))}
+                    description="新建默认 365 天；到期后仍可登录和生成卡密，但卡密按套餐原价结算。留空表示折扣永久有效。"
+                />
                 <NumberInput
                     label="默认卡密有效期（天）"
                     value={formData.defaultCdkExpireDays}
@@ -897,7 +915,7 @@ const DistributorsManagePage: React.FC = () => {
                                                 </div>
                                             </div>
                                         </TableCell>
-                                        <TableCell><div className="space-y-1"><Chip size="sm" color="secondary" variant="flat">L{distributor.level || 1}</Chip><p className="font-medium">¥{Number(distributor.balance || 0).toFixed(2)}</p><p className="text-xs text-default-500">默认 {distributor.default_cdk_expire_days ?? 90} 天</p></div></TableCell>
+                                        <TableCell><div className="space-y-1"><Chip size="sm" color="secondary" variant="flat">L{distributor.level || 1}</Chip><p className="font-medium">¥{Number(distributor.balance || 0).toFixed(2)}</p><Chip size="sm" color={distributor.discount_active === false ? 'warning' : 'success'} variant="flat">{distributor.discount_active === false ? '折扣已到期' : `折扣至 ${distributor.expires_at ? dayjs(distributor.expires_at).format('YYYY-MM-DD') : '永久'}`}</Chip><p className="text-xs text-default-500">卡密默认 {distributor.default_cdk_expire_days ?? 90} 天</p></div></TableCell>
                                         <TableCell><Chip size="sm" variant="flat" color={permissionsEnabled(distributor) === 4 ? 'success' : 'warning'}>{permissionsEnabled(distributor)}/4 已开通</Chip></TableCell>
                                         <TableCell><span className="block max-w-56 truncate text-sm text-default-500" title={distributor.remarks || ''}>{distributor.remarks || '-'}</span></TableCell>
                                         <TableCell>{distributor.updated_at ? dayjs(distributor.updated_at).format('YYYY-MM-DD HH:mm') : '-'}</TableCell>
@@ -948,6 +966,7 @@ const DistributorsManagePage: React.FC = () => {
                                 <Card shadow="none"><CardBody><p className="text-sm text-default-500">账号状态</p><div className="mt-2"><Chip color={selectedDistributor.status === 1 ? 'success' : 'danger'} variant="flat">{selectedDistributor.status === 1 ? '启用' : '停用'}</Chip></div></CardBody></Card>
                                 <Card shadow="none"><CardBody><p className="text-sm text-default-500">等级 / 余额</p><p className="mt-2 font-medium">L{selectedDistributor.level || 1} / ¥{Number(selectedDistributor.balance || 0).toFixed(2)}</p></CardBody></Card>
                                 <Card shadow="none"><CardBody><p className="text-sm text-default-500">创建时间</p><p className="mt-2">{selectedDistributor.created_at ? dayjs(selectedDistributor.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}</p></CardBody></Card>
+                                <Card shadow="none"><CardBody><p className="text-sm text-default-500">折扣有效期</p><p className="mt-2 font-medium">{selectedDistributor.expires_at ? dayjs(selectedDistributor.expires_at).format('YYYY-MM-DD HH:mm') : '永久有效'}</p><Chip className="mt-2" size="sm" color={selectedDistributor.discount_active === false ? 'warning' : 'success'} variant="flat">{selectedDistributor.discount_active === false ? '已到期，生成卡密按原价' : '折扣有效'}</Chip></CardBody></Card>
                                 <Card shadow="none"><CardBody><p className="text-sm text-default-500">更新时间</p><p className="mt-2">{selectedDistributor.updated_at ? dayjs(selectedDistributor.updated_at).format('YYYY-MM-DD HH:mm:ss') : '-'}</p></CardBody></Card>
                             </div></Tab>
                             <Tab key="site" title="域名与内容"><div className="space-y-4 py-3">

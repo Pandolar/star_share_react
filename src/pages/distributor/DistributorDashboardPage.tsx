@@ -157,6 +157,7 @@ const DistributorDashboardPage: React.FC = () => {
     const canGenerate = permissions?.can_generate_cdk === true;
     const canEditNotice = permissions?.can_edit_notice === true;
     const canEditLinks = permissions?.can_edit_links === true;
+    const discountActive = distributor?.discount_active !== false;
     const domains = useMemo(() => normalizeDomains(distributor?.domains), [distributor?.domains]);
     const selectedPackage = packages.find((item) => String(item.package_id) === genPackageId);
     const estimatedCost = Number(((selectedPackage?.unit_price || 0) * (genCount || 0)).toFixed(2));
@@ -501,6 +502,7 @@ const DistributorDashboardPage: React.FC = () => {
                         </Chip>
                         <Chip color="secondary" variant="flat">等级 L{distributor.level ?? 1}</Chip>
                         {canGenerate && <Chip color="success" variant="flat">余额 ¥{balance.toFixed(2)}</Chip>}
+                        {canGenerate && <Chip color={discountActive ? 'success' : 'warning'} variant="flat">{discountActive ? `折扣至 ${distributor.expires_at ? formatDateTime(distributor.expires_at) : '永久'}` : '折扣已到期 · 按原价'}</Chip>}
                     </div>
                 </section>
 
@@ -568,7 +570,7 @@ const DistributorDashboardPage: React.FC = () => {
                                     <Card className="lg:col-span-2" shadow="sm">
                                         <CardHeader className="flex-col items-start gap-1">
                                             <div className="flex items-center gap-2 font-semibold"><Ticket className="h-5 w-5 text-success" />用余额生成卡密</div>
-                                            <p className="text-sm text-default-500">列表单价已按“专属套餐 → 专属整体 → 等级套餐 → 等级整体 → 原价”的优先级计算。</p>
+                                            <p className="text-sm text-default-500">{discountActive ? '列表单价已按“专属套餐 → 专属整体 → 等级套餐 → 等级整体 → 原价”的优先级计算。' : '分销商折扣已到期，当前可继续生成卡密，所有套餐均按原价结算。'}</p>
                                         </CardHeader>
                                         <Divider />
                                         <CardBody>
@@ -867,6 +869,15 @@ const DistributorDashboardPage: React.FC = () => {
                         </div>
                     </Tab>
                 </Tabs>
+                <Alert
+                    isVisible
+                    color={discountActive ? 'primary' : 'warning'}
+                    variant="flat"
+                    title={discountActive ? '分销商折扣有效期说明' : '分销商折扣已到期'}
+                    description={discountActive
+                        ? `当前折扣有效期至 ${distributor.expires_at ? formatDateTime(distributor.expires_at) : '永久'}。有效期仅影响生成卡密时的折扣价格。`
+                        : `折扣已于 ${distributor.expires_at ? formatDateTime(distributor.expires_at) : '-'} 到期。到期后仍可登录控制台、管理站点、查看余额和生成卡密，但新生成卡密按套餐原价扣款；历史卡密、余额及其他功能不受影响。`}
+                />
             </main>
 
             {canGenerate && (

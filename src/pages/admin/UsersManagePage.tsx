@@ -299,34 +299,36 @@ const UsersManagePage: React.FC = () => {
         }
     };
 
-    // 统一通过确认弹窗执行解除限速，避免列表操作和批量搜索入口行为不一致。
-    const confirmClearLimit = async () => {
-        if (!pendingClearLimitUser) return;
-
+    const clearUserLimit = async (user: User) => {
+        if (clearLimitSubmitting) return;
         setClearLimitSubmitting(true);
         try {
-            const response = await adminApiService.clearUserLimit(pendingClearLimitUser.id);
+            const response = await adminApiService.clearUserLimit(user.id);
             if (response.code === 20000) {
-                // 构建操作摘要：限速清除 + 解封 + 加白
                 const d = response.data || {};
                 const parts: string[] = ['限速已清除'];
                 if (d.unban === 'done') parts.push('已解封');
                 else if (d.unban === 'skipped') parts.push('解封跳过(未封禁)');
-                else if (typeof d.unban === 'string' && d.unban.startsWith('failed')) parts.push('解封失败');
+                else if (typeof d.unban === 'string' && (d.unban.startsWith('failed') || d.unban.startsWith('error'))) parts.push('解封失败');
                 if (d.whitelist === 'done') parts.push('已加白');
                 else if (d.whitelist === 'skipped') parts.push('加白跳过(已在白名单)');
-                else if (typeof d.whitelist === 'string' && d.whitelist.startsWith('failed')) parts.push('加白失败');
+                else if (typeof d.whitelist === 'string' && (d.whitelist.startsWith('failed') || d.whitelist.startsWith('error'))) parts.push('加白失败');
                 showToast(parts.join(' | '), 'success');
                 onClearLimitConfirmClose();
                 setPendingClearLimitUser(null);
-            } else {
-                showToast(response.msg || '解除限速失败', 'error');
+                return true;
             }
+            showToast(response.msg || '解除限速失败', 'error');
         } catch (error) {
             showToast('解除限速失败', 'error');
         } finally {
             setClearLimitSubmitting(false);
         }
+        return false;
+    };
+
+    const confirmClearLimit = async () => {
+        if (pendingClearLimitUser) await clearUserLimit(pendingClearLimitUser);
     };
 
     const openClearLimitConfirm = (user: User) => {
@@ -370,9 +372,12 @@ const UsersManagePage: React.FC = () => {
                 }
             }
 
-            setClearLimitCandidates(candidates);
+            setClearLimitCandidates(candidates.length > 1 ? candidates : []);
 
-            if (candidates.length === 0) {
+            if (candidates.length === 1) {
+                onQuickClearClose();
+                await clearUserLimit(candidates[0]);
+            } else if (candidates.length === 0) {
                 showToast('未找到匹配用户，请检查输入内容', 'warning');
             }
         } catch (error) {
@@ -383,10 +388,9 @@ const UsersManagePage: React.FC = () => {
         }
     };
 
-    const handleQuickClearLimitSelect = (user: User) => {
-        setPendingClearLimitUser(user);
+    const handleQuickClearLimitSelect = async (user: User) => {
         onQuickClearClose();
-        onClearLimitConfirmOpen();
+        await clearUserLimit(user);
     };
 
     // 打开编辑Modal
@@ -1004,7 +1008,7 @@ const UsersManagePage: React.FC = () => {
 
                             <div className="space-y-3">
                                 <div className="text-sm text-default-600">
-                                    {clearLimitCandidates.length > 0 ? `找到 ${clearLimitCandidates.length} 个候选用户，请确认目标用户后再解除限速。` : '输入任意邮箱、用户名或用户 ID 后搜索。'}
+                                    {clearLimitCandidates.length > 1 ? `找到 ${clearLimitCandidates.length} 个候选用户，请确认目标用户；确认后会立即解除限速、解封并加白。` : '输入任意邮箱、用户名或用户 ID 后搜索；唯一结果会直接执行。'}
                                 </div>
                                 <div className="space-y-2">
                                     {clearLimitCandidates.map((user) => (

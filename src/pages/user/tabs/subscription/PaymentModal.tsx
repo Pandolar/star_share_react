@@ -54,7 +54,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [eligibility, setEligibility] = useState<InvoiceEligibility | null>(null);
   const [eligibilityLoading, setEligibilityLoading] = useState(false);
   const [invoiceSelected, setInvoiceSelected] = useState(false);
-  const [invoiceConfirmed, setInvoiceConfirmed] = useState(false);
   const [invoiceFeatureAvailable, setInvoiceFeatureAvailable] = useState(false);
 
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -74,7 +73,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setPaymentStatus('pending');
     setQrCodeExpired(false);
     setInvoiceSelected(false);
-    setInvoiceConfirmed(false);
     setEligibility(null);
     setInvoiceFeatureAvailable(false);
     void (async () => {
@@ -115,38 +113,46 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     return cleanup;
   }, [isOpen, checkoutId, selectedPackage]);
 
-  const loadEligibility = async () => {
-    if (!selectedPackage) return;
+  const loadEligibility = async (): Promise<InvoiceEligibility | null> => {
+    if (!selectedPackage) return null;
     setEligibilityLoading(true);
     try {
       const response = await orderUserApi.getInvoiceEligibility(selectedPackage.id);
       if (response.code === 20000) {
-        setEligibility(response.data || null);
-        setInvoiceFeatureAvailable(Boolean(response.data && response.data.reason !== 'invoice_disabled' && response.data.reason !== 'non_self_site'));
-      } else {
-        toast.warning(response.msg || '无法查询开票资格');
+        const nextEligibility = response.data || null;
+        setEligibility(nextEligibility);
+        setInvoiceFeatureAvailable(Boolean(nextEligibility && nextEligibility.reason !== 'invoice_disabled' && nextEligibility.reason !== 'non_self_site'));
+        return nextEligibility;
       }
+      toast.warning(response.msg || '无法查询开票资格');
     } catch {
       toast.error('无法查询开票资格，请稍后重试');
     } finally {
       setEligibilityLoading(false);
     }
+    return null;
   };
 
   const handleInvoiceSwitch = async (selected: boolean) => {
-    setInvoiceSelected(selected);
-    if (!selected || invoiceOrder) return;
-    setInvoiceConfirmed(false);
-    if (!eligibility) await loadEligibility();
-  };
-
-  const confirmInvoice = async () => {
-    if (!eligibility?.eligible) {
-      toast.warning(getInvoiceUnavailableText(eligibility?.reason));
+    if (!selected) {
+      setInvoiceSelected(false);
       return;
     }
+    if (invoiceOrder) {
+      setInvoiceSelected(true);
+      return;
+    }
+
+    const currentEligibility = eligibility || await loadEligibility();
+    if (!currentEligibility?.eligible) {
+      toast.warning(getInvoiceUnavailableText(currentEligibility?.reason));
+      setInvoiceSelected(false);
+      return;
+    }
+
+    setInvoiceSelected(true);
     const createdOrder = await onCreateInvoiceOrder();
-    if (createdOrder) setInvoiceConfirmed(true);
+    if (!createdOrder) setInvoiceSelected(false);
   };
 
   const handleManualCheck = async () => {
@@ -184,7 +190,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setPaymentStatus('pending');
     setQrCodeExpired(false);
     setInvoiceSelected(false);
-    setInvoiceConfirmed(false);
     onClose();
   };
 
@@ -223,18 +228,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     </div>
                     <Switch size="sm" isSelected={invoiceSelected} isDisabled={creatingInvoiceOrder || eligibilityLoading} onValueChange={handleInvoiceSwitch} aria-label="需要开票" />
                   </div>
-                  {invoiceSelected && invoiceOrder ? (
+                  {invoiceSelected && invoiceOrder && (
                     <div className="mt-2 rounded-lg bg-primary/5 p-3 text-sm space-y-1">
                       <p>套餐原价：¥{invoiceOrder.base_amount}</p><p>开票服务费：¥{invoiceOrder.invoice_snapshot?.surcharge_amount}</p><p>最终支付：¥{invoiceOrder.payable_amount}</p><p>抬头：{invoiceOrder.invoice_snapshot?.title}</p><p>税号：{invoiceOrder.invoice_snapshot?.tax_number}</p><p>接收邮箱：{invoiceOrder.invoice_snapshot?.email}</p><p>预计 {invoiceOrder.invoice_snapshot?.delivery_workdays} 个工作日内发送</p>
                     </div>
-                  ) : invoiceSelected && eligibilityLoading ? <div className="mt-2"><Spinner size="sm" /></div> : invoiceSelected && eligibility ? (
-                    <div className="mt-2 rounded-lg bg-primary/5 p-3 text-sm space-y-2">
-                      <p>套餐原价：¥{eligibility.base_amount}</p><p>开票服务费：¥{eligibility.surcharge_amount}（{(Number(eligibility.surcharge_rate || 0) * 100).toFixed(1)}%）</p><p>最终支付：¥{eligibility.payable_amount}</p><p>抬头：{eligibility.billing_profile?.title || '-'}</p><p>税号：{eligibility.billing_profile?.tax_number || '-'}</p><p>接收邮箱：{eligibility.email || '-'}</p><p>预计 {eligibility.delivery_workdays} 个工作日内发送至上述邮箱</p>
-                      {!eligibility.eligible && <p className="text-warning-700">{getInvoiceUnavailableText(eligibility.reason)}</p>}
-                      {eligibility.eligible && <Button color="primary" size="sm" onPress={confirmInvoice} isLoading={creatingInvoiceOrder}>确认并生成开票二维码</Button>}
-                    </div>
-                  ) : null}
-                  {invoiceConfirmed && <p className="mt-2 text-xs text-success">开票二维码已生成。</p>}
+                  )}
+                  {invoiceSelected && creatingInvoiceOrder && !invoiceOrder && <div className="mt-2 flex items-center gap-2 text-sm text-default-500"><Spinner size="sm" />正在生成开票二维码...</div>}
                 </div>
               )}
                 {paymentStatus === 'pending' && qrCodeExpired && <div className="space-y-4"><AlertCircle className="w-12 h-12 mx-auto text-danger" /><p className="text-danger font-medium">本次结账已过期，请重新下单</p><Button color="primary" onPress={handleClose}>重新下单</Button></div>}

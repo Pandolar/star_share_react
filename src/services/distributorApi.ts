@@ -26,6 +26,8 @@ export interface DistributorInfo {
     balance?: number;
     level?: number;
     default_cdk_expire_days?: number;
+    expires_at?: string | null;
+    discount_active?: boolean;
     permissions?: DistributorPermissions;
     created_at: string | null;
     updated_at: string | null;
@@ -59,6 +61,8 @@ export interface DistributorLoginResponse {
     balance?: number;
     level?: number;
     permissions?: DistributorPermissions;
+    expires_at?: string | null;
+    discount_active?: boolean;
 }
 
 /**
@@ -90,6 +94,7 @@ export interface DistributorPackage {
     base_price: number;
     discount_rate: number;
     unit_price: number;
+    discount_active?: boolean;
 }
 
 /**
@@ -112,6 +117,7 @@ export interface DistributorGenerateResponse {
     total_cost: number;
     balance_after: number;
     discount_rate: number;
+    discount_active?: boolean;
 }
 
 /**

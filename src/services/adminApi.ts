@@ -536,6 +536,7 @@ class AdminApiService {
         remarks?: string;
         level?: number;
         default_cdk_expire_days?: number;
+        expires_at?: string | null;
         can_login?: boolean;
         can_generate_cdk?: boolean;
         can_edit_notice?: boolean;
@@ -557,6 +558,7 @@ class AdminApiService {
         remarks?: string;
         level?: number;
         default_cdk_expire_days?: number;
+        expires_at?: string | null;
         can_login?: boolean;
         can_generate_cdk?: boolean;
         can_edit_notice?: boolean;

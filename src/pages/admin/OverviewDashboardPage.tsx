@@ -220,8 +220,8 @@ const DistributionCard: React.FC<{
 
 const OverviewDashboardPage: React.FC = () => {
   const today = dayjs();
-  const defaultStart = today.subtract(29, 'day').format('YYYY-MM-DD');
-  const defaultEnd = today.format('YYYY-MM-DD');
+  const defaultStart = today.format('YYYY-MM-DD');
+  const defaultEnd = defaultStart;
   const [filters, setFilters] = useState<DashboardQueryParams>({
     start_date: defaultStart,
     end_date: defaultEnd,
@@ -326,7 +326,7 @@ const OverviewDashboardPage: React.FC = () => {
       <Card shadow="sm">
         <CardHeader className="flex-col items-start gap-1 pb-2">
           <div className="flex items-center gap-2 font-semibold"><CalendarDays className="h-4 w-4" />运营筛选器</div>
-          <p className="text-xs text-default-500">默认展示最近30天；支持最长366天，小时粒度最多14天。</p>
+          <p className="text-xs text-default-500">默认展示今天；支持最长366天，小时粒度最多14天。</p>
         </CardHeader>
         <CardBody className="gap-4 pt-2">
           <div className="flex flex-wrap gap-2">
@@ -365,7 +365,7 @@ const OverviewDashboardPage: React.FC = () => {
             </Select>
             <div className="flex items-end gap-2">
               <Button color="primary" onPress={applyFilters}>应用</Button>
-              <Tooltip content="恢复最近30天默认筛选"><Button isIconOnly variant="flat" aria-label="重置运营筛选" onPress={resetFilters}><RotateCcw className="h-4 w-4" /></Button></Tooltip>
+              <Tooltip content="恢复今天默认筛选"><Button isIconOnly variant="flat" aria-label="重置运营筛选" onPress={resetFilters}><RotateCcw className="h-4 w-4" /></Button></Tooltip>
             </div>
           </div>
           {data?.period.package_id && <Alert color="primary" variant="flat" title="套餐筛选说明" description={data.meta.package_filter_note} />}
