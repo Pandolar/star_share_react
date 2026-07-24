@@ -441,6 +441,29 @@ const UsersManagePage: React.FC = () => {
         </Chip>
     );
 
+    const renderMembership = (user: User) => {
+        const membership = user.membership;
+        if (!membership || membership.status === 'free') {
+            return <div className="space-y-1"><Chip size="sm" variant="flat">Free</Chip><p className="text-xs text-default-400">暂无生效套餐</p></div>;
+        }
+        const statusText = membership.status === 'active' ? '生效中' : '已冻结';
+        const detail = membership.status === 'active' && membership.expires_at
+            ? `至 ${dayjs(membership.expires_at).format('YYYY-MM-DD')}`
+            : membership.remaining_minutes
+                ? `剩余 ${Math.max(1, Math.ceil(membership.remaining_minutes / 1440))} 天`
+                : '等待恢复';
+        return (
+            <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-1.5">
+                    <Chip size="sm" color={membership.status === 'active' ? 'success' : 'warning'} variant="flat">{statusText}</Chip>
+                    <Chip size="sm" color="primary" variant="bordered">{membership.level}</Chip>
+                </div>
+                <p className="max-w-48 truncate text-sm font-medium" title={membership.package_name || ''}>{membership.package_name || '-'}</p>
+                <p className="text-xs text-default-500">{membership.category || '-'} · {detail}{membership.active_count > 1 ? ` · ${membership.active_count} 个生效套餐` : ''}</p>
+            </div>
+        );
+    };
+
     // 操作按钮渲染
     const renderActions = (user: User) => (
         <Dropdown>
@@ -591,16 +614,17 @@ const UsersManagePage: React.FC = () => {
                         isHeaderSticky
                         classNames={{
                             wrapper: "max-h-[600px] overflow-x-auto",
-                            table: "min-w-[1100px]",
+                            table: "min-w-[1320px]",
                         }}
                     >
                         <TableHeader>
-                            <TableColumn width={100}>ID</TableColumn>
+                            <TableColumn width={80}>ID</TableColumn>
                             <TableColumn>用户信息</TableColumn>
+                            <TableColumn>会员与套餐</TableColumn>
+                            <TableColumn>现金累充</TableColumn>
                             <TableColumn>联系方式</TableColumn>
-                            <TableColumn>状态</TableColumn>
-                            <TableColumn>创建时间</TableColumn>
-                            <TableColumn>备注</TableColumn>
+                            <TableColumn>账号状态</TableColumn>
+                            <TableColumn>注册时间</TableColumn>
                             <TableColumn width={80}>操作</TableColumn>
                         </TableHeader>
                         <TableBody
@@ -613,26 +637,25 @@ const UsersManagePage: React.FC = () => {
                                     <TableCell>{user.id}</TableCell>
                                     <TableCell>
                                         <div className="space-y-1">
-                                            <div className="font-medium">{user.username || '未设置'}</div>
+                                            <div className="font-medium">{user.username || '未设置用户名'}</div>
+                                            <div className="max-w-48 truncate text-xs text-default-500" title={user.remarks || ''}>{user.remarks || '无备注'}</div>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>{renderMembership(user)}</TableCell>
+                                    <TableCell>
+                                        <div className="space-y-1">
+                                            <div className="font-semibold text-success">¥{Number(user.cash_summary?.paid_amount || 0).toFixed(2)}</div>
+                                            <div className="text-xs text-default-500">{user.cash_summary?.paid_orders || 0} 笔现金支付</div>
                                         </div>
                                     </TableCell>
                                     <TableCell>
                                         <div className="space-y-1">
                                             <div className="text-sm">{user.email}</div>
-                                            {user.tel && (
-                                                <div className="text-xs text-default-500">{user.tel}</div>
-                                            )}
+                                            {user.tel && <div className="text-xs text-default-500">{user.tel}</div>}
                                         </div>
                                     </TableCell>
                                     <TableCell>{renderStatus(user.status)}</TableCell>
-                                    <TableCell className="text-sm">
-                                        {dayjs(user.created_at).format('YYYY-MM-DD HH:mm')}
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="max-w-40 truncate text-sm text-default-600">
-                                            {user.remarks || '-'}
-                                        </div>
-                                    </TableCell>
+                                    <TableCell className="text-sm">{dayjs(user.created_at).format('YYYY-MM-DD HH:mm')}</TableCell>
                                     <TableCell>{renderActions(user)}</TableCell>
                                 </TableRow>
                             ))}
@@ -807,7 +830,14 @@ const UsersManagePage: React.FC = () => {
                     <ModalBody>
                         {selectedUser && (
                             <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                    <Card shadow="none"><CardBody className="gap-2"><span className="text-sm text-default-500">账号状态</span><div>{renderStatus(selectedUser.status)}</div></CardBody></Card>
+                                    <Card shadow="none"><CardBody className="gap-2"><span className="text-sm text-default-500">会员状态</span>{renderMembership(selectedUser)}</CardBody></Card>
+                                    <Card shadow="none"><CardBody className="gap-1"><span className="text-sm text-default-500">现金累充</span><strong className="text-xl text-success">¥{Number(selectedUser.cash_summary?.paid_amount || 0).toFixed(2)}</strong><span className="text-xs text-default-500">{selectedUser.cash_summary?.paid_orders || 0} 笔现金支付</span></CardBody></Card>
+                                    <Card shadow="none"><CardBody className="gap-1"><span className="text-sm text-default-500">注册时间</span><strong className="text-sm">{dayjs(selectedUser.created_at).format('YYYY-MM-DD')}</strong><span className="text-xs text-default-500">{dayjs(selectedUser.created_at).format('HH:mm:ss')}</span></CardBody></Card>
+                                </div>
+                                <p className="text-sm font-medium text-default-700">基础资料</p>
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                     <div>
                                         <span className="text-sm text-default-500">用户ID</span>
                                         <div className="font-medium">{selectedUser.id}</div>
@@ -876,21 +906,17 @@ const UsersManagePage: React.FC = () => {
                                     ) : (
                                         <Table aria-label="用户套餐记录" className="mt-2">
                                             <TableHeader>
-                                                <TableColumn>套餐ID</TableColumn>
+                                                <TableColumn>套餐</TableColumn>
                                                 <TableColumn>状态</TableColumn>
-                                                <TableColumn>方式</TableColumn>
-                                                <TableColumn>创建时间</TableColumn>
+                                                <TableColumn>来源</TableColumn>
+                                                <TableColumn>开通时间</TableColumn>
                                             </TableHeader>
                                             <TableBody>
                                                 {viewUserPackages.map((pkg) => (
                                                     <TableRow key={pkg.id}>
-                                                        <TableCell>{pkg.package_id}</TableCell>
-                                                        <TableCell>
-                                                            <Chip size="sm" variant="flat" color={pkg.status === 'active' ? 'success' : pkg.status === 'frozen' ? 'warning' : 'default'}>
-                                                                {pkg.status === 'active' ? '有效' : pkg.status === 'frozen' ? '冻结' : '过期'}
-                                                            </Chip>
-                                                        </TableCell>
-                                                        <TableCell>{pkg.way || '-'}</TableCell>
+                                                        <TableCell><div><p className="font-medium">{pkg.package?.package_name || `套餐 #${pkg.package_id}`}</p><p className="text-xs text-default-500">{pkg.package ? `${pkg.package.category} · ${pkg.package.level}` : `ID ${pkg.package_id}`}</p></div></TableCell>
+                                                        <TableCell><Chip size="sm" variant="flat" color={pkg.status === 'active' ? 'success' : pkg.status === 'frozen' ? 'warning' : 'default'}>{pkg.status === 'active' ? '有效' : pkg.status === 'frozen' ? '冻结' : '过期'}</Chip></TableCell>
+                                                        <TableCell>{pkg.way === 'purchase' ? '现金购买' : pkg.way === 'exchange' ? '兑换码' : pkg.way || '-'}</TableCell>
                                                         <TableCell>{dayjs(pkg.created_at).format('YYYY-MM-DD HH:mm')}</TableCell>
                                                     </TableRow>
                                                 ))}
@@ -909,21 +935,17 @@ const UsersManagePage: React.FC = () => {
                                     ) : (
                                         <Table aria-label="用户订单记录" className="mt-2">
                                             <TableHeader>
-                                                <TableColumn>订单号</TableColumn>
+                                                <TableColumn>订单与套餐</TableColumn>
                                                 <TableColumn>状态</TableColumn>
-                                                <TableColumn>方式</TableColumn>
+                                                <TableColumn>实付金额</TableColumn>
                                                 <TableColumn>创建时间</TableColumn>
                                             </TableHeader>
                                             <TableBody>
                                                 {viewUserOrders.map((order) => (
                                                     <TableRow key={order.id}>
-                                                        <TableCell><code className="text-xs">{order.order_id}</code></TableCell>
-                                                        <TableCell>
-                                                            <Chip size="sm" variant="flat" color={order.status === 'paid' ? 'success' : order.status === 'failed' ? 'danger' : 'warning'}>
-                                                                {order.status === 'paid' ? '已支付' : order.status === 'failed' ? '支付失败' : '待支付'}
-                                                            </Chip>
-                                                        </TableCell>
-                                                        <TableCell>{order.way || '-'}</TableCell>
+                                                        <TableCell><div><p className="font-medium">{order.package?.package_name || `套餐 #${order.package_id}`}</p><code className="text-xs text-default-500">{order.order_id}</code>{order.promotion_code && <Chip className="ml-2" size="sm" color="success" variant="flat">{order.promotion_code}</Chip>}</div></TableCell>
+                                                        <TableCell><Chip size="sm" variant="flat" color={order.status === 'paid' ? 'success' : order.status === 'failed' ? 'danger' : 'warning'}>{order.status === 'paid' ? '已支付' : order.status === 'failed' ? '支付失败' : '待支付'}</Chip></TableCell>
+                                                        <TableCell><div><p className="font-medium">¥{Number(order.paid_amount ?? order.payable_amount ?? order.base_amount ?? 0).toFixed(2)}</p>{Number(order.discount_amount || 0) > 0 && <p className="text-xs text-success">优惠 ¥{Number(order.discount_amount).toFixed(2)}</p>}</div></TableCell>
                                                         <TableCell>{dayjs(order.created_at).format('YYYY-MM-DD HH:mm')}</TableCell>
                                                     </TableRow>
                                                 ))}

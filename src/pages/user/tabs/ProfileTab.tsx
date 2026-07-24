@@ -307,7 +307,9 @@ export const ProfileTab: React.FC = () => {
                 <CardBody className="p-6">
                   <div className="flex items-start gap-4">
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center ${levelStyle.bgColor}`}>
-                      {React.createElement(levelStyle.icon, {
+                      {hasPackage ? (
+                        <span className="text-2xl leading-none" role="img" aria-label="生效套餐">⭐</span>
+                      ) : React.createElement(levelStyle.icon, {
                         size: 24,
                         className: `text-${levelStyle.color}`,
                       })}

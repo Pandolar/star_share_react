@@ -18,6 +18,9 @@ import {
     ModalFooter,
     NumberInput,
     useDisclosure,
+    Tabs,
+    Tab,
+    Chip,
 } from '@heroui/react';
 import {
     Settings,
@@ -35,6 +38,7 @@ import adminApiService from '../../services/adminApi';
 import { SystemConfig, UpdateConfigRequest } from '../../types/admin';
 import { showToast } from '../../components/Toast';
 import { CompensationConfigEditor } from './CompensationConfigEditor';
+import { PromotionCodeConfigEditor } from './PromotionCodeConfigEditor';
 
 /**
  * 系统配置管理页面
@@ -48,6 +52,7 @@ const SettingsManagePage: React.FC = () => {
     const [configValues, setConfigValues] = useState<Record<string, string>>({});
     const [selectedGroup, setSelectedGroup] = useState<string>('');
     const [packageLevels, setPackageLevels] = useState<Array<{ level: string; category: string }>>([]);
+    const [packageOptions, setPackageOptions] = useState<Array<{ id: number; package_name: string; category: string; level: string }>>([]);
     const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onOpenChange: onConfirmOpenChange } = useDisclosure();
     const [pendingConfig, setPendingConfig] = useState<{ key: string; value: string; description: string } | null>(null);
 
@@ -88,6 +93,12 @@ const SettingsManagePage: React.FC = () => {
                 if (resp.code === 20000 && Array.isArray(resp.data)) {
                     const seen = new Set<string>();
                     const levels: Array<{ level: string; category: string }> = [];
+                    setPackageOptions(resp.data.map((item) => ({
+                        id: item.id,
+                        package_name: item.package_name,
+                        category: item.category,
+                        level: item.level,
+                    })));
                     resp.data.forEach((p) => {
                         const key = `${p.level}|${p.category}`;
                         if (p.level && p.category && !seen.has(key)) {
@@ -195,7 +206,13 @@ const SettingsManagePage: React.FC = () => {
     }, {} as Record<string, SystemConfig[]>), [configs]);
 
     // 分组列表
-    const groupKeys = useMemo(() => Object.keys(groupedConfigs), [groupedConfigs]);
+    const groupKeys = useMemo(() => {
+        const preferredOrder = ['基础设置', '账号与通知', '支付与开票', '套餐与权益', '风控与限速', '外部集成'];
+        return [
+            ...preferredOrder.filter((group) => groupedConfigs[group]),
+            ...Object.keys(groupedConfigs).filter((group) => !preferredOrder.includes(group)).sort(),
+        ];
+    }, [groupedConfigs]);
 
     const filterGroups = useCallback((textValue: string, inputValue: string) => {
         const query = inputValue.trim().toLocaleLowerCase();
@@ -219,12 +236,12 @@ const SettingsManagePage: React.FC = () => {
     // 分组图标映射
     const getGroupIcon = (group: string) => {
         const iconMap: Record<string, React.ReactNode> = {
-            '系统设置': <Globe className="w-5 h-5" />,
-            '管理员设置': <User className="w-5 h-5" />,
-            '用户管理': <Mail className="w-5 h-5" />,
-            '支付设置': <CreditCard className="w-5 h-5" />,
-            '安全设置': <Shield className="w-5 h-5" />,
-            '通知设置': <Bell className="w-5 h-5" />,
+            '基础设置': <Globe className="w-5 h-5" />,
+            '账号与通知': <Mail className="w-5 h-5" />,
+            '支付与开票': <CreditCard className="w-5 h-5" />,
+            '套餐与权益': <User className="w-5 h-5" />,
+            '风控与限速': <Shield className="w-5 h-5" />,
+            '外部集成': <Settings className="w-5 h-5" />,
         };
         return iconMap[group] || <Settings className="w-5 h-5" />;
     };
@@ -251,7 +268,7 @@ const SettingsManagePage: React.FC = () => {
                         <div className="text-sm text-default-500">配置键: {config.key}</div>
                     </div>
                     <Switch
-                        isSelected={value === 'true'}
+                        isSelected={['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase())}
                         onValueChange={(selected) => updateConfigValue(config.key, selected ? 'true' : 'false')}
                         isDisabled={!config.editable}
                         color={isChanged ? 'warning' : 'primary'}
@@ -313,6 +330,13 @@ const SettingsManagePage: React.FC = () => {
                         placeholder={`请输入${config.description}（支持Markdown格式）`}
                         minRows={5}
                         description={config.key.startsWith('SUBSCRIPTION_NOTICE_') ? '支持Markdown：标题、列表、**粗体**、链接等' : undefined}
+                    />
+                ) : config.key === 'PROMOTION_CODE_CONFIG' ? (
+                    <PromotionCodeConfigEditor
+                        value={value}
+                        onChange={(json) => updateConfigValue(config.key, json)}
+                        disabled={!config.editable}
+                        packages={packageOptions}
                     />
                 ) : config.key === 'COMPENSATION_CONFIG' ? (
                     <CompensationConfigEditor
@@ -415,15 +439,36 @@ const SettingsManagePage: React.FC = () => {
 
             {/* 支持按分组名、配置说明或配置键查找所在分组 */}
             <Card>
-                <CardBody className="gap-3">
+                <CardBody className="gap-4">
                     <div>
-                        <p className="font-medium text-foreground">配置分组</p>
-                        <p className="text-sm text-default-500">输入分组名，或直接搜索配置说明和配置键，快速定位所在分组。</p>
+                        <p className="font-medium text-foreground">配置分类</p>
+                        <p className="text-sm text-default-500">设置项已归并为少量业务分类；直接切换标签，或按配置说明和配置键快速定位。</p>
                     </div>
+                    <Tabs
+                        aria-label="配置分类"
+                        selectedKey={selectedGroup}
+                        onSelectionChange={(key) => setSelectedGroup(String(key))}
+                        variant="underlined"
+                        color="primary"
+                        classNames={{ tabList: 'w-full overflow-x-auto', cursor: 'w-full' }}
+                    >
+                        {groupKeys.map((group) => (
+                            <Tab
+                                key={group}
+                                title={(
+                                    <div className="flex items-center gap-2 whitespace-nowrap">
+                                        {getGroupIcon(group)}
+                                        <span>{group}</span>
+                                        <Chip size="sm" variant="flat">{groupedConfigs[group]?.length || 0}</Chip>
+                                    </div>
+                                )}
+                            />
+                        ))}
+                    </Tabs>
                     <Autocomplete
-                        aria-label="查找配置分组"
-                        label="查找配置分组"
-                        placeholder="例如：通知、SMTP、WHITE_LABEL_CONFIG"
+                        aria-label="快速定位配置"
+                        label="快速定位配置"
+                        placeholder="例如：SMTP、优惠码、WHITE_LABEL_CONFIG"
                         selectedKey={selectedGroup || null}
                         onSelectionChange={(key) => {
                             if (key != null) setSelectedGroup(String(key));
@@ -432,7 +477,7 @@ const SettingsManagePage: React.FC = () => {
                         menuTrigger="focus"
                         isClearable={false}
                         startContent={<Search className="h-4 w-4 text-default-400" />}
-                        description={`共 ${groupKeys.length} 个分组，当前分组有 ${groupedConfigs[selectedGroup]?.length || 0} 项配置`}
+                        description={`共 ${groupKeys.length} 个分类，当前显示 ${groupedConfigs[selectedGroup]?.length || 0} 项配置`}
                         className="w-full max-w-2xl"
                     >
                         {groupKeys.map((group) => (

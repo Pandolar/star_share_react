@@ -16,6 +16,8 @@ interface WhiteLabelState {
     notice: string;
     noticeId: string;
     enableRegister: boolean;
+    enableWechatLogin: boolean;
+    enablePromotionCode: boolean;
     purchaseUrl: string;
     customerServiceUrl: string;
     subscriptionNotice: string;
@@ -27,6 +29,8 @@ const defaultState: WhiteLabelState = {
     notice: '',
     noticeId: '',
     enableRegister: true,
+    enableWechatLogin: false,
+    enablePromotionCode: false,
     purchaseUrl: '',
     customerServiceUrl: '',
     subscriptionNotice: '',
@@ -70,6 +74,8 @@ export const WhiteLabelProvider: React.FC<WhiteLabelProviderProps> = ({ children
                         notice: res.data.notice || '',
                         noticeId: res.data.notice_id || '',
                         enableRegister: res.data.enable_register !== false,
+                        enableWechatLogin: res.data.enable_wechat_login === true,
+                        enablePromotionCode: res.data.enable_promotion_code === true,
                         purchaseUrl: res.data.purchase_url || '',
                         customerServiceUrl: res.data.customer_service_url || '',
                         subscriptionNotice: res.data.subscription_notice || '',

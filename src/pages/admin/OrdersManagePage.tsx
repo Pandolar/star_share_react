@@ -540,7 +540,7 @@ const OrdersManagePage: React.FC = () => {
                                         <div className="mt-1">{renderInvoiceStatus(selectedOrder)}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-default-500">基础 / 应付</span>
+                                        <span className="text-sm text-default-500">套餐原价 / {selectedOrder.invoice_requested ? '开票价' : '应付'}</span>
                                         <div className="font-medium">¥{Number(selectedOrder.base_amount || 0).toFixed(2)} / ¥{Number(selectedOrder.payable_amount || 0).toFixed(2)}</div>
                                     </div>
                                     <div>

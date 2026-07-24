@@ -13,6 +13,17 @@ export interface PackageInfo {
   status: number;
 }
 
+export interface PromotionSnapshot {
+  code: string;
+  name: string;
+  discount_type: 'rate' | 'fixed';
+  discount_value: number;
+  scope_type: 'all' | 'packages' | 'levels';
+  original_amount: string;
+  discount_amount: string;
+  discounted_amount: string;
+}
+
 export interface OrderInfo {
   success: boolean;
   trade_no: string;
@@ -25,11 +36,21 @@ export interface OrderInfo {
   base_amount?: string;
   payable_amount?: string;
   invoice_requested?: boolean;
+  discount_amount?: string;
+  promotion_code?: string | null;
+  promotion_snapshot?: PromotionSnapshot | null;
+  expires_at?: string | null;
+  expires_in_seconds?: number;
   invoice_snapshot?: {
     title: string;
     tax_number: string;
     email: string;
     surcharge_amount: string;
+    original_amount?: string;
+    base_amount?: string;
+    discount_amount?: string;
+    promotion_code?: string | null;
+    payable_amount?: string;
     delivery_workdays: number;
   } | null;
 }

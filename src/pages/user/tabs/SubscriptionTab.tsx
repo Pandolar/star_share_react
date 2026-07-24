@@ -152,6 +152,34 @@ export const SubscriptionTab: React.FC = () => {
     }
   };
 
+  const applyPromotionCode = async (promotionCode: string) => {
+    if (!selectedPackage) return null;
+    setOrderLoading(true);
+    try {
+      const response = await orderUserApi.createOrder(selectedPackage.id, {
+        ...(isMobileDevice ? { device: 'mobile' as const } : {}),
+        promotion_code: promotionCode,
+        replace_checkout_id: ordinaryOrder?.checkout_id,
+      });
+      if (response.code !== 20000) {
+        toast.error(response.msg || '优惠码使用失败');
+        return null;
+      }
+      const nextOrder = { ...response.data, invoice_snapshot: response.data.invoice_snapshot || null };
+      setOrdinaryOrder(nextOrder);
+      setInvoiceOrder(null);
+      toast.success(nextOrder.promotion_code
+        ? `优惠码 ${nextOrder.promotion_code} 已使用`
+        : '已恢复套餐原价');
+      return nextOrder;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '优惠码使用失败');
+      return null;
+    } finally {
+      setOrderLoading(false);
+    }
+  };
+
   const getMostPopularPackage = (categoryPackages: PackageInfo[]) => {
     if (categoryPackages.length <= 1) return null;
     const sortedByPrice = [...categoryPackages].sort((a, b) => a.price - b.price);
@@ -692,6 +720,8 @@ export const SubscriptionTab: React.FC = () => {
         invoiceOrder={invoiceOrder}
         creatingInvoiceOrder={orderLoading}
         onCreateInvoiceOrder={createInvoiceOrder}
+        promotionActionLoading={orderLoading}
+        onApplyPromotionCode={applyPromotionCode}
         onClose={() => {
           setPaymentModalOpen(false);
           setOrdinaryOrder(null);

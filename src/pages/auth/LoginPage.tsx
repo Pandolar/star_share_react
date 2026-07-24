@@ -56,8 +56,9 @@ const LoginPage: React.FC = () => {
 
   // 登录方式切换
   const [loginMethod, setLoginMethod] = useState<'wechat' | 'email'>('email');
-  // 白牌模式：隐藏微信登录，仅保留邮箱登录
-  const { isWhiteLabel, enableRegister } = useWhiteLabel();
+  // 白牌或全局开关关闭时隐藏微信登录，仅保留邮箱登录
+  const { isWhiteLabel, enableRegister, enableWechatLogin } = useWhiteLabel();
+  const showWechatLogin = !isWhiteLabel && enableWechatLogin;
   // 切到微信 Tab 后是否已确认继续使用（用于在显示二维码前先弹推荐邮箱登录的提示）
   const [wechatConfirmed, setWechatConfirmed] = useState(false);
 
@@ -520,8 +521,8 @@ const LoginPage: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-6">
-          {/* 登录方式选择（白牌模式隐藏微信登录，仅邮箱登录） */}
-          {!isWhiteLabel && (
+          {/* 登录方式选择（白牌或微信登录关闭时仅显示邮箱登录） */}
+          {showWechatLogin && (
           <div className="flex space-x-1 bg-default-100 p-1 rounded-lg">
             <button
               onClick={() => handleLoginMethodChange('email')}
@@ -550,7 +551,7 @@ const LoginPage: React.FC = () => {
           )}
 
           {/* 微信二维码登录 */}
-          {!isWhiteLabel && loginMethod === 'wechat' && !wechatConfirmed && (
+          {showWechatLogin && loginMethod === 'wechat' && !wechatConfirmed && (
             <Card className="w-full">
               <CardBody className="flex flex-col items-center space-y-5 p-6 sm:p-8">
                 <div className="w-12 h-12 rounded-full bg-warning/15 flex items-center justify-center">
@@ -582,7 +583,7 @@ const LoginPage: React.FC = () => {
             </Card>
           )}
 
-          {!isWhiteLabel && loginMethod === 'wechat' && wechatConfirmed && (
+          {showWechatLogin && loginMethod === 'wechat' && wechatConfirmed && (
             <Card className="w-full">
               <CardBody className="flex flex-col items-center space-y-4 p-8">
                 <h3 className="text-lg font-semibold text-default-800">微信扫码登录</h3>

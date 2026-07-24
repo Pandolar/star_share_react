@@ -138,6 +138,21 @@ export interface User {
     remarks?: string;
     xy_uuid_token?: string;
     wechat_openid?: string;
+    membership?: {
+        status: 'active' | 'frozen' | 'free';
+        package_id?: number | null;
+        package_name?: string | null;
+        category?: string | null;
+        level: string;
+        expires_at?: string | null;
+        remaining_minutes?: number | null;
+        active_count: number;
+        frozen_count: number;
+    };
+    cash_summary?: {
+        paid_orders: number;
+        paid_amount: number;
+    };
 }
 
 export interface CreateUserRequest {
@@ -322,6 +337,9 @@ export interface Order {
     payable_amount?: number | null;
     paid_amount?: number | null;
     invoice_snapshot?: Record<string, unknown> | null;
+    promotion_code?: string | null;
+    discount_amount?: number | null;
+    promotion_snapshot?: Record<string, unknown> | null;
     user?: AdminUserSummary | null;
     package?: AdminPackageSummary | null;
 }
@@ -355,6 +373,9 @@ export interface InvoiceRecord {
     surcharge_amount: number;
     payable_amount: number;
     paid_amount: number;
+    discount_amount?: number;
+    invoice_base_amount?: number;
+    promotion_code?: string | null;
     title: string;
     tax_number: string;
     delivery_workdays?: number;

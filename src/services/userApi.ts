@@ -161,6 +161,8 @@ export const siteModeApi = {
         mode: 'normal' | 'whitelabel';
         is_white_label: boolean;
         enable_register?: boolean;
+        enable_wechat_login?: boolean;
+        enable_promotion_code?: boolean;
         notice?: string;
         notice_id?: string;
         purchase_url?: string;
@@ -297,6 +299,9 @@ export interface PackageInfoResponse {
 export interface InvoiceEligibility {
     eligible: boolean;
     reason: 'invoice_disabled' | 'below_threshold' | 'email_unbound' | 'email_not_allowed' | 'billing_profile_missing' | 'non_self_site' | null;
+    original_amount: string;
+    discount_amount: string;
+    promotion_code: string | null;
     base_amount: string;
     surcharge_rate: string;
     surcharge_amount: string;
@@ -319,12 +324,28 @@ export interface CreateOrderOptions {
     device?: 'mobile' | 'pc';
     invoice_requested?: boolean;
     checkout_id?: string;
+    promotion_code?: string;
+    replace_checkout_id?: string;
+}
+
+export interface PromotionOrderSnapshot {
+    code: string;
+    name: string;
+    discount_type: 'rate' | 'fixed';
+    discount_value: number;
+    scope_type: 'all' | 'packages' | 'levels';
+    original_amount: string;
+    discount_amount: string;
+    discounted_amount: string;
 }
 
 export interface InvoiceOrderSnapshot {
     title: string;
     tax_number: string;
     email: string;
+    original_amount: string;
+    discount_amount: string;
+    promotion_code: string | null;
     base_amount: string;
     surcharge_rate: string;
     surcharge_amount: string;
@@ -347,6 +368,11 @@ export const orderUserApi = {
         payable_amount?: string;
         invoice_requested?: boolean;
         invoice_snapshot?: InvoiceOrderSnapshot | null;
+        discount_amount?: string;
+        promotion_code?: string | null;
+        promotion_snapshot?: PromotionOrderSnapshot | null;
+        expires_at?: string | null;
+        expires_in_seconds?: number;
     }>> => {
         return createUserRequest(getUserApiUrl('/u/pay_order'), {
             method: 'POST',
@@ -354,8 +380,11 @@ export const orderUserApi = {
         });
     },
 
-    getInvoiceEligibility: async (package_id: number): Promise<ApiResponse<InvoiceEligibility>> => {
-        return createUserRequest(getUserApiUrl(`/u/invoice/eligibility?package_id=${package_id}`), {
+    getInvoiceEligibility: async (package_id: number, promotion_code?: string, checkout_id?: string): Promise<ApiResponse<InvoiceEligibility>> => {
+        const query = new URLSearchParams({ package_id: String(package_id) });
+        if (promotion_code) query.set('promotion_code', promotion_code);
+        if (checkout_id) query.set('checkout_id', checkout_id);
+        return createUserRequest(getUserApiUrl(`/u/invoice/eligibility?${query.toString()}`), {
             method: 'GET',
         });
     },
@@ -364,6 +393,8 @@ export const orderUserApi = {
         paid: boolean;
         winning_order_id: string | null;
         invoice_requested: boolean | null;
+        expires_at?: string | null;
+        expires_in_seconds?: number;
         orders: Array<{ order_id: string; invoice_requested: boolean; status: string }>;
     }>> => {
         return createUserRequest(getUserApiUrl(`/u/checkout_status?checkout_id=${encodeURIComponent(checkout_id)}`), {
