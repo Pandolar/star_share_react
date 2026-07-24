@@ -107,6 +107,7 @@ export interface PackageQueryParams extends CommonQueryParams {
     duration?: number;
     level?: string;
     priority?: number;
+    status?: 0 | 1;
 }
 
 // 用户管理相关类型
@@ -138,6 +139,7 @@ export interface User {
     remarks?: string;
     xy_uuid_token?: string;
     wechat_openid?: string;
+    inviter?: AdminUserSummary | null;
     membership?: {
         status: 'active' | 'frozen' | 'free';
         package_id?: number | null;

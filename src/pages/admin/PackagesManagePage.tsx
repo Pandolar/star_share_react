@@ -62,6 +62,7 @@ const PackagesManagePage: React.FC = () => {
     const [searchInput, setSearchInput] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState<string>('all');
+    const [statusFilter, setStatusFilter] = useState<string>('1');
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
@@ -112,6 +113,9 @@ const PackagesManagePage: React.FC = () => {
             if (categoryFilter !== 'all') {
                 params.category = categoryFilter;
             }
+            if (statusFilter !== 'all') {
+                params.status = Number(statusFilter) as 0 | 1;
+            }
 
             const response = await adminApiService.getPackages(params);
 
@@ -138,7 +142,7 @@ const PackagesManagePage: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [currentPage, searchQuery, categoryFilter, pageSize]);
+    }, [currentPage, searchQuery, categoryFilter, statusFilter, pageSize]);
 
     // 初始化和依赖更新
     useEffect(() => {
@@ -161,6 +165,7 @@ const PackagesManagePage: React.FC = () => {
         setSearchInput('');
         setSearchQuery('');
         setCategoryFilter('all');
+        setStatusFilter('1');
         setCurrentPage(1);
     };
 
@@ -399,6 +404,19 @@ const PackagesManagePage: React.FC = () => {
                                     {option.label}
                                 </SelectItem>
                             ))}
+                        </Select>
+                        <Select
+                            aria-label="套餐状态"
+                            selectedKeys={[statusFilter]}
+                            onSelectionChange={(keys) => {
+                                setStatusFilter(String(Array.from(keys)[0] || '1'));
+                                setCurrentPage(1);
+                            }}
+                            className="w-full sm:w-36"
+                        >
+                            <SelectItem key="1">已上架</SelectItem>
+                            <SelectItem key="0">已下架</SelectItem>
+                            <SelectItem key="all">全部状态</SelectItem>
                         </Select>
                         <div className="flex gap-2">
                             <Button

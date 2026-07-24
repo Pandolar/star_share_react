@@ -441,25 +441,30 @@ const UsersManagePage: React.FC = () => {
         </Chip>
     );
 
-    const renderMembership = (user: User) => {
+    const renderMembership = (user: User, compact = false) => {
         const membership = user.membership;
         if (!membership || membership.status === 'free') {
-            return <div className="space-y-1"><Chip size="sm" variant="flat">Free</Chip><p className="text-xs text-default-400">暂无生效套餐</p></div>;
+            return <span className="text-sm text-default-400">Free</span>;
         }
-        const statusText = membership.status === 'active' ? '生效中' : '已冻结';
-        const detail = membership.status === 'active' && membership.expires_at
+        const timeText = membership.status === 'active' && membership.expires_at
             ? `至 ${dayjs(membership.expires_at).format('YYYY-MM-DD')}`
             : membership.remaining_minutes
                 ? `剩余 ${Math.max(1, Math.ceil(membership.remaining_minutes / 1440))} 天`
-                : '等待恢复';
-        return (
-            <div className="space-y-1">
-                <div className="flex flex-wrap items-center gap-1.5">
-                    <Chip size="sm" color={membership.status === 'active' ? 'success' : 'warning'} variant="flat">{statusText}</Chip>
-                    <Chip size="sm" color="primary" variant="bordered">{membership.level}</Chip>
+                : '已冻结';
+        if (compact) {
+            return (
+                <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+                    <span className="max-w-40 truncate text-sm font-medium" title={membership.package_name || ''}>{membership.package_name || '-'}</span>
+                    <Chip size="sm" color="primary" variant="flat">{membership.level}</Chip>
+                    <span className="text-xs text-default-500">{timeText}</span>
                 </div>
-                <p className="max-w-48 truncate text-sm font-medium" title={membership.package_name || ''}>{membership.package_name || '-'}</p>
-                <p className="text-xs text-default-500">{membership.category || '-'} · {detail}{membership.active_count > 1 ? ` · ${membership.active_count} 个生效套餐` : ''}</p>
+            );
+        }
+        return (
+            <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium">{membership.package_name || '-'}</span>
+                <Chip size="sm" color="primary" variant="flat">{membership.level}</Chip>
+                <span className="text-sm text-default-500">{membership.category || '-'} · {timeText}</span>
             </div>
         );
     };
@@ -614,16 +619,17 @@ const UsersManagePage: React.FC = () => {
                         isHeaderSticky
                         classNames={{
                             wrapper: "max-h-[600px] overflow-x-auto",
-                            table: "min-w-[1320px]",
+                            table: "min-w-[1450px]",
                         }}
                     >
                         <TableHeader>
                             <TableColumn width={80}>ID</TableColumn>
-                            <TableColumn>用户信息</TableColumn>
+                            <TableColumn>用户</TableColumn>
                             <TableColumn>会员与套餐</TableColumn>
                             <TableColumn>现金累充</TableColumn>
+                            <TableColumn>邀请人</TableColumn>
                             <TableColumn>联系方式</TableColumn>
-                            <TableColumn>账号状态</TableColumn>
+                            <TableColumn>状态</TableColumn>
                             <TableColumn>注册时间</TableColumn>
                             <TableColumn width={80}>操作</TableColumn>
                         </TableHeader>
@@ -635,27 +641,20 @@ const UsersManagePage: React.FC = () => {
                             {users.map((user) => (
                                 <TableRow key={user.id} onDoubleClick={() => openEditModal(user)}>
                                     <TableCell>{user.id}</TableCell>
+                                    <TableCell><span className="font-medium">{user.username || '未设置用户名'}</span></TableCell>
+                                    <TableCell>{renderMembership(user, true)}</TableCell>
                                     <TableCell>
-                                        <div className="space-y-1">
-                                            <div className="font-medium">{user.username || '未设置用户名'}</div>
-                                            <div className="max-w-48 truncate text-xs text-default-500" title={user.remarks || ''}>{user.remarks || '无备注'}</div>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>{renderMembership(user)}</TableCell>
-                                    <TableCell>
-                                        <div className="space-y-1">
-                                            <div className="font-semibold text-success">¥{Number(user.cash_summary?.paid_amount || 0).toFixed(2)}</div>
-                                            <div className="text-xs text-default-500">{user.cash_summary?.paid_orders || 0} 笔现金支付</div>
-                                        </div>
+                                        <span className="whitespace-nowrap font-semibold text-success">¥{Number(user.cash_summary?.paid_amount || 0).toFixed(2)}</span>
+                                        <span className="ml-1 text-xs text-default-500">· {user.cash_summary?.paid_orders || 0} 笔</span>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="space-y-1">
-                                            <div className="text-sm">{user.email}</div>
-                                            {user.tel && <div className="text-xs text-default-500">{user.tel}</div>}
-                                        </div>
+                                        {user.inviter ? (
+                                            <span className="whitespace-nowrap text-sm" title={user.inviter.email || ''}>{user.inviter.username || user.inviter.email || `用户 #${user.inviter.id}`} <span className="text-default-400">#{user.inviter.id}</span></span>
+                                        ) : <span className="text-default-400">无</span>}
                                     </TableCell>
+                                    <TableCell><span className="whitespace-nowrap text-sm">{user.email}{user.tel ? ` · ${user.tel}` : ''}</span></TableCell>
                                     <TableCell>{renderStatus(user.status)}</TableCell>
-                                    <TableCell className="text-sm">{dayjs(user.created_at).format('YYYY-MM-DD HH:mm')}</TableCell>
+                                    <TableCell className="whitespace-nowrap text-sm">{dayjs(user.created_at).format('YYYY-MM-DD HH:mm')}</TableCell>
                                     <TableCell>{renderActions(user)}</TableCell>
                                 </TableRow>
                             ))}
@@ -832,9 +831,9 @@ const UsersManagePage: React.FC = () => {
                             <div className="space-y-4">
                                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                                     <Card shadow="none"><CardBody className="gap-2"><span className="text-sm text-default-500">账号状态</span><div>{renderStatus(selectedUser.status)}</div></CardBody></Card>
-                                    <Card shadow="none"><CardBody className="gap-2"><span className="text-sm text-default-500">会员状态</span>{renderMembership(selectedUser)}</CardBody></Card>
-                                    <Card shadow="none"><CardBody className="gap-1"><span className="text-sm text-default-500">现金累充</span><strong className="text-xl text-success">¥{Number(selectedUser.cash_summary?.paid_amount || 0).toFixed(2)}</strong><span className="text-xs text-default-500">{selectedUser.cash_summary?.paid_orders || 0} 笔现金支付</span></CardBody></Card>
-                                    <Card shadow="none"><CardBody className="gap-1"><span className="text-sm text-default-500">注册时间</span><strong className="text-sm">{dayjs(selectedUser.created_at).format('YYYY-MM-DD')}</strong><span className="text-xs text-default-500">{dayjs(selectedUser.created_at).format('HH:mm:ss')}</span></CardBody></Card>
+                                    <Card shadow="none"><CardBody className="gap-2"><span className="text-sm text-default-500">会员套餐</span>{renderMembership(selectedUser)}</CardBody></Card>
+                                    <Card shadow="none"><CardBody className="gap-1"><span className="text-sm text-default-500">现金累充</span><strong className="text-xl text-success">¥{Number(selectedUser.cash_summary?.paid_amount || 0).toFixed(2)} <span className="text-xs font-normal text-default-500">· {selectedUser.cash_summary?.paid_orders || 0} 笔</span></strong></CardBody></Card>
+                                    <Card shadow="none"><CardBody className="gap-1"><span className="text-sm text-default-500">邀请人</span><strong className="text-sm">{selectedUser.inviter ? `${selectedUser.inviter.username || selectedUser.inviter.email || '未命名用户'} #${selectedUser.inviter.id}` : '无'}</strong>{selectedUser.inviter?.email && <span className="truncate text-xs text-default-500">{selectedUser.inviter.email}</span>}</CardBody></Card>
                                 </div>
                                 <p className="text-sm font-medium text-default-700">基础资料</p>
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -851,8 +850,8 @@ const UsersManagePage: React.FC = () => {
                                         <div className="font-medium">{selectedUser.email}</div>
                                     </div>
                                     <div>
-                                        <span className="text-sm text-default-500">邀请人用户ID</span>
-                                        <div className="font-medium">{selectedUser.inviter_user ?? '-'}</div>
+                                        <span className="text-sm text-default-500">邀请人</span>
+                                        <div className="font-medium">{selectedUser.inviter ? `${selectedUser.inviter.username || selectedUser.inviter.email || '未命名用户'}（ID #${selectedUser.inviter.id}）` : '无'}</div>
                                     </div>
                                     <div>
                                         <span className="text-sm text-default-500">电话</span>

@@ -115,7 +115,7 @@ const TrendChart: React.FC<{
   metric: ChartMetric;
   granularity: 'hour' | 'day';
 }> = ({ data, metric, granularity }) => {
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [hover, setHover] = useState<{ index: number; left: number; top: number } | null>(null);
   const width = 1000;
   const height = 320;
   const margins = { top: 22, right: 26, bottom: 56, left: 74 };
@@ -138,25 +138,43 @@ const TrendChart: React.FC<{
     ? `¥${value >= 10000 ? `${(value / 10000).toFixed(1)}万` : Math.round(value).toLocaleString('zh-CN')}`
     : Math.round(value).toLocaleString('zh-CN');
   const tooltipValue = (value: number) => metric.format === 'currency' ? currency(value) : integer(value);
+  const weekday = (bucket: string) => ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][dayjs(bucket).day()];
   const handlePointerMove = (event: React.MouseEvent<SVGSVGElement>) => {
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const chartX = ((event.clientX - bounds.left) / bounds.width) * width;
-    const index = Math.max(0, Math.min(points.length - 1, Math.round((chartX - margins.left) / Math.max(stepX, 1))));
-    setHoveredIndex(index);
+    const svg = event.currentTarget;
+    const matrix = svg.getScreenCTM();
+    const container = svg.parentElement;
+    if (!matrix || !container || points.length === 0) return;
+
+    const pointer = svg.createSVGPoint();
+    pointer.x = event.clientX;
+    pointer.y = event.clientY;
+    const chartPointer = pointer.matrixTransform(matrix.inverse());
+    const index = Math.max(0, Math.min(points.length - 1, Math.round((chartPointer.x - margins.left) / Math.max(stepX, 1))));
+    const selectedPoint = points[index];
+    const projected = svg.createSVGPoint();
+    projected.x = selectedPoint.x;
+    projected.y = selectedPoint.y;
+    const screenPoint = projected.matrixTransform(matrix);
+    const bounds = container.getBoundingClientRect();
+    setHover({
+      index,
+      left: Math.min(Math.max(screenPoint.x - bounds.left, 90), Math.max(90, bounds.width - 90)),
+      top: Math.max(74, screenPoint.y - bounds.top - 10),
+    });
   };
 
-  const hoveredPoint = hoveredIndex === null ? null : points[hoveredIndex];
+  const hoveredPoint = hover === null ? null : points[hover.index];
   if (!data.length) return <div className="flex h-72 items-center justify-center text-sm text-default-400">当前筛选暂无趋势数据</div>;
 
   return (
-    <div className="relative w-full overflow-x-auto md:overflow-x-hidden" onMouseLeave={() => setHoveredIndex(null)}>
+    <div className="relative w-full overflow-x-auto md:overflow-x-hidden" onMouseLeave={() => setHover(null)}>
       <div className="relative h-[320px] min-w-[760px] w-full">
         {hoveredPoint && (
           <div
             className="pointer-events-none absolute z-20 min-w-36 -translate-x-1/2 -translate-y-full rounded-lg border border-divider bg-content1 px-3 py-2 text-xs shadow-lg"
-            style={{ left: `${(hoveredPoint.x / width) * 100}%`, top: Math.max(74, hoveredPoint.y - 10) }}
+            style={{ left: hover?.left, top: hover?.top }}
           >
-            <p className="text-default-500">{dayjs(hoveredPoint.bucket).format(granularity === 'hour' ? 'YYYY-MM-DD HH:mm' : 'YYYY-MM-DD')}</p>
+            <p className="text-default-500">{granularity === 'hour' ? dayjs(hoveredPoint.bucket).format('YYYY-MM-DD HH:mm') : `${dayjs(hoveredPoint.bucket).format('YYYY-MM-DD')} ${weekday(hoveredPoint.bucket)}`}</p>
             <p className="mt-1 text-sm font-semibold" style={{ color: metric.color }}>{metric.label}：{tooltipValue(hoveredPoint.value)}</p>
           </div>
         )}
@@ -177,9 +195,14 @@ const TrendChart: React.FC<{
           <polyline points={line} fill="none" stroke={metric.color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
           {points.map((point, index) => (
             <g key={`${point.bucket}-${index}`} className="pointer-events-none">
-              {hoveredIndex === index && <line x1={point.x} x2={point.x} y1={margins.top} y2={height - margins.bottom} stroke={metric.color} strokeDasharray="3 3" opacity="0.55" />}
-              <circle cx={point.x} cy={point.y} r={hoveredIndex === index ? 6 : 3.5} fill="white" stroke={metric.color} strokeWidth="2" />
-              {(index % labelEvery === 0 || index === points.length - 1) && <text x={point.x} y={height - margins.bottom + 22} textAnchor="middle" fontSize="10" fill="#71717a">{dayjs(point.bucket).format(granularity === 'hour' ? 'MM-DD HH:mm' : 'MM-DD')}</text>}
+              {hover?.index === index && <line x1={point.x} x2={point.x} y1={margins.top} y2={height - margins.bottom} stroke={metric.color} strokeDasharray="3 3" opacity="0.55" />}
+              <circle cx={point.x} cy={point.y} r={hover?.index === index ? 6 : 3.5} fill="white" stroke={metric.color} strokeWidth="2" />
+              {(index % labelEvery === 0 || index === points.length - 1) && (
+                <text x={point.x} y={height - margins.bottom + 17} textAnchor="middle" fontSize="10" fill="#71717a">
+                  <tspan x={point.x}>{dayjs(point.bucket).format(granularity === 'hour' ? 'MM-DD HH:mm' : 'MM-DD')}</tspan>
+                  {granularity === 'day' && <tspan x={point.x} dy="12">{weekday(point.bucket)}</tspan>}
+                </text>
+              )}
             </g>
           ))}
           <text x={18} y={margins.top + innerHeight / 2} textAnchor="middle" fontSize="11" fill="#52525b" transform={`rotate(-90 18 ${margins.top + innerHeight / 2})`}>{metric.label}{metric.format === 'currency' ? '（元）' : '（个）'}</text>

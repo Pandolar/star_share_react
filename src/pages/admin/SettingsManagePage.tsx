@@ -2,15 +2,10 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     Input,
     Button,
-    Card,
-    CardBody,
-    Alert,
     Textarea,
     Switch,
     Divider,
     Spinner,
-    Autocomplete,
-    AutocompleteItem,
     Modal,
     ModalContent,
     ModalHeader,
@@ -31,8 +26,6 @@ import {
     Mail,
     CreditCard,
     Shield,
-    Bell,
-    Search,
 } from 'lucide-react';
 import adminApiService from '../../services/adminApi';
 import { SystemConfig, UpdateConfigRequest } from '../../types/admin';
@@ -214,17 +207,6 @@ const SettingsManagePage: React.FC = () => {
         ];
     }, [groupedConfigs]);
 
-    const filterGroups = useCallback((textValue: string, inputValue: string) => {
-        const query = inputValue.trim().toLocaleLowerCase();
-        if (!query) return true;
-
-        const groupConfigs = groupedConfigs[textValue] || [];
-        return textValue.toLocaleLowerCase().includes(query)
-            || groupConfigs.some((config) => (
-                config.key.toLocaleLowerCase().includes(query)
-                || config.description.toLocaleLowerCase().includes(query)
-            ));
-    }, [groupedConfigs]);
 
     // 初始化选中的分组
     useEffect(() => {
@@ -429,21 +411,6 @@ const SettingsManagePage: React.FC = () => {
                 </div>
             </div>
 
-            {/* 配置说明 */}
-            <Alert
-                isVisible
-                color="warning"
-                title="谨慎修改系统配置"
-                description="黄色输入框表示已修改但未保存；禁用的输入框不可编辑。保存只作用于当前分类，JSON 配置会在提交前校验格式。"
-            />
-
-            {/* 支持按分组名、配置说明或配置键查找所在分组 */}
-            <Card>
-                <CardBody className="gap-4">
-                    <div>
-                        <p className="font-medium text-foreground">配置分类</p>
-                        <p className="text-sm text-default-500">设置项已归并为少量业务分类；直接切换标签，或按配置说明和配置键快速定位。</p>
-                    </div>
                     <Tabs
                         aria-label="配置分类"
                         selectedKey={selectedGroup}
@@ -465,33 +432,6 @@ const SettingsManagePage: React.FC = () => {
                             />
                         ))}
                     </Tabs>
-                    <Autocomplete
-                        aria-label="快速定位配置"
-                        label="快速定位配置"
-                        placeholder="例如：SMTP、优惠码、WHITE_LABEL_CONFIG"
-                        selectedKey={selectedGroup || null}
-                        onSelectionChange={(key) => {
-                            if (key != null) setSelectedGroup(String(key));
-                        }}
-                        defaultFilter={filterGroups}
-                        menuTrigger="focus"
-                        isClearable={false}
-                        startContent={<Search className="h-4 w-4 text-default-400" />}
-                        description={`共 ${groupKeys.length} 个分类，当前显示 ${groupedConfigs[selectedGroup]?.length || 0} 项配置`}
-                        className="w-full max-w-2xl"
-                    >
-                        {groupKeys.map((group) => (
-                            <AutocompleteItem key={group} textValue={group}>
-                                <div className="flex w-full items-center gap-2">
-                                    {getGroupIcon(group)}
-                                    <span className="flex-1">{group}</span>
-                                    <span className="text-sm text-default-500">{groupedConfigs[group]?.length || 0} 项</span>
-                                </div>
-                            </AutocompleteItem>
-                        ))}
-                    </Autocomplete>
-                </CardBody>
-            </Card>
 
             {/* 配置列表：当前分组 */}
             <div className="space-y-4">
@@ -503,16 +443,6 @@ const SettingsManagePage: React.FC = () => {
                 ))}
             </div>
 
-            {/* 操作提示 */}
-            {hasChanges && (
-                <Alert
-                    isVisible
-                    color="warning"
-                    icon={<Bell className="w-4 h-4" />}
-                    title="当前分类有未保存的更改"
-                    description="切换分类前请保存，否则本页刷新后更改会丢失。"
-                />
-            )}
 
             {/* 确认提交弹窗 */}
             <Modal isOpen={isConfirmOpen} onOpenChange={onConfirmOpenChange} placement="center">
