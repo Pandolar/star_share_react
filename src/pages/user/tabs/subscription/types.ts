@@ -46,6 +46,7 @@ export interface OrderInfo {
     tax_number: string;
     email: string;
     surcharge_amount: string;
+    surcharge_rate?: string;
     original_amount?: string;
     base_amount?: string;
     discount_amount?: string;

@@ -50,6 +50,12 @@ const getInvoiceProfileAction = (reason?: string | null) => {
   return null;
 };
 
+const getInvoicePriceLabel = (surchargeRate?: string | number | null) => {
+  const points = Number(surchargeRate) * 100;
+  if (!Number.isFinite(points)) return '开票价';
+  return `开票价(加${Number(points.toFixed(4))}个点)`;
+};
+
 export const PaymentModal: React.FC<PaymentModalProps> = ({
   isOpen,
   selectedPackage,
@@ -333,7 +339,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                       <div className="flex items-center justify-between text-sm"><span className="flex items-center gap-2 text-default-500">优惠码 <Chip size="sm" color="success" variant="flat">{activePromotion.code}</Chip></span><span className="font-medium text-success">-¥{activePromotion.discount_amount}</span></div>
                     </>
                   )}
-                  <div className="flex items-center justify-between"><span className="text-default-500">{activeOrder.invoice_requested ? '开票价' : '支付金额'}</span><span className="text-2xl font-bold text-primary">¥{activeOrder.payable_amount || selectedPackage?.price}</span></div>
+                  <div className="flex items-center justify-between"><span className="text-default-500">{activeOrder.invoice_requested ? getInvoicePriceLabel(activeOrder.invoice_snapshot?.surcharge_rate || eligibility?.surcharge_rate) : '支付金额'}</span><span className="text-2xl font-bold text-primary">¥{activeOrder.payable_amount || selectedPackage?.price}</span></div>
                   <div className="flex items-center justify-between"><span className="text-default-500">套餐时长</span><span className="font-medium">{selectedPackage ? getDurationText(selectedPackage.duration) : ''}</span></div>
                 </CardBody>
               </Card>
@@ -380,7 +386,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                           <ReceiptText className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                           <div>
                             <p className="text-sm font-medium text-default-700">开票信息</p>
-                            <p className="text-xs text-default-500">开票价 ¥{eligibility.payable_amount}，预计 {eligibility.delivery_workdays} 个工作日内发送至邮箱</p>
+                            <p className="text-xs text-default-500">{getInvoicePriceLabel(eligibility.surcharge_rate)}：¥{eligibility.payable_amount}，预计 {eligibility.delivery_workdays} 个工作日内发送至邮箱</p>
                           </div>
                         </div>
                         {invoiceOrder ? (
@@ -388,7 +394,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                             <p>套餐原价：¥{invoiceOrder.base_amount}</p>
                             {invoiceOrder.promotion_snapshot && <p className="text-success">优惠码 {invoiceOrder.promotion_snapshot.code}：-¥{invoiceOrder.promotion_snapshot.discount_amount}</p>}
                             {invoiceOrder.invoice_snapshot?.base_amount && invoiceOrder.promotion_snapshot && <p>优惠后金额：¥{invoiceOrder.invoice_snapshot.base_amount}</p>}
-                            <p className="font-medium text-primary">开票价：¥{invoiceOrder.payable_amount}</p>
+                            <p className="font-medium text-primary">{getInvoicePriceLabel(invoiceOrder.invoice_snapshot?.surcharge_rate || eligibility.surcharge_rate)}：¥{invoiceOrder.payable_amount}</p>
                             <p>抬头：{invoiceOrder.invoice_snapshot?.title}</p>
                             <p>税号：{invoiceOrder.invoice_snapshot?.tax_number}</p>
                             <p>接收邮箱：{invoiceOrder.invoice_snapshot?.email}</p>
