@@ -68,12 +68,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [eligibility, setEligibility] = useState<InvoiceEligibility | null>(null);
   const [eligibilityLoading, setEligibilityLoading] = useState(false);
   const [invoiceSelected, setInvoiceSelected] = useState(false);
+  const [invoiceCreationFailed, setInvoiceCreationFailed] = useState(false);
   const [invoiceFeatureAvailable, setInvoiceFeatureAvailable] = useState(false);
   const [promotionPanelOpen, setPromotionPanelOpen] = useState(false);
   const [promotionCodeInput, setPromotionCodeInput] = useState('');
 
   const checkIntervalRef = useRef<number | undefined>(undefined);
   const qrTimerRef = useRef<number | undefined>(undefined);
+  const invoicePanelRef = useRef<HTMLDivElement | null>(null);
   const activeOrder = invoiceSelected && invoiceOrder ? invoiceOrder : ordinaryOrder;
   const checkoutId = ordinaryOrder?.checkout_id;
   const activePromotion = ordinaryOrder?.promotion_snapshot || null;
@@ -90,6 +92,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setPaymentStatus('pending');
     setQrCodeExpired(false);
     setInvoiceSelected(false);
+    setInvoiceCreationFailed(false);
     setEligibility(null);
     setInvoiceFeatureAvailable(false);
     setPromotionPanelOpen(false);
@@ -144,6 +147,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     return cleanup;
   }, [isOpen, checkoutId, selectedPackage, ordinaryOrder?.expires_at, ordinaryOrder?.expires_in_seconds, ordinaryOrder?.promotion_code]);
 
+  useEffect(() => {
+    if (!invoiceSelected) return;
+    const frame = window.requestAnimationFrame(() => {
+      invoicePanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [invoiceSelected, eligibilityLoading, eligibility?.reason, invoiceOrder?.order_id]);
+
   const loadEligibility = async (): Promise<InvoiceEligibility | null> => {
     if (!selectedPackage) return null;
     setEligibilityLoading(true);
@@ -177,21 +188,19 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const handleInvoiceSwitch = async (selected: boolean) => {
     if (!selected) {
       setInvoiceSelected(false);
+      setInvoiceCreationFailed(false);
       return;
     }
-    if (invoiceOrder) {
-      setInvoiceSelected(true);
-      return;
-    }
-    const currentEligibility = eligibility || await loadEligibility();
-    if (!currentEligibility?.eligible) {
-      toast.warning(getInvoiceUnavailableText(currentEligibility?.reason));
-      setInvoiceSelected(false);
-      return;
-    }
+
     setInvoiceSelected(true);
+    setInvoiceCreationFailed(false);
+    if (invoiceOrder) return;
+
+    const currentEligibility = eligibility || await loadEligibility();
+    if (!currentEligibility?.eligible) return;
+
     const createdOrder = await onCreateInvoiceOrder();
-    if (!createdOrder) setInvoiceSelected(false);
+    if (!createdOrder) setInvoiceCreationFailed(true);
   };
 
   const handleApplyPromotion = async () => {
@@ -250,6 +259,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setPaymentStatus('pending');
     setQrCodeExpired(false);
     setInvoiceSelected(false);
+    setInvoiceCreationFailed(false);
     setPromotionPanelOpen(false);
     onClose();
   };
@@ -338,35 +348,64 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   </div>
                 )}
 
-                {paymentStatus === 'pending' && !qrCodeExpired && invoiceFeatureAvailable && (
-                  <div className="mt-6 rounded-lg border border-divider bg-default-50 px-3 py-2.5 text-left">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <ReceiptText className="h-4 w-4 text-default-500" />
-                        <div>
-                          <p className="text-sm font-medium text-default-700">需要开票</p>
-                          {eligibility && <p className="text-xs text-default-500">开票价 ¥{eligibility.payable_amount}，预计 {eligibility.delivery_workdays} 个工作日内发送至邮箱</p>}
-                        </div>
-                      </div>
-                      <Switch size="sm" isSelected={invoiceSelected} isDisabled={creatingInvoiceOrder || promotionActionLoading || eligibilityLoading} onValueChange={handleInvoiceSwitch} aria-label="需要开票" />
-                    </div>
-                    {invoiceSelected && invoiceOrder && (
-                      <div className="mt-2 space-y-1 rounded-lg bg-primary/5 p-3 text-sm">
-                        <p>套餐原价：¥{invoiceOrder.base_amount}</p>
-                        {invoiceOrder.promotion_snapshot && <p className="text-success">优惠码 {invoiceOrder.promotion_snapshot.code}：-¥{invoiceOrder.promotion_snapshot.discount_amount}</p>}
-                        {invoiceOrder.invoice_snapshot?.base_amount && invoiceOrder.promotion_snapshot && <p>优惠后金额：¥{invoiceOrder.invoice_snapshot.base_amount}</p>}
-                        <p className="font-medium text-primary">开票价：¥{invoiceOrder.payable_amount}</p>
-                        <p>抬头：{invoiceOrder.invoice_snapshot?.title}</p>
-                        <p>税号：{invoiceOrder.invoice_snapshot?.tax_number}</p>
-                        <p>接收邮箱：{invoiceOrder.invoice_snapshot?.email}</p>
-                        <p>预计 {invoiceOrder.invoice_snapshot?.delivery_workdays} 个工作日内发送</p>
+                {paymentStatus === 'pending' && !qrCodeExpired && invoiceFeatureAvailable && invoiceSelected && (
+                  <div ref={invoicePanelRef} className="mt-5 rounded-lg border border-divider bg-default-50 p-3 text-left">
+                    {eligibilityLoading && (
+                      <div className="flex items-center gap-2 text-sm text-default-500">
+                        <Spinner size="sm" />正在检查开票条件...
                       </div>
                     )}
-                    {invoiceSelected && creatingInvoiceOrder && !invoiceOrder && <div className="mt-2 flex items-center gap-2 text-sm text-default-500"><Spinner size="sm" />正在生成开票二维码...</div>}
-                    {!invoiceSelected && eligibility && !eligibility.eligible && invoiceProfileAction && (
-                      <div className="mt-2 flex flex-col gap-2 rounded-lg bg-warning/10 p-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-start gap-2 text-sm text-warning-700"><UserRoundCog className="mt-0.5 h-4 w-4 shrink-0" /><span>{getInvoiceUnavailableText(eligibility.reason)}，完善后返回即可开票。</span></div>
-                        <Button size="sm" color="warning" variant="flat" onPress={() => goToInvoiceProfile(invoiceProfileAction.openEdit as 'email' | 'billing_profile')}>{invoiceProfileAction.label}</Button>
+                    {!eligibilityLoading && !eligibility && (
+                      <div className="flex items-start gap-2 text-sm text-warning-700">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>暂时无法查询开票资格，请关闭开关后重试。</span>
+                      </div>
+                    )}
+                    {!eligibilityLoading && eligibility && !eligibility.eligible && (
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-start gap-2 text-sm text-warning-700">
+                          <UserRoundCog className="mt-0.5 h-4 w-4 shrink-0" />
+                          <span>{getInvoiceUnavailableText(eligibility.reason)}{invoiceProfileAction ? '，完善后返回即可开票。' : '。'}</span>
+                        </div>
+                        {invoiceProfileAction && (
+                          <Button size="sm" color="warning" variant="flat" onPress={() => goToInvoiceProfile(invoiceProfileAction.openEdit as 'email' | 'billing_profile')}>
+                            {invoiceProfileAction.label}
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                    {!eligibilityLoading && eligibility?.eligible && (
+                      <div className="space-y-3">
+                        <div className="flex items-start gap-2">
+                          <ReceiptText className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                          <div>
+                            <p className="text-sm font-medium text-default-700">开票信息</p>
+                            <p className="text-xs text-default-500">开票价 ¥{eligibility.payable_amount}，预计 {eligibility.delivery_workdays} 个工作日内发送至邮箱</p>
+                          </div>
+                        </div>
+                        {invoiceOrder ? (
+                          <div className="space-y-1 rounded-lg bg-primary/5 p-3 text-sm">
+                            <p>套餐原价：¥{invoiceOrder.base_amount}</p>
+                            {invoiceOrder.promotion_snapshot && <p className="text-success">优惠码 {invoiceOrder.promotion_snapshot.code}：-¥{invoiceOrder.promotion_snapshot.discount_amount}</p>}
+                            {invoiceOrder.invoice_snapshot?.base_amount && invoiceOrder.promotion_snapshot && <p>优惠后金额：¥{invoiceOrder.invoice_snapshot.base_amount}</p>}
+                            <p className="font-medium text-primary">开票价：¥{invoiceOrder.payable_amount}</p>
+                            <p>抬头：{invoiceOrder.invoice_snapshot?.title}</p>
+                            <p>税号：{invoiceOrder.invoice_snapshot?.tax_number}</p>
+                            <p>接收邮箱：{invoiceOrder.invoice_snapshot?.email}</p>
+                          </div>
+                        ) : invoiceCreationFailed ? (
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-start gap-2 text-sm text-warning-700">
+                              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                              <span>开票订单生成失败，请重试。</span>
+                            </div>
+                            <Button size="sm" color="warning" variant="flat" onPress={() => void handleInvoiceSwitch(true)}>重试</Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-sm text-default-500">
+                            <Spinner size="sm" />{creatingInvoiceOrder ? '正在生成开票二维码...' : '正在准备开票二维码...'}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -379,7 +418,28 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             </div>
           )}
         </ModalBody>
-        <ModalFooter>{paymentStatus === 'pending' && !qrCodeExpired && <div className="flex w-full items-center justify-between"><Button variant="light" onPress={handleClose}>取消支付</Button><Button color="success" onPress={handleManualCheck} isLoading={manualCheckLoading}>我已完成支付</Button></div>}</ModalFooter>
+        <ModalFooter>
+          {paymentStatus === 'pending' && !qrCodeExpired && (
+            <div className="flex w-full flex-wrap items-center justify-between gap-2">
+              {invoiceFeatureAvailable ? (
+                <Switch
+                  size="sm"
+                  isSelected={invoiceSelected}
+                  isDisabled={creatingInvoiceOrder || promotionActionLoading || eligibilityLoading}
+                  onValueChange={handleInvoiceSwitch}
+                  aria-label="是否开票"
+                  classNames={{ label: 'text-xs text-default-500' }}
+                >
+                  是否开票
+                </Switch>
+              ) : <span />}
+              <div className="ml-auto flex items-center gap-2">
+                <Button variant="light" onPress={handleClose}>取消支付</Button>
+                <Button color="success" onPress={handleManualCheck} isLoading={manualCheckLoading}>我已完成支付</Button>
+              </div>
+            </div>
+          )}
+        </ModalFooter>
       </ModalContent>
     </Modal>
   );
