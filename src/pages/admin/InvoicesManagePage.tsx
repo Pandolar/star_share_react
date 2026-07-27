@@ -99,7 +99,7 @@ const InvoicesManagePage: React.FC = () => {
           value={queryInput}
           onValueChange={setQueryInput}
           onKeyDown={(event) => { if (event.key === 'Enter') { setPage(1); setQuery(queryInput.trim()); } }}
-          placeholder="搜索订单号、用户名或邮箱"
+          placeholder="搜索订单号、用户名、邮箱、抬头或税号"
           startContent={<Search size={16} />}
         />
         <Select className="sm:max-w-44" selectedKeys={[status]} onSelectionChange={(keys) => { setStatus(String(Array.from(keys)[0] || 'all')); setPage(1); }}>

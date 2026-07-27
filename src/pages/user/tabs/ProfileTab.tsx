@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardBody, Avatar, Chip, Spinner, Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from '@heroui/react';
 import { User, Mail, Calendar, Shield, AlertCircle, Package, Crown, Edit3, MessageCircle, ArrowUpCircle, Gauge, Snowflake, Info, Gift } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { userInfoApi, compensationApi, CompensationItem } from '../../../services/userApi';
 import { toast } from '../../../utils/toast';
 import { EditProfileModal } from './profile/EditProfileModal';
@@ -36,6 +36,8 @@ export const ProfileTab: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // 冻结套餐Modal
   const { isOpen: isFrozenOpen, onOpen: onFrozenOpen, onClose: onFrozenClose } = useDisclosure();
@@ -92,13 +94,31 @@ export const ProfileTab: React.FC = () => {
   };
 
   useEffect(() => {
-    const openEdit = searchParams.get('openEdit');
-    if (openEdit === 'email' || openEdit === 'username' || openEdit === 'password' || (!whiteLabelLoading && !isWhiteLabel && (openEdit === 'payment_info' || openEdit === 'billing_profile'))) {
-      setEditModal({ open: true, tab: openEdit });
-    } else if (openEdit === 'payment_info' || openEdit === 'billing_profile') {
+    if (whiteLabelLoading) return;
+
+    const stateOpenEdit = (location.state as { openEdit?: string } | null)?.openEdit;
+    const queryOpenEdit = searchParams.get('openEdit');
+    const openEdit = stateOpenEdit || queryOpenEdit;
+    const publicEditTabs: EditTabKey[] = ['email', 'username', 'password'];
+    const selfSiteEditTabs: EditTabKey[] = ['payment_info', 'billing_profile'];
+    const canOpen = publicEditTabs.includes(openEdit as EditTabKey)
+      || (!isWhiteLabel && selfSiteEditTabs.includes(openEdit as EditTabKey));
+
+    if (openEdit && canOpen) {
+      setEditModal({ open: true, tab: openEdit as EditTabKey });
+    } else if (openEdit && selfSiteEditTabs.includes(openEdit as EditTabKey)) {
       setEditModal((current) => ({ ...current, open: false }));
     }
-  }, [searchParams, isWhiteLabel, whiteLabelLoading]);
+
+    if (stateOpenEdit || queryOpenEdit) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('openEdit');
+      navigate({
+        pathname: location.pathname,
+        search: nextParams.toString() ? `?${nextParams.toString()}` : '',
+      }, { replace: true, state: null });
+    }
+  }, [location.pathname, location.state, navigate, searchParams, isWhiteLabel, whiteLabelLoading]);
 
   const fetchUserInfo = async () => {
     try {

@@ -397,99 +397,6 @@ const InviteManagePage: React.FC = () => {
       </div>
 
       <Card>
-        <CardHeader className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2"><Settings2 className="w-4 h-4" /><span className="font-medium">全局邀请规则</span></div>
-          <Button color="primary" startContent={<Save className="w-4 h-4" />} isLoading={savingPolicy} onPress={handleSaveGlobalPolicy}>保存规则</Button>
-        </CardHeader>
-        <CardBody>
-          {policyLoading ? (
-            <div className="py-8 flex justify-center"><Spinner label="加载规则中..." /></div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2">
-                <Switch isSelected={globalPolicyForm.enabled} onValueChange={(checked) => setGlobalPolicyForm((prev) => ({ ...prev, enabled: checked }))}>
-                  启用邀请奖励
-                </Switch>
-              </div>
-              <Select label="默认奖励模式" selectedKeys={[globalPolicyForm.reward_mode]} onSelectionChange={(keys) => setGlobalPolicyForm((prev) => ({ ...prev, reward_mode: String(Array.from(keys)[0] || 'duration') as 'duration' | 'cash' }))}>
-                <SelectItem key="duration">返时长</SelectItem>
-                <SelectItem key="cash">返现</SelectItem>
-              </Select>
-              <NumberInput label="默认奖励比例" value={globalPolicyForm.reward_ratio === '' ? undefined : Number(globalPolicyForm.reward_ratio)} onValueChange={(reward_ratio) => setGlobalPolicyForm((prev) => ({ ...prev, reward_ratio: Number.isNaN(reward_ratio) ? '' : String(reward_ratio) }))} minValue={0} maxValue={1} step={0.01} description="0.15 表示 15%" />
-              <NumberInput label="默认奖励前 N 单" value={globalPolicyForm.max_reward_order_count === '' ? undefined : Number(globalPolicyForm.max_reward_order_count)} onValueChange={(max_reward_order_count) => setGlobalPolicyForm((prev) => ({ ...prev, max_reward_order_count: Number.isNaN(max_reward_order_count) ? '' : String(max_reward_order_count) }))} minValue={0} step={1} />
-              <NumberInput label="默认最低提现金额" value={globalPolicyForm.min_withdraw_amount === '' ? undefined : Number(globalPolicyForm.min_withdraw_amount)} onValueChange={(min_withdraw_amount) => setGlobalPolicyForm((prev) => ({ ...prev, min_withdraw_amount: Number.isNaN(min_withdraw_amount) ? '' : String(min_withdraw_amount) }))} minValue={0} step={0.01} />
-              <div className="md:col-span-2">
-                <Textarea
-                  label="套餐覆盖规则 JSON（可选）"
-                  value={globalPolicyForm.package_rules}
-                  onValueChange={(package_rules) => setGlobalPolicyForm((prev) => ({ ...prev, package_rules }))}
-                  minRows={6}
-                  placeholder={'例如：{\n  "5": { "reward_mode": "cash", "reward_ratio": 0.15 }\n}'}
-                />
-              </div>
-            </div>
-          )}
-        </CardBody>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2"><Users className="w-4 h-4" /><span className="font-medium">邀请人专属规则</span></div>
-          <div className="flex gap-2 flex-wrap">
-            <Input
-              placeholder="搜索用户邮箱/用户名"
-              value={usersSearchInput}
-              onValueChange={setUsersSearchInput}
-              onKeyDown={(event) => event.key === 'Enter' && applyUsersSearch()}
-              className="w-56"
-            />
-            <Button variant="flat" color="primary" startContent={<Search className="w-4 h-4" />} onPress={applyUsersSearch}>查询</Button>
-          </div>
-        </CardHeader>
-        <CardBody>
-          <Table aria-label="邀请人专属规则表格">
-            <TableHeader>
-              <TableColumn>ID</TableColumn>
-              <TableColumn>用户</TableColumn>
-              <TableColumn>邀请码</TableColumn>
-              <TableColumn>当前规则</TableColumn>
-              <TableColumn>操作</TableColumn>
-            </TableHeader>
-            <TableBody isLoading={usersLoading} loadingContent={<Spinner label="加载中..." />} emptyContent="暂无用户数据">
-              {inviterUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>{user.id}</TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{user.username || '未设置用户名'}</div>
-                      <div className="text-xs text-default-500">{user.email}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{user.inviter_code || '-'}</TableCell>
-                  <TableCell>{formatInviterRuleSummary(user)}</TableCell>
-                  <TableCell>
-                    <Button size="sm" color="primary" variant="flat" onPress={() => openInviterModal(user)}>编辑规则</Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="text-sm text-default-600">
-              共 {inviterUsersTotal} 条，默认每页 {INVITER_PAGE_SIZE} 条
-            </div>
-            <Pagination
-              total={inviterUsersTotalPages}
-              page={inviterUsersPage}
-              onChange={setInviterUsersPage}
-              showControls
-              color="primary"
-            />
-          </div>
-        </CardBody>
-      </Card>
-
-      <Card>
         <CardHeader className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2"><Wallet className="w-4 h-4" /><span className="font-medium">邀请奖励流水</span></div>
           <div className="flex gap-2 flex-wrap">
@@ -630,6 +537,99 @@ const InviteManagePage: React.FC = () => {
               ))}
             </TableBody>
           </Table>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2"><Users className="w-4 h-4" /><span className="font-medium">邀请人专属规则</span></div>
+          <div className="flex gap-2 flex-wrap">
+            <Input
+              placeholder="搜索用户邮箱/用户名"
+              value={usersSearchInput}
+              onValueChange={setUsersSearchInput}
+              onKeyDown={(event) => event.key === 'Enter' && applyUsersSearch()}
+              className="w-56"
+            />
+            <Button variant="flat" color="primary" startContent={<Search className="w-4 h-4" />} onPress={applyUsersSearch}>查询</Button>
+          </div>
+        </CardHeader>
+        <CardBody>
+          <Table aria-label="邀请人专属规则表格">
+            <TableHeader>
+              <TableColumn>ID</TableColumn>
+              <TableColumn>用户</TableColumn>
+              <TableColumn>邀请码</TableColumn>
+              <TableColumn>当前规则</TableColumn>
+              <TableColumn>操作</TableColumn>
+            </TableHeader>
+            <TableBody isLoading={usersLoading} loadingContent={<Spinner label="加载中..." />} emptyContent="暂无用户数据">
+              {inviterUsers.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell>{user.id}</TableCell>
+                  <TableCell>
+                    <div>
+                      <div className="font-medium">{user.username || '未设置用户名'}</div>
+                      <div className="text-xs text-default-500">{user.email}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell>{user.inviter_code || '-'}</TableCell>
+                  <TableCell>{formatInviterRuleSummary(user)}</TableCell>
+                  <TableCell>
+                    <Button size="sm" color="primary" variant="flat" onPress={() => openInviterModal(user)}>编辑规则</Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="text-sm text-default-600">
+              共 {inviterUsersTotal} 条，默认每页 {INVITER_PAGE_SIZE} 条
+            </div>
+            <Pagination
+              total={inviterUsersTotalPages}
+              page={inviterUsersPage}
+              onChange={setInviterUsersPage}
+              showControls
+              color="primary"
+            />
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2"><Settings2 className="w-4 h-4" /><span className="font-medium">全局邀请规则</span></div>
+          <Button color="primary" startContent={<Save className="w-4 h-4" />} isLoading={savingPolicy} onPress={handleSaveGlobalPolicy}>保存规则</Button>
+        </CardHeader>
+        <CardBody>
+          {policyLoading ? (
+            <div className="py-8 flex justify-center"><Spinner label="加载规则中..." /></div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <Switch isSelected={globalPolicyForm.enabled} onValueChange={(checked) => setGlobalPolicyForm((prev) => ({ ...prev, enabled: checked }))}>
+                  启用邀请奖励
+                </Switch>
+              </div>
+              <Select label="默认奖励模式" selectedKeys={[globalPolicyForm.reward_mode]} onSelectionChange={(keys) => setGlobalPolicyForm((prev) => ({ ...prev, reward_mode: String(Array.from(keys)[0] || 'duration') as 'duration' | 'cash' }))}>
+                <SelectItem key="duration">返时长</SelectItem>
+                <SelectItem key="cash">返现</SelectItem>
+              </Select>
+              <NumberInput label="默认奖励比例" value={globalPolicyForm.reward_ratio === '' ? undefined : Number(globalPolicyForm.reward_ratio)} onValueChange={(reward_ratio) => setGlobalPolicyForm((prev) => ({ ...prev, reward_ratio: Number.isNaN(reward_ratio) ? '' : String(reward_ratio) }))} minValue={0} maxValue={1} step={0.01} description="0.15 表示 15%" />
+              <NumberInput label="默认奖励前 N 单" value={globalPolicyForm.max_reward_order_count === '' ? undefined : Number(globalPolicyForm.max_reward_order_count)} onValueChange={(max_reward_order_count) => setGlobalPolicyForm((prev) => ({ ...prev, max_reward_order_count: Number.isNaN(max_reward_order_count) ? '' : String(max_reward_order_count) }))} minValue={0} step={1} />
+              <NumberInput label="默认最低提现金额" value={globalPolicyForm.min_withdraw_amount === '' ? undefined : Number(globalPolicyForm.min_withdraw_amount)} onValueChange={(min_withdraw_amount) => setGlobalPolicyForm((prev) => ({ ...prev, min_withdraw_amount: Number.isNaN(min_withdraw_amount) ? '' : String(min_withdraw_amount) }))} minValue={0} step={0.01} />
+              <div className="md:col-span-2">
+                <Textarea
+                  label="套餐覆盖规则 JSON（可选）"
+                  value={globalPolicyForm.package_rules}
+                  onValueChange={(package_rules) => setGlobalPolicyForm((prev) => ({ ...prev, package_rules }))}
+                  minRows={6}
+                  placeholder={'例如：{\n  "5": { "reward_mode": "cash", "reward_ratio": 0.15 }\n}'}
+                />
+              </div>
+            </div>
+          )}
         </CardBody>
       </Card>
 

@@ -402,6 +402,13 @@ export const orderUserApi = {
         });
     },
 
+    cancelCheckout: async (checkout_id: string): Promise<ApiResponse<{ cancelled: boolean }>> => {
+        return createUserRequest(getUserApiUrl('/u/checkout_cancel'), {
+            method: 'POST',
+            body: JSON.stringify({ checkout_id }),
+        });
+    },
+
     getOrders: async (): Promise<ApiResponse<Array<{
         order_id: string;
         package_id: number;

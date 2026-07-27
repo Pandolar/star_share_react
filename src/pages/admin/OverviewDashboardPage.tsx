@@ -200,7 +200,7 @@ const TrendChart: React.FC<{
               {(index % labelEvery === 0 || index === points.length - 1) && (
                 <text x={point.x} y={height - margins.bottom + 17} textAnchor="middle" fontSize="10" fill="#71717a">
                   <tspan x={point.x}>{dayjs(point.bucket).format(granularity === 'hour' ? 'MM-DD HH:mm' : 'MM-DD')}</tspan>
-                  {granularity === 'day' && <tspan x={point.x} dy="12">{weekday(point.bucket)}</tspan>}
+                  <tspan x={point.x} dy="12">{weekday(point.bucket)}</tspan>
                 </text>
               )}
             </g>

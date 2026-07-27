@@ -12,6 +12,7 @@ import {
   Switch,
   Input,
   Chip,
+  Tooltip,
 } from '@heroui/react';
 import { motion } from 'framer-motion';
 import { CheckCircle, AlertCircle, QrCode, ExternalLink, ReceiptText, UserRoundCog, TicketPercent } from 'lucide-react';
@@ -20,6 +21,7 @@ import { toast } from '../../../../utils/toast';
 import { generateQRCodeDataUrl } from './qrCode';
 import { getDurationText, PackageInfo, OrderInfo } from './types';
 import { useWhiteLabel } from '../../../../contexts/WhiteLabelContext';
+import { useNavigate } from 'react-router-dom';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -68,6 +70,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   onClose,
 }) => {
   const { enablePromotionCode } = useWhiteLabel();
+  const navigate = useNavigate();
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('pending');
   const [qrCodeExpired, setQrCodeExpired] = useState(false);
   const [manualCheckLoading, setManualCheckLoading] = useState(false);
@@ -81,6 +84,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const checkIntervalRef = useRef<number | undefined>(undefined);
   const qrTimerRef = useRef<number | undefined>(undefined);
+  const checkoutIdRef = useRef<string | undefined>(undefined);
   const invoicePanelRef = useRef<HTMLDivElement | null>(null);
   const activeOrder = invoiceSelected && invoiceOrder ? invoiceOrder : ordinaryOrder;
   const checkoutId = ordinaryOrder?.checkout_id;
@@ -92,6 +96,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     checkIntervalRef.current = undefined;
     qrTimerRef.current = undefined;
   };
+
+  checkoutIdRef.current = checkoutId;
 
   useEffect(() => {
     if (!isOpen || !checkoutId) return;
@@ -135,8 +141,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     }, remainingMs);
 
     checkIntervalRef.current = window.setInterval(async () => {
+      const polledCheckoutId = checkoutId;
       try {
-        const response = await orderUserApi.getCheckoutStatus(checkoutId);
+        const response = await orderUserApi.getCheckoutStatus(polledCheckoutId);
+        if (checkoutIdRef.current !== polledCheckoutId) return;
         if (response.code === 20000 && response.data?.paid) {
           setPaymentStatus('success');
           cleanup();
@@ -187,8 +195,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const goToInvoiceProfile = (openEdit: 'email' | 'billing_profile') => {
     cleanup();
+    if (checkoutId && ordinaryOrder?.promotion_snapshot) {
+      void orderUserApi.cancelCheckout(checkoutId).catch(() => undefined);
+    }
     onClose();
-    window.location.assign(`/user-center?tab=profile&openEdit=${openEdit}`);
+    navigate('/user-center?tab=profile', { state: { openEdit } });
   };
 
   const handleInvoiceSwitch = async (selected: boolean) => {
@@ -260,7 +271,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     }
   };
 
-  const handleClose = () => {
+  const closeModal = () => {
     cleanup();
     setPaymentStatus('pending');
     setQrCodeExpired(false);
@@ -268,6 +279,17 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setInvoiceCreationFailed(false);
     setPromotionPanelOpen(false);
     onClose();
+  };
+
+  const handleClose = () => {
+    if (checkoutId && activePromotion && paymentStatus === 'pending') {
+      void orderUserApi.cancelCheckout(checkoutId).catch(() => undefined);
+    }
+    closeModal();
+  };
+
+  const handleExpiredClose = () => {
+    closeModal();
   };
 
   const qrCodeValue = activeOrder?.qr_code || activeOrder?.payment_url || '';
@@ -416,7 +438,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     )}
                   </div>
                 )}
-                {paymentStatus === 'pending' && qrCodeExpired && <div className="space-y-4"><AlertCircle className="mx-auto h-12 w-12 text-danger" /><p className="font-medium text-danger">本次结账已过期，请重新下单</p><Button color="primary" onPress={handleClose}>重新下单</Button></div>}
+                {paymentStatus === 'pending' && qrCodeExpired && <div className="space-y-4"><AlertCircle className="mx-auto h-12 w-12 text-danger" /><p className="font-medium text-danger">本次结账已过期，请重新下单</p><Button color="primary" onPress={handleExpiredClose}>重新下单</Button></div>}
                 {paymentStatus === 'checking' && <div className="space-y-4"><Spinner size="lg" color="primary" /><p>正在确认支付结果...</p></div>}
                 {paymentStatus === 'success' && <div className="space-y-6"><CheckCircle className="mx-auto h-20 w-20 text-success" /><div><h3 className="mb-2 text-2xl font-bold text-success">支付成功！</h3><p className="text-default-500">页面即将刷新，请稍等...</p></div></div>}
                 {paymentStatus === 'failed' && <div className="space-y-4"><AlertCircle className="mx-auto h-12 w-12 text-danger" /><p>支付异常，请联系客服处理</p></div>}
@@ -428,16 +450,23 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           {paymentStatus === 'pending' && !qrCodeExpired && (
             <div className="flex w-full flex-wrap items-center justify-between gap-2">
               {invoiceFeatureAvailable ? (
-                <Switch
-                  size="sm"
-                  isSelected={invoiceSelected}
-                  isDisabled={creatingInvoiceOrder || promotionActionLoading || eligibilityLoading}
-                  onValueChange={handleInvoiceSwitch}
-                  aria-label="是否开票"
-                  classNames={{ label: 'text-xs text-default-500' }}
+                <Tooltip
+                  content="请选择是否开票，若未选择开票并完成支付，后续无法补开。"
+                  placement="top-start"
                 >
-                  是否开票
-                </Switch>
+                  <span className="inline-flex">
+                    <Switch
+                      size="sm"
+                      isSelected={invoiceSelected}
+                      isDisabled={creatingInvoiceOrder || promotionActionLoading || eligibilityLoading}
+                      onValueChange={handleInvoiceSwitch}
+                      aria-label="是否开票"
+                      classNames={{ label: 'text-xs text-default-500' }}
+                    >
+                      是否开票
+                    </Switch>
+                  </span>
+                </Tooltip>
               ) : <span />}
               <div className="ml-auto flex items-center gap-2">
                 <Button variant="light" onPress={handleClose}>取消支付</Button>
