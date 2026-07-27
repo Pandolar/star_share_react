@@ -16,6 +16,8 @@ import {
     Tabs,
     Tab,
     Chip,
+    Select,
+    SelectItem,
 } from '@heroui/react';
 import {
     Settings,
@@ -32,6 +34,24 @@ import { SystemConfig, UpdateConfigRequest } from '../../types/admin';
 import { showToast } from '../../components/Toast';
 import { CompensationConfigEditor } from './CompensationConfigEditor';
 import { PromotionCodeConfigEditor } from './PromotionCodeConfigEditor';
+import { BillRuleConfigEditor } from './BillRuleConfigEditor';
+import { InvoiceConfigEditor } from './InvoiceConfigEditor';
+import { InvitePolicyConfigEditor } from './InvitePolicyConfigEditor';
+import { SpeedTestNodesEditor } from './SpeedTestNodesEditor';
+import { WhiteLabelConfigEditor } from './WhiteLabelConfigEditor';
+import { BarkConfigEditor } from './BarkConfigEditor';
+import { DistributorLevelDiscountsEditor } from './DistributorLevelDiscountsEditor';
+import { HomeInfoConfigEditor } from './HomeInfoConfigEditor';
+const VISUAL_CONFIG_KEYS: Record<string, true> = {
+    SPEEDTEST_URL_LIST: true,
+    HOME_INFO: true,
+    SEND_BARK_CONFIG: true,
+    DISTRIBUTOR_LEVEL_DISCOUNTS: true,
+    WHITE_LABEL_CONFIG: true,
+    INVOICE_CONFIG: true,
+    INVITE_POLICY: true,
+    BILL_RULE: true,
+};
 
 /**
  * 系统配置管理页面
@@ -302,7 +322,19 @@ const SettingsManagePage: React.FC = () => {
                     )}
                 </div>
 
-                {(config.key === 'NOTICE' || config.key.startsWith('SUBSCRIPTION_NOTICE_')) ? (
+                {config.key === 'HOME_INFO' ? (
+                    <HomeInfoConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} />
+                ) : config.key === 'SPEEDTEST_URL_LIST' ? (
+                    <SpeedTestNodesEditor
+                        value={value}
+                        onChange={(nextValue) => updateConfigValue(config.key, nextValue)}
+                        disabled={!config.editable}
+                    />
+                ) : config.key === 'SEND_BARK_CONFIG' ? (
+                    <BarkConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} />
+                ) : config.key === 'DISTRIBUTOR_LEVEL_DISCOUNTS' ? (
+                    <DistributorLevelDiscountsEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} packages={packageOptions} />
+                ) : (config.key === 'NOTICE' || config.key.startsWith('SUBSCRIPTION_NOTICE_')) ? (
                     <Textarea
                         value={value}
                         onValueChange={(nextValue) => updateConfigValue(config.key, nextValue)}
@@ -327,6 +359,26 @@ const SettingsManagePage: React.FC = () => {
                         disabled={!config.editable}
                         levelOptions={packageLevels}
                     />
+                ) : config.key === 'WHITE_LABEL_CONFIG' ? (
+                    <WhiteLabelConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} />
+                ) : config.key === 'INVOICE_CONFIG' ? (
+                    <InvoiceConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} />
+                ) : config.key === 'INVITE_POLICY' ? (
+                    <InvitePolicyConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} packages={packageOptions} />
+                ) : config.key === 'BILL_RULE' ? (
+                    <BillRuleConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} legacyType={configValues.BILL_RULE_TYPE || 'fixed'} packageLevels={Array.from(new Set(packageLevels.map((item) => item.level)))} />
+                ) : config.key === 'BILL_RULE_TYPE' ? (
+                    <Select
+                        label="旧版规则模式"
+                        selectedKeys={[value || 'fixed']}
+                        onSelectionChange={(keys) => updateConfigValue(config.key, String(Array.from(keys)[0] || 'fixed'))}
+                        isDisabled={!config.editable}
+                        description="仅用于转换尚未升级到 v2 的 BILL_RULE；v2 中每条限额可单独选择固定或滑动窗口。"
+                        className="max-w-md"
+                    >
+                        <SelectItem key="fixed">统一限速</SelectItem>
+                        <SelectItem key="detailed">按模型明细限速</SelectItem>
+                    </Select>
                 ) : isJson ? (
                     <Textarea
                         value={value}
@@ -458,7 +510,7 @@ const SettingsManagePage: React.FC = () => {
                                     <div>即将提交以下配置项：</div>
                                     <div className="font-medium">{pendingConfig?.description}</div>
                                     <div className="text-default-500">键：{pendingConfig?.key}</div>
-                                    <div className="break-all">新值：{pendingConfig?.value}</div>
+                                    <div className="break-all">{pendingConfig && VISUAL_CONFIG_KEYS[pendingConfig.key] ? '页面中的可视化配置将按当前值保存。' : `新值：${pendingConfig?.value || ''}`}</div>
                                 </div>
                             </ModalBody>
                             <ModalFooter>

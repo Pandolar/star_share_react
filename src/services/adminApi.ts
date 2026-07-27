@@ -448,8 +448,8 @@ class AdminApiService {
         return response.data;
     }
 
-    async markInvoiceIssued(id: number, remarks?: string): Promise<AdminApiResponse> {
-        const response = await this.api.put('/star/invoices', { id, invoice_status: 'issued', remarks });
+    async updateInvoiceStatus(id: number, invoice_status: 'processing' | 'issued', remarks?: string): Promise<AdminApiResponse> {
+        const response = await this.api.put('/star/invoices', { id, invoice_status, remarks });
         return response.data;
     }
 
