@@ -85,10 +85,10 @@ export const BillRuleConfigEditor: React.FC<Props> = ({ value, onChange, disable
     updateRules({ ...config.rules, [level]: emptyRule() }); setNewLevel('');
   };
 
+
   return <div className="space-y-5">
     {parsed.error && <Alert color="danger" title="计费限速规则需要修复" description={parsed.error} />}
-    {parsed.legacy && <Alert color="warning" variant="flat" title="检测到旧版限速规则" description="页面已按当前规则转换为v2预览。点击转换后再保存，即可使用模型分组、权重和固定/滑动窗口。" endContent={<Button size="sm" color="warning" variant="flat" onPress={() => emit({})} isDisabled={disabled}>转换为 v2</Button>} />}
-    <Alert color="primary" variant="flat" title="规则优先级" description="单模型限额优先于模型分组限额；两者都未命中时使用套餐等级的默认限额。模型权重表示一次请求消耗多少次配额。" startContent={<Zap className="h-5 w-5" />} />
+    <Alert color="primary" variant="flat" title="规则优先级" description="单模型限额优先于模型分组限额；两者都未命中时使用套餐等级的默认限额。模型权重表示一次请求消耗多少次配额。修改配置后先保存，再点击刷新限速器使运行中的服务重新加载。" startContent={<Zap className="h-5 w-5" />} />
 
     <section className="space-y-3"><div className="flex items-center justify-between"><div><h4 className="font-medium">模型消耗权重</h4><p className="text-xs text-default-500">未单独列出的模型每次请求消耗1次</p></div><Button size="sm" variant="flat" startContent={<Plus className="h-4 w-4" />} onPress={() => { let key = 'new-model'; let i = 2; while (key in config.model_costs) key = `new-model-${i++}`; emit({ model_costs: { ...config.model_costs, [key]: 2 } }); }} isDisabled={disabled}>新增模型</Button></div>
       {Object.entries(config.model_costs).map(([model, cost], index) => <div key={index} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem_auto]"><Input label="模型ID" value={model} onValueChange={(next) => emit({ model_costs: renameRecordKey(config.model_costs, model, next) })} isDisabled={disabled} /><NumberInput label="每次消耗" value={Number(cost)} onValueChange={(nextCost) => emit({ model_costs: { ...config.model_costs, [model]: Math.max(1, Math.trunc(nextCost || 1)) } })} minValue={1} step={1} isDisabled={disabled} /><Button isIconOnly color="danger" variant="light" aria-label={`删除模型${model}的消耗权重`} onPress={() => { const next = { ...config.model_costs }; delete next[model]; emit({ model_costs: next }); }} isDisabled={disabled}><Trash2 className="h-4 w-4" /></Button></div>)}

@@ -287,6 +287,11 @@ class AdminApiService {
         return response.data;
     }
 
+    async refreshUserPackages(userId: number): Promise<AdminApiResponse<{ user_id: number; packages: Record<string, unknown> }>> {
+        const response = await this.api.post('/star/refresh_user_packages', { user_id: userId });
+        return response.data;
+    }
+
     // ==================== 用户套餐记录 ====================
 
     /**
@@ -404,6 +409,11 @@ class AdminApiService {
      */
     async updateConfig(data: UpdateConfigRequest): Promise<AdminApiResponse> {
         const response = await this.api.put('/star/config', data);
+        return response.data;
+    }
+
+    async reloadLimitConfig(): Promise<AdminApiResponse<{ reloaded: boolean }>> {
+        const response = await this.api.get('/star/reload_limit_config');
         return response.data;
     }
 

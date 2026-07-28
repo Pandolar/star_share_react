@@ -88,6 +88,7 @@ const UsersManagePage: React.FC = () => {
     const [clearLimitCandidates, setClearLimitCandidates] = useState<User[]>([]);
     const [clearLimitSearchLoading, setClearLimitSearchLoading] = useState(false);
     const [clearLimitSubmitting, setClearLimitSubmitting] = useState(false);
+    const [refreshingPackageUserId, setRefreshingPackageUserId] = useState<number | null>(null);
     const [pendingClearLimitUser, setPendingClearLimitUser] = useState<User | null>(null);
     const [viewUserPackages, setViewUserPackages] = useState<UserPackage[]>([]);
     const [viewUserOrders, setViewUserOrders] = useState<Order[]>([]);
@@ -327,6 +328,21 @@ const UsersManagePage: React.FC = () => {
         return false;
     };
 
+    const refreshUserPackages = async (user: User) => {
+        if (refreshingPackageUserId !== null) return;
+        setRefreshingPackageUserId(user.id);
+        try {
+            const response = await adminApiService.refreshUserPackages(user.id);
+            if (response.code !== 20000) throw new Error(response.msg || '刷新用户套餐失败');
+            showToast(`用户 #${user.id} 套餐信息已刷新到 Redis`, 'success');
+            await fetchUsers();
+        } catch (error) {
+            showToast(error instanceof Error ? error.message : '刷新用户套餐失败', 'error');
+        } finally {
+            setRefreshingPackageUserId(null);
+        }
+    };
+
     const confirmClearLimit = async () => {
         if (pendingClearLimitUser) await clearUserLimit(pendingClearLimitUser);
     };
@@ -495,6 +511,13 @@ const UsersManagePage: React.FC = () => {
                     onPress={() => openClearLimitConfirm(user)}
                 >
                     清除限速
+                </DropdownItem>
+                <DropdownItem
+                    key="refresh-packages"
+                    startContent={<RefreshCw className={`w-4 h-4 ${refreshingPackageUserId === user.id ? 'animate-spin' : ''}`} />}
+                    onPress={() => refreshUserPackages(user)}
+                >
+                    刷新用户套餐
                 </DropdownItem>
                 <DropdownItem
                     key="compensation"

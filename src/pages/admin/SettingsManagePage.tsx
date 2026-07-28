@@ -50,6 +50,8 @@ const VISUAL_CONFIG_KEYS: Record<string, true> = {
     WHITE_LABEL_CONFIG: true,
     INVOICE_CONFIG: true,
     INVITE_POLICY: true,
+    PROMOTION_CODE_CONFIG: true,
+    COMPENSATION_CONFIG: true,
     BILL_RULE: true,
 };
 
@@ -63,6 +65,8 @@ const SettingsManagePage: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [configValues, setConfigValues] = useState<Record<string, string>>({});
+    const [rawJsonConfigKeys, setRawJsonConfigKeys] = useState<Set<string>>(() => new Set());
+    const [reloadingLimit, setReloadingLimit] = useState(false);
     const [selectedGroup, setSelectedGroup] = useState<string>('');
     const [packageLevels, setPackageLevels] = useState<Array<{ level: string; category: string }>>([]);
     const [packageOptions, setPackageOptions] = useState<Array<{ id: number; package_name: string; category: string; level: string }>>([]);
@@ -133,6 +137,33 @@ const SettingsManagePage: React.FC = () => {
             ...prev,
             [key]: value
         }));
+    };
+
+    const toggleConfigMode = (key: string) => {
+        setRawJsonConfigKeys((current) => {
+            const next = new Set(current);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+        });
+    };
+
+    const reloadLimitConfig = async () => {
+        const savedValue = configs.find((config) => config.key === 'BILL_RULE')?.value;
+        if (savedValue !== undefined && configValues.BILL_RULE !== savedValue) {
+            showToast('请先保存计费限速规则，再刷新限速器', 'warning');
+            return;
+        }
+        setReloadingLimit(true);
+        try {
+            const response = await adminApiService.reloadLimitConfig();
+            if (response.code !== 20000) throw new Error(response.msg || '刷新限速器失败');
+            showToast(response.msg || '限速器已重新加载', 'success');
+        } catch (error) {
+            showToast(error instanceof Error ? error.message : '刷新限速器失败', 'error');
+        } finally {
+            setReloadingLimit(false);
+        }
     };
 
     // 保存单个配置
@@ -253,6 +284,8 @@ const SettingsManagePage: React.FC = () => {
         const value = configValues[config.key] || '';
         const isChanged = value !== config.value;
         const isJson = config.type === 'json';
+        const supportsModeSwitch = isJson && Boolean(VISUAL_CONFIG_KEYS[config.key]);
+        const showRawJson = supportsModeSwitch && rawJsonConfigKeys.has(config.key);
         const isJsonValid = !isJson ? true : (() => {
             try {
                 JSON.parse(value || '');
@@ -281,48 +314,75 @@ const SettingsManagePage: React.FC = () => {
 
         return (
             <div className="space-y-2">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
                     <div>
                         <div className="font-medium">{config.description}</div>
                         <div className="text-sm text-default-500">配置键: {config.key}</div>
                     </div>
-                    {config.editable && isChanged && (
-                        <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        {config.key === 'BILL_RULE' && (
                             <Button
                                 size="sm"
                                 color="primary"
                                 variant="flat"
-                                startContent={<Save className="w-3 h-3" />}
-                                isDisabled={!isJsonValid}
-                                onPress={() => {
-                                    if (!isJsonValid) {
-                                        showToast('JSON 格式无效，请检查后再确认', 'warning');
-                                        return;
-                                    }
-                                    setPendingConfig({ key: config.key, value, description: config.description });
-                                    onConfirmOpen();
-                                }}
+                                startContent={<RefreshCw className={`w-3 h-3 ${reloadingLimit ? 'animate-spin' : ''}`} />}
+                                onPress={reloadLimitConfig}
+                                isLoading={reloadingLimit}
+                                isDisabled={reloadingLimit}
                             >
-                                确认
+                                刷新限速器
                             </Button>
-                            <Button
-                                size="sm"
-                                variant="light"
-                                onPress={() => {
-                                    // 取消改动，恢复到原始值
-                                    setConfigValues((prev) => ({
-                                        ...prev,
-                                        [config.key]: config.value,
-                                    }));
-                                }}
-                            >
-                                取消
+                        )}
+                        {supportsModeSwitch && (
+                            <Button size="sm" variant="bordered" onPress={() => toggleConfigMode(config.key)}>
+                                {showRawJson ? '切换可视化' : '查看原始 JSON'}
                             </Button>
-                        </div>
-                    )}
+                        )}
+                        {config.editable && isChanged && (
+                            <>
+                                <Button
+                                    size="sm"
+                                    color="primary"
+                                    variant="flat"
+                                    startContent={<Save className="w-3 h-3" />}
+                                    isDisabled={!isJsonValid}
+                                    onPress={() => {
+                                        if (!isJsonValid) {
+                                            showToast('JSON 格式无效，请检查后再确认', 'warning');
+                                            return;
+                                        }
+                                        setPendingConfig({ key: config.key, value, description: config.description });
+                                        onConfirmOpen();
+                                    }}
+                                >
+                                    确认
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="light"
+                                    onPress={() => updateConfigValue(config.key, config.value)}
+                                >
+                                    取消
+                                </Button>
+                            </>
+                        )}
+                    </div>
                 </div>
 
-                {config.key === 'HOME_INFO' ? (
+                {showRawJson ? (
+                    <Textarea
+                        aria-label={`${config.description} 原始 JSON`}
+                        value={value}
+                        onValueChange={(nextValue) => updateConfigValue(config.key, nextValue)}
+                        isDisabled={!config.editable}
+                        variant="bordered"
+                        className="font-mono"
+                        isInvalid={!isJsonValid}
+                        color={!isJsonValid ? 'danger' : isChanged ? 'warning' : 'default'}
+                        errorMessage={!isJsonValid ? 'JSON 格式无效' : undefined}
+                        minRows={12}
+                    />
+                ) : config.key === 'HOME_INFO' ? (
                     <HomeInfoConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} />
                 ) : config.key === 'SPEEDTEST_URL_LIST' ? (
                     <SpeedTestNodesEditor
