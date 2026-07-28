@@ -19,6 +19,58 @@ const statusLabels: Record<string, string> = {
 };
 
 
+const parseCsvRows = (text: string): string[][] => {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = '';
+  let quoted = false;
+  const source = text.replace(/^\uFEFF/, '');
+
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index];
+    if (quoted) {
+      if (character === '"' && source[index + 1] === '"') {
+        cell += '"';
+        index += 1;
+      } else if (character === '"') {
+        quoted = false;
+      } else {
+        cell += character;
+      }
+    } else if (character === '"') {
+      quoted = true;
+    } else if (character === ',') {
+      row.push(cell);
+      cell = '';
+    } else if (character === '\r' || character === '\n') {
+      if (character === '\r' && source[index + 1] === '\n') index += 1;
+      row.push(cell);
+      if (row.some((value) => value !== '')) rows.push(row);
+      row = [];
+      cell = '';
+    } else {
+      cell += character;
+    }
+  }
+  if (cell || row.length) {
+    row.push(cell);
+    if (row.some((value) => value !== '')) rows.push(row);
+  }
+  return rows;
+};
+
+const invoiceSummaryFromCsv = (csv: string): string => {
+  const [headers = [], ...records] = parseCsvRows(csv);
+  const titleIndex = headers.indexOf('发票抬头');
+  const taxNumberIndex = headers.indexOf('税号');
+  const amountIndex = headers.indexOf('实付金额');
+  if ([titleIndex, taxNumberIndex, amountIndex].some((index) => index < 0)) return '';
+  return records.map((record) => (
+    `抬头：${record[titleIndex] || '-'}，税号：${record[taxNumberIndex] || '-'}，金额：${record[amountIndex] || '-'}`
+  )).join('\n');
+};
+
+
 const InvoicesManagePage: React.FC = () => {
   const [rows, setRows] = useState<InvoiceRecord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -33,6 +85,7 @@ const InvoicesManagePage: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [selectedRows, setSelectedRows] = useState<Map<number, InvoiceRecord>>(new Map());
   const [csvPreview, setCsvPreview] = useState('');
+  const [invoiceSummaryPreview, setInvoiceSummaryPreview] = useState('');
   const copyModal = useDisclosure();
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -133,7 +186,9 @@ const InvoicesManagePage: React.FC = () => {
         ...(selectedIds.length ? { ids: selectedIds.join(',') } : {}),
       });
       if (!blob.size) { showToast('没有可复制的开票记录', 'warning'); return; }
-      setCsvPreview(await blob.text());
+      const csvText = await blob.text();
+      setCsvPreview(csvText);
+      setInvoiceSummaryPreview(invoiceSummaryFromCsv(csvText));
       copyModal.onOpen();
     } catch {
       showToast('生成复制文本失败', 'error');
@@ -142,10 +197,10 @@ const InvoicesManagePage: React.FC = () => {
     }
   };
 
-  const copyCsv = async () => {
+  const copyText = async (text: string, successMessage: string) => {
     try {
-      await navigator.clipboard.writeText(csvPreview);
-      showToast('CSV文本已复制', 'success');
+      await navigator.clipboard.writeText(text);
+      showToast(successMessage, 'success');
     } catch {
       showToast('复制失败，请在编辑框中手动复制', 'error');
     }
@@ -207,7 +262,7 @@ const InvoicesManagePage: React.FC = () => {
       </div>
 
       <Modal isOpen={copyModal.isOpen} onClose={copyModal.onClose} size="4xl" scrollBehavior="inside">
-        <ModalContent><ModalHeader>开票记录 CSV 文本</ModalHeader><ModalBody><p className="text-sm text-default-500">内容与导出 CSV 的列顺序一致，可手动选择复制，也可点击底部按钮一键复制。</p><Textarea value={csvPreview} onValueChange={setCsvPreview} minRows={18} className="font-mono" /></ModalBody><ModalFooter><Button variant="light" onPress={copyModal.onClose}>关闭</Button><Button color="primary" startContent={<Copy size={16} />} onPress={copyCsv}>一键复制</Button></ModalFooter></ModalContent>
+        <ModalContent><ModalHeader>开票记录 CSV 文本</ModalHeader><ModalBody className="space-y-4"><div className="space-y-2"><p className="text-sm text-default-500">内容与导出 CSV 的列顺序一致，可手动选择复制，也可点击底部按钮复制。</p><Textarea aria-label="开票记录 CSV 文本内容" value={csvPreview} onValueChange={setCsvPreview} minRows={12} className="font-mono" /></div><div className="space-y-2"><p className="text-sm text-default-500">开票信息简版，每条记录一行。</p><Textarea aria-label="开票信息简版文本" value={invoiceSummaryPreview} onValueChange={setInvoiceSummaryPreview} minRows={8} /></div></ModalBody><ModalFooter><Button variant="light" onPress={copyModal.onClose}>关闭</Button><Button variant="flat" startContent={<Copy size={16} />} onPress={() => copyText(csvPreview, 'CSV文本已复制')}>复制 CSV</Button><Button color="primary" startContent={<Copy size={16} />} onPress={() => copyText(invoiceSummaryPreview, '开票信息简版已复制')}>复制开票信息</Button></ModalFooter></ModalContent>
       </Modal>
     </div>
   );
