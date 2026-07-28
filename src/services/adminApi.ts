@@ -453,6 +453,11 @@ class AdminApiService {
         return response.data;
     }
 
+    async updateInvoiceStatuses(ids: number[], invoice_status: 'processing' | 'issued', remarks?: string): Promise<AdminApiResponse> {
+        const response = await this.api.put('/star/invoices', { ids, invoice_status, remarks });
+        return response.data;
+    }
+
     async exportInvoices(params: InvoiceQueryParams = {}): Promise<Blob> {
         const queryString = this.buildQueryString(params);
         const response = await this.api.get(`/star/invoices/export?${queryString}`, { responseType: 'blob' });

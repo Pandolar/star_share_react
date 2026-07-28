@@ -4,7 +4,7 @@ import {
   ModalFooter, ModalHeader, Pagination, Select, SelectItem, Spinner, Table, TableBody,
   TableCell, TableColumn, TableHeader, TableRow, Textarea, useDisclosure,
 } from '@heroui/react';
-import { Copy, Download, FileText, RefreshCw, Search } from 'lucide-react';
+import { Copy, Download, FileText, PlayCircle, RefreshCw, Search } from 'lucide-react';
 import adminApiService from '../../services/adminApi';
 import type { InvoiceQueryParams, InvoiceRecord } from '../../types/admin';
 import { showToast } from '../../components/Toast';
@@ -76,6 +76,7 @@ const InvoicesManagePage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [copying, setCopying] = useState(false);
+  const [batchUpdating, setBatchUpdating] = useState(false);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [queryInput, setQueryInput] = useState('');
   const [query, setQuery] = useState('');
@@ -93,6 +94,9 @@ const InvoicesManagePage: React.FC = () => {
   const allOnPageSelected = rows.length > 0 && selectedOnPage === rows.length;
   const someOnPageSelected = selectedOnPage > 0 && !allOnPageSelected;
   const selectedIds = useMemo(() => Array.from(selectedRows.keys()), [selectedRows]);
+  const processableSelectedIds = useMemo(() => Array.from(selectedRows.values())
+    .filter((record) => record.order_status === 'paid' && record.invoice_status === 'pending_issue')
+    .map((record) => record.id), [selectedRows]);
 
   const queryParams = useCallback((): InvoiceQueryParams => ({
     current_page: page,
@@ -156,6 +160,30 @@ const InvoicesManagePage: React.FC = () => {
     }
   };
 
+  const batchStartProcessing = async () => {
+    if (!processableSelectedIds.length) {
+      showToast('请先选择待开票的已支付订单', 'warning');
+      return;
+    }
+    setBatchUpdating(true);
+    try {
+      const response = await adminApiService.updateInvoiceStatuses(processableSelectedIds, 'processing');
+      if (response.code !== 20000) throw new Error(response.msg || '批量开始开票失败');
+      const updatedCount = Number(response.data?.updated_count) || processableSelectedIds.length;
+      showToast(`已将 ${updatedCount} 条订单标记为开票中`, 'success');
+      setSelectedRows((current) => {
+        const next = new Map(current);
+        processableSelectedIds.forEach((id) => next.delete(id));
+        return next;
+      });
+      await load();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '批量开始开票失败', 'error');
+    } finally {
+      setBatchUpdating(false);
+    }
+  };
+
   const exportCsv = async () => {
     setExporting(true);
     try {
@@ -214,6 +242,7 @@ const InvoicesManagePage: React.FC = () => {
           <div><h1 className="text-2xl font-bold">开票管理</h1><p className="text-sm text-default-500">处理开票申请，并按筛选或选中记录导出财务明细</p></div>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button color="primary" variant="flat" startContent={<PlayCircle size={16} />} onPress={batchStartProcessing} isLoading={batchUpdating} isDisabled={!processableSelectedIds.length}>批量开始开票{processableSelectedIds.length ? `（${processableSelectedIds.length}）` : ''}</Button>
           <Button startContent={<Copy size={16} />} onPress={openCopy} isLoading={copying}>复制文本{selectedIds.length ? `（${selectedIds.length}）` : ''}</Button>
           <Button startContent={<Download size={16} />} onPress={exportCsv} isLoading={exporting}>导出{selectedIds.length ? `选中 ${selectedIds.length} 条` : '当前筛选'}</Button>
         </div>
