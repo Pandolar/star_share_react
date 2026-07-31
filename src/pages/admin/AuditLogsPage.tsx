@@ -54,6 +54,12 @@ const RESULT_LABELS: Record<string, string> = {
   login: '登录',
   admin_deduct: '管理员扣减',
   generate_cdk: '生成卡密扣款',
+  create: '新增',
+  update: '修改',
+  rename: '改名',
+  publish: '发布',
+  unpublish: '撤回',
+  delete: '删除',
 };
 
 const TYPE_COLORS: Record<string, 'primary' | 'secondary' | 'success' | 'warning'> = {
@@ -61,6 +67,7 @@ const TYPE_COLORS: Record<string, 'primary' | 'secondary' | 'success' | 'warning
   user_session: 'primary',
   distributor_balance: 'success',
   cdk_usage: 'secondary',
+  article_management: 'primary',
 };
 
 const formatValue = (value: unknown): string => {
@@ -84,6 +91,10 @@ const describeLog = (record: AuditLogRecord): string => {
   }
   if (record.type === 'cdk_usage') {
     return `兑换 ${data.cdk_code || `CDK #${record.ref_id ?? '-'}`} · 套餐 #${data.package_id ?? '-'}`;
+  }
+  if (record.type === 'article_management') {
+    const action = RESULT_LABELS[String(data.action || '')] || data.action || '内容变更';
+    return `${action}文章 ${data.title || data.identifier || '-'} · /star/doc/${data.identifier || '-'}`;
   }
   return Object.entries(data).slice(0, 2).map(([key, value]) => `${key}: ${formatValue(value)}`).join(' · ') || '无附加信息';
 };

@@ -30,6 +30,7 @@ const InviteManagePage = lazyWithRetry(() => import('./pages/admin/InviteManageP
 const DistributorsManagePage = lazyWithRetry(() => import('./pages/admin/DistributorsManagePage'), 'DistributorsManagePage');
 const InvoicesManagePage = lazyWithRetry(() => import('./pages/admin/InvoicesManagePage'), 'InvoicesManagePage');
 const AuditLogsPage = lazyWithRetry(() => import('./pages/admin/AuditLogsPage'), 'AuditLogsPage');
+const ArticlesManagePage = lazyWithRetry(() => import('./pages/admin/ArticlesManagePage'), 'ArticlesManagePage');
 const DistributorLoginPage = lazyWithRetry(() => import('./pages/distributor/DistributorLoginPage'), 'DistributorLoginPage');
 const DistributorDashboardPage = lazyWithRetry(() => import('./pages/distributor/DistributorDashboardPage'), 'DistributorDashboardPage');
 const DistributorProtectedRoute = lazyWithRetry(() => import('./components/distributor/DistributorProtectedRoute'), 'DistributorProtectedRoute');
@@ -110,6 +111,7 @@ const App: React.FC = () => {
                 <Route path="cdk" element={<CDKManagePage />} />
                 <Route path="distributors" element={<DistributorsManagePage />} />
                 <Route path="audit-logs" element={<AuditLogsPage />} />
+                <Route path="articles" element={<ArticlesManagePage />} />
                 <Route path="settings" element={<SettingsManagePage />} />
                 <Route path="invites" element={<InviteManagePage />} />
               </Route>

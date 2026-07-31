@@ -33,6 +33,7 @@ import {
     Gift,
     ReceiptText,
     ScrollText,
+    FileText,
 } from 'lucide-react';
 import adminApiService from '../../services/adminApi';
 
@@ -111,6 +112,12 @@ const AdminLayout: React.FC = () => {
             label: '分销商管理',
             icon: <Users className="w-5 h-5" />,
             path: '/star-admin/distributors',
+        },
+        {
+            key: 'articles',
+            label: '文章管理',
+            icon: <FileText className="w-5 h-5" />,
+            path: '/star-admin/articles',
         },
         {
             key: 'audit-logs',

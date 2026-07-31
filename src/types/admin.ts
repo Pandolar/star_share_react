@@ -303,6 +303,34 @@ export interface CDKQueryParams extends CommonQueryParams {
     remarks?: string;
 }
 
+export type ArticleStatus = 'draft' | 'published';
+
+export interface ArticleSummary {
+    identifier: string;
+    title: string;
+    description: string;
+    status: ArticleStatus;
+    created_at: string;
+    updated_at: string;
+    published_at?: string | null;
+    revision: string;
+}
+
+export interface Article extends ArticleSummary {
+    version: 1;
+    format: 'markdown';
+    content: string;
+}
+
+export interface SaveArticleRequest {
+    identifier: string;
+    title: string;
+    description?: string;
+    content: string;
+    status: ArticleStatus;
+    revision?: string;
+}
+
 // 系统配置相关类型
 export interface SystemConfig {
     id: number;

@@ -1,7 +1,8 @@
-import axios, { AxiosInstance } from 'axios';
+import axios from 'axios';
+import type { AxiosInstance } from 'axios';
 import md5 from 'md5';
 import { storage as storageConfig } from '../config';
-import {
+import type {
     AdminApiResponse,
     Package,
     CreatePackageRequest,
@@ -35,6 +36,9 @@ import {
     AuditLogRetentionPolicy,
     DashboardData,
     DashboardQueryParams,
+    Article,
+    ArticleSummary,
+    SaveArticleRequest,
 } from '../types/admin';
 
 /**
@@ -391,6 +395,34 @@ class AdminApiService {
         deleted_by_type: Record<string, number>;
     }>> {
         const response = await this.api.put('/star/audit_logs/retention', { retention });
+        return response.data;
+    }
+
+    // ==================== 文章管理 ====================
+
+    async getArticles(querystring = ''): Promise<AdminApiResponse<ArticleSummary[]>> {
+        const query = querystring ? `?${this.buildQueryString({ querystring })}` : '';
+        const response = await this.api.get(`/star/articles${query}`);
+        return response.data;
+    }
+
+    async getArticle(identifier: string): Promise<AdminApiResponse<Article>> {
+        const response = await this.api.get(`/star/articles/${encodeURIComponent(identifier)}`);
+        return response.data;
+    }
+
+    async createArticle(data: SaveArticleRequest): Promise<AdminApiResponse<Article>> {
+        const response = await this.api.post('/star/articles', data);
+        return response.data;
+    }
+
+    async updateArticle(currentIdentifier: string, data: SaveArticleRequest): Promise<AdminApiResponse<Article>> {
+        const response = await this.api.put(`/star/articles/${encodeURIComponent(currentIdentifier)}`, data);
+        return response.data;
+    }
+
+    async deleteArticle(identifier: string, revision: string): Promise<AdminApiResponse> {
+        const response = await this.api.delete(`/star/articles/${encodeURIComponent(identifier)}`, { data: { revision } });
         return response.data;
     }
 
