@@ -46,6 +46,12 @@ const getInvoiceUnavailableText = (reason?: string | null) => ({
   non_self_site: '开票仅在自营站点可用',
 }[reason || 'invoice_disabled'] || '当前账户暂不满足开票条件');
 
+const getInvoiceSwitchTooltip = (eligibility: InvoiceEligibility | null) => (
+  eligibility?.reason === 'below_threshold'
+    ? `不满足开票金额条件，需大于${eligibility.min_package_amount}元才可开票。`
+    : '请选择是否开票，若未选择开票并完成支付，后续无法补开。'
+);
+
 const getInvoiceProfileAction = (reason?: string | null) => {
   if (reason === 'email_unbound') return { label: '去绑定邮箱', openEdit: 'email' };
   if (reason === 'billing_profile_missing') return { label: '去完善开票信息', openEdit: 'billing_profile' };
@@ -318,13 +324,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         </ModalHeader>
         <ModalBody>
           {promotionPanelOpen && enablePromotionCode && paymentStatus === 'pending' && !qrCodeExpired && (
-            <Card shadow="none" className="border border-secondary-200 bg-secondary-50/40">
-              <CardBody className="gap-3 p-3">
+            <Card shadow="none" className="w-full min-w-0 shrink-0 border border-secondary-200 bg-secondary-50/40">
+              <CardBody className="w-full min-w-0 gap-3 p-3">
                 <div className="flex items-center gap-2 text-sm font-medium text-secondary-700">
-                  <TicketPercent className="h-4 w-4" />
+                  <TicketPercent className="h-4 w-4 shrink-0" />
                   使用优惠码
                 </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-start">
                   <Input
                     size="sm"
                     label="优惠码"
@@ -332,10 +338,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     value={promotionCodeInput}
                     onValueChange={(value) => setPromotionCodeInput(value.toUpperCase())}
                     onKeyDown={(event) => event.key === 'Enter' && void handleApplyPromotion()}
-                    className="flex-1"
+                    className="min-w-0 flex-1"
                     description="使用成功后会按优惠价生成新的5分钟支付二维码"
                   />
-                  <div className="flex gap-2 sm:pt-1">
+                  <div className="flex shrink-0 gap-2 sm:pt-1">
                     {activePromotion && (
                       <Button size="sm" variant="light" onPress={handleRemovePromotion} isDisabled={promotionActionLoading}>
                         不使用优惠
@@ -451,14 +457,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             <div className="flex w-full flex-wrap items-center justify-between gap-2">
               {invoiceFeatureAvailable ? (
                 <Tooltip
-                  content="请选择是否开票，若未选择开票并完成支付，后续无法补开。"
+                  content={getInvoiceSwitchTooltip(eligibility)}
                   placement="top-start"
                 >
                   <span className="inline-flex">
                     <Switch
                       size="sm"
                       isSelected={invoiceSelected}
-                      isDisabled={creatingInvoiceOrder || promotionActionLoading || eligibilityLoading}
+                      isDisabled={creatingInvoiceOrder || promotionActionLoading || eligibilityLoading || eligibility?.reason === 'below_threshold'}
                       onValueChange={handleInvoiceSwitch}
                       aria-label="是否开票"
                       classNames={{ label: 'text-xs text-default-500' }}

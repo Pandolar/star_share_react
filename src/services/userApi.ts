@@ -300,6 +300,7 @@ export interface InvoiceEligibility {
     eligible: boolean;
     reason: 'invoice_disabled' | 'below_threshold' | 'email_unbound' | 'email_not_allowed' | 'billing_profile_missing' | 'non_self_site' | null;
     original_amount: string;
+    min_package_amount: string;
     discount_amount: string;
     promotion_code: string | null;
     base_amount: string;

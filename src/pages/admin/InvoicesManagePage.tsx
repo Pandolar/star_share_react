@@ -97,6 +97,9 @@ const InvoicesManagePage: React.FC = () => {
   const processableSelectedIds = useMemo(() => Array.from(selectedRows.values())
     .filter((record) => record.order_status === 'paid' && record.invoice_status === 'pending_issue')
     .map((record) => record.id), [selectedRows]);
+  const issuableSelectedIds = useMemo(() => Array.from(selectedRows.values())
+    .filter((record) => record.order_status === 'paid' && record.invoice_status === 'processing')
+    .map((record) => record.id), [selectedRows]);
 
   const queryParams = useCallback((): InvoiceQueryParams => ({
     current_page: page,
@@ -183,6 +186,30 @@ const InvoicesManagePage: React.FC = () => {
       setBatchUpdating(false);
     }
   };
+  const batchMarkIssued = async () => {
+    if (!issuableSelectedIds.length) {
+      showToast('请先选择开票中的已支付订单', 'warning');
+      return;
+    }
+    setBatchUpdating(true);
+    try {
+      const response = await adminApiService.updateInvoiceStatuses(issuableSelectedIds, 'issued');
+      if (response.code !== 20000) throw new Error(response.msg || '批量标记已开票失败');
+      const updatedCount = Number(response.data?.updated_count) || issuableSelectedIds.length;
+      showToast(`已将 ${updatedCount} 条订单标记为已开票`, 'success');
+      setSelectedRows((current) => {
+        const next = new Map(current);
+        issuableSelectedIds.forEach((id) => next.delete(id));
+        return next;
+      });
+      await load();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '批量标记已开票失败', 'error');
+    } finally {
+      setBatchUpdating(false);
+    }
+  };
+
 
   const exportCsv = async () => {
     setExporting(true);
@@ -243,6 +270,7 @@ const InvoicesManagePage: React.FC = () => {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button color="primary" variant="flat" startContent={<PlayCircle size={16} />} onPress={batchStartProcessing} isLoading={batchUpdating} isDisabled={!processableSelectedIds.length}>批量开始开票{processableSelectedIds.length ? `（${processableSelectedIds.length}）` : ''}</Button>
+          <Button color="success" variant="flat" onPress={batchMarkIssued} isLoading={batchUpdating} isDisabled={!issuableSelectedIds.length}>批量标记已开票{issuableSelectedIds.length ? `（${issuableSelectedIds.length}）` : ''}</Button>
           <Button startContent={<Copy size={16} />} onPress={openCopy} isLoading={copying}>复制文本{selectedIds.length ? `（${selectedIds.length}）` : ''}</Button>
           <Button startContent={<Download size={16} />} onPress={exportCsv} isLoading={exporting}>导出{selectedIds.length ? `选中 ${selectedIds.length} 条` : '当前筛选'}</Button>
         </div>
