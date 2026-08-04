@@ -48,7 +48,7 @@ const getInvoiceUnavailableText = (reason?: string | null) => ({
 
 const getInvoiceSwitchTooltip = (eligibility: InvoiceEligibility | null) => (
   eligibility?.reason === 'below_threshold'
-    ? `不满足开票金额条件，需大于${eligibility.min_package_amount}元才可开票。`
+    ? `当前套餐金额未达到开票门槛。最低开票金额为 ${eligibility.min_package_amount} 元`
     : '请选择是否开票，若未选择开票并完成支付，后续无法补开。'
 );
 
