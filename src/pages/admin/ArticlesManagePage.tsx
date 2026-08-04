@@ -49,6 +49,8 @@ import {
   Trash2,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
 import adminApiService from '../../services/adminApi';
 import { showToast } from '../../components/Toast';
@@ -89,7 +91,7 @@ const MarkdownPreview: FC<{ article: Pick<SaveArticleRequest, 'title' | 'descrip
       {article.description && <p className="mt-2 text-default-500">{article.description}</p>}
     </div>
     <div className="space-y-4 text-default-700 [&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-primary [&_blockquote]:bg-default-100 [&_blockquote]:px-4 [&_blockquote]:py-2 [&_code]:rounded [&_code]:bg-default-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_h1]:text-3xl [&_h1]:font-bold [&_h2]:border-b [&_h2]:border-divider [&_h2]:pb-2 [&_h2]:text-2xl [&_h2]:font-semibold [&_h3]:text-xl [&_h3]:font-semibold [&_img]:max-w-full [&_img]:rounded-xl [&_li]:ml-5 [&_ol]:list-decimal [&_p]:leading-7 [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:bg-default-900 [&_pre]:p-4 [&_pre]:text-default-100 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-divider [&_td]:p-2 [&_th]:border [&_th]:border-divider [&_th]:bg-default-100 [&_th]:p-2 [&_ul]:list-disc">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{article.content || '*开始输入 Markdown 正文，预览会实时显示在这里。*'}</ReactMarkdown>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw, rehypeSanitize]}>{article.content || '*开始输入 Markdown 正文，预览会实时显示在这里。*'}</ReactMarkdown>
     </div>
   </div>
 );
