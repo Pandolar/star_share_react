@@ -49,7 +49,7 @@ import {
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import adminApiService from '../../services/adminApi';
-import { CDK, CreateCDKRequest, UpdateCDKRequest, CDKQueryParams, Package as PackageType } from '../../types/admin';
+import { CDK, CreateCDKRequest, UpdateCDKRequest, CDKQueryParams, Package as PackageType, SourceDomainStats } from '../../types/admin';
 import { showToast } from '../../components/Toast';
 
 /**
@@ -83,6 +83,8 @@ const CDKManagePage: React.FC = () => {
     const [distributors, setDistributors] = useState<Array<{ id: number; username: string }>>([]);
     // 分销商筛选
     const [distributorFilter, setDistributorFilter] = useState<string>('all');
+    const [sourceDomainFilter, setSourceDomainFilter] = useState('');
+    const [sourceStats, setSourceStats] = useState<SourceDomainStats | null>(null);
 
   // 状态选项
   const statusOptions = [
@@ -137,6 +139,9 @@ const CDKManagePage: React.FC = () => {
             if (distributorFilter !== 'all') {
                 params.distributor_id = distributorFilter === 'self' ? 0 : Number(distributorFilter);
             }
+            if (sourceDomainFilter.trim()) {
+                params.source_domain = sourceDomainFilter.trim().toLowerCase();
+            }
 
             const response = await adminApiService.getCDKs(params);
 
@@ -163,7 +168,7 @@ const CDKManagePage: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [currentPage, searchQuery, statusFilter, distributorFilter, pageSize]);
+    }, [currentPage, searchQuery, statusFilter, distributorFilter, sourceDomainFilter, pageSize]);
 
     // 初始化筛选选项
     useEffect(() => {
@@ -171,6 +176,12 @@ const CDKManagePage: React.FC = () => {
         fetchDistributors();
     }, [fetchPackages, fetchDistributors]);
 
+
+    useEffect(() => {
+        void adminApiService.getCDKSourceStats().then((response) => {
+            if (response.code === 20000) setSourceStats(response.data);
+        }).catch(() => undefined);
+    }, []);
     // 列表条件变化时刷新
     useEffect(() => {
         fetchCDKs();
@@ -194,6 +205,7 @@ const CDKManagePage: React.FC = () => {
         setSearchQuery('');
         setStatusFilter('all');
         setDistributorFilter('all');
+        setSourceDomainFilter('');
         setCurrentPage(1);
     };
 
@@ -564,6 +576,13 @@ const CDKManagePage: React.FC = () => {
                                 )),
                             ]}
                         </Select>
+                        <Input
+                            aria-label="兑换来源域名"
+                            placeholder="筛选兑换来源域名"
+                            value={sourceDomainFilter}
+                            onValueChange={(value) => { setSourceDomainFilter(value); setCurrentPage(1); }}
+                            className="w-full sm:w-56"
+                        />
                         <div className="flex gap-2">
                             <Button
                                 color="primary"
@@ -586,8 +605,9 @@ const CDKManagePage: React.FC = () => {
 
             {/* 操作区域 */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-2 text-sm text-default-600">
+                <div className="flex flex-wrap items-center gap-2 text-sm text-default-600">
                     <span>共 {total} 个CDK</span>
+                    {sourceStats?.domains.slice(0, 3).map((item) => <Chip key={item.label} size="sm" variant="flat">{item.label} {item.count}</Chip>)}
                     {crossPageSelection.size > 0 && <Chip size="sm" color="primary" variant="flat">已选 {crossPageSelection.size}</Chip>}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -652,6 +672,7 @@ const CDKManagePage: React.FC = () => {
                             <TableColumn>归属</TableColumn>
                             <TableColumn>状态</TableColumn>
                             <TableColumn>使用信息</TableColumn>
+                            <TableColumn>兑换来源</TableColumn>
                             <TableColumn>过期时间</TableColumn>
                             <TableColumn>创建时间</TableColumn>
                             <TableColumn>备注</TableColumn>
@@ -699,30 +720,18 @@ const CDKManagePage: React.FC = () => {
                                     <TableCell>{renderStatus(cdk.status, cdk.expires_at)}</TableCell>
                                     <TableCell>
                                         <div className="space-y-1">
-                                            {cdk.user_id && (
-                                                <div className="text-sm">
-                                                    {cdk.user_username || cdk.user_email || `ID: ${cdk.user_id}`}
-                                                </div>
-                                            )}
-                                            {cdk.user_id && cdk.user_email && !cdk.user_username && (
-                                                <div className="text-xs text-default-500">{cdk.user_email}</div>
-                                            )}
-                                            {cdk.user_id && cdk.user_username && (
-                                                <div className="text-xs text-default-500">{cdk.user_email || `ID: ${cdk.user_id}`}</div>
-                                            )}
-                                            {(cdk.max_uses || 1) > 1 && (
-                                                <div className="text-xs text-default-500">
-                                                    使用次数: {cdk.use_count || 0}/{cdk.max_uses}
-                                                </div>
-                                            )}
-                                            {cdk.used_at && (
-                                                <div className="text-xs text-default-500">
-                                                    使用时间: {dayjs(cdk.used_at).format('MM-DD HH:mm')}
-                                                </div>
-                                            )}
-                                            {!cdk.user_id && !cdk.used_at && (cdk.max_uses || 1) <= 1 && (
-                                                <div className="text-xs text-default-400">-</div>
-                                            )}
+                                            {cdk.user_id && <div className="text-sm">{cdk.user_username || cdk.user_email || `ID: ${cdk.user_id}`}</div>}
+                                            {cdk.user_id && cdk.user_email && !cdk.user_username && <div className="text-xs text-default-500">{cdk.user_email}</div>}
+                                            {cdk.user_id && cdk.user_username && <div className="text-xs text-default-500">{cdk.user_email || `ID: ${cdk.user_id}`}</div>}
+                                            {(cdk.max_uses || 1) > 1 && <div className="text-xs text-default-500">使用次数: {cdk.use_count || 0}/{cdk.max_uses}</div>}
+                                            {cdk.used_at && <div className="text-xs text-default-500">使用时间: {dayjs(cdk.used_at).format('MM-DD HH:mm')}</div>}
+                                            {!cdk.user_id && !cdk.used_at && (cdk.max_uses || 1) <= 1 && <div className="text-xs text-default-400">-</div>}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="space-y-1 text-xs">
+                                            <code className="text-default-600">{cdk.latest_source_domain || '历史记录 / 未知来源'}</code>
+                                            {(cdk.redemption_count || 0) > 1 && <p className="text-default-500">累计 {cdk.redemption_count} 次兑换</p>}
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-sm">
@@ -998,6 +1007,11 @@ const CDKManagePage: React.FC = () => {
                                             </div>
                                         </div>
                                     )}
+                                    <div>
+                                        <span className="text-sm text-default-500">最近兑换来源</span>
+                                        <div className="break-all font-medium">{selectedCDK.latest_source_domain || '历史记录 / 未知来源'}</div>
+                                        {(selectedCDK.redemption_count || 0) > 1 && <div className="text-xs text-default-500">累计 {selectedCDK.redemption_count} 次兑换</div>}
+                                    </div>
                                 </div>
                                 {selectedCDK.remarks && (
                                     <Alert isVisible color="default" variant="flat" title="备注" description={selectedCDK.remarks} />

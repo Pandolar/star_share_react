@@ -44,6 +44,7 @@ import { useSearchParams } from 'react-router-dom';
 import adminApiService from '../../services/adminApi';
 import { Order, UpdateOrderRequest, OrderQueryParams } from '../../types/admin';
 import { showToast } from '../../components/Toast';
+import type { SourceDomainStats } from '../../types/admin';
 import { LongTextPreview, PackageSummary, UserSummary } from '../../components/admin/AdminEntitySummary';
 
 /**
@@ -59,6 +60,8 @@ const OrdersManagePage: React.FC = () => {
     const [searchInput, setSearchInput] = useState(urlQuery);
     const [searchQuery, setSearchQuery] = useState(urlQuery);
     const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [sourceDomainFilter, setSourceDomainFilter] = useState('');
+    const [sourceStats, setSourceStats] = useState<SourceDomainStats | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
@@ -96,6 +99,9 @@ const OrdersManagePage: React.FC = () => {
             if (statusFilter !== 'all') {
                 params.status = statusFilter as 'pending' | 'paid' | 'failed';
             }
+            if (sourceDomainFilter.trim()) {
+                params.source_domain = sourceDomainFilter.trim().toLowerCase();
+            }
 
             const response = await adminApiService.getOrders(params);
 
@@ -122,8 +128,14 @@ const OrdersManagePage: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [currentPage, searchQuery, statusFilter, pageSize]);
+    }, [currentPage, searchQuery, statusFilter, sourceDomainFilter, pageSize]);
 
+
+    useEffect(() => {
+        void adminApiService.getOrderSourceStats().then((response) => {
+            if (response.code === 20000) setSourceStats(response.data);
+        }).catch(() => undefined);
+    }, []);
     // 初始化和依赖更新
     useEffect(() => {
         fetchOrders();
@@ -149,6 +161,7 @@ const OrdersManagePage: React.FC = () => {
 
     // 处理重置
     const handleReset = () => {
+        setSourceDomainFilter('');
         setSearchInput('');
         setSearchQuery('');
         setStatusFilter('all');
@@ -334,6 +347,13 @@ const OrdersManagePage: React.FC = () => {
                                 </SelectItem>
                             ))}
                         </Select>
+                        <Input
+                            aria-label="来源域名"
+                            placeholder="筛选完整来源域名"
+                            value={sourceDomainFilter}
+                            onValueChange={(value) => { setSourceDomainFilter(value); setCurrentPage(1); }}
+                            className="w-full sm:w-56"
+                        />
                         <div className="flex gap-2">
                             <Button
                                 color="primary"
@@ -355,12 +375,10 @@ const OrdersManagePage: React.FC = () => {
             </Card>
 
             {/* 操作区域 */}
-            <div className="flex justify-between items-center">
-                <div className="text-sm text-default-600">
-                    共 {total} 个订单
-                </div>
+            <div className="flex flex-wrap items-center gap-2 text-sm text-default-600">
+                <span>共 {total} 个订单</span>
+                {sourceStats?.domains.slice(0, 3).map((item) => <Chip key={item.label} size="sm" variant="flat">{item.label} {item.count}</Chip>)}
             </div>
-
             {/* 订单表格 */}
             <Card>
                 <CardBody className="p-0">
@@ -376,6 +394,7 @@ const OrdersManagePage: React.FC = () => {
                             <TableColumn width={280}>订单 / 交易号</TableColumn>
                             <TableColumn width={250}>用户</TableColumn>
                             <TableColumn width={280}>套餐</TableColumn>
+                            <TableColumn width={180}>来源域名</TableColumn>
                             <TableColumn width={150}>支付</TableColumn>
                             <TableColumn width={130}>开票</TableColumn>
                             <TableColumn width={240}>备注</TableColumn>
@@ -401,6 +420,7 @@ const OrdersManagePage: React.FC = () => {
                                     <TableCell>
                                         <PackageSummary packageInfo={order.package} packageId={order.package_id} />
                                     </TableCell>
+                                    <TableCell><code className="text-xs text-default-600">{order.source_domain || '历史记录 / 未知来源'}</code></TableCell>
                                     <TableCell>
                                         <div className="space-y-1.5">
                                             {renderStatus(order.status)}
@@ -557,6 +577,10 @@ const OrdersManagePage: React.FC = () => {
                                             <div className="font-medium">{selectedOrder.way}</div>
                                         </div>
                                     )}
+                                    <div>
+                                        <span className="text-sm text-default-500">来源域名</span>
+                                        <div className="break-all font-medium">{selectedOrder.source_domain || '历史记录 / 未知来源'}</div>
+                                    </div>
                                 </div>
                                 {selectedOrder.remarks && (
                                     <Alert isVisible color="default" variant="flat" title="备注" description={selectedOrder.remarks} />

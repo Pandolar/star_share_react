@@ -39,6 +39,7 @@ import type {
     Article,
     ArticleSummary,
     SaveArticleRequest,
+    SourceDomainStats,
 } from '../types/admin';
 
 /**
@@ -318,6 +319,11 @@ class AdminApiService {
         return response.data;
     }
 
+    async getCDKSourceStats(): Promise<AdminApiResponse<SourceDomainStats>> {
+        const response = await this.api.get('/star/cdk/source_stats');
+        return response.data;
+    }
+
     /**
      * 批量生成CDK
      */
@@ -465,6 +471,11 @@ class AdminApiService {
     async getOrders(params: OrderQueryParams = {}): Promise<AdminApiResponse<Order[]>> {
         const queryString = this.buildQueryString(params);
         const response = await this.api.get(`/star/order?${queryString}`);
+        return response.data;
+    }
+
+    async getOrderSourceStats(): Promise<AdminApiResponse<SourceDomainStats>> {
+        const response = await this.api.get('/star/order/source_stats');
         return response.data;
     }
 

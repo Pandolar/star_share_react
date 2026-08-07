@@ -268,6 +268,13 @@ export interface CDK {
     max_uses?: number;
     use_count?: number;
     created_by?: string;
+    latest_source_domain?: string | null;
+    redemption_count?: number;
+}
+
+export interface SourceDomainStats {
+    total: number;
+    domains: Array<{ domain: string | null; label: string; count: number }>;
 }
 
 export interface CreateCDKRequest {
@@ -301,6 +308,7 @@ export interface CDKQueryParams extends CommonQueryParams {
     batch_id?: string;
     is_expired?: boolean;
     remarks?: string;
+    source_domain?: string;
 }
 
 export type ArticleStatus = 'draft' | 'published';
@@ -372,6 +380,8 @@ export interface Order {
     promotion_snapshot?: Record<string, unknown> | null;
     user?: AdminUserSummary | null;
     package?: AdminPackageSummary | null;
+    source_domain?: string | null;
+    cdk_id?: number | null;
 }
 
 export interface UpdateOrderRequest {
@@ -389,8 +399,8 @@ export interface OrderQueryParams extends CommonQueryParams {
     created_at?: string;
     way?: string;
     remarks?: string;
+    source_domain?: string;
 }
-
 export interface InvoiceRecord {
     id: number;
     order_id: string;
@@ -498,6 +508,7 @@ export interface DashboardInventory {
     active_package_records: number;
     active_package_users: number;
     frozen_package_records: number;
+
     unused_cdks: number;
     disabled_cdks: number;
     pending_orders: number;
