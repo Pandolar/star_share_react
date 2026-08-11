@@ -53,7 +53,7 @@ export const CdkRedeemModal: React.FC<CdkRedeemModalProps> = ({ isOpen, onClose,
       if (res.code === 20000) {
         setStatus('success');
         setMessage('兑换成功，正在刷新页面...');
-        setTimeout(() => window.location.reload(), 1500);
+        setTimeout(() => window.location.reload(), 2500);
       } else {
         setStatus('failed');
         setMessage(res.msg || '兑换失败');

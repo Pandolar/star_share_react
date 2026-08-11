@@ -1,14 +1,19 @@
 import confetti from 'canvas-confetti';
 
+const realisticConfetti = confetti.create(undefined, {
+  resize: true,
+  useWorker: false,
+});
+
 const PARTICLE_COUNT = 200;
 const DEFAULT_OPTIONS: confetti.Options = {
   origin: { y: 0.7 },
-  disableForReducedMotion: true,
+  disableForReducedMotion: false,
   zIndex: 2000,
 };
 
 const fire = (particleRatio: number, options: confetti.Options) => {
-  void confetti({
+  void realisticConfetti({
     ...DEFAULT_OPTIONS,
     ...options,
     particleCount: Math.floor(PARTICLE_COUNT * particleRatio),
