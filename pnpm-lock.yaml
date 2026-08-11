@@ -50,6 +50,9 @@ importers:
       axios:
         specifier: ^1.11.0
         version: 1.11.0
+      canvas-confetti:
+        specifier: ^1.9.4
+        version: 1.9.4
       dayjs:
         specifier: ^1.11.10
         version: 1.11.13
@@ -105,6 +108,9 @@ importers:
       '@craco/craco':
         specifier: ^7.1.0
         version: 7.1.0(@types/node@16.18.126)(postcss@8.5.6)(react-scripts@5.0.1(@babel/plugin-syntax-flow@7.27.1(@babel/core@7.28.0))(@babel/plugin-transform-react-jsx@7.27.1(@babel/core@7.28.0))(@types/babel__core@7.20.5)(eslint@8.57.1)(react@19.1.1)(ts-node@10.9.2(@types/node@16.18.126)(typescript@4.9.5))(type-fest@2.19.0)(typescript@4.9.5))(typescript@4.9.5)
+      '@types/canvas-confetti':
+        specifier: ^1.9.0
+        version: 1.9.0
       '@types/md5':
         specifier: ^2.3.2
         version: 2.3.5
@@ -2366,6 +2372,9 @@ packages:
   '@types/bonjour@3.5.13':
     resolution: {integrity: sha512-z9fJ5Im06zvUL548KvYNecEVlA7cVDkGUi6kZusb04mpyEFKCIZJvloCcmpmLaIahDpOQGHaHmG6imtPMmPXGQ==}
 
+  '@types/canvas-confetti@1.9.0':
+    resolution: {integrity: sha512-aBGj/dULrimR1XDZLtG9JwxX1b4HPRF6CX9Yfwh3NvstZEm1ZL7RBnel4keCPSqs1ANRu1u2Aoz9R+VmtjYuTg==}
+
   '@types/connect-history-api-fallback@1.5.4':
     resolution: {integrity: sha512-n6Cr2xS1h4uAulPRdlw6Jl6s1oG8KrVilPN2yUITEs+K48EzMJJ3W1xy8K5eWuFvjp3R74AOIGSmp2UfBJ8HFw==}
 
@@ -3063,6 +3072,9 @@ packages:
 
   caniuse-lite@1.0.30001731:
     resolution: {integrity: sha512-lDdp2/wrOmTRWuoB5DpfNkC0rJDU8DqRa6nYL6HK6sytw70QMopt/NIc/9SM7ylItlBWfACXk0tEn37UWM/+mg==}
+
+  canvas-confetti@1.9.4:
+    resolution: {integrity: sha512-yxQbJkAVrFXWNbTUjPqjF7G+g6pDotOUHGbkZq2NELZUMDpiJ85rIEazVb8GTaAptNW2miJAXbs1BtioA251Pw==}
 
   case-sensitive-paths-webpack-plugin@2.4.0:
     resolution: {integrity: sha512-roIFONhcxog0JSSWbvVAh3OocukmSgpqOH6YpMkCvav/ySIV3JKg4Dc8vYtQjYi/UxpNE36r/9v+VqTQqgkYmw==}
@@ -10776,6 +10788,8 @@ snapshots:
     dependencies:
       '@types/node': 16.18.126
 
+  '@types/canvas-confetti@1.9.0': {}
+
   '@types/connect-history-api-fallback@1.5.4':
     dependencies:
       '@types/express-serve-static-core': 5.0.7
@@ -11646,6 +11660,8 @@ snapshots:
       lodash.uniq: 4.5.0
 
   caniuse-lite@1.0.30001731: {}
+
+  canvas-confetti@1.9.4: {}
 
   case-sensitive-paths-webpack-plugin@2.4.0: {}
 

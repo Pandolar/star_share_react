@@ -11,6 +11,7 @@ import {
 import { motion } from 'framer-motion';
 import { CheckCircle, AlertCircle } from 'lucide-react';
 import { exchangeUserApi } from '../../../../services/userApi';
+import { celebrateSuccess } from '../../../../utils/confetti';
 
 interface CdkRedeemModalProps {
   isOpen: boolean;
@@ -32,6 +33,10 @@ export const CdkRedeemModal: React.FC<CdkRedeemModalProps> = ({ isOpen, onClose,
       setLoading(false);
     }
   }, [isOpen, initialCdk]);
+
+  useEffect(() => {
+    if (status === 'success') celebrateSuccess();
+  }, [status]);
 
   const handleRedeem = async () => {
     const cdk = cdkValue.trim();

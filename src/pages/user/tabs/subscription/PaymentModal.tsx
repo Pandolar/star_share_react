@@ -18,6 +18,7 @@ import { motion } from 'framer-motion';
 import { CheckCircle, AlertCircle, QrCode, ExternalLink, ReceiptText, UserRoundCog, TicketPercent } from 'lucide-react';
 import { orderUserApi, type InvoiceEligibility } from '../../../../services/userApi';
 import { toast } from '../../../../utils/toast';
+import { celebrateSuccess } from '../../../../utils/confetti';
 import { generateQRCodeDataUrl } from './qrCode';
 import { getDurationText, PackageInfo, OrderInfo } from './types';
 import { useWhiteLabel } from '../../../../contexts/WhiteLabelContext';
@@ -102,6 +103,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     checkIntervalRef.current = undefined;
     qrTimerRef.current = undefined;
   };
+
+  useEffect(() => {
+    if (paymentStatus === 'success') celebrateSuccess();
+  }, [paymentStatus]);
 
   checkoutIdRef.current = checkoutId;
 
