@@ -300,6 +300,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const qrCodeValue = activeOrder?.qr_code || activeOrder?.payment_url || '';
   const invoiceProfileAction = getInvoiceProfileAction(eligibility?.reason);
+  const paymentReady = !invoiceSelected || (eligibility?.eligible === true && Boolean(invoiceOrder));
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} size="lg" scrollBehavior="inside" hideCloseButton={paymentStatus === 'success'} classNames={{ base: 'max-h-[92vh] mx-2 sm:mx-0', body: 'py-4 sm:py-6 overflow-y-auto', footer: 'border-t border-divider bg-background sticky bottom-0' }}>
@@ -358,22 +359,24 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
           {activeOrder && (
             <div className="space-y-6">
-              <Card>
-                <CardBody className="space-y-3 p-4">
-                  <div className="flex items-center justify-between"><span className="text-default-500">订单号</span><code className="rounded bg-default-100 px-2 py-1 font-mono text-xs">{activeOrder.order_id}</code></div>
-                  {activePromotion && (
-                    <>
-                      <div className="flex items-center justify-between text-sm"><span className="text-default-500">套餐原价</span><span className="text-default-400 line-through">¥{activePromotion.original_amount}</span></div>
-                      <div className="flex items-center justify-between text-sm"><span className="flex items-center gap-2 text-default-500">优惠码 <Chip size="sm" color="success" variant="flat">{activePromotion.code}</Chip></span><span className="font-medium text-success">-¥{activePromotion.discount_amount}</span></div>
-                    </>
-                  )}
-                  <div className="flex items-center justify-between"><span className="text-default-500">{activeOrder.invoice_requested ? getInvoicePriceLabel(activeOrder.invoice_snapshot?.surcharge_rate || eligibility?.surcharge_rate) : '支付金额'}</span><span className="text-2xl font-bold text-primary">¥{activeOrder.payable_amount || selectedPackage?.price}</span></div>
-                  <div className="flex items-center justify-between"><span className="text-default-500">套餐时长</span><span className="font-medium">{selectedPackage ? getDurationText(selectedPackage.duration) : ''}</span></div>
-                </CardBody>
-              </Card>
+              {paymentReady && (
+                <Card>
+                  <CardBody className="space-y-3 p-4">
+                    <div className="flex items-center justify-between"><span className="text-default-500">订单号</span><code className="rounded bg-default-100 px-2 py-1 font-mono text-xs">{activeOrder.order_id}</code></div>
+                    {activePromotion && (
+                      <>
+                        <div className="flex items-center justify-between text-sm"><span className="text-default-500">套餐原价</span><span className="text-default-400 line-through">¥{activePromotion.original_amount}</span></div>
+                        <div className="flex items-center justify-between text-sm"><span className="flex items-center gap-2 text-default-500">优惠码 <Chip size="sm" color="success" variant="flat">{activePromotion.code}</Chip></span><span className="font-medium text-success">-¥{activePromotion.discount_amount}</span></div>
+                      </>
+                    )}
+                    <div className="flex items-center justify-between"><span className="text-default-500">{activeOrder.invoice_requested ? getInvoicePriceLabel(activeOrder.invoice_snapshot?.surcharge_rate || eligibility?.surcharge_rate) : '支付金额'}</span><span className="text-2xl font-bold text-primary">¥{activeOrder.payable_amount || selectedPackage?.price}</span></div>
+                    <div className="flex items-center justify-between"><span className="text-default-500">套餐时长</span><span className="font-medium">{selectedPackage ? getDurationText(selectedPackage.duration) : ''}</span></div>
+                  </CardBody>
+                </Card>
+              )}
 
               <div className="text-center">
-                {paymentStatus === 'pending' && !qrCodeExpired && (
+                {paymentStatus === 'pending' && !qrCodeExpired && paymentReady && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-center gap-2"><QrCode className="h-5 w-5 text-primary" /><span className="text-base font-medium">{activeOrder.pay_type === 'wxpay' ? '请使用微信扫码支付' : '请扫码支付'}</span></div>
                     <p className="text-sm text-default-500">本次结账 5 分钟内有效，请尽快完成支付</p>
@@ -476,7 +479,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               ) : <span />}
               <div className="ml-auto flex items-center gap-2">
                 <Button variant="light" onPress={handleClose}>取消支付</Button>
-                <Button color="success" onPress={handleManualCheck} isLoading={manualCheckLoading}>我已完成支付</Button>
+                <Button color="success" onPress={handleManualCheck} isLoading={manualCheckLoading} isDisabled={!paymentReady}>我已完成支付</Button>
               </div>
             </div>
           )}
