@@ -20,6 +20,7 @@ import { orderUserApi, type InvoiceEligibility } from '../../../../services/user
 import { toast } from '../../../../utils/toast';
 import { celebrateSuccess } from '../../../../utils/confetti';
 import { generateQRCodeDataUrl } from './qrCode';
+import { getCheckoutRemainingMs } from './checkoutExpiry';
 import { getDurationText, PackageInfo, OrderInfo } from './types';
 import { useWhiteLabel } from '../../../../contexts/WhiteLabelContext';
 import { useNavigate } from 'react-router-dom';
@@ -37,7 +38,6 @@ interface PaymentModalProps {
 }
 
 type PaymentStatus = 'pending' | 'checking' | 'success' | 'failed';
-const CHECKOUT_EXPIRY_MS = 5 * 60 * 1000;
 const getInvoiceUnavailableText = (reason?: string | null) => ({
   invoice_disabled: '开票功能暂未开放',
   below_threshold: '当前套餐金额未达到开票门槛',
@@ -137,10 +137,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       }
     })();
 
-    const expiresAtMs = ordinaryOrder?.expires_at ? new Date(ordinaryOrder.expires_at).getTime() : Number.NaN;
-    const remainingMs = Number.isFinite(expiresAtMs)
-      ? expiresAtMs - Date.now()
-      : Math.max(0, ordinaryOrder?.expires_in_seconds ?? CHECKOUT_EXPIRY_MS / 1000) * 1000;
+    const remainingMs = getCheckoutRemainingMs({
+      expires_at: ordinaryOrder?.expires_at,
+      expires_in_seconds: ordinaryOrder?.expires_in_seconds,
+    });
     if (remainingMs <= 0) {
       setQrCodeExpired(true);
       return cleanup;
