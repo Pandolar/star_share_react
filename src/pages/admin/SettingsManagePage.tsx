@@ -42,6 +42,7 @@ import { WhiteLabelConfigEditor } from './WhiteLabelConfigEditor';
 import { BarkConfigEditor } from './BarkConfigEditor';
 import { DistributorLevelDiscountsEditor } from './DistributorLevelDiscountsEditor';
 import { HomeInfoConfigEditor } from './HomeInfoConfigEditor';
+import { TeamPlanConfigEditor } from './TeamPlanConfigEditor';
 const VISUAL_CONFIG_KEYS: Record<string, true> = {
     SPEEDTEST_URL_LIST: true,
     HOME_INFO: true,
@@ -53,6 +54,7 @@ const VISUAL_CONFIG_KEYS: Record<string, true> = {
     PROMOTION_CODE_CONFIG: true,
     COMPENSATION_CONFIG: true,
     BILL_RULE: true,
+    TEAM_PLAN_CONFIG: true,
 };
 
 /**
@@ -425,6 +427,8 @@ const SettingsManagePage: React.FC = () => {
                     <InvoiceConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} />
                 ) : config.key === 'INVITE_POLICY' ? (
                     <InvitePolicyConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} packages={packageOptions} />
+                ) : config.key === 'TEAM_PLAN_CONFIG' ? (
+                    <TeamPlanConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} packages={packageOptions} />
                 ) : config.key === 'BILL_RULE' ? (
                     <BillRuleConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} legacyType={configValues.BILL_RULE_TYPE || 'fixed'} packageLevels={Array.from(new Set(packageLevels.map((item) => item.level)))} />
                 ) : config.key === 'BILL_RULE_TYPE' ? (

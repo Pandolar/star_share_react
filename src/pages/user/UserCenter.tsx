@@ -12,26 +12,27 @@ import {
   Package,
   FileText,
   MessageCircle,
+  Users,
   Menu,
   X,
   LogOut,
   Home,
   AlertCircle,
 } from 'lucide-react';
-
 // Tab页面组件导入
 import { AnnouncementTab } from './tabs/AnnouncementTab';
 import { ProfileTab } from './tabs/ProfileTab';
 import { SubscriptionTab } from './tabs/SubscriptionTab';
 import { OrderHistoryTab } from './tabs/OrderHistoryTab';
 import { InviteTab } from './tabs/InviteTab';
+import { TeamTab } from './tabs/TeamTab';
 
 // 组件和工具导入
 import { LogoutConfirmModal } from '../../components/LogoutConfirmModal';
 import { ChatwootFloatingButton } from '../../components/chat/ChatwootFloatingButton';
 import { clearAuthCookies, getCookie } from '../../utils/cookies';
 import { useAuthCheck } from '../../hooks/useAuthCheck';
-import { userInfoApi } from '../../services/userApi';
+import { teamUserApi, userInfoApi } from '../../services/userApi';
 import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
 
 // Tab配置接口
@@ -61,6 +62,12 @@ const ALL_TAB_CONFIGS: TabConfig[] = [
     label: '订阅套餐',
     icon: <Package size={20} />,
     component: SubscriptionTab
+  },
+  {
+    key: 'team',
+    label: '团队',
+    icon: <Users size={20} />,
+    component: TeamTab
   },
   {
     key: 'orders',
@@ -99,18 +106,17 @@ const UserCenter: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [emailUnbound, setEmailUnbound] = useState(false);
+  const [teamTabVisible, setTeamTabVisible] = useState(true);
   const navigate = useNavigate();
 
   // 白牌模式：隐藏“邀请好友”“订单记录”Tab（白牌无邀请、无支付即无订单）
   // wlLoading：白牌判定完成前不挂载客服，避免注入并持久残留 Chatwoot SDK。
   const { isWhiteLabel, loading: wlLoading } = useWhiteLabel();
-  const tabConfigs = React.useMemo(
-    () =>
-      isWhiteLabel
-        ? ALL_TAB_CONFIGS.filter(t => t.key !== 'invite' && t.key !== 'orders')
-        : ALL_TAB_CONFIGS,
-    [isWhiteLabel]
-  );
+  const tabConfigs = React.useMemo(() => ALL_TAB_CONFIGS.filter((tab) => {
+    if (isWhiteLabel && (tab.key === 'invite' || tab.key === 'orders')) return false;
+    if (tab.key === 'team' && !teamTabVisible) return false;
+    return true;
+  }), [isWhiteLabel, teamTabVisible]);
 
   // 使用认证检查Hook
   const { isAuthenticated, isChecking, countdown, handleAuthFailure } = useAuthCheck({
@@ -148,6 +154,25 @@ const UserCenter: React.FC = () => {
     return () => { cancelled = true; };
   }, [isAuthenticated]);
 
+  // 关闭新增团队时，仅对无团队且无待处理邀请的用户隐藏团队页签。
+  useEffect(() => {
+    let cancelled = false;
+    if (!isAuthenticated) return;
+    (async () => {
+      try {
+        const resp = await teamUserApi.getTeam();
+        if (cancelled || resp.code !== 20000) return;
+        const hasTeam = Boolean(resp.data?.team);
+        const hasIncomingInvitation = Boolean(resp.data?.invitations?.incoming?.length);
+        setTeamTabVisible(Boolean(resp.data?.plan_config?.enabled) || hasTeam || hasIncomingInvitation);
+      } catch {
+        // 查询失败时保留页签，由 TeamTab 自己展示错误，避免误隐藏存量团队。
+        if (!cancelled) setTeamTabVisible(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isAuthenticated]);
+
   // 一键跳转到绑定邮箱（profile tab，并通过 query 携带 openEdit=email 由 ProfileTab 自动打开弹窗）
   const goBindEmail = () => {
     const params = new URLSearchParams(searchParams);
@@ -165,19 +190,19 @@ const UserCenter: React.FC = () => {
       setActiveTab(urlTab);
       return;
     }
-    // 白牌模式下，如果访问被禁用的 tab（如 invite/orders），重定向到第一个可用 tab
-    if (urlTab && !validKeys.includes(urlTab) && isWhiteLabel) {
+    // 被开关或站点模式隐藏的页签统一回退到首个可用页签。
+    if (urlTab && !validKeys.includes(urlTab)) {
       const params = new URLSearchParams(searchParams);
       params.delete('tab');
       setSearchParams(params);
-      setActiveTab(validKeys[0] || 'usage');
+      setActiveTab(validKeys[0] || 'subscription');
       return;
     }
     // 付费重置配额深链：未指定 tab 时落到”个人主页”（使用额度区块在此）
     if (!urlTab && searchParams.get('action') === 'reset_quota' && activeTab !== 'profile') {
       setActiveTab('profile');
     }
-  }, [searchParams, activeTab, tabConfigs, isWhiteLabel, setSearchParams]);
+  }, [searchParams, activeTab, tabConfigs, setSearchParams]);
 
   // 切换 Tab 并将 tab 写入 URL 查询参数
   const switchTab = (key: string, isMobile = false) => {

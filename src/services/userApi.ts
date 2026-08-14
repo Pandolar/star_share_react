@@ -548,6 +548,57 @@ export const inviteUserApi = {
     },
 };
 
+export interface TeamPlan {
+    package_id: number;
+    min_seats: number;
+    max_seats: number;
+    discount_rate?: number;
+}
+
+export interface TeamMember {
+    id: number;
+    user_id: number;
+    username?: string | null;
+    email?: string | null;
+    role: 'owner' | 'member';
+    status: string;
+    joined_at?: string | null;
+    left_at?: string | null;
+}
+
+export interface TeamInvitation {
+    id: number;
+    team_id: number;
+    team_name?: string | null;
+    inviter_user_id: number;
+    inviter_name?: string | null;
+    invitee_user_id: number;
+    invitee_name?: string | null;
+    status: string;
+    expires_at: string;
+    created_at?: string;
+}
+
+export interface TeamOverview {
+    team: ({ id: number; team_name: string; owner_user_id: number; package_id: number; seat_count: number; status: string; starts_at?: string | null; expires_at?: string | null; pending_package_id?: number | null; pending_seat_count?: number | null; pending_effective_at?: string | null; is_owner: boolean } | null);
+    members: TeamMember[];
+    invitations: { incoming: TeamInvitation[]; outgoing: TeamInvitation[] };
+    plan_config: { enabled: boolean; min_seats: number; max_seats: number; plans: TeamPlan[] };
+}
+
+export const teamUserApi = {
+    getTeam: async (): Promise<ApiResponse<TeamOverview>> => createUserRequest(getUserApiUrl('/u/team'), { method: 'GET' }),
+    createOrder: async (params: { action: 'initial' | 'change' | 'renewal'; package_id: number; seat_count: number; team_name?: string }): Promise<ApiResponse<{ checkout_id?: string; payment_url?: string | null; order?: { id?: number; order_id?: string; checkout_id?: string; payment_url?: string | null }; team?: TeamOverview['team'] }>> => createUserRequest(getUserApiUrl('/u/team/order'), { method: 'POST', body: JSON.stringify(params) }),
+    invite: async (params: { email: string }): Promise<ApiResponse<TeamInvitation>> => createUserRequest(getUserApiUrl('/u/team/invitations'), { method: 'POST', body: JSON.stringify(params) }),
+    acceptInvitation: async (invitationId: number): Promise<ApiResponse<unknown>> => createUserRequest(getUserApiUrl(`/u/team/invitations/${invitationId}/accept`), { method: 'POST' }),
+    rejectInvitation: async (invitationId: number): Promise<ApiResponse<unknown>> => createUserRequest(getUserApiUrl(`/u/team/invitations/${invitationId}/reject`), { method: 'POST' }),
+    revokeInvitation: async (invitationId: number): Promise<ApiResponse<unknown>> => createUserRequest(getUserApiUrl(`/u/team/invitations/${invitationId}/revoke`), { method: 'POST' }),
+    leave: async (): Promise<ApiResponse<unknown>> => createUserRequest(getUserApiUrl('/u/team/leave'), { method: 'POST' }),
+    suspendMember: async (memberId: number): Promise<ApiResponse<unknown>> => createUserRequest(getUserApiUrl(`/u/team/members/${memberId}/suspend`), { method: 'POST' }),
+    resumeMember: async (memberId: number): Promise<ApiResponse<unknown>> => createUserRequest(getUserApiUrl(`/u/team/members/${memberId}/resume`), { method: 'POST' }),
+    removeMember: async (memberId: number): Promise<ApiResponse<unknown>> => createUserRequest(getUserApiUrl(`/u/team/members/${memberId}/remove`), { method: 'POST' }),
+};
+
 // 额度使用详情类型
 export interface LimitUsageItem {
     scope: 'model' | 'group' | 'default';
@@ -589,6 +640,7 @@ const userApi = {
     order: orderUserApi,
     exchange: exchangeUserApi,
     invite: inviteUserApi,
+    team: teamUserApi,
     limitUsage: limitUsageApi,
 };
 
