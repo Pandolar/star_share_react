@@ -18,9 +18,8 @@ interface WhiteLabelState {
     enableRegister: boolean;
     enableWechatLogin: boolean;
     enablePromotionCode: boolean;
-    purchaseUrl: string;
-    customerServiceUrl: string;
     subscriptionNotice: string;
+    userAgreementUrl: string;
 }
 
 const defaultState: WhiteLabelState = {
@@ -31,9 +30,8 @@ const defaultState: WhiteLabelState = {
     enableRegister: true,
     enableWechatLogin: false,
     enablePromotionCode: false,
-    purchaseUrl: '',
-    customerServiceUrl: '',
     subscriptionNotice: '',
+    userAgreementUrl: '',
 };
 
 const WhiteLabelContext = createContext<WhiteLabelState>(defaultState);
@@ -76,9 +74,8 @@ export const WhiteLabelProvider: React.FC<WhiteLabelProviderProps> = ({ children
                         enableRegister: res.data.enable_register !== false,
                         enableWechatLogin: res.data.enable_wechat_login === true,
                         enablePromotionCode: res.data.enable_promotion_code === true,
-                        purchaseUrl: res.data.purchase_url || '',
-                        customerServiceUrl: res.data.customer_service_url || '',
                         subscriptionNotice: res.data.subscription_notice || '',
+                        userAgreementUrl: isWL ? '' : (res.data.user_agreement_url || ''),
                     });
                     return;
                 }

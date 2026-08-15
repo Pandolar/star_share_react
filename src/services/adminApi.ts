@@ -598,7 +598,6 @@ class AdminApiService {
         can_login?: boolean;
         can_generate_cdk?: boolean;
         can_edit_notice?: boolean;
-        can_edit_links?: boolean;
     }): Promise<AdminApiResponse> {
         const response = await this.api.post('/star/distributors', data);
         return response.data;
@@ -620,7 +619,6 @@ class AdminApiService {
         can_login?: boolean;
         can_generate_cdk?: boolean;
         can_edit_notice?: boolean;
-        can_edit_links?: boolean;
     }): Promise<AdminApiResponse> {
         const response = await this.api.put('/star/distributors', data);
         return response.data;

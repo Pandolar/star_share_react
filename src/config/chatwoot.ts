@@ -4,8 +4,8 @@
  */
 
 // 默认配置（降级使用）
-let chatwootBaseUrl = 'https://chatwoot.foxaigc.com';
-let chatwootWebsiteToken = 'ZRAa6tfs39gTE5Mn3R3KDHVj';
+let chatwootBaseUrl = '';
+let chatwootWebsiteToken = '';
 let configLoaded = false;
 
 /**

@@ -14,6 +14,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { PaymentModal } from './subscription/PaymentModal';
 import { CdkRedeemModal } from './subscription/CdkRedeemModal';
+import { UserAgreementConsent, useUserAgreementRequirement } from '../../../components/UserAgreementConsent';
 import {
   PackageInfo,
   OrderInfo,
@@ -37,9 +38,11 @@ export const SubscriptionTab: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<SubscriptionType>('yearly');
   const [showSubscriptionGuide, setShowSubscriptionGuide] = useState(false);
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
+  const [agreementAccepted, setAgreementAccepted] = useState(true);
 
   const isMobileDevice = useIsMobile();
-  const { isWhiteLabel, loading: whiteLabelLoading, purchaseUrl, subscriptionNotice } = useWhiteLabel();
+  const { isWhiteLabel, loading: whiteLabelLoading, subscriptionNotice } = useWhiteLabel();
+  const { isRequired: isAgreementRequired } = useUserAgreementRequirement();
 
   const [cdkCode, setCdkCode] = useState('');
 
@@ -107,6 +110,10 @@ export const SubscriptionTab: React.FC = () => {
 
   // 创建订单
   const createOrder = async (pkg: PackageInfo) => {
+    if (isAgreementRequired && !agreementAccepted) {
+      toast.warning('请先勾选同意《用户协议》');
+      return;
+    }
     try {
       setOrderLoading(true);
       setSelectedPackage(pkg);
@@ -129,6 +136,7 @@ export const SubscriptionTab: React.FC = () => {
   };
 
   const createInvoiceOrder = async () => {
+    if (isAgreementRequired && !agreementAccepted) return null;
     if (!selectedPackage || !ordinaryOrder?.checkout_id || invoiceOrder) return null;
     setOrderLoading(true);
     try {
@@ -153,6 +161,7 @@ export const SubscriptionTab: React.FC = () => {
   };
 
   const applyPromotionCode = async (promotionCode: string) => {
+    if (isAgreementRequired && !agreementAccepted) return null;
     if (!selectedPackage) return null;
     setOrderLoading(true);
     try {
@@ -381,19 +390,6 @@ export const SubscriptionTab: React.FC = () => {
                 兑换
               </Button>
             </div>
-            {purchaseUrl && (
-              <div className="mt-4 pt-4 border-t border-default-100">
-                <Button
-                  color="primary"
-                  variant="flat"
-                  size="sm"
-                  onPress={() => window.open(purchaseUrl, '_blank')}
-                  className="w-full sm:w-auto"
-                >
-                  购买激活码
-                </Button>
-              </div>
-            )}
           </CardBody>
         </Card>
       )}
@@ -452,6 +448,11 @@ export const SubscriptionTab: React.FC = () => {
           )}
         </CardBody>
       </Card>
+      )}
+      {!isWhiteLabel && (
+        <div className="mb-5 flex justify-end px-1">
+          <UserAgreementConsent isSelected={agreementAccepted} onValueChange={setAgreementAccepted} />
+        </div>
       )}
 
       {loading && (
@@ -588,7 +589,7 @@ export const SubscriptionTab: React.FC = () => {
                         ) : (
                           <button
                             className={`hero-button ${isPopular ? 'primary' : 'secondary'}`}
-                            disabled={pkg.status !== 1 || (orderLoading && selectedPackage?.id === pkg.id)}
+                            disabled={pkg.status !== 1 || (isAgreementRequired && !agreementAccepted) || (orderLoading && selectedPackage?.id === pkg.id)}
                             onClick={() => createOrder(pkg)}
                           >
                             {orderLoading && selectedPackage?.id === pkg.id ? (
@@ -681,7 +682,7 @@ export const SubscriptionTab: React.FC = () => {
                       ) : (
                         <button
                           className="hero-button primary"
-                          disabled={pkg.status !== 1 || (orderLoading && selectedPackage?.id === pkg.id)}
+                          disabled={pkg.status !== 1 || (isAgreementRequired && !agreementAccepted) || (orderLoading && selectedPackage?.id === pkg.id)}
                           onClick={() => createOrder(pkg)}
                           style={{ height: '40px', fontSize: '14px' }}
                         >
@@ -709,7 +710,7 @@ export const SubscriptionTab: React.FC = () => {
         <div className="text-center py-16">
           <Package className="w-16 h-16 mx-auto mb-4 text-default-300" />
           <h3 className="text-xl font-semibold text-default-600 mb-2">暂无可用套餐</h3>
-          <p className="text-default-400">请稍后再试或联系客服</p>
+          <p className="text-default-400">请稍后再试</p>
         </div>
       )}
 

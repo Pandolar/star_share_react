@@ -11,8 +11,8 @@ import { useAutoLogin } from '../../hooks/useAutoLogin';
 import { useRedirect } from '../../hooks/useRedirect';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
+import { UserAgreementConsent, useUserAgreementRequirement } from '../../components/UserAgreementConsent';
 
-const USER_AGREEMENT_URL = 'https://r7r3bw489x.feishu.cn/wiki/Mq7FwBuhdiNH12kmqFvc4W0onqg';
 
 const LoginPage: React.FC = () => {
   // 邮箱登录相关状态
@@ -58,13 +58,14 @@ const LoginPage: React.FC = () => {
   const [loginMethod, setLoginMethod] = useState<'wechat' | 'email'>('email');
   // 白牌或全局开关关闭时隐藏微信登录，仅保留邮箱登录
   const { isWhiteLabel, enableRegister, enableWechatLogin } = useWhiteLabel();
+  const { isRequired: isAgreementRequired } = useUserAgreementRequirement();
   const showWechatLogin = !isWhiteLabel && enableWechatLogin;
   // 切到微信 Tab 后是否已确认继续使用（用于在显示二维码前先弹推荐邮箱登录的提示）
   const [wechatConfirmed, setWechatConfirmed] = useState(false);
 
   // 获取微信二维码
   const fetchWechatQR = async () => {
-    if (!hasAgreedUserAgreement) {
+    if (isAgreementRequired && !hasAgreedUserAgreement) {
       toast.warning('请先勾选同意《用户协议》');
       return;
     }
@@ -303,7 +304,7 @@ const LoginPage: React.FC = () => {
   // 处理邮箱登录
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!hasAgreedUserAgreement) {
+    if (isAgreementRequired && !hasAgreedUserAgreement) {
       toast.warning('请先勾选同意《用户协议》');
       return;
     }
@@ -480,7 +481,7 @@ const LoginPage: React.FC = () => {
 
   // 如果用户取消勾选协议，停止二维码轮询并清空二维码状态
   useEffect(() => {
-    if (hasAgreedUserAgreement) return;
+    if (!isAgreementRequired || hasAgreedUserAgreement) return;
 
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
@@ -497,7 +498,7 @@ const LoginPage: React.FC = () => {
     setQrStatus('loading');
     setWechatTempToken('');
     setIsWechatBinding(false);
-  }, [hasAgreedUserAgreement]);
+  }, [hasAgreedUserAgreement, isAgreementRequired]);
 
   // 当登录方式切换时不需要清理二维码状态
 
@@ -595,7 +596,7 @@ const LoginPage: React.FC = () => {
                 </div>
 
                 <div className="relative">
-                  {!hasAgreedUserAgreement ? (
+                  {isAgreementRequired && !hasAgreedUserAgreement ? (
                     <div className="w-48 h-48 flex items-center justify-center bg-default-50 border-2 border-dashed border-default-300 rounded-lg">
                       <div className="text-center px-4">
                         <p className="text-sm text-default-600">请先勾选同意《用户协议》</p>
@@ -649,7 +650,7 @@ const LoginPage: React.FC = () => {
                           color="primary"
                           variant="light"
                           onClick={refreshQRCode}
-                          disabled={isLoadingQR || !hasAgreedUserAgreement}
+                          disabled={isLoadingQR || (isAgreementRequired && !hasAgreedUserAgreement)}
                         >
                           {isLoadingQR ? <Spinner size="sm" /> : '刷新二维码'}
                         </Button>
@@ -669,35 +670,14 @@ const LoginPage: React.FC = () => {
                     color="primary"
                     variant="light"
                     onClick={refreshQRCode}
-                    disabled={isLoadingQR || qrStatus === 'loading' || !hasAgreedUserAgreement}
+                    disabled={isLoadingQR || qrStatus === 'loading' || (isAgreementRequired && !hasAgreedUserAgreement)}
                     className="text-xs"
                   >
                     {isLoadingQR ? <Spinner size="sm" /> : '刷新二维码'}
                   </Button>
                 </div>
 
-                <div className="w-full flex items-start gap-2 text-sm text-default-600">
-                  <input
-                    id="login-user-agreement-wechat"
-                    type="checkbox"
-                    checked={hasAgreedUserAgreement}
-                    onChange={(e) => setHasAgreedUserAgreement(e.target.checked)}
-                    className="mt-1 h-4 w-4 rounded border-default-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  <div className="leading-5">
-                    <label htmlFor="login-user-agreement-wechat" className="select-none">
-                      登录即代表同意
-                    </label>
-                    <a
-                      href={USER_AGREEMENT_URL}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="ml-1 text-primary-700 hover:text-primary-600 underline underline-offset-2"
-                    >
-                      《用户协议》
-                    </a>
-                  </div>
-                </div>
+                <UserAgreementConsent isSelected={hasAgreedUserAgreement} onValueChange={setHasAgreedUserAgreement} className="w-full" />
               </CardBody>
             </Card>
           )}
@@ -741,33 +721,12 @@ const LoginPage: React.FC = () => {
                       }
                     />
                   </div>
-                  <div className="flex items-start gap-2 text-sm text-default-600">
-                    <input
-                      id="login-user-agreement-email"
-                      type="checkbox"
-                      checked={hasAgreedUserAgreement}
-                      onChange={(e) => setHasAgreedUserAgreement(e.target.checked)}
-                      className="mt-1 h-4 w-4 rounded border-default-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    <div className="leading-5">
-                      <label htmlFor="login-user-agreement-email" className="select-none">
-                        登录即代表同意
-                      </label>
-                      <a
-                        href={USER_AGREEMENT_URL}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        className="ml-1 text-primary-700 hover:text-primary-600 underline underline-offset-2"
-                      >
-                        《用户协议》
-                      </a>
-                    </div>
-                  </div>
+                  <UserAgreementConsent isSelected={hasAgreedUserAgreement} onValueChange={setHasAgreedUserAgreement} />
                   <Button
                     type="submit"
                     color="primary"
                     fullWidth
-                    disabled={isLoggingIn || !hasAgreedUserAgreement}
+                    disabled={isLoggingIn || (isAgreementRequired && !hasAgreedUserAgreement)}
                     className="!mt-6"
                   >
                     {isLoggingIn ? <Spinner size="sm" color="white" /> : '登录'}

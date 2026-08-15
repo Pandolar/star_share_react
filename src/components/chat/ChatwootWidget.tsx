@@ -76,6 +76,7 @@ const loadChatwootSDK = async (): Promise<void> => {
   // 先加载配置
   await loadChatwootConfig();
   const baseUrl = getChatwootBaseUrl();
+  if (!baseUrl) throw new Error('Chatwoot 配置不可用');
 
   return new Promise((resolve, reject) => {
     // 如果 SDK 已经加载
@@ -130,6 +131,10 @@ const initChatwootSDK = (): Promise<void> => {
     // 获取动态配置
     const websiteToken = getChatwootWebsiteToken();
     const baseUrl = getChatwootBaseUrl();
+    if (!websiteToken || !baseUrl) {
+      resolve();
+      return;
+    }
 
     // 运行 SDK
     if (window.chatwootSDK?.run) {

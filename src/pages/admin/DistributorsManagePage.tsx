@@ -16,7 +16,6 @@ import {
     DropdownTrigger,
     Form,
     Input,
-    Link,
     Modal,
     ModalBody,
     ModalContent,
@@ -62,7 +61,7 @@ import dayjs from 'dayjs';
 import adminApiService from '../../services/adminApi';
 import { showToast } from '../../components/Toast';
 
-type PermissionKey = 'can_login' | 'can_generate_cdk' | 'can_edit_notice' | 'can_edit_links';
+type PermissionKey = 'can_login' | 'can_generate_cdk' | 'can_edit_notice';
 
 interface DiscountConfig {
     overall?: number;
@@ -77,8 +76,6 @@ interface Distributor {
     domains_parsed?: string[];
     notice?: string;
     notice_id?: string;
-    purchase_url?: string;
-    customer_service_url?: string;
     remarks?: string;
     balance?: number;
     level?: number;
@@ -88,7 +85,6 @@ interface Distributor {
     can_login?: boolean;
     can_generate_cdk?: boolean;
     can_edit_notice?: boolean;
-    can_edit_links?: boolean;
     discount_config?: DiscountConfig;
     created_at?: string;
     updated_at?: string;
@@ -107,7 +103,6 @@ interface DistributorFormState {
     can_login: boolean;
     can_generate_cdk: boolean;
     can_edit_notice: boolean;
-    can_edit_links: boolean;
 }
 
 interface BalanceLog {
@@ -139,13 +134,11 @@ const DEFAULT_FORM: DistributorFormState = {
     can_login: true,
     can_generate_cdk: true,
     can_edit_notice: true,
-    can_edit_links: true,
 };
 const PERMISSIONS: Array<{ key: PermissionKey; label: string; description: string }> = [
     { key: 'can_login', label: '登录分销商后台', description: '关闭后立即终止所有设备会话，并阻止后续登录。' },
     { key: 'can_generate_cdk', label: '余额生成卡密', description: '允许按最终折后价扣减余额并生成当前账号名下的卡密。' },
     { key: 'can_edit_notice', label: '修改站点公告', description: '允许分销商在后台修改其绑定域名显示的公告。' },
-    { key: 'can_edit_links', label: '修改购买/客服链接', description: '允许修改白牌访问端的购买入口和客服入口。' },
 ];
 
 const normalizeDomain = (value: string) => {
@@ -305,7 +298,6 @@ const DistributorsManagePage: React.FC = () => {
             can_login: distributor.can_login !== false,
             can_generate_cdk: distributor.can_generate_cdk !== false,
             can_edit_notice: distributor.can_edit_notice !== false,
-            can_edit_links: distributor.can_edit_links !== false,
         });
         editModal.onOpen();
     };
@@ -382,7 +374,6 @@ const DistributorsManagePage: React.FC = () => {
                 can_login: formData.can_login,
                 can_generate_cdk: formData.can_generate_cdk,
                 can_edit_notice: formData.can_edit_notice,
-                can_edit_links: formData.can_edit_links,
             });
             if (response.code === 20000) {
                 createModal.onClose();
@@ -417,7 +408,6 @@ const DistributorsManagePage: React.FC = () => {
                 can_login: formData.can_login,
                 can_generate_cdk: formData.can_generate_cdk,
                 can_edit_notice: formData.can_edit_notice,
-                can_edit_links: formData.can_edit_links,
             });
             if (response.code === 20000) {
                 editModal.onClose();
@@ -972,7 +962,6 @@ const DistributorsManagePage: React.FC = () => {
                             <Tab key="site" title="域名与内容"><div className="space-y-4 py-3">
                                 <div><p className="mb-2 text-sm text-default-500">绑定域名</p><div className="flex flex-wrap gap-2">{parseStoredDomains(selectedDistributor).length === 0 ? <Chip variant="flat">未绑定</Chip> : parseStoredDomains(selectedDistributor).map((domain) => <Chip key={domain} color="primary" variant="flat" startContent={<Globe className="h-3 w-3" />}>{domain}</Chip>)}</div></div>
                                 <Card shadow="none"><CardBody><p className="text-sm text-default-500">公告</p><p className="mt-2 whitespace-pre-wrap">{selectedDistributor.notice || '-'}</p></CardBody></Card>
-                                <div className="grid gap-3 sm:grid-cols-2"><Card shadow="none"><CardBody><p className="text-sm text-default-500">购买链接</p>{selectedDistributor.purchase_url ? <Link href={selectedDistributor.purchase_url} isExternal showAnchorIcon className="mt-2 break-all">{selectedDistributor.purchase_url}</Link> : <p className="mt-2">-</p>}</CardBody></Card><Card shadow="none"><CardBody><p className="text-sm text-default-500">客服链接</p>{selectedDistributor.customer_service_url ? <Link href={selectedDistributor.customer_service_url} isExternal showAnchorIcon className="mt-2 break-all">{selectedDistributor.customer_service_url}</Link> : <p className="mt-2">-</p>}</CardBody></Card></div>
                             </div></Tab>
                             <Tab key="permissions" title="权限"><div className="space-y-3 py-3">{PERMISSIONS.map(({ key, label, description }) => <Alert key={key} isVisible color={selectedDistributor[key] !== false ? 'success' : 'default'} title={`${label}：${selectedDistributor[key] !== false ? '已开通' : '未开通'}`} description={description} />)}</div></Tab>
                             <Tab key="notes" title="备注"><Card className="my-3" shadow="none"><CardBody><p className="whitespace-pre-wrap">{selectedDistributor.remarks || '无管理员备注'}</p></CardBody></Card></Tab>

@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-
 import { HelmetProvider } from 'react-helmet-async';
 import ErrorBoundary from './components/ErrorBoundary';
 import { lazyWithRetry } from './utils/lazyWithRetry';
-import { WhiteLabelProvider } from './contexts/WhiteLabelContext';
+import { WhiteLabelProvider, useWhiteLabel } from './contexts/WhiteLabelContext';
 
 const HomePage = lazyWithRetry(() => import('./pages/HomePage'), 'HomePage');
 const UserCenter = lazyWithRetry(() => import('./pages/user/UserCenter'), 'UserCenter');
@@ -40,6 +40,13 @@ const RouteLoadingFallback: React.FC = () => (
     页面加载中...
   </div>
 );
+
+const SelfSiteOnly: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isWhiteLabel, loading } = useWhiteLabel();
+  if (loading) return <RouteLoadingFallback />;
+  if (isWhiteLabel) return <Navigate to="/user-center" replace />;
+  return <>{children}</>;
+};
 
 const AdminRouteShell: React.FC = () => (
   <AdminProtectedRoute>
@@ -82,12 +89,12 @@ const App: React.FC = () => {
               <Route path="/user-center" element={<UserCenter />} />
 
               {/* 其他功能路由 */}
-              <Route path="/handle_callback" element={<RedirectPage />} />
-              <Route path="/goplus" element={<GoPlusPage />} />
-              <Route path="/sharespeedtest" element={<ShareSpeedTestPage />} />
-              <Route path="/jumpns" element={<JumpNsPage />} />
-              <Route path="/new-api" element={<NewApiPage />} />
-              <Route path="/customer-service" element={<CustomerServicePage />} />
+              <Route path="/handle_callback" element={<SelfSiteOnly><RedirectPage /></SelfSiteOnly>} />
+              <Route path="/goplus" element={<SelfSiteOnly><GoPlusPage /></SelfSiteOnly>} />
+              <Route path="/sharespeedtest" element={<SelfSiteOnly><ShareSpeedTestPage /></SelfSiteOnly>} />
+              <Route path="/jumpns" element={<SelfSiteOnly><JumpNsPage /></SelfSiteOnly>} />
+              <Route path="/new-api" element={<SelfSiteOnly><NewApiPage /></SelfSiteOnly>} />
+              <Route path="/customer-service" element={<SelfSiteOnly><CustomerServicePage /></SelfSiteOnly>} />
 
               {/* 分销商路由（结构对齐 /star-admin/：登录页独立，其余在 /distributor 受保护壳下） */}
               <Route path="/distributor/login" element={<DistributorLoginPage />} />

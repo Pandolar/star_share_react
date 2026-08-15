@@ -17,6 +17,7 @@ import { resetQuotaApi, orderUserApi } from '../services/userApi';
 import { toast } from '../utils/toast';
 import { generateQRCodeDataUrl } from '../pages/user/tabs/subscription/qrCode';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { UserAgreementConsent, useUserAgreementRequirement } from './UserAgreementConsent';
 
 interface OrderInfo {
   order_id: string;
@@ -33,11 +34,11 @@ interface ResetQuotaModalProps {
   onSuccess?: () => void;
 }
 
-type PaymentStatus = 'loading' | 'pending' | 'checking' | 'success' | 'failed';
+type PaymentStatus = 'confirming' | 'loading' | 'pending' | 'checking' | 'success' | 'failed';
 
 /**
  * 付费重置配额支付弹窗。
- * 打开即创建重置订单，展示二维码并轮询支付状态；支付成功后服务端会清空该用户本周期配额。
+ * 先确认金额与用户协议，再创建订单并轮询支付状态。
  */
 export const ResetQuotaModal: React.FC<ResetQuotaModalProps> = ({
   isOpen,
@@ -46,11 +47,13 @@ export const ResetQuotaModal: React.FC<ResetQuotaModalProps> = ({
   onSuccess,
 }) => {
   const isMobileDevice = useIsMobile();
-  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('loading');
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('confirming');
   const [orderInfo, setOrderInfo] = useState<OrderInfo | null>(null);
   const [qrCodeExpired, setQrCodeExpired] = useState(false);
   const [manualCheckLoading, setManualCheckLoading] = useState(false);
   const [createError, setCreateError] = useState('');
+  const [agreementAccepted, setAgreementAccepted] = useState(true);
+  const { isRequired: isAgreementRequired } = useUserAgreementRequirement();
 
   const checkIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const qrTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -75,44 +78,41 @@ export const ResetQuotaModal: React.FC<ResetQuotaModalProps> = ({
     }, 1800);
   };
 
-  // 打开弹窗时创建订单
   useEffect(() => {
     if (!isOpen) return;
-    let cancelled = false;
+    setPaymentStatus('confirming');
+    setOrderInfo(null);
+    setQrCodeExpired(false);
+    setCreateError('');
+    setAgreementAccepted(true);
+  }, [isOpen]);
 
-    const create = async () => {
-      setPaymentStatus('loading');
-      setOrderInfo(null);
-      setQrCodeExpired(false);
-      setCreateError('');
-      try {
-        const isAndroid = /android/i.test(navigator.userAgent);
-        const requestData = isMobileDevice ? { device: 'mobile' } : {};
-        const response = await resetQuotaApi.createOrder(requestData);
-        if (cancelled) return;
-        if (response.code === 20000 && response.data?.order_id) {
-          setOrderInfo(response.data);
-          setPaymentStatus('pending');
-          if (isAndroid && response.data.payment_url) {
-            window.open(response.data.payment_url, '_blank');
-          }
-        } else {
-          setCreateError(response.msg || '创建订单失败');
-          setPaymentStatus('failed');
-        }
-      } catch (err) {
-        if (cancelled) return;
-        setCreateError(err instanceof Error ? err.message : '网络错误');
+  const createResetOrder = async () => {
+    if (isAgreementRequired && !agreementAccepted) {
+      toast.warning('请先勾选同意《用户协议》');
+      return;
+    }
+    setPaymentStatus('loading');
+    setOrderInfo(null);
+    setQrCodeExpired(false);
+    setCreateError('');
+    try {
+      const isAndroid = /android/i.test(navigator.userAgent);
+      const requestData = isMobileDevice ? { device: 'mobile' } : {};
+      const response = await resetQuotaApi.createOrder(requestData);
+      if (response.code === 20000 && response.data?.order_id) {
+        setOrderInfo(response.data);
+        setPaymentStatus('pending');
+        if (isAndroid && response.data.payment_url) window.open(response.data.payment_url, '_blank');
+      } else {
+        setCreateError(response.msg || '创建订单失败');
         setPaymentStatus('failed');
       }
-    };
-
-    create();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+    } catch (requestError) {
+      setCreateError(requestError instanceof Error ? requestError.message : '网络错误');
+      setPaymentStatus('failed');
+    }
+  };
 
   // 拿到订单后开始轮询 + 二维码过期计时
   useEffect(() => {
@@ -227,6 +227,12 @@ export const ResetQuotaModal: React.FC<ResetQuotaModalProps> = ({
 
             {/* 支付区域 */}
             <div className="text-center">
+              {paymentStatus === 'confirming' && (
+                <div className="mx-auto max-w-sm space-y-3 py-4 text-left">
+                  <p className="text-sm leading-6 text-default-500">确认金额后继续，下一步将生成 5 分钟有效的支付二维码。</p>
+                  <UserAgreementConsent isSelected={agreementAccepted} onValueChange={setAgreementAccepted} />
+                </div>
+              )}
               {paymentStatus === 'loading' && (
                 <div className="space-y-4 py-6">
                   <Spinner size="lg" color="primary" />
@@ -334,6 +340,12 @@ export const ResetQuotaModal: React.FC<ResetQuotaModalProps> = ({
         </ModalBody>
 
         <ModalFooter>
+          {paymentStatus === 'confirming' && (
+            <div className="flex w-full items-center justify-end gap-2">
+              <Button variant="light" onPress={handleClose}>取消</Button>
+              <Button color="warning" isDisabled={isAgreementRequired && !agreementAccepted} onPress={() => void createResetOrder()}>继续支付</Button>
+            </div>
+          )}
           {paymentStatus === 'pending' && !qrCodeExpired && (
             <div className="flex w-full justify-between items-center">
               <Button color="default" variant="light" onPress={handleClose}>

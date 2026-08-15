@@ -140,8 +140,9 @@ export const ProfileTab: React.FC = () => {
   useEffect(() => {
     if (whiteLabelLoading) return;
     fetchUserInfo();
-    fetchCompensations();
-  }, [whiteLabelLoading]);
+    if (isWhiteLabel) setCompensations([]);
+    else void fetchCompensations();
+  }, [isWhiteLabel, whiteLabelLoading]);
 
   const openEditModal = (tab: EditTabKey = 'username') => setEditModal({ open: true, tab });
   const closeEditModal = () => setEditModal((s) => ({ ...s, open: false }));
@@ -282,7 +283,7 @@ export const ProfileTab: React.FC = () => {
                         <span>邀请人：{userInfo.inviter_user}</span>
                       </div>
                     )}
-                    {userInfo.wechat_openid && (
+                    {!isWhiteLabel && userInfo.wechat_openid && (
                       <div className="flex items-center gap-2 text-default-600">
                         <MessageCircle size={16} />
                         <span>微信：<span className="text-success">已绑定微信</span></span>

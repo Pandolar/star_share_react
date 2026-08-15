@@ -18,6 +18,7 @@ import {
   LogOut,
   Home,
   AlertCircle,
+  Building2,
 } from 'lucide-react';
 // Tab页面组件导入
 import { AnnouncementTab } from './tabs/AnnouncementTab';
@@ -26,13 +27,14 @@ import { SubscriptionTab } from './tabs/SubscriptionTab';
 import { OrderHistoryTab } from './tabs/OrderHistoryTab';
 import { InviteTab } from './tabs/InviteTab';
 import { TeamTab } from './tabs/TeamTab';
+import { AboutUsTab } from './tabs/AboutUsTab';
 
 // 组件和工具导入
 import { LogoutConfirmModal } from '../../components/LogoutConfirmModal';
 import { ChatwootFloatingButton } from '../../components/chat/ChatwootFloatingButton';
 import { clearAuthCookies, getCookie } from '../../utils/cookies';
 import { useAuthCheck } from '../../hooks/useAuthCheck';
-import { teamUserApi, userInfoApi } from '../../services/userApi';
+import { announcementApi, teamUserApi, userInfoApi } from '../../services/userApi';
 import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
 
 // Tab配置接口
@@ -81,6 +83,12 @@ const ALL_TAB_CONFIGS: TabConfig[] = [
     icon: <MessageCircle size={20} />,
     component: InviteTab
   },
+  {
+    key: 'about',
+    label: '关于我们',
+    icon: <Building2 size={20} />,
+    component: AboutUsTab
+  },
 ];
 
 const UserCenter: React.FC = () => {
@@ -107,16 +115,19 @@ const UserCenter: React.FC = () => {
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [emailUnbound, setEmailUnbound] = useState(false);
   const [teamTabVisible, setTeamTabVisible] = useState(true);
+  const [aboutVisible, setAboutVisible] = useState(false);
+  const [aboutVisibilityResolved, setAboutVisibilityResolved] = useState(false);
   const navigate = useNavigate();
 
-  // 白牌模式：隐藏“邀请好友”“订单记录”Tab（白牌无邀请、无支付即无订单）
+  // 白牌模式只保留公告、基础资料和无价格套餐兑换目录。
   // wlLoading：白牌判定完成前不挂载客服，避免注入并持久残留 Chatwoot SDK。
   const { isWhiteLabel, loading: wlLoading } = useWhiteLabel();
   const tabConfigs = React.useMemo(() => ALL_TAB_CONFIGS.filter((tab) => {
-    if (isWhiteLabel && (tab.key === 'invite' || tab.key === 'orders')) return false;
+    if (isWhiteLabel && (tab.key === 'invite' || tab.key === 'orders' || tab.key === 'about' || tab.key === 'team')) return false;
     if (tab.key === 'team' && !teamTabVisible) return false;
+    if (tab.key === 'about' && !aboutVisible) return false;
     return true;
-  }), [isWhiteLabel, teamTabVisible]);
+  }), [aboutVisible, isWhiteLabel, teamTabVisible]);
 
   // 使用认证检查Hook
   const { isAuthenticated, isChecking, countdown, handleAuthFailure } = useAuthCheck({
@@ -157,7 +168,11 @@ const UserCenter: React.FC = () => {
   // 关闭新增团队时，仅对无团队且无待处理邀请的用户隐藏团队页签。
   useEffect(() => {
     let cancelled = false;
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || wlLoading) return;
+    if (isWhiteLabel) {
+      setTeamTabVisible(false);
+      return;
+    }
     (async () => {
       try {
         const resp = await teamUserApi.getTeam();
@@ -171,7 +186,33 @@ const UserCenter: React.FC = () => {
       }
     })();
     return () => { cancelled = true; };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isWhiteLabel, wlLoading]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!isAuthenticated || wlLoading) {
+      setAboutVisible(false);
+      setAboutVisibilityResolved(false);
+      return;
+    }
+    if (isWhiteLabel) {
+      setAboutVisible(false);
+      setAboutVisibilityResolved(true);
+      return;
+    }
+    setAboutVisibilityResolved(false);
+    announcementApi.getPublicInfo()
+      .then((response) => {
+        if (!cancelled) setAboutVisible(response.code === 20000 && response.data?.about_enabled === true);
+      })
+      .catch(() => {
+        if (!cancelled) setAboutVisible(false);
+      })
+      .finally(() => {
+        if (!cancelled) setAboutVisibilityResolved(true);
+      });
+    return () => { cancelled = true; };
+  }, [isAuthenticated, isWhiteLabel, wlLoading]);
 
   // 一键跳转到绑定邮箱（profile tab，并通过 query 携带 openEdit=email 由 ProfileTab 自动打开弹窗）
   const goBindEmail = () => {
@@ -185,6 +226,7 @@ const UserCenter: React.FC = () => {
   // 根据 URL 查询参数同步激活的 Tab（支持 ?tab=subscription 等）
   useEffect(() => {
     const urlTab = searchParams.get('tab');
+    if (urlTab === 'about' && !aboutVisibilityResolved) return;
     const validKeys = tabConfigs.map(t => t.key);
     if (urlTab && validKeys.includes(urlTab) && urlTab !== activeTab) {
       setActiveTab(urlTab);
@@ -202,7 +244,7 @@ const UserCenter: React.FC = () => {
     if (!urlTab && searchParams.get('action') === 'reset_quota' && activeTab !== 'profile') {
       setActiveTab('profile');
     }
-  }, [searchParams, activeTab, tabConfigs, setSearchParams]);
+  }, [searchParams, activeTab, tabConfigs, setSearchParams, aboutVisibilityResolved]);
 
   // 切换 Tab 并将 tab 写入 URL 查询参数
   const switchTab = (key: string, isMobile = false) => {

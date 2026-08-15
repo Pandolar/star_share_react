@@ -32,6 +32,7 @@ import {
     RechargeStepType,
     JsonValidationState,
 } from './goPlus/types';
+import { UserAgreementConsent, useUserAgreementRequirement } from '../../components/UserAgreementConsent';
 
 // 导航链接接口
 interface NavLink {
@@ -86,6 +87,8 @@ const GoPlusPage: React.FC = () => {
     // **新增：CDK兑换相关状态**
     const [cdkInput, setCdkInput] = useState<string>(''); // CDK兑换码输入
     const [isCdkLoading, setIsCdkLoading] = useState<boolean>(false); // CDK兑换中状态
+    const [agreementAccepted, setAgreementAccepted] = useState(true);
+    const { isRequired: isAgreementRequired } = useUserAgreementRequirement();
 
     // JSON验证状态 - 明确区分格式验证和字段验证
     const [validationState, setValidationState] = useState<JsonValidationState>({
@@ -349,6 +352,10 @@ const GoPlusPage: React.FC = () => {
 
     // 创建订单
     const createOrder = async () => {
+        if (isAgreementRequired && !agreementAccepted) {
+            toast.warning('请先勾选同意《用户协议》');
+            return;
+        }
         setIsLoading(true);
         try {
             const response = await fetch('/u/go_plus_order', {
@@ -942,11 +949,14 @@ const GoPlusPage: React.FC = () => {
                                         </div>
 
 
+                                        <UserAgreementConsent isSelected={agreementAccepted} onValueChange={setAgreementAccepted} />
+
                                         <div className="flex flex-col sm:flex-row gap-4">
                                             <Button
                                                 color="primary"
                                                 onPress={createOrder}
                                                 isLoading={isLoading}
+                                                isDisabled={isAgreementRequired && !agreementAccepted}
                                                 className="flex-1 !bg-blue-600 !text-white hover:!bg-blue-700"
                                             >
                                                 {isLoading ? '创建订单中...' : '创建订单并支付'}

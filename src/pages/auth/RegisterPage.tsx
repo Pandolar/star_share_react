@@ -9,8 +9,8 @@ import { setAuthCookies } from '../../utils/cookies';
 import { useAutoLogin } from '../../hooks/useAutoLogin';
 import { useRedirect } from '../../hooks/useRedirect';
 import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
+import { UserAgreementConsent, useUserAgreementRequirement } from '../../components/UserAgreementConsent';
 
-const USER_AGREEMENT_URL = 'https://r7r3bw489x.feishu.cn/wiki/Mq7FwBuhdiNH12kmqFvc4W0onqg';
 const AFF_STORAGE_KEY = 'register_aff';
 
 const RegisterPage: React.FC = () => {
@@ -34,6 +34,7 @@ const RegisterPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { isWhiteLabel, enableRegister, loading: wlLoading } = useWhiteLabel();
+  const { isRequired: isAgreementRequired } = useUserAgreementRequirement();
 
   // 注册功能关闭时，直接跳回登录页（防止直接访问 /register）
   useEffect(() => {
@@ -120,7 +121,7 @@ const RegisterPage: React.FC = () => {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!hasAgreedUserAgreement) {
+    if (isAgreementRequired && !hasAgreedUserAgreement) {
       toast.warning('请先勾选同意《用户协议》');
       return;
     }
@@ -246,33 +247,12 @@ const RegisterPage: React.FC = () => {
           </div>
           )}
 
-          <div className="flex items-start gap-2 text-sm text-default-600">
-            <input
-              id="register-user-agreement"
-              type="checkbox"
-              checked={hasAgreedUserAgreement}
-              onChange={(e) => setHasAgreedUserAgreement(e.target.checked)}
-              className="mt-1 h-4 w-4 rounded border-default-300 text-primary-600 focus:ring-primary-500"
-            />
-            <div className="leading-5">
-              <label htmlFor="register-user-agreement" className="select-none">
-                注册即代表同意
-              </label>
-              <a
-                href={USER_AGREEMENT_URL}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="ml-1 text-primary-700 hover:text-primary-600 underline underline-offset-2"
-              >
-                《用户协议》
-              </a>
-            </div>
-          </div>
+          <UserAgreementConsent isSelected={hasAgreedUserAgreement} onValueChange={setHasAgreedUserAgreement} />
           <Button
             type="submit"
             color="primary"
             fullWidth
-            disabled={isRegistering || !hasAgreedUserAgreement}
+            disabled={isRegistering || (isAgreementRequired && !hasAgreedUserAgreement)}
             className="!mt-8"
           >
             {isRegistering ? <Spinner size="sm" color="white" /> : '注册'}

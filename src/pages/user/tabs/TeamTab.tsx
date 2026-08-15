@@ -44,12 +44,14 @@ import {
 } from '../../../services/userApi';
 import { toast } from '../../../utils/toast';
 import { TeamPaymentModal } from './team/TeamPaymentModal';
+import { UserAgreementConsent, useUserAgreementRequirement } from '../../../components/UserAgreementConsent';
 
 const formatDate = (value?: string | null) => value
   ? new Date(value).toLocaleString('zh-CN', { hour12: false })
   : '--';
 
 const memberName = (member: TeamMember) => member.username || member.email || `用户 #${member.user_id}`;
+const formatDiscount = (rate: number) => `${Number((rate * 10).toFixed(2))} 折`;
 
 const TEAM_STATUS: Record<string, { label: string; color: 'success' | 'warning' | 'danger' | 'default' }> = {
   active: { label: '生效中', color: 'success' },
@@ -133,6 +135,10 @@ export const TeamTab: React.FC = () => {
   const [checkout, setCheckout] = useState<TeamCheckout | null>(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const orderModal = useDisclosure();
+  const cancelModal = useDisclosure();
+  const [cancellingTeam, setCancellingTeam] = useState(false);
+  const [agreementAccepted, setAgreementAccepted] = useState(true);
+  const { isRequired: isAgreementRequired } = useUserAgreementRequirement();
 
   const loadOverview = useCallback(async (background = false): Promise<TeamOverview | null> => {
     if (background) setRefreshing(true);
@@ -204,6 +210,27 @@ export const TeamTab: React.FC = () => {
     openOrder(action, pending);
   };
 
+  const replacePendingOrder = () => {
+    openOrder(overview?.pending_checkout?.action || 'initial', overview?.pending_checkout);
+  };
+
+  const cancelPendingTeam = async () => {
+    setCancellingTeam(true);
+    try {
+      const response = await teamUserApi.cancelPending();
+      if (response.code !== 20000) throw new Error(response.msg || '取消团队失败');
+      setPaymentOpen(false);
+      setCheckout(null);
+      cancelModal.onClose();
+      toast.success('已取消团队创建，可以重新选择套餐');
+      await loadOverview(true);
+    } catch (requestError) {
+      toast.error(requestError instanceof Error ? requestError.message : '取消团队失败');
+    } finally {
+      setCancellingTeam(false);
+    }
+  };
+
   const createOrder = async () => {
     if (!selectedPlan) {
       toast.error('请选择团队套餐');
@@ -211,6 +238,10 @@ export const TeamTab: React.FC = () => {
     }
     if (orderAction === 'initial' && !teamName.trim()) {
       toast.error('请输入团队名称');
+      return;
+    }
+    if (isAgreementRequired && !agreementAccepted) {
+      toast.warning('请先勾选同意《用户协议》');
       return;
     }
     setCreatingOrder(true);
@@ -390,6 +421,9 @@ export const TeamTab: React.FC = () => {
           </button>
           {guideOpen && (
             <div className="mt-4 grid gap-3 border-t border-primary-100 pt-4 text-sm md:grid-cols-2">
+              <p className="rounded-lg bg-white/70 p-3 leading-6 text-default-700 md:col-span-2">
+                团队模式适用于科研团队、班级、企业组织及其他集中管理场景。一次采购多席位，一键邀请成员使用，被邀请人无需另行下单购买。
+              </p>
               <div className="flex gap-3"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-success" /><p><strong>独立权益：</strong>团队套餐与个人套餐分开，成员使用团队统一权益。</p></div>
               <div className="flex gap-3"><UsersRound className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><p><strong>席位计算：</strong>所有者、正式成员和未过期邀请都会占用席位。</p></div>
               <div className="flex gap-3"><MailPlus className="mt-0.5 h-4 w-4 shrink-0 text-secondary" /><p><strong>邀请成员：</strong>只能邀请已注册账户；同一用户同时只能属于一个团队。</p></div>
@@ -432,9 +466,11 @@ export const TeamTab: React.FC = () => {
                 : '首笔支付订单不存在或已失效，请重新生成支付订单。'}
               startContent={<Clock3 className="h-5 w-5" />}
               endContent={team.is_owner && (
-                <Button size="sm" color="warning" onPress={continuePayment}>
-                  {pendingCheckout?.recoverable ? '继续支付' : '重新生成订单'}
-                </Button>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button size="sm" variant="light" onPress={cancelModal.onOpen}>取消创建</Button>
+                  <Button size="sm" variant="flat" color="warning" onPress={replacePendingOrder}>更换订单</Button>
+                  {pendingCheckout?.recoverable && <Button size="sm" color="warning" onPress={continuePayment}>继续支付</Button>}
+                </div>
               )}
             />
           )}
@@ -636,7 +672,7 @@ export const TeamTab: React.FC = () => {
               }}
               renderValue={(items) => items.map((item) => {
                 const plan = item.data as TeamPlan | undefined;
-                return plan ? `${plan.package_name} · ${plan.level}` : item.textValue;
+                return plan ? `${plan.package_name} · ${plan.level} · ${formatDiscount(plan.discount_rate)}` : item.textValue;
               })}
             >
               {plans.map((plan) => (
@@ -646,7 +682,10 @@ export const TeamTab: React.FC = () => {
                       <p className="font-medium">{plan.package_name}</p>
                       <p className="text-xs text-default-500">{plan.level} · {plan.duration} 天 · {plan.min_seats}-{plan.max_seats} 个席位</p>
                     </div>
-                    <p className="shrink-0 text-sm font-semibold">¥{plan.discounted_unit_price}/席</p>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Chip size="sm" color="success" variant="flat">{formatDiscount(plan.discount_rate)}</Chip>
+                      <p className="text-sm font-semibold">¥{plan.discounted_unit_price}/席</p>
+                    </div>
                   </div>
                 </SelectItem>
               ))}
@@ -664,19 +703,33 @@ export const TeamTab: React.FC = () => {
             {selectedPlan && (
               <div className="grid gap-3 rounded-lg bg-default-50 p-4 sm:grid-cols-3">
                 <div><p className="text-xs text-default-500">套餐周期</p><p className="mt-1 font-semibold">{selectedPlan.duration} 天</p></div>
-                <div><p className="text-xs text-default-500">团队单价</p><p className="mt-1 font-semibold">¥{selectedPlan.discounted_unit_price}/席</p></div>
+                <div><p className="text-xs text-default-500">团队单价（{formatDiscount(selectedPlan.discount_rate)}）</p><p className="mt-1 font-semibold">¥{selectedPlan.discounted_unit_price}/席</p></div>
                 <div><p className="text-xs text-default-500">预计应付</p><p className="mt-1 font-semibold text-danger">¥{estimatedTotal.toFixed(2)}</p></div>
               </div>
             )}
             {orderAction === 'change' && team?.status === 'active' && (
               <Alert color="primary" variant="flat" title="套餐变更规则" description="升级付款后立即生效并开启一个新周期；降级或降低席位将在当前周期结束后生效。" />
             )}
+            <UserAgreementConsent isSelected={agreementAccepted} onValueChange={setAgreementAccepted} />
           </ModalBody>
           <ModalFooter>
             <Button variant="light" onPress={orderModal.onClose}>取消</Button>
-            <Button color="primary" isLoading={creatingOrder} onPress={() => void createOrder()}>
+            <Button color="primary" isLoading={creatingOrder} isDisabled={isAgreementRequired && !agreementAccepted} onPress={() => void createOrder()}>
               创建支付订单
             </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <Modal isOpen={cancelModal.isOpen} onClose={cancelModal.onClose} size="sm" placement="center">
+        <ModalContent>
+          <ModalHeader>取消创建团队</ModalHeader>
+          <ModalBody>
+            <p className="text-sm leading-6 text-default-600">取消后当前支付二维码会立即失效，团队不会生效。你可以随后重新创建并选择其他套餐或席位。</p>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" onPress={cancelModal.onClose}>返回</Button>
+            <Button color="danger" isLoading={cancellingTeam} onPress={() => void cancelPendingTeam()}>确认取消</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

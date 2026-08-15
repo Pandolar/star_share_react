@@ -137,7 +137,7 @@ export const userAuthApi = {
 // 公告API
 export const announcementApi = {
     // 获取公告信息
-    getPublicInfo: async (): Promise<ApiResponse<{ notice: string }>> => {
+    getPublicInfo: async (): Promise<ApiResponse<{ notice: string; about_enabled?: boolean; about_content?: string }>> => {
         return createUserRequest(getUserApiUrl('/u/get_public_info'), {
             method: 'GET',
         });
@@ -165,9 +165,8 @@ export const siteModeApi = {
         enable_promotion_code?: boolean;
         notice?: string;
         notice_id?: string;
-        purchase_url?: string;
-        customer_service_url?: string;
         subscription_notice?: string;
+        user_agreement_url?: string;
     }>> => {
         return createUserRequest(getUserApiUrl('/u/get_site_mode'), {
             method: 'GET',
@@ -638,6 +637,7 @@ export const teamUserApi = {
         method: 'POST',
         body: JSON.stringify(params),
     }),
+    cancelPending: async (): Promise<ApiResponse<{ team_id: number; cancelled: boolean }>> => createUserRequest(getUserApiUrl('/u/team/cancel'), { method: 'POST' }),
     invite: async (params: { email: string }): Promise<ApiResponse<TeamInvitation>> => createUserRequest(getUserApiUrl('/u/team/invitations'), { method: 'POST', body: JSON.stringify(params) }),
     acceptInvitation: async (invitationId: number): Promise<ApiResponse<unknown>> => createUserRequest(getUserApiUrl(`/u/team/invitations/${invitationId}/accept`), { method: 'POST' }),
     rejectInvitation: async (invitationId: number): Promise<ApiResponse<unknown>> => createUserRequest(getUserApiUrl(`/u/team/invitations/${invitationId}/reject`), { method: 'POST' }),

@@ -12,6 +12,7 @@ import { motion } from 'framer-motion';
 import { CheckCircle, AlertCircle } from 'lucide-react';
 import { exchangeUserApi } from '../../../../services/userApi';
 import { celebrateSuccess } from '../../../../utils/confetti';
+import { UserAgreementConsent, useUserAgreementRequirement } from '../../../../components/UserAgreementConsent';
 
 interface CdkRedeemModalProps {
   isOpen: boolean;
@@ -24,6 +25,8 @@ export const CdkRedeemModal: React.FC<CdkRedeemModalProps> = ({ isOpen, onClose,
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<'idle' | 'success' | 'failed'>('idle');
   const [message, setMessage] = useState('');
+  const [agreementAccepted, setAgreementAccepted] = useState(true);
+  const { isRequired: isAgreementRequired } = useUserAgreementRequirement();
 
   useEffect(() => {
     if (isOpen) {
@@ -31,6 +34,7 @@ export const CdkRedeemModal: React.FC<CdkRedeemModalProps> = ({ isOpen, onClose,
       setStatus('idle');
       setMessage('');
       setLoading(false);
+      setAgreementAccepted(true);
     }
   }, [isOpen, initialCdk]);
 
@@ -39,6 +43,11 @@ export const CdkRedeemModal: React.FC<CdkRedeemModalProps> = ({ isOpen, onClose,
   }, [status]);
 
   const handleRedeem = async () => {
+    if (isAgreementRequired && !agreementAccepted) {
+      setStatus('failed');
+      setMessage('请先勾选同意《用户协议》');
+      return;
+    }
     const cdk = cdkValue.trim();
     if (!cdk) {
       setStatus('failed');
@@ -103,6 +112,7 @@ export const CdkRedeemModal: React.FC<CdkRedeemModalProps> = ({ isOpen, onClose,
                 isDisabled={loading}
                 isRequired
               />
+              <UserAgreementConsent isSelected={agreementAccepted} onValueChange={setAgreementAccepted} />
               {status === 'failed' && (
                 <div className="flex items-center gap-2 text-danger text-sm">
                   <AlertCircle className="w-4 h-4" />
@@ -110,7 +120,7 @@ export const CdkRedeemModal: React.FC<CdkRedeemModalProps> = ({ isOpen, onClose,
                 </div>
               )}
               <div className="flex md:hidden justify-end">
-                <Button variant="light" size="sm" onPress={handleRedeem} isLoading={loading}>
+                <Button variant="light" size="sm" onPress={handleRedeem} isLoading={loading} isDisabled={isAgreementRequired && !agreementAccepted}>
                   确认兑换
                 </Button>
               </div>
@@ -123,7 +133,7 @@ export const CdkRedeemModal: React.FC<CdkRedeemModalProps> = ({ isOpen, onClose,
               <Button variant="light" onPress={onClose} isDisabled={loading}>
                 取消
               </Button>
-              <Button variant="light" onPress={handleRedeem} isLoading={loading}>
+              <Button variant="light" onPress={handleRedeem} isLoading={loading} isDisabled={isAgreementRequired && !agreementAccepted}>
                 确认兑换
               </Button>
             </>

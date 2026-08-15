@@ -56,7 +56,6 @@ import {
     ExternalLink,
     Globe,
     KeyRound,
-    Link as LinkIcon,
     Lock,
     LogOut,
     RefreshCw,
@@ -100,15 +99,6 @@ const normalizeDomains = (domains: DistributorInfo['domains'] | undefined): stri
     return domains.split(',').map((item) => item.trim()).filter(Boolean);
 };
 
-const isValidHttpUrl = (value: string) => {
-    if (!value) return true;
-    try {
-        const url = new URL(value);
-        return url.protocol === 'http:' || url.protocol === 'https:';
-    } catch {
-        return false;
-    }
-};
 
 const formatDateTime = (value?: string | null) => (
     value && dayjs(value).isValid() ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'
@@ -122,8 +112,6 @@ const DistributorDashboardPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState('cdk');
 
     const [notice, setNotice] = useState('');
-    const [purchaseUrl, setPurchaseUrl] = useState('');
-    const [customerServiceUrl, setCustomerServiceUrl] = useState('');
     const [savingSettings, setSavingSettings] = useState(false);
 
     const [oldPassword, setOldPassword] = useState('');
@@ -156,7 +144,6 @@ const DistributorDashboardPage: React.FC = () => {
     const permissions = distributor?.permissions;
     const canGenerate = permissions?.can_generate_cdk === true;
     const canEditNotice = permissions?.can_edit_notice === true;
-    const canEditLinks = permissions?.can_edit_links === true;
     const discountActive = distributor?.discount_active !== false;
     const domains = useMemo(() => normalizeDomains(distributor?.domains), [distributor?.domains]);
     const selectedPackage = packages.find((item) => String(item.package_id) === genPackageId);
@@ -176,8 +163,6 @@ const DistributorDashboardPage: React.FC = () => {
         const info = response.data;
         setDistributor(info);
         setNotice(info.notice || '');
-        setPurchaseUrl(info.purchase_url || '');
-        setCustomerServiceUrl(info.customer_service_url || '');
         setBalance(Number(info.balance || 0));
         localStorage.setItem('distributor', JSON.stringify(info));
         return info;
@@ -324,16 +309,8 @@ const DistributorDashboardPage: React.FC = () => {
 
     const handleSaveSettings = async (event: React.FormEvent) => {
         event.preventDefault();
-        if (canEditLinks && (!isValidHttpUrl(purchaseUrl.trim()) || !isValidHttpUrl(customerServiceUrl.trim()))) {
-            showToast('购买链接和客服链接必须是完整的 http(s) 地址', 'warning');
-            return;
-        }
-        const payload: { notice?: string; purchase_url?: string; customer_service_url?: string } = {};
+        const payload: { notice?: string } = {};
         if (canEditNotice) payload.notice = notice.trim();
-        if (canEditLinks) {
-            payload.purchase_url = purchaseUrl.trim();
-            payload.customer_service_url = customerServiceUrl.trim();
-        }
 
         setSavingSettings(true);
         try {
@@ -519,24 +496,20 @@ const DistributorDashboardPage: React.FC = () => {
                             {canGenerate && (
                                 <Alert isVisible color="secondary" variant="flat" title="生成卡密" description="余额和折扣由管理员维护；生成区显示最终折后单价，费用在生成成功时一次性扣除。" />
                             )}
-                            {(canEditNotice || canEditLinks) && (
+                            {canEditNotice && (
                                 <Alert
                                     isVisible
                                     color="warning"
                                     variant="flat"
-                                    title="配置站点内容"
-                                    description={canEditNotice && canEditLinks
-                                        ? '可维护公告、购买链接和客服链接，修改后请用绑定域名实际访问确认。'
-                                        : canEditNotice
-                                            ? '可维护站点公告，修改后请用绑定域名实际访问确认。'
-                                            : '可维护购买链接和客服链接，修改后请用绑定域名实际访问确认。'}
+                                    title="配置站点公告"
+                                    description="可维护绑定域名展示的基础公告，保存后请用绑定域名实际访问确认。"
                                 />
                             )}
                         </div>
                     </AccordionItem>
                 </Accordion>
 
-                {(canEditNotice || canEditLinks) && domains.length === 0 && (
+                {canEditNotice && domains.length === 0 && (
                     <Alert
                         isVisible
                         color="warning"
@@ -764,7 +737,7 @@ const DistributorDashboardPage: React.FC = () => {
                         </div>
                     </Tab>
 
-                    {(canEditNotice || canEditLinks) && (
+                    {canEditNotice && (
                         <Tab key="site" title={<span className="flex items-center gap-2"><Globe className="h-4 w-4" />站点配置</span>}>
                             <div className="grid gap-6 pt-4 lg:grid-cols-3">
                                 <Card shadow="sm">
@@ -798,8 +771,8 @@ const DistributorDashboardPage: React.FC = () => {
 
                                 <Card className="lg:col-span-2" shadow="sm">
                                     <CardHeader className="flex-col items-start gap-1">
-                                        <div className="flex items-center gap-2 font-semibold"><Bell className="h-5 w-5 text-primary" />访问端内容配置</div>
-                                        <p className="text-sm text-default-500">保存后由访问端按绑定域名读取；清空字段会隐藏对应内容或入口。</p>
+                                        <div className="flex items-center gap-2 font-semibold"><Bell className="h-5 w-5 text-primary" />访问端公告配置</div>
+                                        <p className="text-sm text-default-500">保存后由访问端按绑定域名读取，仅用于展示基础公告。</p>
                                     </CardHeader>
                                     <Divider />
                                     <CardBody>
@@ -814,30 +787,6 @@ const DistributorDashboardPage: React.FC = () => {
                                                     description="公告修改后会生成新的公告 ID，访问端可据此重新展示。"
                                                     placeholder="例如：购买方式、服务时间或重要通知"
                                                 />
-                                            )}
-                                            {canEditLinks && (
-                                                <>
-                                                    <Input
-                                                        label="购买卡密链接"
-                                                        value={purchaseUrl}
-                                                        onValueChange={setPurchaseUrl}
-                                                        startContent={<LinkIcon className="h-4 w-4 text-default-400" />}
-                                                        isInvalid={!isValidHttpUrl(purchaseUrl.trim())}
-                                                        errorMessage="请输入完整的 http:// 或 https:// 地址"
-                                                        description="访问端的购买入口会跳转到这里；留空则不显示购买入口。"
-                                                        placeholder="https://example.com/buy"
-                                                    />
-                                                    <Input
-                                                        label="售后客服链接"
-                                                        value={customerServiceUrl}
-                                                        onValueChange={setCustomerServiceUrl}
-                                                        startContent={<LinkIcon className="h-4 w-4 text-default-400" />}
-                                                        isInvalid={!isValidHttpUrl(customerServiceUrl.trim())}
-                                                        errorMessage="请输入完整的 http:// 或 https:// 地址"
-                                                        description="访问端客服入口会跳转到这里；留空则不显示。"
-                                                        placeholder="https://example.com/support"
-                                                    />
-                                                </>
                                             )}
                                             <Button type="submit" color="primary" size="lg" isLoading={savingSettings} startContent={!savingSettings && <Save className="h-5 w-5" />}>
                                                 保存站点配置

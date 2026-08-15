@@ -20,8 +20,6 @@ export interface DistributorInfo {
     domains: string | string[];
     notice: string;
     notice_id: string;
-    purchase_url: string;
-    customer_service_url: string;
     remarks: string;
     balance?: number;
     level?: number;
@@ -40,7 +38,6 @@ export interface DistributorPermissions {
     can_login: boolean;
     can_generate_cdk: boolean;
     can_edit_notice: boolean;
-    can_edit_links: boolean;
 }
 
 /**
@@ -70,8 +67,6 @@ export interface DistributorLoginResponse {
  */
 export interface DistributorSettingsRequest {
     notice?: string;
-    purchase_url?: string;
-    customer_service_url?: string;
 }
 
 /**
