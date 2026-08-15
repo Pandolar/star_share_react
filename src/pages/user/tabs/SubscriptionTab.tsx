@@ -14,7 +14,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { PaymentModal } from './subscription/PaymentModal';
 import { CdkRedeemModal } from './subscription/CdkRedeemModal';
-import { UserAgreementConsent, useUserAgreementRequirement } from '../../../components/UserAgreementConsent';
+import { useUserAgreementRequirement } from '../../../components/UserAgreementConsent';
 import {
   PackageInfo,
   OrderInfo,
@@ -110,10 +110,7 @@ export const SubscriptionTab: React.FC = () => {
 
   // 创建订单
   const createOrder = async (pkg: PackageInfo) => {
-    if (isAgreementRequired && !agreementAccepted) {
-      toast.warning('请先勾选同意《用户协议》');
-      return;
-    }
+    setAgreementAccepted(true);
     try {
       setOrderLoading(true);
       setSelectedPackage(pkg);
@@ -449,11 +446,6 @@ export const SubscriptionTab: React.FC = () => {
         </CardBody>
       </Card>
       )}
-      {!isWhiteLabel && (
-        <div className="mb-5 flex justify-end px-1">
-          <UserAgreementConsent isSelected={agreementAccepted} onValueChange={setAgreementAccepted} />
-        </div>
-      )}
 
       {loading && (
         <div className="flex flex-col items-center justify-center py-16">
@@ -589,7 +581,7 @@ export const SubscriptionTab: React.FC = () => {
                         ) : (
                           <button
                             className={`hero-button ${isPopular ? 'primary' : 'secondary'}`}
-                            disabled={pkg.status !== 1 || (isAgreementRequired && !agreementAccepted) || (orderLoading && selectedPackage?.id === pkg.id)}
+                            disabled={pkg.status !== 1 || (orderLoading && selectedPackage?.id === pkg.id)}
                             onClick={() => createOrder(pkg)}
                           >
                             {orderLoading && selectedPackage?.id === pkg.id ? (
@@ -682,7 +674,7 @@ export const SubscriptionTab: React.FC = () => {
                       ) : (
                         <button
                           className="hero-button primary"
-                          disabled={pkg.status !== 1 || (isAgreementRequired && !agreementAccepted) || (orderLoading && selectedPackage?.id === pkg.id)}
+                          disabled={pkg.status !== 1 || (orderLoading && selectedPackage?.id === pkg.id)}
                           onClick={() => createOrder(pkg)}
                           style={{ height: '40px', fontSize: '14px' }}
                         >
@@ -723,6 +715,8 @@ export const SubscriptionTab: React.FC = () => {
         onCreateInvoiceOrder={createInvoiceOrder}
         promotionActionLoading={orderLoading}
         onApplyPromotionCode={applyPromotionCode}
+        agreementAccepted={agreementAccepted}
+        onAgreementValueChange={setAgreementAccepted}
         onClose={() => {
           setPaymentModalOpen(false);
           setOrdinaryOrder(null);

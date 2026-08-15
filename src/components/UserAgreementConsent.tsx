@@ -27,15 +27,15 @@ export const UserAgreementConsent: React.FC<UserAgreementConsentProps> = ({
   if (!isVisible) return null;
 
   return (
-    <div className={`flex items-start gap-2 text-xs text-default-500 ${className}`}>
+    <div className={`inline-flex items-center gap-2 text-xs text-default-500 ${className}`}>
       <Checkbox
         size="sm"
         isSelected={isSelected}
         onValueChange={onValueChange}
         aria-label="同意用户协议"
-        classNames={{ wrapper: 'mt-0.5', label: 'hidden' }}
+        classNames={{ base: '!m-0 shrink-0 p-0', wrapper: 'm-0', label: 'hidden' }}
       />
-      <span className="leading-6">
+      <span className="leading-5">
         我已阅读并同意
         <a
           href={userAgreementUrl}

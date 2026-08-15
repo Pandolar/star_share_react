@@ -24,6 +24,7 @@ import { getCheckoutRemainingMs } from './checkoutExpiry';
 import { getDurationText, PackageInfo, OrderInfo } from './types';
 import { useWhiteLabel } from '../../../../contexts/WhiteLabelContext';
 import { useNavigate } from 'react-router-dom';
+import { UserAgreementConsent, useUserAgreementRequirement } from '../../../../components/UserAgreementConsent';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -34,6 +35,8 @@ interface PaymentModalProps {
   onCreateInvoiceOrder: () => Promise<OrderInfo | null>;
   promotionActionLoading: boolean;
   onApplyPromotionCode: (promotionCode: string) => Promise<OrderInfo | null>;
+  agreementAccepted: boolean;
+  onAgreementValueChange: (selected: boolean) => void;
   onClose: () => void;
 }
 
@@ -74,9 +77,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   onCreateInvoiceOrder,
   promotionActionLoading,
   onApplyPromotionCode,
+  agreementAccepted,
+  onAgreementValueChange,
   onClose,
 }) => {
   const { enablePromotionCode } = useWhiteLabel();
+  const { isRequired: isAgreementRequired } = useUserAgreementRequirement();
   const navigate = useNavigate();
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('pending');
   const [qrCodeExpired, setQrCodeExpired] = useState(false);
@@ -213,12 +219,21 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     navigate('/user-center?tab=profile', { state: { openEdit } });
   };
 
+
+  const ensureAgreementAccepted = () => {
+    if (isAgreementRequired && !agreementAccepted) {
+      toast.warning('请先勾选同意《用户协议》');
+      return false;
+    }
+    return true;
+  };
   const handleInvoiceSwitch = async (selected: boolean) => {
     if (!selected) {
       setInvoiceSelected(false);
       setInvoiceCreationFailed(false);
       return;
     }
+    if (!ensureAgreementAccepted()) return;
 
     setInvoiceSelected(true);
     setInvoiceCreationFailed(false);
@@ -232,6 +247,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   };
 
   const handleApplyPromotion = async () => {
+    if (!ensureAgreementAccepted()) return;
     const code = promotionCodeInput.trim().toUpperCase();
     if (!code) {
       toast.warning('请输入优惠码');
@@ -245,6 +261,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   };
 
   const handleRemovePromotion = async () => {
+    if (!ensureAgreementAccepted()) return;
     const nextOrder = await onApplyPromotionCode('');
     if (nextOrder) {
       setPromotionCodeInput('');
@@ -253,6 +270,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   };
 
   const handleManualCheck = async () => {
+    if (!ensureAgreementAccepted()) return;
     if (!checkoutId) return;
     setManualCheckLoading(true);
     setPaymentStatus('checking');
@@ -305,7 +323,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const qrCodeValue = activeOrder?.qr_code || activeOrder?.payment_url || '';
   const invoiceProfileAction = getInvoiceProfileAction(eligibility?.reason);
-  const paymentReady = !invoiceSelected || (eligibility?.eligible === true && Boolean(invoiceOrder));
+  const agreementReady = !isAgreementRequired || agreementAccepted;
+  const paymentReady = agreementReady && (!invoiceSelected || (eligibility?.eligible === true && Boolean(invoiceOrder)));
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} size="lg" scrollBehavior="inside" hideCloseButton={paymentStatus === 'success'} classNames={{ base: 'max-h-[92vh] mx-2 sm:mx-0', body: 'py-4 sm:py-6 overflow-y-auto', footer: 'border-t border-divider bg-background sticky bottom-0' }}>
@@ -389,6 +408,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     {activeOrder.payment_url && <a href={activeOrder.payment_url} target="_blank" rel="noopener noreferrer"><Button variant="flat" color="primary" endContent={<ExternalLink className="h-4 w-4" />}>打开支付页面</Button></a>}
                   </div>
                 )}
+                {paymentStatus === 'pending' && !qrCodeExpired && !agreementReady && (
+                  <p className="rounded-lg bg-warning-50 px-4 py-3 text-sm text-warning-700">勾选同意《用户协议》后显示支付二维码</p>
+                )}
 
                 {paymentStatus === 'pending' && !qrCodeExpired && invoiceFeatureAvailable && invoiceSelected && (
                   <div ref={invoicePanelRef} className="mt-5 rounded-lg border border-divider bg-default-50 p-3 text-left">
@@ -463,25 +485,28 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         <ModalFooter>
           {paymentStatus === 'pending' && !qrCodeExpired && (
             <div className="flex w-full flex-wrap items-center justify-between gap-2">
-              {invoiceFeatureAvailable ? (
-                <Tooltip
-                  content={getInvoiceSwitchTooltip(eligibility)}
-                  placement="top-start"
-                >
-                  <span className="inline-flex">
-                    <Switch
-                      size="sm"
-                      isSelected={invoiceSelected}
-                      isDisabled={creatingInvoiceOrder || promotionActionLoading || eligibilityLoading || eligibility?.reason === 'below_threshold'}
-                      onValueChange={handleInvoiceSwitch}
-                      aria-label="是否开票"
-                      classNames={{ label: 'text-xs text-default-500' }}
-                    >
-                      是否开票
-                    </Switch>
-                  </span>
-                </Tooltip>
-              ) : <span />}
+              <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+                {invoiceFeatureAvailable && (
+                  <Tooltip
+                    content={getInvoiceSwitchTooltip(eligibility)}
+                    placement="top-start"
+                  >
+                    <span className="inline-flex">
+                      <Switch
+                        size="sm"
+                        isSelected={invoiceSelected}
+                        isDisabled={!agreementReady || creatingInvoiceOrder || promotionActionLoading || eligibilityLoading || eligibility?.reason === 'below_threshold'}
+                        onValueChange={handleInvoiceSwitch}
+                        aria-label="是否开票"
+                        classNames={{ label: 'text-xs text-default-500' }}
+                      >
+                        是否开票
+                      </Switch>
+                    </span>
+                  </Tooltip>
+                )}
+                <UserAgreementConsent isSelected={agreementAccepted} onValueChange={onAgreementValueChange} />
+              </div>
               <div className="ml-auto flex items-center gap-2">
                 <Button variant="light" onPress={handleClose}>取消支付</Button>
                 <Button color="success" onPress={handleManualCheck} isLoading={manualCheckLoading} isDisabled={!paymentReady}>我已完成支付</Button>
