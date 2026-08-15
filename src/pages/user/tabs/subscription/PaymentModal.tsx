@@ -408,6 +408,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     {activeOrder.payment_url && <a href={activeOrder.payment_url} target="_blank" rel="noopener noreferrer"><Button variant="flat" color="primary" endContent={<ExternalLink className="h-4 w-4" />}>打开支付页面</Button></a>}
                   </div>
                 )}
+                {paymentStatus === 'pending' && !qrCodeExpired && (
+                  <div className="mt-4 flex justify-center">
+                    <UserAgreementConsent isSelected={agreementAccepted} onValueChange={onAgreementValueChange} />
+                  </div>
+                )}
                 {paymentStatus === 'pending' && !qrCodeExpired && !agreementReady && (
                   <p className="rounded-lg bg-warning-50 px-4 py-3 text-sm text-warning-700">勾选同意《用户协议》后显示支付二维码</p>
                 )}
@@ -505,7 +510,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     </span>
                   </Tooltip>
                 )}
-                <UserAgreementConsent isSelected={agreementAccepted} onValueChange={onAgreementValueChange} />
               </div>
               <div className="ml-auto flex items-center gap-2">
                 <Button variant="light" onPress={handleClose}>取消支付</Button>
