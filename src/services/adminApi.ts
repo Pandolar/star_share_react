@@ -40,6 +40,9 @@ import type {
     ArticleSummary,
     SaveArticleRequest,
     SourceDomainStats,
+    AdminTeamDetailData,
+    AdminTeamQueryParams,
+    AdminTeamRecord,
 } from '../types/admin';
 
 /**
@@ -570,6 +573,29 @@ class AdminApiService {
     async getDashboard(params: DashboardQueryParams = {}): Promise<AdminApiResponse<DashboardData>> {
         const queryString = this.buildQueryString(params);
         const response = await this.api.get(`/star/dashboard?${queryString}`);
+        return response.data;
+    }
+
+    // ==================== 团队管理 ====================
+
+    async getTeams(params: AdminTeamQueryParams = {}): Promise<AdminApiResponse<AdminTeamRecord[]>> {
+        const queryString = this.buildQueryString(params);
+        const response = await this.api.get(`/star/teams?${queryString}`);
+        return response.data;
+    }
+
+    async getTeamDetail(teamId: number): Promise<AdminApiResponse<AdminTeamDetailData>> {
+        const response = await this.api.get(`/star/teams/${teamId}`);
+        return response.data;
+    }
+
+    async manageTeamMember(teamId: number, memberId: number, action: 'suspend' | 'resume' | 'remove' | 'revoke'): Promise<AdminApiResponse> {
+        const response = await this.api.post(`/star/teams/${teamId}/members/${memberId}/${action}`);
+        return response.data;
+    }
+
+    async cancelPendingTeam(teamId: number): Promise<AdminApiResponse> {
+        const response = await this.api.post(`/star/teams/${teamId}/cancel`);
         return response.data;
     }
 

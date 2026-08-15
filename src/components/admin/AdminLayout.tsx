@@ -90,6 +90,12 @@ const AdminLayout: React.FC = () => {
             path: '/star-admin/user-packages',
         },
         {
+            key: 'teams',
+            label: '团队管理',
+            icon: <Users className="w-5 h-5" />,
+            path: '/star-admin/teams',
+        },
+        {
             key: 'orders',
             label: '订单管理',
             icon: <ShoppingCart className="w-5 h-5" />,

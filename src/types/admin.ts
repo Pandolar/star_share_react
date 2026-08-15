@@ -436,6 +436,94 @@ export interface InvoiceQueryParams extends CommonQueryParams {
     ids?: string;
 }
 
+export type AdminTeamStatus = 'pending' | 'active' | 'expired' | 'cancelled';
+export type AdminTeamMemberStatus = 'invited' | 'active' | 'suspended' | 'removed' | 'left';
+
+export interface AdminTeamUserSummary {
+    id: number;
+    username?: string | null;
+    email?: string | null;
+    status?: number;
+}
+
+export interface AdminTeamPackageSummary {
+    id: number;
+    package_name: string;
+    category: string;
+    level: string;
+    price: number;
+    duration: number;
+}
+
+export interface AdminTeamMemberCounts {
+    active: number;
+    suspended: number;
+    invited: number;
+    removed: number;
+    left: number;
+}
+
+export interface AdminTeamRecord {
+    id: number;
+    team_name: string;
+    owner: AdminTeamUserSummary | null;
+    package: AdminTeamPackageSummary | null;
+    seat_count: number;
+    status: AdminTeamStatus;
+    starts_at?: string | null;
+    expires_at?: string | null;
+    pending_package_id?: number | null;
+    pending_seat_count?: number | null;
+    pending_effective_at?: string | null;
+    member_counts: AdminTeamMemberCounts;
+    created_at?: string | null;
+    updated_at?: string | null;
+}
+
+export interface AdminTeamMember {
+    id: number;
+    user_id: number;
+    username?: string | null;
+    email?: string | null;
+    role: 'owner' | 'member';
+    status: AdminTeamMemberStatus;
+    inviter?: AdminTeamUserSummary | null;
+    invited_at?: string | null;
+    invite_expires_at?: string | null;
+    joined_at?: string | null;
+    left_at?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
+}
+
+export interface AdminTeamOrder {
+    id: number;
+    order_id: string;
+    order_type: 'team_initial' | 'team_change' | 'team_renewal';
+    status: 'pending' | 'paid' | 'failed';
+    package_id: number;
+    old_package_id?: number | null;
+    new_package_id?: number | null;
+    old_seat_count?: number | null;
+    new_seat_count?: number | null;
+    payable_amount?: number | null;
+    paid_amount?: number | null;
+    paid_at?: string | null;
+    created_at?: string | null;
+}
+
+export interface AdminTeamDetailData {
+    team: AdminTeamRecord;
+    pending_package: AdminTeamPackageSummary | null;
+    members: AdminTeamMember[];
+    orders: AdminTeamOrder[];
+}
+
+export interface AdminTeamQueryParams extends CommonQueryParams {
+    status?: AdminTeamStatus;
+    package_id?: number;
+}
+
 // 分页数据类型
 export interface PaginatedData<T> {
     list: T[];
