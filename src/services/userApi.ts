@@ -550,9 +550,15 @@ export const inviteUserApi = {
 
 export interface TeamPlan {
     package_id: number;
+    package_name: string;
+    category: string;
+    level: string;
+    duration: number;
     min_seats: number;
     max_seats: number;
-    discount_rate?: number;
+    discount_rate: number;
+    unit_price: string;
+    discounted_unit_price: string;
 }
 
 export interface TeamMember {
@@ -579,16 +585,59 @@ export interface TeamInvitation {
     created_at?: string;
 }
 
+export interface TeamCheckout {
+    order_id: string;
+    checkout_id?: string | null;
+    package_id: number;
+    package_name?: string | null;
+    seat_count: number;
+    payable_amount?: string;
+    payment_url?: string | null;
+    qr_code?: string | null;
+    expires_at?: string | null;
+    order_type?: 'team_initial' | 'team_change' | 'team_renewal';
+    action?: 'initial' | 'change' | 'renewal';
+    expires_in_seconds?: number;
+    recoverable?: boolean;
+}
+
 export interface TeamOverview {
-    team: ({ id: number; team_name: string; owner_user_id: number; package_id: number; seat_count: number; status: string; starts_at?: string | null; expires_at?: string | null; pending_package_id?: number | null; pending_seat_count?: number | null; pending_effective_at?: string | null; is_owner: boolean } | null);
+    team: ({
+        id: number;
+        team_name: string;
+        owner_user_id: number;
+        package_id: number;
+        package_name?: string | null;
+        package_level?: string | null;
+        seat_count: number;
+        status: string;
+        starts_at?: string | null;
+        expires_at?: string | null;
+        pending_package_id?: number | null;
+        pending_package_name?: string | null;
+        pending_seat_count?: number | null;
+        pending_effective_at?: string | null;
+        is_owner: boolean;
+    } | null);
     members: TeamMember[];
     invitations: { incoming: TeamInvitation[]; outgoing: TeamInvitation[] };
     plan_config: { enabled: boolean; min_seats: number; max_seats: number; plans: TeamPlan[] };
+    pending_checkout?: TeamCheckout | null;
+    current_user?: { email?: string | null; username?: string | null };
 }
 
 export const teamUserApi = {
     getTeam: async (): Promise<ApiResponse<TeamOverview>> => createUserRequest(getUserApiUrl('/u/team'), { method: 'GET' }),
-    createOrder: async (params: { action: 'initial' | 'change' | 'renewal'; package_id: number; seat_count: number; team_name?: string }): Promise<ApiResponse<{ checkout_id?: string; payment_url?: string | null; order?: { id?: number; order_id?: string; checkout_id?: string; payment_url?: string | null }; team?: TeamOverview['team'] }>> => createUserRequest(getUserApiUrl('/u/team/order'), { method: 'POST', body: JSON.stringify(params) }),
+    createOrder: async (params: {
+        action: 'initial' | 'change' | 'renewal';
+        package_id: number;
+        seat_count: number;
+        team_name?: string;
+        replace_pending?: boolean;
+    }): Promise<ApiResponse<TeamCheckout & { success?: boolean }>> => createUserRequest(getUserApiUrl('/u/team/order'), {
+        method: 'POST',
+        body: JSON.stringify(params),
+    }),
     invite: async (params: { email: string }): Promise<ApiResponse<TeamInvitation>> => createUserRequest(getUserApiUrl('/u/team/invitations'), { method: 'POST', body: JSON.stringify(params) }),
     acceptInvitation: async (invitationId: number): Promise<ApiResponse<unknown>> => createUserRequest(getUserApiUrl(`/u/team/invitations/${invitationId}/accept`), { method: 'POST' }),
     rejectInvitation: async (invitationId: number): Promise<ApiResponse<unknown>> => createUserRequest(getUserApiUrl(`/u/team/invitations/${invitationId}/reject`), { method: 'POST' }),

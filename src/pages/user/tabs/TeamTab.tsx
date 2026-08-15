@@ -1,34 +1,696 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Card, CardBody, Chip, Divider, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, NumberInput, Select, SelectItem, Spinner, useDisclosure } from '@heroui/react';
-import { Crown, LogOut, Mail, RefreshCw, Users } from 'lucide-react';
-import { teamUserApi, TeamOverview, TeamInvitation, TeamMember, TeamPlan } from '../../../services/userApi';
+import {
+  Alert,
+  Button,
+  Card,
+  CardBody,
+  Chip,
+  Divider,
+  Input,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  NumberInput,
+  Select,
+  SelectItem,
+  Spinner,
+  useDisclosure,
+} from '@heroui/react';
+import {
+  CalendarDays,
+  Check,
+  ChevronDown,
+  CircleDollarSign,
+  Clock3,
+  Crown,
+  Info,
+  MailPlus,
+  RefreshCw,
+  Settings2,
+  ShieldCheck,
+  UserMinus,
+  UsersRound,
+  X,
+} from 'lucide-react';
+import {
+  TeamCheckout,
+  TeamInvitation,
+  TeamMember,
+  TeamOverview,
+  TeamPlan,
+  teamUserApi,
+} from '../../../services/userApi';
 import { toast } from '../../../utils/toast';
+import { TeamPaymentModal } from './team/TeamPaymentModal';
 
-const date = (value?: string | null) => value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '-';
-const name = (member: TeamMember) => member.username || member.email || `用户 #${member.user_id}`;
+const formatDate = (value?: string | null) => value
+  ? new Date(value).toLocaleString('zh-CN', { hour12: false })
+  : '--';
+
+const memberName = (member: TeamMember) => member.username || member.email || `用户 #${member.user_id}`;
+
+const TEAM_STATUS: Record<string, { label: string; color: 'success' | 'warning' | 'danger' | 'default' }> = {
+  active: { label: '生效中', color: 'success' },
+  pending: { label: '等待付款', color: 'warning' },
+  expired: { label: '已到期', color: 'danger' },
+  cancelled: { label: '已关闭', color: 'default' },
+};
+
+const MEMBER_STATUS: Record<string, string> = {
+  active: '正常',
+  suspended: '已暂停',
+};
+
+interface InviteRowProps {
+  invitation: TeamInvitation;
+  owner?: boolean;
+  actionId: number | null;
+  onAction: (invitation: TeamInvitation, action: 'accept' | 'reject' | 'revoke') => void;
+}
+
+const InviteRow: React.FC<InviteRowProps> = ({ invitation, owner, actionId, onAction }) => (
+  <div className="flex flex-col gap-3 border-b border-divider py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
+    <div className="min-w-0">
+      <p className="truncate font-medium">{invitation.team_name || '团队邀请'}</p>
+      <p className="mt-1 truncate text-sm text-default-500">
+        {owner
+          ? `邀请 ${invitation.invitee_name || `用户 #${invitation.invitee_user_id}`}`
+          : `由 ${invitation.inviter_name || `用户 #${invitation.inviter_user_id}`} 发出`}
+      </p>
+      <p className="mt-1 text-xs text-default-400">{formatDate(invitation.expires_at)} 失效</p>
+    </div>
+    {owner ? (
+      <Button
+        size="sm"
+        color="danger"
+        variant="flat"
+        isLoading={actionId === invitation.id}
+        onPress={() => onAction(invitation, 'revoke')}
+      >
+        撤销邀请
+      </Button>
+    ) : (
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          variant="flat"
+          startContent={<X className="h-4 w-4" />}
+          isDisabled={actionId === invitation.id}
+          onPress={() => onAction(invitation, 'reject')}
+        >
+          拒绝
+        </Button>
+        <Button
+          size="sm"
+          color="primary"
+          startContent={<Check className="h-4 w-4" />}
+          isLoading={actionId === invitation.id}
+          onPress={() => onAction(invitation, 'accept')}
+        >
+          接受
+        </Button>
+      </div>
+    )}
+  </div>
+);
 
 export const TeamTab: React.FC = () => {
   const [overview, setOverview] = useState<TeamOverview | null>(null);
-  const [loading, setLoading] = useState(true); const [refreshing, setRefreshing] = useState(false); const [error, setError] = useState('');
-  const [email, setEmail] = useState(''); const [inviting, setInviting] = useState(false); const [actionId, setActionId] = useState<number | null>(null);
-  const [planId, setPlanId] = useState(''); const [seats, setSeats] = useState(2); const [teamName, setTeamName] = useState(''); const [orderAction, setOrderAction] = useState<'initial' | 'change' | 'renewal'>('initial'); const [ordering, setOrdering] = useState(false);
-  const orderModal = useDisclosure(); const noticeModal = useDisclosure(); const [checkout, setCheckout] = useState<{ checkout_id?: string; order_id?: string; payment_url?: string | null } | null>(null);
-  const load = useCallback(async (refresh = false) => { try { refresh ? setRefreshing(true) : setLoading(true); setError(''); const result = await teamUserApi.getTeam(); if (result.code !== 20000) throw new Error(result.msg || '获取团队信息失败'); setOverview(result.data); } catch (e) { setError(e instanceof Error ? e.message : '获取团队信息失败'); } finally { setLoading(false); setRefreshing(false); } }, []);
-  useEffect(() => { load(); }, [load]);
-  const team = overview?.team || null; const members = overview?.members || []; const plans = useMemo(() => overview?.plan_config?.plans || [], [overview?.plan_config?.plans]); const canCreateTeam = Boolean(overview?.plan_config?.enabled); const isOwner = Boolean(team?.is_owner); const selectedPlan = useMemo(() => plans.find(plan => String(plan.package_id) === planId) || null, [planId, plans]); const min = selectedPlan?.min_seats || overview?.plan_config?.min_seats || 2; const max = selectedPlan?.max_seats || overview?.plan_config?.max_seats || 200;
-  const openOrder = (action: 'initial' | 'change' | 'renewal' = team ? 'change' : 'initial') => { const plan = plans.find(item => item.package_id === team?.package_id) || plans[0]; if (!plan) return toast.error('当前没有可用团队套餐'); setOrderAction(action); setPlanId(String(plan.package_id)); setSeats(team?.seat_count || plan.min_seats); setTeamName(team?.team_name || ''); orderModal.onOpen(); };
-  const order = async () => { if (!selectedPlan || seats < min || seats > max || (!team && !teamName.trim())) return toast.error(!team && !teamName.trim() ? '请输入团队名称' : `席位数需在 ${min} 到 ${max} 之间`); try { setOrdering(true); const result = await teamUserApi.createOrder({ action: orderAction, package_id: selectedPlan.package_id, seat_count: seats, ...(team ? {} : { team_name: teamName.trim() }) }); if (result.code !== 20000) throw new Error(result.msg || '创建团队订单失败'); orderModal.onClose(); setCheckout(result.data?.order || result.data || null); noticeModal.onOpen(); await load(true); } catch (e) { toast.error(e instanceof Error ? e.message : '创建团队订单失败'); } finally { setOrdering(false); } };
-  const invite = async () => { if (!email.trim()) return toast.error('请输入成员邮箱'); try { setInviting(true); const result = await teamUserApi.invite({ email: email.trim() }); if (result.code !== 20000) throw new Error(result.msg || '邀请发送失败'); toast.success('邀请已发送'); setEmail(''); await load(true); } catch (e) { toast.error(e instanceof Error ? e.message : '邀请发送失败'); } finally { setInviting(false); } };
-  const invitationAction = async (invitation: TeamInvitation, action: 'accept' | 'reject' | 'revoke') => { try { setActionId(invitation.id); const result = action === 'accept' ? await teamUserApi.acceptInvitation(invitation.id) : action === 'reject' ? await teamUserApi.rejectInvitation(invitation.id) : await teamUserApi.revokeInvitation(invitation.id); if (result.code !== 20000) throw new Error(result.msg || '操作失败'); toast.success(action === 'accept' ? '已加入团队' : action === 'reject' ? '已拒绝邀请' : '邀请已撤销'); await load(true); } catch (e) { toast.error(e instanceof Error ? e.message : '操作失败'); } finally { setActionId(null); } };
-  const leave = async () => { try { setActionId(-1); const result = await teamUserApi.leave(); if (result.code !== 20000) throw new Error(result.msg || '退出团队失败'); toast.success('已退出团队'); await load(true); } catch (e) { toast.error(e instanceof Error ? e.message : '退出团队失败'); } finally { setActionId(null); } };
-  const memberAction = async (member: TeamMember, action: 'suspend' | 'resume' | 'remove') => { try { setActionId(member.id); const result = action === 'suspend' ? await teamUserApi.suspendMember(member.id) : action === 'resume' ? await teamUserApi.resumeMember(member.id) : await teamUserApi.removeMember(member.id); if (result.code !== 20000) throw new Error(result.msg || '操作失败'); toast.success(action === 'suspend' ? '成员已暂停' : action === 'resume' ? '成员已恢复' : '成员已移除'); await load(true); } catch (e) { toast.error(e instanceof Error ? e.message : '操作失败'); } finally { setActionId(null); } };
-  if (loading) return <div className="flex min-h-[320px] items-center justify-center"><Spinner size="lg" label="正在加载团队信息..." /></div>;
-  if (error) return <Card><CardBody className="items-center gap-4 py-12 text-center"><p className="font-semibold text-danger">团队信息加载失败</p><p className="text-sm text-default-500">{error}</p><Button color="primary" onPress={() => load()}>重试</Button></CardBody></Card>;
-  const incoming = overview?.invitations?.incoming || []; const outgoing = overview?.invitations?.outgoing || [];
-  return <div className="space-y-6"><div className="flex flex-wrap items-center justify-between gap-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10"><Users className="h-5 w-5 text-primary" /></div><div><h1 className="text-2xl font-bold">团队</h1><p className="mt-1 text-sm text-default-500">集中管理团队订阅与成员席位。</p></div></div><div className="flex gap-2"><Button variant="flat" isLoading={refreshing} onPress={() => load(true)} startContent={!refreshing ? <RefreshCw className="h-4 w-4" /> : undefined}>刷新</Button>{((!team && canCreateTeam) || (Boolean(team) && isOwner)) && <Button color="primary" onPress={() => openOrder(team ? 'change' : 'initial')} startContent={<Crown className="h-4 w-4" />}>{team ? '调整订阅' : '创建团队'}</Button>}{Boolean(team) && isOwner && <Button color="secondary" variant="flat" onPress={() => openOrder('renewal')}>续费团队</Button>}</div></div>
-  {!team ? (canCreateTeam ? <Card><CardBody className="items-center gap-4 py-12 text-center"><Users className="h-10 w-10 text-default-400" /><div><p className="font-semibold">您还没有团队</p><p className="mt-1 text-sm text-default-500">创建团队后可邀请已有用户共享团队订阅。</p></div><Button color="primary" onPress={() => openOrder('initial')}>创建团队</Button></CardBody></Card> : <Alert color="default" title="团队订阅暂未开放" description="当前站点尚未启用团队订阅。" />) : <><Card><CardBody className="gap-5 p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><h2 className="text-xl font-semibold">{team.team_name}</h2><Chip size="sm" color={team.status === 'active' ? 'success' : 'warning'} variant="flat">{team.status === 'active' ? '已生效' : '待生效'}</Chip></div><p className="mt-1 text-sm text-default-500">套餐 #{team.package_id} · 到期：{date(team.expires_at)}</p></div>{!isOwner && <Button color="danger" variant="flat" isLoading={actionId === -1} onPress={leave} startContent={<LogOut className="h-4 w-4" />}>退出团队</Button>}</div><Divider /><div className="grid gap-4 sm:grid-cols-3"><div><p className="text-sm text-default-500">已用席位</p><p className="text-2xl font-bold">{members.length} <span className="text-sm font-normal text-default-500">/ {team.seat_count}</span></p></div><div><p className="text-sm text-default-500">可用席位</p><p className="text-2xl font-bold">{Math.max(0, team.seat_count - members.length)}</p></div><div><p className="text-sm text-default-500">团队所有者</p><p className="text-lg font-medium">用户 #{team.owner_user_id}</p></div></div></CardBody></Card><Card><CardBody className="gap-4 p-5"><h2 className="font-semibold">团队成员</h2>{members.map(member => <div key={member.user_id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-divider px-3 py-2"><div><p className="font-medium">{name(member)}</p><p className="text-xs text-default-500">{member.email || '-'} · 加入于 {date(member.joined_at)}</p></div><div className="flex items-center gap-2"><Chip size="sm" variant="flat" color={member.role === 'owner' ? 'primary' : member.status === 'suspended' ? 'warning' : 'default'}>{member.role === 'owner' ? '所有者' : member.status === 'suspended' ? '已暂停' : '成员'}</Chip>{isOwner && member.role !== 'owner' && <>{member.status === 'active' ? <Button size="sm" variant="flat" isLoading={actionId === member.id} onPress={() => memberAction(member, 'suspend')}>暂停</Button> : <Button size="sm" variant="flat" isLoading={actionId === member.id} onPress={() => memberAction(member, 'resume')}>恢复</Button>}<Button size="sm" color="danger" variant="flat" isLoading={actionId === member.id} onPress={() => memberAction(member, 'remove')}>移除</Button></>}</div></div>)}</CardBody></Card>{isOwner && <Card><CardBody className="gap-4 p-5"><div><h2 className="font-semibold">邀请成员</h2><p className="mt-1 text-sm text-default-500">仅可邀请已注册用户；待处理邀请会占用可用席位。</p></div><div className="flex flex-col gap-2 sm:flex-row"><Input type="email" label="成员邮箱" placeholder="name@example.com" value={email} onValueChange={setEmail} startContent={<Mail className="h-4 w-4 text-default-400" />} /><Button color="primary" className="sm:self-end" isLoading={inviting} onPress={invite}>发送邀请</Button></div></CardBody></Card>}</>}
-  {(incoming.length > 0 || outgoing.length > 0) && <Card><CardBody className="gap-4 p-5"><h2 className="font-semibold">待处理邀请</h2>{isOwner ? outgoing.map(item => <InviteRow key={item.id} invitation={item} owner actionId={actionId} onAction={invitationAction} />) : incoming.map(item => <InviteRow key={item.id} invitation={item} actionId={actionId} onAction={invitationAction} />)}</CardBody></Card>}
-  <Modal isOpen={orderModal.isOpen} onClose={orderModal.onClose}><ModalContent>{() => <><ModalHeader>{orderAction === 'renewal' ? '续费团队' : team ? '调整团队订阅' : '创建团队'}</ModalHeader><ModalBody>{!team && <Input label="团队名称" value={teamName} onValueChange={setTeamName} />}<Select label="团队套餐" selectedKeys={planId ? [planId] : []} onSelectionChange={keys => { const value = String(Array.from(keys)[0] || ''); setPlanId(value); const plan = plans.find(item => String(item.package_id) === value); if (plan) setSeats(Math.max(plan.min_seats, Math.min(plan.max_seats, seats))); }}>{plans.map((plan: TeamPlan) => <SelectItem key={String(plan.package_id)}>{`套餐 #${plan.package_id}（${plan.min_seats}–${plan.max_seats} 席）`}</SelectItem>)}</Select><NumberInput label="席位数" value={seats} onValueChange={value => setSeats(Math.trunc(value || min))} minValue={min} maxValue={max} description={`此套餐支持 ${min}–${max} 个席位`} /></ModalBody><ModalFooter><Button variant="flat" onPress={orderModal.onClose}>取消</Button><Button color="primary" isLoading={ordering} onPress={order}>{orderAction === 'renewal' ? '创建续费订单' : '创建订单'}</Button></ModalFooter></>}</ModalContent></Modal><Modal isOpen={noticeModal.isOpen} onClose={noticeModal.onClose}><ModalContent>{() => <><ModalHeader>团队订单已创建</ModalHeader><ModalBody><p>订单正在等待支付完成，完成后团队订阅将自动生效。</p>{(checkout?.order_id || checkout?.checkout_id) && <p className="text-sm text-default-500">订单号：{checkout.order_id || checkout.checkout_id}</p>}</ModalBody><ModalFooter><Button variant="flat" onPress={noticeModal.onClose}>稍后支付</Button>{checkout?.payment_url && <Button color="primary" onPress={() => window.open(checkout.payment_url || '', '_blank', 'noopener,noreferrer')}>前往支付</Button>}</ModalFooter></>}</ModalContent></Modal></div>;
-};
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [teamName, setTeamName] = useState('');
+  const [email, setEmail] = useState('');
+  const [inviting, setInviting] = useState(false);
+  const [actionId, setActionId] = useState<number | null>(null);
+  const [orderAction, setOrderAction] = useState<'initial' | 'change' | 'renewal'>('initial');
+  const [planId, setPlanId] = useState('');
+  const [seats, setSeats] = useState(2);
+  const [creatingOrder, setCreatingOrder] = useState(false);
+  const [checkout, setCheckout] = useState<TeamCheckout | null>(null);
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const orderModal = useDisclosure();
 
-const InviteRow: React.FC<{ invitation: TeamInvitation; owner?: boolean; actionId: number | null; onAction: (item: TeamInvitation, action: 'accept' | 'reject' | 'revoke') => void }> = ({ invitation, owner, actionId, onAction }) => <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-divider p-3"><div><p className="font-medium">{invitation.team_name || '团队邀请'}</p><p className="text-sm text-default-500">{owner ? invitation.invitee_name || `用户 #${invitation.invitee_user_id}` : invitation.inviter_name || `用户 #${invitation.inviter_user_id}`} · 截止 {date(invitation.expires_at)}</p></div><div className="flex gap-2">{owner ? <Button size="sm" color="danger" variant="flat" isLoading={actionId === invitation.id} onPress={() => onAction(invitation, 'revoke')}>撤销</Button> : <><Button size="sm" variant="flat" isLoading={actionId === invitation.id} onPress={() => onAction(invitation, 'reject')}>拒绝</Button><Button size="sm" color="primary" isLoading={actionId === invitation.id} onPress={() => onAction(invitation, 'accept')}>接受</Button></>}</div></div>;
+  const loadOverview = useCallback(async (background = false): Promise<TeamOverview | null> => {
+    if (background) setRefreshing(true);
+    else setLoading(true);
+    try {
+      const response = await teamUserApi.getTeam();
+      if (response.code !== 20000 || !response.data) {
+        throw new Error(response.msg || '团队信息加载失败');
+      }
+      setOverview(response.data);
+      setCheckout(response.data.pending_checkout || null);
+      setError('');
+      if (response.data.team) {
+        setTeamName(response.data.team.team_name);
+      } else {
+        const accountEmail = response.data.current_user?.email?.trim();
+        if (accountEmail) setTeamName((current) => current || `${accountEmail} 的团队1`);
+      }
+      return response.data;
+    } catch (requestError) {
+      const message = requestError instanceof Error ? requestError.message : '团队信息加载失败';
+      setError(message);
+      return null;
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadOverview();
+  }, [loadOverview]);
+
+  const team = overview?.team || null;
+  const plans = useMemo(() => overview?.plan_config.plans || [], [overview]);
+  const incoming = overview?.invitations.incoming || [];
+  const outgoing = overview?.invitations.outgoing || [];
+  const activeMembers = overview?.members.filter((member) => member.status === 'active' || member.status === 'suspended') || [];
+  const occupiedSeats = activeMembers.length + outgoing.length;
+  const selectedPlan = useMemo(
+    () => plans.find((plan) => String(plan.package_id) === planId) || null,
+    [planId, plans],
+  );
+  const estimatedTotal = selectedPlan
+    ? Number(selectedPlan.unit_price) * seats * selectedPlan.discount_rate
+    : 0;
+
+  const openOrder = (
+    action: 'initial' | 'change' | 'renewal',
+    sourceCheckout?: TeamCheckout | null,
+  ) => {
+    const preferredId = sourceCheckout?.package_id || (action === 'initial' ? plans[0]?.package_id : team?.package_id);
+    const plan = plans.find((item) => item.package_id === preferredId) || plans[0];
+    setOrderAction(action);
+    setPlanId(plan ? String(plan.package_id) : '');
+    const desiredSeats = sourceCheckout?.seat_count || team?.seat_count || plan?.min_seats || overview?.plan_config.min_seats || 2;
+    setSeats(Math.max(plan?.min_seats || 2, Math.min(plan?.max_seats || 200, desiredSeats)));
+    orderModal.onOpen();
+  };
+
+  const continuePayment = () => {
+    const pending = overview?.pending_checkout;
+    if (pending?.recoverable) {
+      setCheckout(pending);
+      setPaymentOpen(true);
+      return;
+    }
+    const action = pending?.action || (team?.status === 'pending' ? 'initial' : 'renewal');
+    openOrder(action, pending);
+  };
+
+  const createOrder = async () => {
+    if (!selectedPlan) {
+      toast.error('请选择团队套餐');
+      return;
+    }
+    if (orderAction === 'initial' && !teamName.trim()) {
+      toast.error('请输入团队名称');
+      return;
+    }
+    setCreatingOrder(true);
+    try {
+      const response = await teamUserApi.createOrder({
+        action: orderAction,
+        package_id: selectedPlan.package_id,
+        seat_count: seats,
+        team_name: orderAction === 'initial' ? teamName.trim() : undefined,
+        replace_pending: Boolean(overview?.pending_checkout),
+      });
+      if (response.code !== 20000 || !response.data?.order_id) {
+        throw new Error(response.msg || '创建支付订单失败');
+      }
+      setCheckout(response.data);
+      orderModal.onClose();
+      setPaymentOpen(true);
+      await loadOverview(true);
+    } catch (requestError) {
+      const message = requestError instanceof Error ? requestError.message : '创建支付订单失败';
+      if (message === '请求超时') {
+        const latest = await loadOverview(true);
+        if (latest?.pending_checkout?.recoverable) {
+          setCheckout(latest.pending_checkout);
+          orderModal.onClose();
+          setPaymentOpen(true);
+          toast.info('订单已创建，已恢复支付页面');
+        } else {
+          toast.warning('订单仍在确认中，请稍后刷新后继续支付');
+        }
+      } else {
+        toast.error(message);
+      }
+    } finally {
+      setCreatingOrder(false);
+    }
+  };
+
+  const sendInvite = async () => {
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) return;
+    setInviting(true);
+    try {
+      const response = await teamUserApi.invite({ email: normalizedEmail });
+      if (response.code !== 20000) throw new Error(response.msg || '邀请失败');
+      toast.success('团队邀请已发送');
+      setEmail('');
+      await loadOverview(true);
+    } catch (requestError) {
+      toast.error(requestError instanceof Error ? requestError.message : '邀请失败');
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const invitationAction = async (
+    invitation: TeamInvitation,
+    action: 'accept' | 'reject' | 'revoke',
+  ) => {
+    setActionId(invitation.id);
+    try {
+      const response = action === 'accept'
+        ? await teamUserApi.acceptInvitation(invitation.id)
+        : action === 'reject'
+          ? await teamUserApi.rejectInvitation(invitation.id)
+          : await teamUserApi.revokeInvitation(invitation.id);
+      if (response.code !== 20000) throw new Error(response.msg || '操作失败');
+      toast.success(action === 'accept' ? '已加入团队' : action === 'reject' ? '已拒绝邀请' : '邀请已撤销');
+      await loadOverview(true);
+    } catch (requestError) {
+      toast.error(requestError instanceof Error ? requestError.message : '操作失败');
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const memberAction = async (member: TeamMember, action: 'suspend' | 'resume' | 'remove') => {
+    setActionId(member.id);
+    try {
+      const response = action === 'suspend'
+        ? await teamUserApi.suspendMember(member.id)
+        : action === 'resume'
+          ? await teamUserApi.resumeMember(member.id)
+          : await teamUserApi.removeMember(member.id);
+      if (response.code !== 20000) throw new Error(response.msg || '操作失败');
+      toast.success('成员状态已更新');
+      await loadOverview(true);
+    } catch (requestError) {
+      toast.error(requestError instanceof Error ? requestError.message : '操作失败');
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const leaveTeam = async () => {
+    try {
+      const response = await teamUserApi.leave();
+      if (response.code !== 20000) throw new Error(response.msg || '退出失败');
+      toast.success('已退出团队');
+      await loadOverview(true);
+    } catch (requestError) {
+      toast.error(requestError instanceof Error ? requestError.message : '退出失败');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[320px] items-center justify-center">
+        <Spinner size="lg" label="正在加载组织团队..." />
+      </div>
+    );
+  }
+
+  if (error && !overview) {
+    return (
+      <Card>
+        <CardBody className="items-center gap-4 py-12 text-center">
+          <Alert color="danger" title="组织团队加载失败" description={error} className="max-w-xl" />
+          <Button color="primary" startContent={<RefreshCw className="h-4 w-4" />} onPress={() => void loadOverview()}>
+            重新加载
+          </Button>
+        </CardBody>
+      </Card>
+    );
+  }
+
+  const status = TEAM_STATUS[team?.status || ''] || { label: team?.status || '未知', color: 'default' as const };
+  const canCreate = !team && overview?.plan_config.enabled && plans.length > 0;
+  const pendingCheckout = overview?.pending_checkout;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary">
+            <UsersRound className="h-6 w-6" />
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-bold">组织团队</h1>
+              {team && <Chip size="sm" color={status.color} variant="flat">{status.label}</Chip>}
+            </div>
+            <p className="mt-1 text-sm text-default-500">统一购买团队套餐，按席位管理成员访问权限</p>
+          </div>
+        </div>
+        <Button
+          size="sm"
+          variant="light"
+          isIconOnly
+          aria-label="刷新团队信息"
+          title="刷新团队信息"
+          isLoading={refreshing}
+          onPress={() => void loadOverview(true)}
+        >
+          {!refreshing && <RefreshCw className="h-4 w-4" />}
+        </Button>
+      </div>
+
+      <Card className="border border-primary-100 bg-primary-50/40 shadow-sm">
+        <CardBody className="p-4 sm:p-5">
+          <button
+            type="button"
+            onClick={() => setGuideOpen((current) => !current)}
+            className="flex w-full items-center justify-between gap-4 text-left"
+            aria-expanded={guideOpen}
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-100 text-primary">
+                <Info className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="font-semibold">团队使用说明</p>
+                <p className="text-sm text-default-500">创建、席位、邀请与续费规则</p>
+              </div>
+            </div>
+            <ChevronDown className={`h-4 w-4 shrink-0 text-default-500 transition-transform ${guideOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {guideOpen && (
+            <div className="mt-4 grid gap-3 border-t border-primary-100 pt-4 text-sm md:grid-cols-2">
+              <div className="flex gap-3"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-success" /><p><strong>独立权益：</strong>团队套餐与个人套餐分开，成员使用团队统一权益。</p></div>
+              <div className="flex gap-3"><UsersRound className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><p><strong>席位计算：</strong>所有者、正式成员和未过期邀请都会占用席位。</p></div>
+              <div className="flex gap-3"><MailPlus className="mt-0.5 h-4 w-4 shrink-0 text-secondary" /><p><strong>邀请成员：</strong>只能邀请已注册账户；同一用户同时只能属于一个团队。</p></div>
+              <div className="flex gap-3"><Settings2 className="mt-0.5 h-4 w-4 shrink-0 text-warning" /><p><strong>调整席位：</strong>新席位数不能低于当前成员和待处理邀请的总数。</p></div>
+              <div className="flex gap-3"><CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-danger" /><p><strong>套餐变更：</strong>升级付款后立即生效；降级在当前周期结束后生效。</p></div>
+              <div className="flex gap-3"><Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-default-600" /><p><strong>付款时限：</strong>每个支付订单 5 分钟有效；关闭或刷新页面后可继续支付。</p></div>
+            </div>
+          )}
+        </CardBody>
+      </Card>
+
+      {!team ? (
+        <Card>
+          <CardBody className="items-center px-6 py-12 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-default-100 text-default-500">
+              <UsersRound className="h-8 w-8" />
+            </div>
+            <h2 className="mt-5 text-xl font-semibold">尚未创建组织团队</h2>
+            <p className="mt-2 max-w-lg text-sm leading-6 text-default-500">
+              创建后由你担任所有者。购买团队套餐并完成付款后，即可邀请已注册成员加入。
+            </p>
+            {canCreate ? (
+              <Button className="mt-6" color="primary" startContent={<Crown className="h-4 w-4" />} onPress={() => openOrder('initial')}>
+                创建团队
+              </Button>
+            ) : (
+              <Chip className="mt-6" variant="flat">当前暂未开放新建团队</Chip>
+            )}
+          </CardBody>
+        </Card>
+      ) : (
+        <>
+          {team.status === 'pending' && (
+            <Alert
+              color="warning"
+              variant="flat"
+              title="团队尚未生效"
+              description={pendingCheckout?.recoverable
+                ? '首笔团队订单等待付款。付款成功后团队权益和成员管理功能会自动开放。'
+                : '首笔支付订单不存在或已失效，请重新生成支付订单。'}
+              startContent={<Clock3 className="h-5 w-5" />}
+              endContent={team.is_owner && (
+                <Button size="sm" color="warning" onPress={continuePayment}>
+                  {pendingCheckout?.recoverable ? '继续支付' : '重新生成订单'}
+                </Button>
+              )}
+            />
+          )}
+
+          {team.status !== 'pending' && pendingCheckout && (
+            <Alert
+              color="warning"
+              variant="flat"
+              title={`有一笔待支付的${pendingCheckout.action === 'change' ? '套餐调整' : '续费'}订单`}
+              description={`${pendingCheckout.package_name || `套餐 #${pendingCheckout.package_id}`} · ${pendingCheckout.seat_count} 席 · ¥${pendingCheckout.payable_amount || '--'}`}
+              startContent={<CircleDollarSign className="h-5 w-5" />}
+              endContent={<Button size="sm" color="warning" onPress={continuePayment}>{pendingCheckout.recoverable ? '继续支付' : '重新生成'}</Button>}
+            />
+          )}
+
+          <Card>
+            <CardBody className="gap-5 p-5 sm:p-6">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-xl font-bold">{team.team_name}</h2>
+                    {team.is_owner && <Chip size="sm" variant="flat" color="primary">所有者</Chip>}
+                  </div>
+                  <p className="mt-1 text-sm text-default-500">团队编号 #{team.id}</p>
+                </div>
+                {team.is_owner ? (
+                  <div className="flex flex-wrap gap-2">
+                    {team.status === 'active' && !team.pending_package_id && (
+                      <Button size="sm" variant="flat" startContent={<Settings2 className="h-4 w-4" />} onPress={() => openOrder('change')}>
+                        调整订阅
+                      </Button>
+                    )}
+                    {(team.status === 'active' || team.status === 'expired') && (
+                      <Button size="sm" color="primary" startContent={<CalendarDays className="h-4 w-4" />} onPress={() => openOrder('renewal')}>
+                        续费团队
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <Button size="sm" color="danger" variant="flat" startContent={<UserMinus className="h-4 w-4" />} onPress={() => void leaveTeam()}>
+                    退出团队
+                  </Button>
+                )}
+              </div>
+
+              <Divider />
+
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div>
+                  <p className="text-xs text-default-500">当前团队套餐</p>
+                  <p className="mt-1 font-semibold">{team.package_name || `套餐 #${team.package_id}`}</p>
+                  {team.package_level && <p className="mt-1 text-xs text-default-400">{team.package_level}</p>}
+                </div>
+                <div>
+                  <p className="text-xs text-default-500">席位使用</p>
+                  <p className="mt-1 font-semibold">{occupiedSeats} / {team.seat_count}</p>
+                  <p className="mt-1 text-xs text-default-400">含 {outgoing.length} 个待接受邀请</p>
+                </div>
+                <div>
+                  <p className="text-xs text-default-500">有效期至</p>
+                  <p className="mt-1 font-semibold">{formatDate(team.expires_at)}</p>
+                </div>
+              </div>
+
+              {team.pending_package_id && (
+                <Alert
+                  color="primary"
+                  variant="flat"
+                  title="下个周期已安排变更"
+                  description={`${team.pending_package_name || `套餐 #${team.pending_package_id}`} · ${team.pending_seat_count || team.seat_count} 席，将于 ${formatDate(team.pending_effective_at)} 生效`}
+                />
+              )}
+            </CardBody>
+          </Card>
+
+          {team.status === 'active' && (
+            <>
+              {team.is_owner && (
+                <Card>
+                  <CardBody className="gap-4 p-5 sm:p-6">
+                    <div>
+                      <h2 className="font-semibold">邀请成员</h2>
+                      <p className="mt-1 text-sm text-default-500">填写已注册用户的邮箱；邀请 7 天内有效并预留一个席位</p>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Input
+                        type="email"
+                        label="成员邮箱"
+                        placeholder="name@example.com"
+                        value={email}
+                        onValueChange={setEmail}
+                        onKeyDown={(event) => event.key === 'Enter' && void sendInvite()}
+                        startContent={<MailPlus className="h-4 w-4 text-default-400" />}
+                        className="flex-1"
+                      />
+                      <Button
+                        color="primary"
+                        className="h-14 sm:self-start"
+                        isLoading={inviting}
+                        isDisabled={occupiedSeats >= team.seat_count}
+                        onPress={() => void sendInvite()}
+                      >
+                        发送邀请
+                      </Button>
+                    </div>
+                    {occupiedSeats >= team.seat_count && <p className="text-sm text-warning-600">当前没有可用席位，请先调整团队订阅。</p>}
+                  </CardBody>
+                </Card>
+              )}
+
+              <Card>
+                <CardBody className="gap-3 p-5 sm:p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="font-semibold">团队成员</h2>
+                      <p className="mt-1 text-sm text-default-500">{activeMembers.length} 名成员</p>
+                    </div>
+                    <Chip size="sm" variant="flat">剩余 {Math.max(0, team.seat_count - occupiedSeats)} 席</Chip>
+                  </div>
+                  <Divider />
+                  {activeMembers.map((member) => (
+                    <div key={member.id} className="flex flex-col gap-3 border-b border-divider py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate font-medium">{memberName(member)}</p>
+                          <Chip size="sm" variant="flat" color={member.status === 'active' ? 'success' : 'warning'}>
+                            {MEMBER_STATUS[member.status] || member.status}
+                          </Chip>
+                          {member.role === 'owner' && <Chip size="sm" color="primary" variant="flat">所有者</Chip>}
+                        </div>
+                        <p className="mt-1 text-xs text-default-400">加入时间 {formatDate(member.joined_at)}</p>
+                      </div>
+                      {team.is_owner && member.role !== 'owner' && (
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            isLoading={actionId === member.id}
+                            onPress={() => void memberAction(member, member.status === 'suspended' ? 'resume' : 'suspend')}
+                          >
+                            {member.status === 'suspended' ? '恢复' : '暂停'}
+                          </Button>
+                          <Button size="sm" color="danger" variant="flat" isDisabled={actionId === member.id} onPress={() => void memberAction(member, 'remove')}>
+                            移除
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </CardBody>
+              </Card>
+            </>
+          )}
+        </>
+      )}
+
+      {(incoming.length > 0 || outgoing.length > 0) && (
+        <Card>
+          <CardBody className="gap-4 p-5 sm:p-6">
+            <div>
+              <h2 className="font-semibold">待处理邀请</h2>
+              <p className="mt-1 text-sm text-default-500">接受、拒绝或撤销尚未过期的邀请</p>
+            </div>
+            <Divider />
+            {incoming.map((invitation) => (
+              <InviteRow key={`incoming-${invitation.id}`} invitation={invitation} actionId={actionId} onAction={invitationAction} />
+            ))}
+            {outgoing.map((invitation) => (
+              <InviteRow key={`outgoing-${invitation.id}`} invitation={invitation} owner actionId={actionId} onAction={invitationAction} />
+            ))}
+          </CardBody>
+        </Card>
+      )}
+
+      <Modal isOpen={orderModal.isOpen} onClose={orderModal.onClose} size="lg" placement="center">
+        <ModalContent>
+          <ModalHeader>
+            {orderAction === 'initial' ? (team?.status === 'pending' ? '重新生成支付订单' : '创建组织团队') : orderAction === 'renewal' ? '续费团队' : '调整团队订阅'}
+          </ModalHeader>
+          <ModalBody className="gap-4">
+            {orderAction === 'initial' && (
+              <Input
+                label="团队名称"
+                value={teamName}
+                onValueChange={setTeamName}
+                description="创建后可在团队概览中识别该组织"
+                maxLength={120}
+              />
+            )}
+            <Select
+              label="团队套餐"
+              selectedKeys={planId ? [planId] : []}
+              isDisabled={orderAction === 'renewal' && team?.status === 'active'}
+              onSelectionChange={(keys) => {
+                const nextId = String(Array.from(keys)[0] || '');
+                setPlanId(nextId);
+                const plan = plans.find((item) => String(item.package_id) === nextId);
+                if (plan) setSeats((current) => Math.max(plan.min_seats, Math.min(plan.max_seats, current)));
+              }}
+              renderValue={(items) => items.map((item) => {
+                const plan = item.data as TeamPlan | undefined;
+                return plan ? `${plan.package_name} · ${plan.level}` : item.textValue;
+              })}
+            >
+              {plans.map((plan) => (
+                <SelectItem key={String(plan.package_id)} textValue={plan.package_name}>
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="font-medium">{plan.package_name}</p>
+                      <p className="text-xs text-default-500">{plan.level} · {plan.duration} 天 · {plan.min_seats}-{plan.max_seats} 个席位</p>
+                    </div>
+                    <p className="shrink-0 text-sm font-semibold">¥{plan.discounted_unit_price}/席</p>
+                  </div>
+                </SelectItem>
+              ))}
+            </Select>
+            <NumberInput
+              label="席位数量"
+              value={seats}
+              onValueChange={(value) => setSeats(Math.max(selectedPlan?.min_seats || 2, Math.trunc(value || 0)))}
+              minValue={selectedPlan?.min_seats || overview?.plan_config.min_seats || 2}
+              maxValue={selectedPlan?.max_seats || overview?.plan_config.max_seats || 200}
+              step={1}
+              isDisabled={orderAction === 'renewal' && team?.status === 'active'}
+              description={selectedPlan ? `${selectedPlan.min_seats}-${selectedPlan.max_seats} 个席位，包含团队所有者` : '请先选择套餐'}
+            />
+            {selectedPlan && (
+              <div className="grid gap-3 rounded-lg bg-default-50 p-4 sm:grid-cols-3">
+                <div><p className="text-xs text-default-500">套餐周期</p><p className="mt-1 font-semibold">{selectedPlan.duration} 天</p></div>
+                <div><p className="text-xs text-default-500">团队单价</p><p className="mt-1 font-semibold">¥{selectedPlan.discounted_unit_price}/席</p></div>
+                <div><p className="text-xs text-default-500">预计应付</p><p className="mt-1 font-semibold text-danger">¥{estimatedTotal.toFixed(2)}</p></div>
+              </div>
+            )}
+            {orderAction === 'change' && team?.status === 'active' && (
+              <Alert color="primary" variant="flat" title="套餐变更规则" description="升级付款后立即生效并开启一个新周期；降级或降低席位将在当前周期结束后生效。" />
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" onPress={orderModal.onClose}>取消</Button>
+            <Button color="primary" isLoading={creatingOrder} onPress={() => void createOrder()}>
+              创建支付订单
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <TeamPaymentModal
+        isOpen={paymentOpen}
+        checkout={checkout}
+        onClose={() => {
+          setPaymentOpen(false);
+          void loadOverview(true);
+        }}
+        onSuccess={async () => { await loadOverview(true); }}
+        onExpired={async () => { await loadOverview(true); }}
+      />
+    </div>
+  );
+};

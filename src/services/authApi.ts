@@ -42,7 +42,7 @@ export interface WechatBindRequest {
 // 创建一个配置好的axios实例
 const authApi = axios.create({
   baseURL: '/u', // 接口统一前缀
-  timeout: 10000, // 请求超时时间
+  timeout: 30000, // 请求超时时间
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -123,7 +123,7 @@ export const loginUser = (email: string, password: string): Promise<LoginRespons
 export const checkToken = (xuserid: string, xtoken: string): Promise<ApiResponse> => {
   const instance = axios.create({
     baseURL: '/u',
-    timeout: 10000,
+    timeout: 30000,
   });
   return instance.get('/check_xtoken', {
     headers: {
@@ -158,7 +158,7 @@ export const getWechatQRCode = (mode: 'login' | 'bind' = 'login'): Promise<Wecha
 export const checkWechatLoginStatus = (ticket: string): Promise<WechatLoginStatusResponse | null> => {
   const instance = axios.create({
     baseURL: '/u',
-    timeout: 10000,
+    timeout: 30000,
   });
 
   return instance.get('/qr_login_status', { params: { ticket } }).then(response => {

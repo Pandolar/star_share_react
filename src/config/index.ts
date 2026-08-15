@@ -13,7 +13,7 @@ const config = {
     api: {
         baseURL: '',
         adminPath: '',
-        timeout: 10000,
+        timeout: 30000,
     },
 
     // 应用配置

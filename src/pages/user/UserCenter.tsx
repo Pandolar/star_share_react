@@ -65,7 +65,7 @@ const ALL_TAB_CONFIGS: TabConfig[] = [
   },
   {
     key: 'team',
-    label: '团队',
+    label: '组织团队',
     icon: <Users size={20} />,
     component: TeamTab
   },
