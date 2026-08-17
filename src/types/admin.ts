@@ -407,6 +407,10 @@ export interface InvoiceRecord {
     user_id: number;
     user_email: string;
     package_name: string;
+    order_type?: string;
+    team_id?: number | null;
+    pricing_type?: 'personal' | 'team';
+    original_amount?: number;
     order_status: 'pending' | 'paid' | 'failed';
     invoice_status: 'awaiting_payment' | 'pending_issue' | 'processing' | 'issued' | 'cancelled' | 'payment_exception';
     base_amount: number;

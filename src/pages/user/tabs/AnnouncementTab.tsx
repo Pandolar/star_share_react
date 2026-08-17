@@ -6,8 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardBody, Spinner } from '@heroui/react';
 import { motion } from 'framer-motion';
 import { Bell, AlertCircle } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { UserMarkdown } from '../../../components/UserMarkdown';
 import { announcementApi } from '../../../services/userApi';
 
 export const AnnouncementTab: React.FC = () => {
@@ -77,107 +76,7 @@ export const AnnouncementTab: React.FC = () => {
               </div>
             </div>
           ) : notice ? (
-            <div className="prose prose-slate max-w-none dark:prose-invert [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  // 自定义组件样式
-                  h1: ({ children }) => (
-                    <h1 className="text-2xl font-bold text-default-900 mb-4 pb-2 border-b border-default-200">
-                      {children}
-                    </h1>
-                  ),
-                  h2: ({ children }) => (
-                    <h2 className="text-xl font-semibold text-default-800 mb-3 mt-6">
-                      {children}
-                    </h2>
-                  ),
-                  h3: ({ children }) => (
-                    <h3 className="text-lg font-medium text-default-700 mb-2 mt-5">
-                      {children}
-                    </h3>
-                  ),
-                  p: ({ children }) => (
-                    <p className="text-default-600 leading-relaxed mb-4">
-                      {children}
-                    </p>
-                  ),
-                  ul: ({ children }) => (
-                    <ul className="list-disc list-inside text-default-600 space-y-1 mb-4">
-                      {children}
-                    </ul>
-                  ),
-                  ol: ({ children }) => (
-                    <ol className="list-decimal list-inside text-default-600 space-y-1 mb-4">
-                      {children}
-                    </ol>
-                  ),
-                  li: ({ children }) => (
-                    <li className="pl-2">{children}</li>
-                  ),
-                  blockquote: ({ children }) => (
-                    <blockquote className="border-l-4 border-primary/30 pl-4 py-2 my-4 bg-primary/5 rounded-r-lg">
-                      {children}
-                    </blockquote>
-                  ),
-                  code: ({ children, ...props }) => (
-                    (props as any).inline ? (
-                      <code className="bg-default-100 text-primary px-1.5 py-0.5 rounded text-sm">
-                        {children}
-                      </code>
-                    ) : (
-                      <code className="block bg-default-100 p-4 rounded-lg text-sm overflow-x-auto">
-                        {children}
-                      </code>
-                    )
-                  ),
-                  strong: ({ children }) => (
-                    <strong className="font-semibold text-default-900">{children}</strong>
-                  ),
-                  em: ({ children }) => (
-                    <em className="italic text-default-700">{children}</em>
-                  ),
-                  a: ({ href, children }) => (
-                    <a
-                      href={href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:text-primary-600 underline"
-                    >
-                      {children}
-                    </a>
-                  ),
-                  table: ({ children }) => (
-                    <div className="overflow-x-auto my-4">
-                      <table className="min-w-full border border-default-200 rounded-lg">
-                        {children}
-                      </table>
-                    </div>
-                  ),
-                  thead: ({ children }) => (
-                    <thead className="bg-default-50">{children}</thead>
-                  ),
-                  tbody: ({ children }) => (
-                    <tbody className="divide-y divide-default-200">{children}</tbody>
-                  ),
-                  tr: ({ children }) => (
-                    <tr className="hover:bg-default-50">{children}</tr>
-                  ),
-                  th: ({ children }) => (
-                    <th className="px-4 py-2 text-left text-sm font-medium text-default-700 border-r border-default-200 last:border-r-0">
-                      {children}
-                    </th>
-                  ),
-                  td: ({ children }) => (
-                    <td className="px-4 py-2 text-sm text-default-600 border-r border-default-200 last:border-r-0">
-                      {children}
-                    </td>
-                  ),
-                }}
-              >
-                {notice}
-              </ReactMarkdown>
-            </div>
+            <UserMarkdown>{notice}</UserMarkdown>
           ) : (
             <div className="text-center py-12 text-default-400">
               <Bell size={48} className="mx-auto mb-4 opacity-50" />

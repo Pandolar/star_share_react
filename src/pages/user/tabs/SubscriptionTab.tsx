@@ -3,10 +3,10 @@
  * 显示用户当前订阅和可用套餐
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, CardBody, Button, Chip, Input, Spinner, Tab, Tabs } from '@heroui/react';
+import { Alert, Card, CardBody, Button, Chip, Input, Spinner, Tab, Tabs } from '@heroui/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Package, Star, Crown, AlertCircle, Calendar, Timer, ChevronDown, Info } from 'lucide-react';
-import { packageUserApi, orderUserApi } from '../../../services/userApi';
+import { packageUserApi, orderUserApi, teamUserApi } from '../../../services/userApi';
 import { toast } from '../../../utils/toast';
 import { useIsMobile } from '../../../hooks/useIsMobile';
 import { useWhiteLabel } from '../../../contexts/WhiteLabelContext';
@@ -15,6 +15,7 @@ import remarkGfm from 'remark-gfm';
 import { PaymentModal } from './subscription/PaymentModal';
 import { CdkRedeemModal } from './subscription/CdkRedeemModal';
 import { useUserAgreementRequirement } from '../../../components/UserAgreementConsent';
+import { useNavigate } from 'react-router-dom';
 import {
   PackageInfo,
   OrderInfo,
@@ -39,10 +40,14 @@ export const SubscriptionTab: React.FC = () => {
   const [showSubscriptionGuide, setShowSubscriptionGuide] = useState(false);
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
   const [agreementAccepted, setAgreementAccepted] = useState(true);
+  const [teamMembershipBlocked, setTeamMembershipBlocked] = useState(false);
+  const [teamMembershipLoading, setTeamMembershipLoading] = useState(true);
+  const [teamMembershipName, setTeamMembershipName] = useState('');
 
   const isMobileDevice = useIsMobile();
   const { isWhiteLabel, loading: whiteLabelLoading, subscriptionNotice } = useWhiteLabel();
   const { isRequired: isAgreementRequired } = useUserAgreementRequirement();
+  const navigate = useNavigate();
 
   const [cdkCode, setCdkCode] = useState('');
 
@@ -108,8 +113,44 @@ export const SubscriptionTab: React.FC = () => {
     fetchPackages();
   }, [fetchPackages]);
 
+  useEffect(() => {
+    if (whiteLabelLoading) return;
+    if (isWhiteLabel) {
+      setTeamMembershipBlocked(false);
+      setTeamMembershipLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setTeamMembershipLoading(true);
+    void teamUserApi.getTeam()
+      .then((response) => {
+        if (cancelled) return;
+        const currentTeam = response.code === 20000 ? response.data?.team : null;
+        setTeamMembershipBlocked(Boolean(currentTeam));
+        setTeamMembershipName(currentTeam?.team_name || '当前组织团队');
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTeamMembershipBlocked(false);
+          setTeamMembershipName('');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setTeamMembershipLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [isWhiteLabel, whiteLabelLoading]);
+
   // 创建订单
   const createOrder = async (pkg: PackageInfo) => {
+    if (teamMembershipLoading) {
+      toast.info('正在确认组织团队状态，请稍后');
+      return;
+    }
+    if (teamMembershipBlocked) {
+      toast.warning('您当前正在组织团队内，请先退出组织团队后再购买个人套餐');
+      return;
+    }
     setAgreementAccepted(true);
     try {
       setOrderLoading(true);
@@ -446,6 +487,16 @@ export const SubscriptionTab: React.FC = () => {
         </CardBody>
       </Card>
       )}
+      {teamMembershipBlocked && !isWhiteLabel && (
+        <Alert
+          className="mb-6"
+          color="warning"
+          variant="flat"
+          title="组织团队成员无法购买个人套餐"
+          description={`您当前属于“${teamMembershipName}”。无论团队订阅是否生效，都需要先退出组织团队后才能购买个人套餐。`}
+          endContent={<Button size="sm" color="warning" variant="flat" onPress={() => navigate('/user-center?tab=team')}>前往组织团队</Button>}
+        />
+      )}
 
       {loading && (
         <div className="flex flex-col items-center justify-center py-16">
@@ -581,7 +632,7 @@ export const SubscriptionTab: React.FC = () => {
                         ) : (
                           <button
                             className={`hero-button ${isPopular ? 'primary' : 'secondary'}`}
-                            disabled={pkg.status !== 1 || (orderLoading && selectedPackage?.id === pkg.id)}
+                            disabled={pkg.status !== 1 || teamMembershipLoading || teamMembershipBlocked || (orderLoading && selectedPackage?.id === pkg.id)}
                             onClick={() => createOrder(pkg)}
                           >
                             {orderLoading && selectedPackage?.id === pkg.id ? (
@@ -590,7 +641,7 @@ export const SubscriptionTab: React.FC = () => {
                                 处理中...
                               </>
                             ) : (
-                              pkg.status === 1 ? '立即订阅' : '暂不可用'
+                              pkg.status === 1 ? (teamMembershipLoading ? '检查团队状态...' : teamMembershipBlocked ? '需先退出团队' : '立即订阅') : '暂不可用'
                             )}
                           </button>
                         )}
@@ -674,7 +725,7 @@ export const SubscriptionTab: React.FC = () => {
                       ) : (
                         <button
                           className="hero-button primary"
-                          disabled={pkg.status !== 1 || (orderLoading && selectedPackage?.id === pkg.id)}
+                          disabled={pkg.status !== 1 || teamMembershipLoading || teamMembershipBlocked || (orderLoading && selectedPackage?.id === pkg.id)}
                           onClick={() => createOrder(pkg)}
                           style={{ height: '40px', fontSize: '14px' }}
                         >
@@ -684,7 +735,7 @@ export const SubscriptionTab: React.FC = () => {
                               处理中...
                             </>
                           ) : (
-                            pkg.status === 1 ? '立即订阅' : '暂不可用'
+                            pkg.status === 1 ? (teamMembershipLoading ? '检查团队状态...' : teamMembershipBlocked ? '需先退出团队' : '立即订阅') : '暂不可用'
                           )}
                         </button>
                       )}

@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Button, Card, CardBody, Spinner } from '@heroui/react';
 import { Building2, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { UserMarkdown } from '../../../components/UserMarkdown';
 import { announcementApi } from '../../../services/userApi';
 
 export const AboutUsTab: React.FC = () => {
@@ -53,9 +52,7 @@ export const AboutUsTab: React.FC = () => {
               </Button>
             </div>
           ) : content ? (
-            <div className="prose prose-slate max-w-none text-default-600 dark:prose-invert [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-primary/30 [&_blockquote]:bg-primary/5 [&_blockquote]:px-4 [&_blockquote]:py-2 [&_code]:rounded [&_code]:bg-default-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_h1]:border-b [&_h1]:border-divider [&_h1]:pb-2 [&_h1]:text-2xl [&_h1]:font-bold [&_h2]:mt-6 [&_h2]:text-xl [&_h2]:font-semibold [&_h3]:mt-5 [&_h3]:text-lg [&_h3]:font-semibold [&_li]:ml-5 [&_ol]:list-decimal [&_p]:leading-7 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-divider [&_td]:p-2 [&_th]:border [&_th]:border-divider [&_th]:bg-default-50 [&_th]:p-2 [&_ul]:list-disc">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-            </div>
+            <UserMarkdown>{content}</UserMarkdown>
           ) : (
             <div className="py-12 text-center text-default-400">暂无关于我们内容</div>
           )}

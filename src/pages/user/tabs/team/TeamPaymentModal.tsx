@@ -17,6 +17,7 @@ import {
   Clock3,
   ExternalLink,
   QrCode,
+  ReceiptText,
   RefreshCw,
   TriangleAlert,
 } from 'lucide-react';
@@ -132,6 +133,7 @@ export const TeamPaymentModal: React.FC<TeamPaymentModalProps> = ({
   const actionLabel = ACTION_LABELS[checkout?.action || 'initial'];
   const totalMinutes = 5 * 60 * 1000;
   const progressValue = Math.max(0, Math.min(100, (remainingMs / totalMinutes) * 100));
+  const invoicePoints = Number(checkout?.invoice_snapshot?.surcharge_rate || 0) * 100;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="lg" placement="center" scrollBehavior="inside">
@@ -141,7 +143,7 @@ export const TeamPaymentModal: React.FC<TeamPaymentModalProps> = ({
             <QrCode className="h-5 w-5" />
           </div>
           <div>
-            <div className="text-lg font-semibold">团队订阅付款</div>
+            <div className="flex flex-wrap items-center gap-2 text-lg font-semibold">团队订阅付款{checkout?.invoice_requested && <Chip size="sm" color="primary" variant="flat">开票订单</Chip>}</div>
             <div className="text-xs font-normal text-default-500">{actionLabel}</div>
           </div>
         </ModalHeader>
@@ -179,11 +181,25 @@ export const TeamPaymentModal: React.FC<TeamPaymentModalProps> = ({
                     <p className="mt-1 font-semibold">{checkout?.seat_count} 席</p>
                   </div>
                   <div>
-                    <p className="text-xs text-default-500">应付金额</p>
+                    <p className="text-xs text-default-500">{checkout?.invoice_requested ? `开票价（加 ${Number(invoicePoints.toFixed(4))} 个点）` : '应付金额'}</p>
                     <p className="mt-1 font-semibold text-danger">¥{checkout?.payable_amount || '--'}</p>
                   </div>
                 </CardBody>
               </Card>
+              {checkout?.invoice_requested && checkout.invoice_snapshot && (
+                <Card shadow="none" className="border border-primary-200 bg-primary-50/30">
+                  <CardBody className="gap-2 p-4 text-sm">
+                    <div className="flex items-center gap-2 font-medium text-primary"><ReceiptText className="h-4 w-4" />开票信息</div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <p>团队折后金额：¥{checkout.invoice_snapshot.base_amount}</p>
+                      <p>开票加点：¥{checkout.invoice_snapshot.surcharge_amount}</p>
+                      <p>发票抬头：{checkout.invoice_snapshot.title}</p>
+                      <p>税号：{checkout.invoice_snapshot.tax_number}</p>
+                      <p className="sm:col-span-2">接收邮箱：{checkout.invoice_snapshot.email} · 预计支付后 {checkout.invoice_snapshot.delivery_workdays} 个工作日发送</p>
+                    </div>
+                  </CardBody>
+                </Card>
+              )}
 
               <div className="flex flex-col items-center gap-3 py-1">
                 {qrCodeValue ? (

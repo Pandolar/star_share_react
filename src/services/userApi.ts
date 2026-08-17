@@ -590,6 +590,7 @@ export interface TeamCheckout {
     package_id: number;
     package_name?: string | null;
     seat_count: number;
+    base_amount?: string;
     payable_amount?: string;
     payment_url?: string | null;
     qr_code?: string | null;
@@ -597,6 +598,8 @@ export interface TeamCheckout {
     order_type?: 'team_initial' | 'team_change' | 'team_renewal';
     action?: 'initial' | 'change' | 'renewal';
     expires_in_seconds?: number;
+    invoice_requested?: boolean;
+    invoice_snapshot?: InvoiceOrderSnapshot | null;
     recoverable?: boolean;
 }
 
@@ -633,11 +636,13 @@ export const teamUserApi = {
         seat_count: number;
         team_name?: string;
         replace_pending?: boolean;
+        invoice_requested?: boolean;
     }): Promise<ApiResponse<TeamCheckout & { success?: boolean }>> => createUserRequest(getUserApiUrl('/u/team/order'), {
         method: 'POST',
         body: JSON.stringify(params),
     }),
     cancelPending: async (): Promise<ApiResponse<{ team_id: number; cancelled: boolean }>> => createUserRequest(getUserApiUrl('/u/team/cancel'), { method: 'POST' }),
+    getInvoiceEligibility: async (packageId: number, seatCount: number): Promise<ApiResponse<InvoiceEligibility>> => createUserRequest(getUserApiUrl(`/u/team/invoice/eligibility?package_id=${packageId}&seat_count=${seatCount}`), { method: 'GET' }),
     invite: async (params: { email: string }): Promise<ApiResponse<TeamInvitation>> => createUserRequest(getUserApiUrl('/u/team/invitations'), { method: 'POST', body: JSON.stringify(params) }),
     acceptInvitation: async (invitationId: number): Promise<ApiResponse<unknown>> => createUserRequest(getUserApiUrl(`/u/team/invitations/${invitationId}/accept`), { method: 'POST' }),
     rejectInvitation: async (invitationId: number): Promise<ApiResponse<unknown>> => createUserRequest(getUserApiUrl(`/u/team/invitations/${invitationId}/reject`), { method: 'POST' }),
