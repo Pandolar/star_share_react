@@ -16,7 +16,6 @@ import {
   Select,
   SelectItem,
   Spinner,
-  Switch,
   useDisclosure,
 } from '@heroui/react';
 import {
@@ -28,8 +27,6 @@ import {
   Crown,
   Info,
   MailPlus,
-  ReceiptText,
-  UserRoundCog,
   RefreshCw,
   Settings2,
   ShieldCheck,
@@ -37,9 +34,7 @@ import {
   UsersRound,
   X,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import {
-  InvoiceEligibility,
   TeamCheckout,
   TeamInvitation,
   TeamMember,
@@ -57,14 +52,6 @@ const formatDate = (value?: string | null) => value
 
 const memberName = (member: TeamMember) => member.username || member.email || `用户 #${member.user_id}`;
 const formatDiscount = (rate: number) => `${Number((rate * 10).toFixed(2))} 折`;
-const INVOICE_REASON: Record<string, string> = {
-  invoice_disabled: '开票功能暂未开放',
-  below_threshold: '当前团队订单金额未达到开票门槛',
-  email_unbound: '请先绑定邮箱后再申请开票',
-  email_not_allowed: '当前邮箱不符合开票要求，请联系客服',
-  billing_profile_missing: '请先完善开票主体信息',
-  non_self_site: '开票仅在自营站点可用',
-};
 
 const TEAM_STATUS: Record<string, { label: string; color: 'success' | 'warning' | 'danger' | 'default' }> = {
   active: { label: '生效中', color: 'success' },
@@ -152,10 +139,6 @@ export const TeamTab: React.FC = () => {
   const [cancellingTeam, setCancellingTeam] = useState(false);
   const [agreementAccepted, setAgreementAccepted] = useState(true);
   const { isRequired: isAgreementRequired } = useUserAgreementRequirement();
-  const [invoiceRequested, setInvoiceRequested] = useState(false);
-  const [invoiceEligibility, setInvoiceEligibility] = useState<InvoiceEligibility | null>(null);
-  const [invoiceEligibilityLoading, setInvoiceEligibilityLoading] = useState(false);
-  const navigate = useNavigate();
 
   const loadOverview = useCallback(async (background = false): Promise<TeamOverview | null> => {
     if (background) setRefreshing(true);
@@ -202,37 +185,6 @@ export const TeamTab: React.FC = () => {
   const estimatedTotal = selectedPlan
     ? Number(selectedPlan.unit_price) * seats * selectedPlan.discount_rate
     : 0;
-  const invoiceOptionVisible = invoiceEligibilityLoading || !invoiceEligibility || !['invoice_disabled', 'non_self_site'].includes(invoiceEligibility.reason || '');
-  const invoiceRatePoints = Number(invoiceEligibility?.surcharge_rate || 0) * 100;
-
-  useEffect(() => {
-    if (!orderModal.isOpen || !selectedPlan) {
-      setInvoiceEligibility(null);
-      setInvoiceEligibilityLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setInvoiceEligibilityLoading(true);
-    const timer = window.setTimeout(() => {
-      void teamUserApi.getInvoiceEligibility(selectedPlan.package_id, seats)
-        .then((response) => {
-          if (cancelled) return;
-          const next = response.code === 20000 ? response.data || null : null;
-          setInvoiceEligibility(next);
-          if (next?.reason === 'invoice_disabled' || next?.reason === 'non_self_site') setInvoiceRequested(false);
-        })
-        .catch(() => {
-          if (!cancelled) setInvoiceEligibility(null);
-        })
-        .finally(() => {
-          if (!cancelled) setInvoiceEligibilityLoading(false);
-        });
-    }, 200);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [orderModal.isOpen, seats, selectedPlan]);
 
   const openOrder = (
     action: 'initial' | 'change' | 'renewal',
@@ -243,7 +195,6 @@ export const TeamTab: React.FC = () => {
     setOrderAction(action);
     setPlanId(plan ? String(plan.package_id) : '');
     const desiredSeats = sourceCheckout?.seat_count || team?.seat_count || plan?.min_seats || overview?.plan_config.min_seats || 2;
-    setInvoiceRequested(Boolean(sourceCheckout?.invoice_requested));
     setSeats(Math.max(plan?.min_seats || 2, Math.min(plan?.max_seats || 200, desiredSeats)));
     orderModal.onOpen();
   };
@@ -261,11 +212,6 @@ export const TeamTab: React.FC = () => {
 
   const replacePendingOrder = () => {
     openOrder(overview?.pending_checkout?.action || 'initial', overview?.pending_checkout);
-  };
-
-  const goToInvoiceProfile = (openEdit: 'email' | 'billing_profile') => {
-    orderModal.onClose();
-    navigate('/user-center?tab=profile', { state: { openEdit } });
   };
 
   const cancelPendingTeam = async () => {
@@ -298,10 +244,6 @@ export const TeamTab: React.FC = () => {
       toast.warning('请先勾选同意《用户协议》');
       return;
     }
-    if (invoiceRequested && !invoiceEligibility?.eligible) {
-      toast.warning(INVOICE_REASON[invoiceEligibility?.reason || ''] || '当前团队订单无法开票');
-      return;
-    }
     setCreatingOrder(true);
     try {
       const response = await teamUserApi.createOrder({
@@ -310,7 +252,6 @@ export const TeamTab: React.FC = () => {
         seat_count: seats,
         team_name: orderAction === 'initial' ? teamName.trim() : undefined,
         replace_pending: Boolean(overview?.pending_checkout),
-        invoice_requested: invoiceRequested,
       });
       if (response.code !== 20000 || !response.data?.order_id) {
         throw new Error(response.msg || '创建支付订单失败');
@@ -338,6 +279,25 @@ export const TeamTab: React.FC = () => {
       setCreatingOrder(false);
     }
   };
+  const createInvoiceOrder = async (): Promise<TeamCheckout | null> => {
+    if (!checkout?.checkout_id) return null;
+    try {
+      const response = await teamUserApi.createOrder({
+        action: checkout.action || (team?.status === 'pending' ? 'initial' : 'renewal'),
+        package_id: checkout.package_id,
+        seat_count: checkout.seat_count,
+        checkout_id: checkout.checkout_id,
+        invoice_requested: true,
+      });
+      if (response.code !== 20000 || !response.data?.order_id) throw new Error(response.msg || '创建开票订单失败');
+      setCheckout(response.data);
+      return response.data;
+    } catch (requestError) {
+      toast.error(requestError instanceof Error ? requestError.message : '创建开票订单失败');
+      return null;
+    }
+  };
+
 
   const sendInvite = async () => {
     const normalizedEmail = email.trim();
@@ -766,45 +726,6 @@ export const TeamTab: React.FC = () => {
                 <div><p className="text-xs text-default-500">预计应付</p><p className="mt-1 font-semibold text-danger">¥{estimatedTotal.toFixed(2)}</p></div>
               </div>
             )}
-            {invoiceOptionVisible && (
-              <div className="space-y-3 rounded-lg border border-primary-200 bg-primary-50/30 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <ReceiptText className="h-4 w-4 text-primary" />
-                    <div>
-                      <p className="text-sm font-medium">申请开票</p>
-                      <p className="text-xs text-default-500">未选择开票并完成支付后，无法补开</p>
-                    </div>
-                  </div>
-                  <Switch
-                    size="sm"
-                    isSelected={invoiceRequested}
-                    isDisabled={invoiceEligibilityLoading || !invoiceEligibility || invoiceEligibility.reason === 'below_threshold' || invoiceEligibility.reason === 'email_not_allowed'}
-                    onValueChange={setInvoiceRequested}
-                    aria-label="团队订单是否开票"
-                  >
-                    是否开票
-                  </Switch>
-                </div>
-                {invoiceEligibilityLoading ? (
-                  <div className="flex items-center gap-2 text-sm text-default-500"><Spinner size="sm" />正在检查开票资格...</div>
-                ) : invoiceEligibility?.eligible ? (
-                  invoiceRequested && <div className="grid gap-2 rounded-lg bg-background p-3 text-sm sm:grid-cols-2">
-                    <p>团队折后金额：<strong>¥{invoiceEligibility.base_amount}</strong></p>
-                    <p>开票加 {Number(invoiceRatePoints.toFixed(4))} 个点：<strong>¥{invoiceEligibility.surcharge_amount}</strong></p>
-                    <p>开票应付金额：<strong className="text-primary">¥{invoiceEligibility.payable_amount}</strong></p>
-                    <p>预计发送：支付后 {invoiceEligibility.delivery_workdays} 个工作日</p>
-                    <p className="sm:col-span-2">抬头：{invoiceEligibility.billing_profile?.title} · 税号：{invoiceEligibility.billing_profile?.tax_number} · 邮箱：{invoiceEligibility.email}</p>
-                  </div>
-                ) : invoiceEligibility ? (
-                  <div className="flex flex-col gap-2 rounded-lg bg-warning-50 p-3 text-sm text-warning-700 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-start gap-2"><UserRoundCog className="mt-0.5 h-4 w-4 shrink-0" /><span>{INVOICE_REASON[invoiceEligibility.reason || ''] || '当前团队订单无法开票'}</span></div>
-                    {invoiceRequested && invoiceEligibility.reason === 'email_unbound' && <Button size="sm" color="warning" variant="flat" onPress={() => goToInvoiceProfile('email')}>去绑定邮箱</Button>}
-                    {invoiceRequested && invoiceEligibility.reason === 'billing_profile_missing' && <Button size="sm" color="warning" variant="flat" onPress={() => goToInvoiceProfile('billing_profile')}>去完善开票信息</Button>}
-                  </div>
-                ) : <p className="text-sm text-danger">开票资格查询失败，请稍后重试</p>}
-              </div>
-            )}
             {orderAction === 'change' && team?.status === 'active' && (
               <Alert color="primary" variant="flat" title="套餐变更规则" description="升级付款后立即生效并开启一个新周期；降级或降低席位将在当前周期结束后生效。" />
             )}
@@ -812,7 +733,7 @@ export const TeamTab: React.FC = () => {
           </ModalBody>
           <ModalFooter>
             <Button variant="light" onPress={orderModal.onClose}>取消</Button>
-            <Button color="primary" isLoading={creatingOrder} isDisabled={(isAgreementRequired && !agreementAccepted) || invoiceEligibilityLoading || (invoiceRequested && !invoiceEligibility?.eligible)} onPress={() => void createOrder()}>
+            <Button color="primary" isLoading={creatingOrder} isDisabled={isAgreementRequired && !agreementAccepted} onPress={() => void createOrder()}>
               创建支付订单
             </Button>
           </ModalFooter>
@@ -841,6 +762,7 @@ export const TeamTab: React.FC = () => {
         }}
         onSuccess={async () => { await loadOverview(true); }}
         onExpired={async () => { await loadOverview(true); }}
+        onCreateInvoiceOrder={createInvoiceOrder}
       />
     </div>
   );

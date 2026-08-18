@@ -636,6 +636,7 @@ export const teamUserApi = {
         seat_count: number;
         team_name?: string;
         replace_pending?: boolean;
+        checkout_id?: string;
         invoice_requested?: boolean;
     }): Promise<ApiResponse<TeamCheckout & { success?: boolean }>> => createUserRequest(getUserApiUrl('/u/team/order'), {
         method: 'POST',
