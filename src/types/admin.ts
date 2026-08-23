@@ -382,6 +382,8 @@ export interface Order {
     package?: AdminPackageSummary | null;
     source_domain?: string | null;
     cdk_id?: number | null;
+    manual_fulfillment_allowed?: boolean;
+
 }
 
 export interface UpdateOrderRequest {

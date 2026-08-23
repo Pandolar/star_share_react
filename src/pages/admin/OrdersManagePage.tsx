@@ -38,6 +38,7 @@ import {
     ShoppingCart,
     Filter,
     RefreshCw,
+    PackageCheck,
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import { useSearchParams } from 'react-router-dom';
@@ -67,11 +68,13 @@ const OrdersManagePage: React.FC = () => {
     const [total, setTotal] = useState(0);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [formData, setFormData] = useState<Partial<UpdateOrderRequest>>({});
+    const [fulfillmentSubmitting, setFulfillmentSubmitting] = useState(false);
 
     // Modal控制
     const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure();
     const { isOpen: isViewOpen, onOpen: onViewOpen, onClose: onViewClose } = useDisclosure();
     const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
+    const { isOpen: isFulfillmentOpen, onOpen: onFulfillmentOpen, onClose: onFulfillmentClose } = useDisclosure();
 
     const [pageSize, setPageSize] = useState<number>(10);
 
@@ -235,6 +238,31 @@ const OrdersManagePage: React.FC = () => {
         onDeleteOpen();
     };
 
+    const openFulfillmentModal = (order: Order) => {
+        setSelectedOrder(order);
+        onFulfillmentOpen();
+    };
+
+    const handleFulfillment = async () => {
+        if (!selectedOrder || fulfillmentSubmitting) return;
+        setFulfillmentSubmitting(true);
+        try {
+            const response = await adminApiService.fulfillOrder(selectedOrder.id);
+            if (response.code === 20000) {
+                showToast('补单成功，用户套餐已开通', 'success');
+                onFulfillmentClose();
+                setSelectedOrder(null);
+                await fetchOrders();
+            } else {
+                showToast(response.msg || '补单失败', 'error');
+            }
+        } catch {
+            showToast('补单失败', 'error');
+        } finally {
+            setFulfillmentSubmitting(false);
+        }
+    };
+
     // 状态渲染
     const renderStatus = (status: string) => {
         const colorMap = {
@@ -287,6 +315,16 @@ const OrdersManagePage: React.FC = () => {
                 >
                     查看详情
                 </DropdownItem>
+                {order.manual_fulfillment_allowed ? (
+                    <DropdownItem
+                        key="fulfill"
+                        color="success"
+                        startContent={<PackageCheck className="w-4 h-4" />}
+                        onPress={() => openFulfillmentModal(order)}
+                    >
+                        一键补单
+                    </DropdownItem>
+                ) : null}
                 <DropdownItem
                     key="edit"
                     startContent={<Edit className="w-4 h-4" />}
@@ -592,6 +630,35 @@ const OrdersManagePage: React.FC = () => {
                         <Button color="primary" onPress={onViewClose}>
                             关闭
                         </Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
+
+            {/* 人工补单确认Modal */}
+            <Modal isOpen={isFulfillmentOpen} onClose={onFulfillmentClose} size="lg">
+                <ModalContent>
+                    <ModalHeader className="flex items-center gap-2">
+                        <PackageCheck className="w-5 h-5 text-success" />
+                        确认一键补单
+                    </ModalHeader>
+                    <ModalBody className="gap-4">
+                        <Alert
+                            isVisible
+                            color="warning"
+                            variant="flat"
+                            title="请先核对支付渠道确已到账"
+                            description="确认后会立即为该用户开通订单对应套餐，并将订单改为已支付；同一订单不可重复补单。"
+                        />
+                        <div className="space-y-2 text-sm">
+                            <p>订单号：<strong className="break-all">{selectedOrder?.order_id}</strong></p>
+                            <p>用户：<strong>{selectedOrder?.user?.email || `用户 #${selectedOrder?.user_id || '-'}`}</strong></p>
+                            <p>套餐：<strong>{selectedOrder?.package?.package_name || `套餐 #${selectedOrder?.package_id || '-'}`}</strong></p>
+                            <p>实付金额：<strong>{selectedOrder?.paid_amount != null ? `¥${Number(selectedOrder.paid_amount).toFixed(2)}` : '-'}</strong></p>
+                        </div>
+                    </ModalBody>
+                    <ModalFooter>
+                        <Button variant="light" onPress={onFulfillmentClose} isDisabled={fulfillmentSubmitting}>取消</Button>
+                        <Button color="success" onPress={handleFulfillment} isLoading={fulfillmentSubmitting}>确认补单并开通套餐</Button>
                     </ModalFooter>
                 </ModalContent>
             </Modal>

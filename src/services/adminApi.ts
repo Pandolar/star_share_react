@@ -490,6 +490,18 @@ class AdminApiService {
         return response.data;
     }
 
+    async fulfillOrder(id: number): Promise<AdminApiResponse<{
+        id: number;
+        order_id: string;
+        status: 'paid';
+        user_id: number;
+        package_id: number;
+        invite_reward_processed: boolean;
+    }>> {
+        const response = await this.api.post('/star/order/fulfill', { id });
+        return response.data;
+    }
+
     /**
      * 删除订单
      */
