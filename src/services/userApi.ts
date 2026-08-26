@@ -559,15 +559,6 @@ export const inviteCashbackApi = {
     getOverview: async (): Promise<ApiResponse<InviteCashbackOverview>> => {
         return createUserRequest(getUserApiUrl('/u/invite_cashback'), { method: 'GET' });
     },
-    activate: async (): Promise<ApiResponse<InviteCashbackOverview>> => {
-        return createUserRequest(getUserApiUrl('/u/invite_cashback_activate'), { method: 'POST' });
-    },
-    setAutoJoin: async (enabled: boolean): Promise<ApiResponse<{ enabled: boolean }>> => {
-        return createUserRequest(getUserApiUrl('/u/invite_cashback_auto_join'), {
-            method: 'PUT',
-            body: JSON.stringify({ enabled }),
-        });
-    },
     withdraw: async (): Promise<ApiResponse<{ workorder_id: number; status: string; amount: number }>> => {
         return createUserRequest(getUserApiUrl('/u/invite_withdraw'), { method: 'POST' });
     },

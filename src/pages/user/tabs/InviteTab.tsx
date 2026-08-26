@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Card, CardBody, Chip, Divider, Input, Spinner, Switch } from '@heroui/react';
+import { Button, Card, CardBody, Chip, Divider, Input, Spinner } from '@heroui/react';
 import { motion } from 'framer-motion';
 import {
   Copy,
@@ -60,6 +60,7 @@ interface InviteeRecord {
   orders_by_package: Array<{ package_name: string; count: number }>;
   orders: InviteOrderRecord[];
   total_reward_days?: number;
+  total_reward_amount?: number;
 }
 
 const copyText = async (text: string, successMessage: string) => {
@@ -94,8 +95,6 @@ export const InviteTab: React.FC = () => {
   const [invitees, setInvitees] = useState<InviteeRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [cashbackAction, setCashbackAction] = useState<'activate' | 'withdraw' | null>(null);
-  const [autoJoinUpdating, setAutoJoinUpdating] = useState(false);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const { isWhiteLabel, loading: whiteLabelLoading } = useWhiteLabel();
@@ -165,45 +164,15 @@ export const InviteTab: React.FC = () => {
     }
   };
 
-  const activateCashback = async () => {
-    try {
-      setCashbackAction('activate');
-      const response = await inviteCashbackApi.activate();
-      if (response.code !== 20000) throw new Error(response.msg || '开启返现活动失败');
-      setCashbackOverview(response.data || null);
-      toast.success(response.msg || '返现活动已开启');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : '开启返现活动失败');
-    } finally {
-      setCashbackAction(null);
-    }
-  };
-
-  const setAutoJoin = async (enabled: boolean) => {
-    try {
-      setAutoJoinUpdating(true);
-      const response = await inviteCashbackApi.setAutoJoin(enabled);
-      if (response.code !== 20000) throw new Error(response.msg || '设置失败');
-      await refreshCashback();
-      toast.success(enabled ? '已开启后续活动自动参加' : '已关闭后续活动自动参加');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : '设置失败');
-    } finally {
-      setAutoJoinUpdating(false);
-    }
-  };
 
   const withdrawCashback = async () => {
     try {
-      setCashbackAction('withdraw');
       const response = await inviteCashbackApi.withdraw();
       if (response.code !== 20000) throw new Error(response.msg || '提现申请失败');
       toast.success(response.msg || '提现申请已提交');
       await refreshCashback();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '提现申请失败');
-    } finally {
-      setCashbackAction(null);
     }
   };
 
@@ -212,8 +181,8 @@ export const InviteTab: React.FC = () => {
   const cashbackSummary = cashbackOverview?.cashback_summary;
   const cashbackWithdrawal = cashbackOverview?.withdrawal;
   const cashbackAvailable = cashbackSummary?.available_amount ?? 0;
-  const eligibleToActivate = Boolean(cashbackEligibility?.eligible);
   const canWithdraw = Boolean(cashbackWithdrawal?.enabled && cashbackAvailable >= (cashbackWithdrawal?.min_amount ?? 0));
+  const cashbackActiveForUser = Boolean(activeCashbackCampaign && cashbackOverview?.enrollment);
 
   if (loading) {
 
@@ -244,7 +213,6 @@ export const InviteTab: React.FC = () => {
   const rewardRatioPercent = overview?.reward_policy_summary?.reward_ratio_percent ?? 0;
   const inviteeRewardRatioPercent = overview?.reward_policy_summary?.invitee_reward_ratio_percent ?? 5;
   const hasPackageSpecificRules = Boolean(overview?.reward_policy_summary?.has_package_specific_rules);
-  const minRewardDurationDays = overview?.reward_policy_summary?.min_reward_duration_days ?? 7;
   const inviteEligible = Boolean(overview?.invite_eligible);
   const historyPackageValue = overview?.history_package_value ?? 0;
   const minHistoryPackageValue = overview?.min_history_package_value ?? 45;
@@ -281,54 +249,28 @@ export const InviteTab: React.FC = () => {
                 <h2 className="mt-2 text-xl font-bold text-default-900">{activeCashbackCampaign?.copywriting.headline || cashbackOverview.ended_campaign?.name || '邀请返现'}</h2>
                 {activeCashbackCampaign && <p className="mt-1 text-sm text-default-500">活动截止至：{activeCashbackCampaign.ends_at}</p>}
               </div>
-              {activeCashbackCampaign && !cashbackOverview.enrollment && <Button color="success" isDisabled={!eligibleToActivate} isLoading={cashbackAction === 'activate'} onPress={activateCashback}>开启本期活动</Button>}
             </div>
             {activeCashbackCampaign ? <>
-              {cashbackOverview.enrollment ? <div className="rounded-xl bg-success/10 border border-success/20 p-4 text-sm text-success-700">您已参加本期活动，邀请好友完成符合条件的订阅后，返现将自动计入可提现余额。</div> : <div className="rounded-xl bg-warning/10 border border-warning/20 p-4 text-sm text-default-700 space-y-2"><div className="font-medium text-default-900">完成以下资格后即可开启本期返现活动</div><div>账号注册：{cashbackEligibility?.account_age_days ?? 0} / {cashbackEligibility?.account_age_required ?? 0} 天</div><div>累计实付：¥{(cashbackEligibility?.cash_paid_amount ?? 0).toFixed(2)} / ¥{(cashbackEligibility?.cash_paid_required ?? 0).toFixed(2)}，或累计套餐：{cashbackEligibility?.package_duration_days ?? 0} / {cashbackEligibility?.package_duration_required ?? 0} 天</div></div>}
+              {cashbackOverview.enrollment ? (
+                <div className="rounded-xl bg-success/10 border border-success/20 p-4 text-sm text-success-700">您已自动参加本期活动，好友完成符合条件的个人现金订阅后，返现将自动计入可提现余额。</div>
+              ) : (
+                <div className="rounded-xl bg-warning/10 border border-warning/20 p-4 text-sm text-default-700 space-y-2"><div className="font-medium text-default-900">本期活动已自动开放，达到资格后立即生效</div><div>账号注册：{cashbackEligibility?.account_age_days ?? 0} / {cashbackEligibility?.account_age_required ?? 0} 天</div><div>累计实付：¥{(cashbackEligibility?.cash_paid_amount ?? 0).toFixed(2)} / ¥{(cashbackEligibility?.cash_paid_required ?? 0).toFixed(2)}，或累计套餐：{cashbackEligibility?.package_duration_days ?? 0} / {cashbackEligibility?.package_duration_required ?? 0} 天</div></div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3"><div className="rounded-xl bg-default-50 p-4"><div className="text-sm text-default-500">可提现返现</div><div className="mt-1 text-xl font-bold">¥{cashbackAvailable.toFixed(2)}</div></div><div className="rounded-xl bg-default-50 p-4"><div className="text-sm text-default-500">提现处理中</div><div className="mt-1 text-xl font-bold">¥{(cashbackSummary?.withdraw_pending_amount ?? 0).toFixed(2)}</div></div><div className="rounded-xl bg-default-50 p-4"><div className="text-sm text-default-500">已提现</div><div className="mt-1 text-xl font-bold">¥{(cashbackSummary?.withdraw_done_amount ?? 0).toFixed(2)}</div></div></div>
               {cashbackOverview.enrollment && <Button variant="flat" color="primary" startContent={<Copy className="w-4 h-4" />} onPress={() => copyText(cashbackOverview.share_copy, '活动分享文案已复制')}>复制活动分享文案</Button>}
-              <div className="flex flex-col gap-3 rounded-xl border border-default-200 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="text-sm text-default-600"><div className="font-medium text-default-900">返现提现</div><div className="mt-1">{cashbackWithdrawal?.notice || '请先在个人中心填写支付宝收款信息。'} 最低提现 ¥{(cashbackWithdrawal?.min_amount ?? 0).toFixed(2)}。</div></div><div className="flex gap-2 shrink-0"><Button variant="flat" onPress={() => navigate('/user-center?tab=profile', { state: { openEdit: 'payment_info' } })}>设置收款信息</Button><Button color="success" isDisabled={!canWithdraw} isLoading={cashbackAction === 'withdraw'} onPress={withdrawCashback}>申请提现</Button></div></div>
+              <div className="flex flex-col gap-3 rounded-xl border border-default-200 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="text-sm text-default-600"><div className="font-medium text-default-900">返现提现</div><div className="mt-1">{cashbackWithdrawal?.notice || '请先在个人中心填写支付宝收款信息。'} 最低提现 ¥{(cashbackWithdrawal?.min_amount ?? 0).toFixed(2)}。</div></div><div className="flex gap-2 shrink-0"><Button variant="flat" onPress={() => navigate('/user-center?tab=profile', { state: { openEdit: 'payment_info' } })}>设置收款信息</Button><Button color="success" isDisabled={!canWithdraw} onPress={withdrawCashback}>申请提现</Button></div></div>
             </> : cashbackOverview.ended_campaign ? <div className="rounded-xl bg-default-100 p-4 text-sm text-default-600">{cashbackOverview.ended_campaign.ended_message}</div> : <div className="rounded-xl bg-default-100 p-4 text-sm text-default-600">当前暂无进行中的返现活动。</div>}
-            <div className="flex flex-col gap-3 rounded-xl bg-primary/5 border border-primary/10 p-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="font-medium text-default-900">后续活动自动参加</div><div className="text-sm text-default-500 mt-1">开启后，符合资格时将自动参加之后开启的返现活动。</div></div><Switch isSelected={cashbackOverview.auto_join_enabled} isDisabled={autoJoinUpdating} onValueChange={(enabled) => void setAutoJoin(enabled)} aria-label="后续活动自动参加" /></div>
           </CardBody>
         </Card>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardBody className="p-5">
-            <div className="flex items-center gap-3">
-              <Users className="w-5 h-5 text-primary" />
-              <div>
-                <div className="text-sm text-default-500">邀请人数</div>
-                <div className="text-2xl font-bold text-default-900">{overview?.invitees_count ?? 0}</div>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody className="p-5">
-            <div className="flex items-center gap-3">
-              <Sparkles className="w-5 h-5 text-success" />
-              <div>
-                <div className="text-sm text-default-500">奖励订单数</div>
-                <div className="text-2xl font-bold text-default-900">{overview?.granted_orders_count ?? 0}</div>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody className="p-5">
-            <div className="flex items-center gap-3">
-              <Calendar className="w-5 h-5 text-warning" />
-              <div>
-                <div className="text-sm text-default-500">累计返时长</div>
-                <div className="text-2xl font-bold text-default-900">{overview?.total_duration_days ?? 0} 天</div>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-      </div>
+      {!cashbackActiveForUser && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card><CardBody className="p-5"><div className="flex items-center gap-3"><Users className="w-5 h-5 text-primary" /><div><div className="text-sm text-default-500">邀请人数</div><div className="text-2xl font-bold text-default-900">{overview?.invitees_count ?? 0}</div></div></div></CardBody></Card>
+          <Card><CardBody className="p-5"><div className="flex items-center gap-3"><Sparkles className="w-5 h-5 text-success" /><div><div className="text-sm text-default-500">奖励订单数</div><div className="text-2xl font-bold text-default-900">{overview?.granted_orders_count ?? 0}</div></div></div></CardBody></Card>
+          <Card><CardBody className="p-5"><div className="flex items-center gap-3"><Calendar className="w-5 h-5 text-warning" /><div><div className="text-sm text-default-500">累计返时长</div><div className="text-2xl font-bold text-default-900">{overview?.total_duration_days ?? 0} 天</div></div></div></CardBody></Card>
+        </div>
+      )}
 
       <Card>
         <CardBody className="p-6 space-y-5">
@@ -391,26 +333,17 @@ export const InviteTab: React.FC = () => {
             </>
           )}
 
-          <Divider />
-
-          <div className="rounded-xl bg-primary/5 border border-primary/10 p-4 text-sm text-default-700 leading-7 space-y-2">
-            <div className="flex items-center gap-2 font-semibold text-default-900 mb-2">
-              <Info className="w-4 h-4 text-primary" />
-              邀请说明
+          {!cashbackActiveForUser && <>
+            <Divider />
+            <div className="rounded-xl bg-primary/5 border border-primary/10 p-4 text-sm text-default-700 leading-7 space-y-2">
+              <div className="flex items-center gap-2 font-semibold text-default-900 mb-2"><Info className="w-4 h-4 text-primary" />邀请说明</div>
+              <div>1. 历史套餐价值满 <span className="font-medium text-default-900">{minHistoryPackageValue} 元</span> 后，可通过专属链接或邀请码邀请好友。</div>
+              <div>2. 当前默认邀请奖励类型：<span className="font-medium text-default-900">{rewardModeText}</span>，邀请人奖励比例约为 <span className="font-medium text-default-900">{rewardRatioPercent}%</span>，被邀请人默认加赠 <span className="font-medium text-default-900">{inviteeRewardRatioPercent}%</span> 时长。</div>
+              <div>3. 返时长奖励按您当前可享受的最高套餐等级计算，且不会超过被邀请人本次实际订阅等级。</div>
+              <div>4. 好友支付或使用 CDK 激活成功后，系统会按实际订单结算。</div>
+              {hasPackageSpecificRules && <div className="text-xs text-primary-700 bg-primary/8 rounded-lg px-3 py-2">您当前存在套餐级单独邀请规则，不同套餐的实际奖励比例可能不同。</div>}
             </div>
-            <div>1. 历史套餐价值满 <span className="font-medium text-default-900">{minHistoryPackageValue} 元</span> 后，可通过专属链接或邀请码邀请好友。</div>
-            <div>2. 当前默认邀请奖励类型：<span className="font-medium text-default-900">{rewardModeText}</span>，邀请人奖励比例约为 <span className="font-medium text-default-900">{rewardRatioPercent}%</span>，被邀请人默认加赠 <span className="font-medium text-default-900">{inviteeRewardRatioPercent}%</span> 时长。</div>
-            <div>3. 例如：如您邀请了用户张三订阅了年卡，您可获得 <span className="font-medium text-default-900">365×{rewardRatioPercent}%={Number((365 * rewardRatioPercent / 100).toFixed(2))}</span> 天的奖励。</div>
-            <div>4. 返时长奖励会按您当前可享受的最高套餐等级计算，且奖励等级不会超过被邀请人本次实际订阅的套餐等级。</div>
-            <div>5. 若被邀请人订阅的套餐时长小于 <span className="font-medium text-default-900">{minRewardDurationDays} 天</span>，系统只会记录该订单，不发放返时长或返现奖励，且不占用前 N 笔奖励名额。</div>
-            <div>6. 好友支付或使用 CDK 激活成功后，系统会按您的邀请规则自动计算奖励；若部分套餐有单独规则，则以实际订单结算为准。</div>
-            <div>7. 如有任何问题，请及时联系客服协助处理。</div>
-            {hasPackageSpecificRules && (
-              <div className="text-xs text-primary-700 bg-primary/8 rounded-lg px-3 py-2">
-                您当前存在套餐级单独邀请规则，不同套餐的实际奖励比例可能略有不同。
-              </div>
-            )}
-          </div>
+          </>}
         </CardBody>
       </Card>
 
@@ -419,7 +352,7 @@ export const InviteTab: React.FC = () => {
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
               <h2 className="text-lg font-semibold text-default-900">我邀请的好友</h2>
-              <p className="text-sm text-default-500 mt-1">仅展示脱敏后的好友信息与返时长相关明细。</p>
+              <p className="text-sm text-default-500 mt-1">仅展示脱敏后的好友标识、套餐和{cashbackActiveForUser ? '返现' : '返时长'}明细。</p>
             </div>
             <Input
               className="w-full md:w-72"
@@ -435,6 +368,8 @@ export const InviteTab: React.FC = () => {
             <div className="space-y-4">
               {filteredInvitees.map((invitee) => {
                 const durationOrders = (invitee.orders || []).filter((order) => Number(order.reward_days || 0) > 0);
+                const cashbackOrders = (invitee.orders || []).filter((order) => order.reward_mode === 'cash' && Number(order.reward_amount || 0) > 0);
+                const cashbackTotal = Number(invitee.total_reward_amount || 0);
                 return (
                   <Card key={invitee.user_id} className="border border-default-100 shadow-sm">
                     <CardBody className="p-5 space-y-4">
@@ -445,7 +380,7 @@ export const InviteTab: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
                           <Chip color="primary" variant="flat">已购套餐 {invitee.orders_by_package?.reduce((sum, item) => sum + item.count, 0) || 0} 笔</Chip>
-                          <Chip color="success" variant="flat">累计返时长 {invitee.total_reward_days || 0} 天</Chip>
+                          {cashbackActiveForUser ? <Chip color="warning" variant="flat">累计返现 ¥{cashbackTotal.toFixed(2)}</Chip> : <Chip color="success" variant="flat">累计返时长 {invitee.total_reward_days || 0} 天</Chip>}
                         </div>
                       </div>
 
@@ -457,25 +392,12 @@ export const InviteTab: React.FC = () => {
                         ))}
                       </div>
 
-                      {durationOrders.length > 0 ? (
-                        <div className="space-y-2">
-                          <div className="text-sm font-medium text-default-700">返时长明细</div>
-                          <div className="space-y-2">
-                            {durationOrders.map((order) => (
-                              <div key={order.order_id} className="rounded-lg bg-default-50 px-4 py-3 text-sm text-default-700 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                                <div>
-                                  <div className="font-medium text-default-900">{order.package_name}</div>
-                                  <div className="text-default-500">订单时间：{order.created_at || '-'} · 第 {order.reward_order_index || '-'} 单</div>
-                                </div>
-                                <Chip color="success" variant="flat">返时长 {order.reward_days || 0} 天</Chip>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
+                      {cashbackActiveForUser ? (
+                        cashbackOrders.length > 0 ? <div className="space-y-2"><div className="text-sm font-medium text-default-700">返现明细</div>{cashbackOrders.map((order) => <div key={order.order_id} className="rounded-lg bg-warning/10 px-4 py-3 text-sm text-default-700 flex flex-col md:flex-row md:items-center md:justify-between gap-2"><div><div className="font-medium text-default-900">{order.package_name}</div><div className="text-default-500">订单时间：{order.created_at || '-'}{order.reward_ratio != null ? ` · 返现比例 ${(Number(order.reward_ratio) * 100).toFixed(2)}%` : ''}</div></div><Chip color="warning" variant="flat">返现 ¥{Number(order.reward_amount || 0).toFixed(2)}</Chip></div>)}</div> : <div className="rounded-lg bg-default-50 px-4 py-3 text-sm text-default-500">该好友暂未产生返现。</div>
+                      ) : durationOrders.length > 0 ? (
+                        <div className="space-y-2"><div className="text-sm font-medium text-default-700">返时长明细</div><div className="space-y-2">{durationOrders.map((order) => <div key={order.order_id} className="rounded-lg bg-default-50 px-4 py-3 text-sm text-default-700 flex flex-col md:flex-row md:items-center md:justify-between gap-2"><div><div className="font-medium text-default-900">{order.package_name}</div><div className="text-default-500">订单时间：{order.created_at || '-'} · 第 {order.reward_order_index || '-'} 单</div></div><Chip color="success" variant="flat">返时长 {order.reward_days || 0} 天</Chip></div>)}</div></div>
                       ) : (
-                        <div className="rounded-lg bg-default-50 px-4 py-3 text-sm text-default-500 leading-6">
-                          当前未展示返时长明细，可能是该好友订单未达到 {minRewardDurationDays} 天奖励门槛，或该订单对应的是其他奖励模式，前台会暂时隐藏。
-                        </div>
+                        <div className="rounded-lg bg-default-50 px-4 py-3 text-sm text-default-500 leading-6">该好友暂未产生返时长奖励。</div>
                       )}
                     </CardBody>
                   </Card>

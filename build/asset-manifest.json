@@ -1,11 +1,11 @@
 {
   "files": {
     "main.css": "/starstatic/css/main.ab821e78.css",
-    "main.js": "/starstatic/js/main.4c279f28.js",
+    "main.js": "/starstatic/js/main.271004b9.js",
     "starstatic/js/7767.3f623f42.chunk.js": "/starstatic/js/7767.3f623f42.chunk.js",
     "starstatic/js/1.23d2607a.chunk.js": "/starstatic/js/1.23d2607a.chunk.js",
     "starstatic/js/4396.ff995d89.chunk.js": "/starstatic/js/4396.ff995d89.chunk.js",
-    "starstatic/js/3438.a3c85281.chunk.js": "/starstatic/js/3438.a3c85281.chunk.js",
+    "starstatic/js/3438.645e7364.chunk.js": "/starstatic/js/3438.645e7364.chunk.js",
     "starstatic/js/1220.0600792d.chunk.js": "/starstatic/js/1220.0600792d.chunk.js",
     "starstatic/js/3690.83186835.chunk.js": "/starstatic/js/3690.83186835.chunk.js",
     "starstatic/js/8729.7c395056.chunk.js": "/starstatic/js/8729.7c395056.chunk.js",
@@ -72,6 +72,6 @@
     "starstatic/js/heroui.1153e32d.js",
     "starstatic/js/7535.66e6bb3b.js",
     "starstatic/css/main.ab821e78.css",
-    "starstatic/js/main.4c279f28.js"
+    "starstatic/js/main.271004b9.js"
   ]
 }
