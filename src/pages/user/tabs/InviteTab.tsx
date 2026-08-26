@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Card, CardBody, Chip, Divider, Input, Spinner } from '@heroui/react';
+import { Button, Card, CardBody, Chip, Divider, Input, Spinner, Switch } from '@heroui/react';
 import { motion } from 'framer-motion';
 import {
   Copy,
@@ -10,8 +10,11 @@ import {
   Sparkles,
   RefreshCw,
   Info,
+  Wallet,
 } from 'lucide-react';
-import { inviteUserApi } from '../../../services/userApi';
+import { useNavigate } from 'react-router-dom';
+import { inviteCashbackApi, inviteUserApi, type InviteCashbackOverview } from '../../../services/userApi';
+import { useWhiteLabel } from '../../../contexts/WhiteLabelContext';
 import { toast } from '../../../utils/toast';
 
 interface InviteOverviewData {
@@ -87,12 +90,16 @@ const copyText = async (text: string, successMessage: string) => {
 
 export const InviteTab: React.FC = () => {
   const [overview, setOverview] = useState<InviteOverviewData | null>(null);
+  const [cashbackOverview, setCashbackOverview] = useState<InviteCashbackOverview | null>(null);
   const [invitees, setInvitees] = useState<InviteeRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [cashbackAction, setCashbackAction] = useState<'activate' | 'withdraw' | null>(null);
+  const [autoJoinUpdating, setAutoJoinUpdating] = useState(false);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-
+  const { isWhiteLabel, loading: whiteLabelLoading } = useWhiteLabel();
+  const navigate = useNavigate();
   const fetchInviteData = async (isRefresh = false) => {
     try {
       if (isRefresh) {
@@ -101,10 +108,12 @@ export const InviteTab: React.FC = () => {
         setLoading(true);
       }
       setError('');
-      const [overviewResponse, recordsResponse] = await Promise.all([
+      const requests = [
         inviteUserApi.getOverview(),
         inviteUserApi.getRecords(),
-      ]);
+        !whiteLabelLoading && !isWhiteLabel ? inviteCashbackApi.getOverview() : Promise.resolve(null),
+      ] as const;
+      const [overviewResponse, recordsResponse, cashbackResponse] = await Promise.all(requests);
 
       if (overviewResponse.code !== 20000) {
         throw new Error(overviewResponse.msg || '获取邀请总览失败');
@@ -115,6 +124,14 @@ export const InviteTab: React.FC = () => {
 
       setOverview(overviewResponse.data || null);
       setInvitees(Array.isArray(recordsResponse.data?.invitees) ? recordsResponse.data.invitees : []);
+      // Cashback is self-site-only. Do not retain a prior response after the site mode changes.
+      if (isWhiteLabel || whiteLabelLoading) {
+        setCashbackOverview(null);
+      } else if (cashbackResponse?.code === 20000) {
+        setCashbackOverview(cashbackResponse.data || null);
+      } else {
+        setCashbackOverview(null);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '获取邀请信息失败');
     } finally {
@@ -124,8 +141,10 @@ export const InviteTab: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchInviteData();
-  }, []);
+    void fetchInviteData();
+    // Site-mode changes must discard any prior self-site cashback response.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isWhiteLabel, whiteLabelLoading]);
 
   const filteredInvitees = useMemo(() => {
     if (!searchTerm.trim()) {
@@ -138,7 +157,66 @@ export const InviteTab: React.FC = () => {
     });
   }, [invitees, searchTerm]);
 
+  const refreshCashback = async () => {
+    if (isWhiteLabel) return;
+    const response = await inviteCashbackApi.getOverview();
+    if (response.code === 20000) {
+      setCashbackOverview(response.data || null);
+    }
+  };
+
+  const activateCashback = async () => {
+    try {
+      setCashbackAction('activate');
+      const response = await inviteCashbackApi.activate();
+      if (response.code !== 20000) throw new Error(response.msg || '开启返现活动失败');
+      setCashbackOverview(response.data || null);
+      toast.success(response.msg || '返现活动已开启');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '开启返现活动失败');
+    } finally {
+      setCashbackAction(null);
+    }
+  };
+
+  const setAutoJoin = async (enabled: boolean) => {
+    try {
+      setAutoJoinUpdating(true);
+      const response = await inviteCashbackApi.setAutoJoin(enabled);
+      if (response.code !== 20000) throw new Error(response.msg || '设置失败');
+      await refreshCashback();
+      toast.success(enabled ? '已开启后续活动自动参加' : '已关闭后续活动自动参加');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '设置失败');
+    } finally {
+      setAutoJoinUpdating(false);
+    }
+  };
+
+  const withdrawCashback = async () => {
+    try {
+      setCashbackAction('withdraw');
+      const response = await inviteCashbackApi.withdraw();
+      if (response.code !== 20000) throw new Error(response.msg || '提现申请失败');
+      toast.success(response.msg || '提现申请已提交');
+      await refreshCashback();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '提现申请失败');
+    } finally {
+      setCashbackAction(null);
+    }
+  };
+
+  const activeCashbackCampaign = cashbackOverview?.active_campaign;
+  const cashbackEligibility = cashbackOverview?.eligibility;
+  const cashbackSummary = cashbackOverview?.cashback_summary;
+  const cashbackWithdrawal = cashbackOverview?.withdrawal;
+  const cashbackAvailable = cashbackSummary?.available_amount ?? 0;
+  const eligibleToActivate = Boolean(cashbackEligibility?.eligible);
+  const canWithdraw = Boolean(cashbackWithdrawal?.enabled && cashbackAvailable >= (cashbackWithdrawal?.min_amount ?? 0));
+
   if (loading) {
+
     return (
       <div className="flex min-h-[320px] items-center justify-center">
         <Spinner size="lg" label="正在加载邀请数据..." />
@@ -193,6 +271,28 @@ export const InviteTab: React.FC = () => {
           刷新数据
         </Button>
       </div>
+
+      {!isWhiteLabel && cashbackOverview?.config_enabled && (
+        <Card className="border border-success/20">
+          <CardBody className="p-6 space-y-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2 text-success font-semibold"><Wallet className="w-4 h-4" />邀请返现活动</div>
+                <h2 className="mt-2 text-xl font-bold text-default-900">{activeCashbackCampaign?.copywriting.headline || cashbackOverview.ended_campaign?.name || '邀请返现'}</h2>
+                {activeCashbackCampaign && <p className="mt-1 text-sm text-default-500">活动截止至：{activeCashbackCampaign.ends_at}</p>}
+              </div>
+              {activeCashbackCampaign && !cashbackOverview.enrollment && <Button color="success" isDisabled={!eligibleToActivate} isLoading={cashbackAction === 'activate'} onPress={activateCashback}>开启本期活动</Button>}
+            </div>
+            {activeCashbackCampaign ? <>
+              {cashbackOverview.enrollment ? <div className="rounded-xl bg-success/10 border border-success/20 p-4 text-sm text-success-700">您已参加本期活动，邀请好友完成符合条件的订阅后，返现将自动计入可提现余额。</div> : <div className="rounded-xl bg-warning/10 border border-warning/20 p-4 text-sm text-default-700 space-y-2"><div className="font-medium text-default-900">完成以下资格后即可开启本期返现活动</div><div>账号注册：{cashbackEligibility?.account_age_days ?? 0} / {cashbackEligibility?.account_age_required ?? 0} 天</div><div>累计实付：¥{(cashbackEligibility?.cash_paid_amount ?? 0).toFixed(2)} / ¥{(cashbackEligibility?.cash_paid_required ?? 0).toFixed(2)}，或累计套餐：{cashbackEligibility?.package_duration_days ?? 0} / {cashbackEligibility?.package_duration_required ?? 0} 天</div></div>}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3"><div className="rounded-xl bg-default-50 p-4"><div className="text-sm text-default-500">可提现返现</div><div className="mt-1 text-xl font-bold">¥{cashbackAvailable.toFixed(2)}</div></div><div className="rounded-xl bg-default-50 p-4"><div className="text-sm text-default-500">提现处理中</div><div className="mt-1 text-xl font-bold">¥{(cashbackSummary?.withdraw_pending_amount ?? 0).toFixed(2)}</div></div><div className="rounded-xl bg-default-50 p-4"><div className="text-sm text-default-500">已提现</div><div className="mt-1 text-xl font-bold">¥{(cashbackSummary?.withdraw_done_amount ?? 0).toFixed(2)}</div></div></div>
+              {cashbackOverview.enrollment && <Button variant="flat" color="primary" startContent={<Copy className="w-4 h-4" />} onPress={() => copyText(cashbackOverview.share_copy, '活动分享文案已复制')}>复制活动分享文案</Button>}
+              <div className="flex flex-col gap-3 rounded-xl border border-default-200 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="text-sm text-default-600"><div className="font-medium text-default-900">返现提现</div><div className="mt-1">{cashbackWithdrawal?.notice || '请先在个人中心填写支付宝收款信息。'} 最低提现 ¥{(cashbackWithdrawal?.min_amount ?? 0).toFixed(2)}。</div></div><div className="flex gap-2 shrink-0"><Button variant="flat" onPress={() => navigate('/user-center?tab=profile', { state: { openEdit: 'payment_info' } })}>设置收款信息</Button><Button color="success" isDisabled={!canWithdraw} isLoading={cashbackAction === 'withdraw'} onPress={withdrawCashback}>申请提现</Button></div></div>
+            </> : cashbackOverview.ended_campaign ? <div className="rounded-xl bg-default-100 p-4 text-sm text-default-600">{cashbackOverview.ended_campaign.ended_message}</div> : <div className="rounded-xl bg-default-100 p-4 text-sm text-default-600">当前暂无进行中的返现活动。</div>}
+            <div className="flex flex-col gap-3 rounded-xl bg-primary/5 border border-primary/10 p-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="font-medium text-default-900">后续活动自动参加</div><div className="text-sm text-default-500 mt-1">开启后，符合资格时将自动参加之后开启的返现活动。</div></div><Switch isSelected={cashbackOverview.auto_join_enabled} isDisabled={autoJoinUpdating} onValueChange={(enabled) => void setAutoJoin(enabled)} aria-label="后续活动自动参加" /></div>
+          </CardBody>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>

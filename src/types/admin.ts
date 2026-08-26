@@ -125,6 +125,55 @@ export interface InvitePolicyOverride {
     }>;
 }
 
+export interface InviteCashbackPackageRule {
+    enabled: boolean;
+    rate: number;
+}
+
+export interface InviteCashbackCampaign {
+    id: string;
+    name: string;
+    enabled: boolean;
+    starts_at: string;
+    ends_at: string;
+    eligibility: {
+        min_account_age_days: number;
+        min_cash_paid_amount: number;
+        min_package_duration_days: number;
+    };
+    cashback: {
+        default_rate: number;
+        max_reward_orders_per_invitee: number;
+        package_rules: Record<string, InviteCashbackPackageRule>;
+    };
+    invitee_reward: {
+        enabled: boolean;
+        duration_ratio: number;
+    };
+    copywriting: {
+        headline: string;
+        share_template: string;
+        ended_message: string;
+    };
+}
+
+export interface InviteCashbackConfig {
+    enabled: boolean;
+    withdrawal: {
+        enabled: boolean;
+        min_amount: number;
+        notice: string;
+    };
+    campaigns: InviteCashbackCampaign[];
+}
+
+export interface InviteCashbackResponseData {
+    config?: InviteCashbackConfig;
+    enabled?: boolean;
+    withdrawal?: InviteCashbackConfig['withdrawal'];
+    campaigns?: InviteCashbackCampaign[];
+}
+
 export interface User {
     id: number;
     username?: string;
@@ -677,6 +726,8 @@ export interface InviteRewardRecord {
     invite_reward_amount?: number;
     invite_reward_processed_at?: string | null;
     invite_withdraw_ticket_id?: number | null;
+    invite_cashback_campaign_id?: string | null;
+    invite_cashback_basis_amount?: number;
     created_at: string;
     invite_reward_meta?: Record<string, any>;
     invite_reward_remark?: string;

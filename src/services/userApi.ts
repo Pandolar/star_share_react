@@ -484,6 +484,99 @@ export const resetQuotaApi = {
 
 
 // 邀请相关API
+export interface InviteCashbackCampaign {
+    id: string;
+    name: string;
+    starts_at: string;
+    ends_at: string;
+    copywriting: {
+        headline: string;
+        share_template: string;
+        ended_message: string;
+    };
+}
+
+export interface InviteCashbackEligibility {
+    eligible: boolean;
+    account_age_days: number;
+    cash_paid_amount: number;
+    package_duration_days: number;
+    account_age_required: number;
+    cash_paid_required: number;
+    package_duration_required: number;
+    account_age_met: boolean;
+    cash_paid_met: boolean;
+    package_duration_met: boolean;
+}
+
+export interface InviteCashbackSummary {
+    available_amount: number;
+    withdraw_pending_amount: number;
+    withdraw_done_amount: number;
+}
+
+export interface InviteCashbackOverview {
+    config_enabled: boolean;
+    active_campaign: InviteCashbackCampaign | null;
+    ended_campaign: {
+        id: string;
+        name: string;
+        ended_message: string;
+    } | null;
+    enrollment: {
+        id: number;
+        campaign_id: string;
+        activated_at: string | null;
+        activation_source: string;
+    } | null;
+    eligibility: InviteCashbackEligibility | null;
+    cashback_summary: InviteCashbackSummary;
+    auto_join_enabled: boolean;
+    withdrawal: {
+        enabled: boolean;
+        min_amount: number;
+        notice: string;
+    };
+    invite_code: string;
+    invite_link: string;
+    share_copy: string;
+}
+
+export interface InviteWithdrawalWorkorder {
+    id: number;
+    ticket_type: 'invite_withdraw';
+    status: string;
+    title: string;
+    content: string | null;
+    amount: number;
+    extra_data: Record<string, unknown>;
+    admin_remark: string | null;
+    created_at: string | null;
+    updated_at: string | null;
+}
+
+export const inviteCashbackApi = {
+    getOverview: async (): Promise<ApiResponse<InviteCashbackOverview>> => {
+        return createUserRequest(getUserApiUrl('/u/invite_cashback'), { method: 'GET' });
+    },
+    activate: async (): Promise<ApiResponse<InviteCashbackOverview>> => {
+        return createUserRequest(getUserApiUrl('/u/invite_cashback_activate'), { method: 'POST' });
+    },
+    setAutoJoin: async (enabled: boolean): Promise<ApiResponse<{ enabled: boolean }>> => {
+        return createUserRequest(getUserApiUrl('/u/invite_cashback_auto_join'), {
+            method: 'PUT',
+            body: JSON.stringify({ enabled }),
+        });
+    },
+    withdraw: async (): Promise<ApiResponse<{ workorder_id: number; status: string; amount: number }>> => {
+        return createUserRequest(getUserApiUrl('/u/invite_withdraw'), { method: 'POST' });
+    },
+    getWorkorders: async (): Promise<ApiResponse<InviteWithdrawalWorkorder[]>> => {
+        return createUserRequest(getUserApiUrl('/u/invite_workorder'), { method: 'GET' });
+    },
+};
+
+ // 邀请相关API
 export const inviteUserApi = {
     getOverview: async (): Promise<ApiResponse<{
         inviter_id: number;
@@ -695,6 +788,7 @@ const userApi = {
     order: orderUserApi,
     exchange: exchangeUserApi,
     invite: inviteUserApi,
+    inviteCashback: inviteCashbackApi,
     team: teamUserApi,
     limitUsage: limitUsageApi,
 };

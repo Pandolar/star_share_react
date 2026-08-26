@@ -30,15 +30,15 @@ import {
 import { Filter, Gift, RefreshCw, Save, Search, Settings2, Ticket, Users, Wallet } from 'lucide-react';
 import dayjs from 'dayjs';
 import adminApiService from '../../services/adminApi';
-import { InvitePolicyConfig, InviteRewardRecord, User, WorkOrder } from '../../types/admin';
+import { InviteCashbackConfig, InvitePolicyConfig, InviteRewardRecord, User, WorkOrder } from '../../types/admin';
 import { showToast } from '../../components/Toast';
+import InviteCashbackConfigEditor from './InviteCashbackConfigEditor';
 
 interface InvitePolicyFormState {
   enabled: boolean;
-  reward_mode: 'duration' | 'cash';
+  reward_mode: 'duration';
   reward_ratio: string;
   max_reward_order_count: string;
-  min_withdraw_amount: string;
   package_rules: string;
 }
 
@@ -47,8 +47,13 @@ const createDefaultPolicyForm = (): InvitePolicyFormState => ({
   reward_mode: 'duration',
   reward_ratio: '0.10',
   max_reward_order_count: '3',
-  min_withdraw_amount: '100',
   package_rules: '{}',
+});
+
+const createDefaultCashbackConfig = (): InviteCashbackConfig => ({
+  enabled: false,
+  withdrawal: { enabled: false, min_amount: 100, notice: '提现暂未开放' },
+  campaigns: [],
 });
 
 const INVITER_PAGE_SIZE = 10;
@@ -58,16 +63,14 @@ const buildPolicyPayload = (form: InvitePolicyFormState) => ({
   reward_mode: form.reward_mode,
   reward_ratio: Number(form.reward_ratio || 0),
   max_reward_order_count: Number(form.max_reward_order_count || 0),
-  min_withdraw_amount: Number(form.min_withdraw_amount || 0),
   package_rules: form.package_rules.trim() ? JSON.parse(form.package_rules) : {},
 });
 
 const mapPolicyToForm = (policy?: any): InvitePolicyFormState => ({
   enabled: policy?.enabled !== false,
-  reward_mode: policy?.reward_mode === 'cash' ? 'cash' : 'duration',
+  reward_mode: 'duration',
   reward_ratio: String(policy?.reward_ratio ?? '0.10'),
   max_reward_order_count: String(policy?.max_reward_order_count ?? 3),
-  min_withdraw_amount: String(policy?.min_withdraw_amount ?? 100),
   package_rules: JSON.stringify(policy?.package_rules || {}, null, 2),
 });
 
@@ -76,16 +79,20 @@ const formatInviterRuleSummary = (user: User) => {
   if (!override || typeof override !== 'object' || Object.keys(override).length === 0) {
     return '默认规则';
   }
-  const modeText = override.reward_mode === 'cash' ? '返现' : '返时长';
+  const modeText = '返时长';
   const ratioText = override.reward_ratio ? `${Number(override.reward_ratio) * 100}%` : '-';
   const countText = override.max_reward_order_count ? `前${override.max_reward_order_count}单` : '未设置';
   return `${modeText} / ${ratioText} / ${countText}`;
+
 };
 
 const InviteManagePage: React.FC = () => {
   const [policyLoading, setPolicyLoading] = useState(true);
   const [savingPolicy, setSavingPolicy] = useState(false);
   const [globalPolicyForm, setGlobalPolicyForm] = useState<InvitePolicyFormState>(createDefaultPolicyForm());
+  const [cashbackLoading, setCashbackLoading] = useState(true);
+  const [savingCashback, setSavingCashback] = useState(false);
+  const [cashbackConfig, setCashbackConfig] = useState<InviteCashbackConfig>(createDefaultCashbackConfig());
 
   const [rewardModeFilter, setRewardModeFilter] = useState<'all' | 'duration' | 'cash'>('all');
   const [rewardStatusFilter, setRewardStatusFilter] = useState<string>('all');
@@ -128,16 +135,33 @@ const InviteManagePage: React.FC = () => {
       const policy: InvitePolicyConfig = response.data?.policy || response.data;
       setGlobalPolicyForm({
         enabled: Boolean(policy?.enabled),
-        reward_mode: policy?.default_policy?.reward_mode === 'cash' ? 'cash' : 'duration',
+        reward_mode: 'duration',
         reward_ratio: String(policy?.default_policy?.reward_ratio ?? '0.10'),
         max_reward_order_count: String(policy?.default_policy?.max_reward_order_count ?? 3),
-        min_withdraw_amount: String(policy?.default_policy?.min_withdraw_amount ?? 100),
         package_rules: JSON.stringify(policy?.package_rules || {}, null, 2),
       });
     } catch (error) {
       showToast(error instanceof Error ? error.message : '获取邀请规则失败', 'error');
     } finally {
       setPolicyLoading(false);
+    }
+  }, []);
+
+  const loadCashbackConfig = useCallback(async () => {
+    setCashbackLoading(true);
+    try {
+      const response = await adminApiService.getInviteCashback();
+      if (response.code !== 20000) throw new Error(response.msg || '获取返现活动配置失败');
+      const data = response.data;
+      setCashbackConfig(data?.config || {
+        enabled: data?.enabled ?? false,
+        withdrawal: data?.withdrawal || createDefaultCashbackConfig().withdrawal,
+        campaigns: data?.campaigns || [],
+      });
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '获取返现活动配置失败', 'error');
+    } finally {
+      setCashbackLoading(false);
     }
   }, []);
 
@@ -219,6 +243,7 @@ const InviteManagePage: React.FC = () => {
       setUsersLoading(false);
     }
   }, [inviterUsersPage, usersSearch]);
+  useEffect(() => { loadCashbackConfig(); }, [loadCashbackConfig]);
 
   useEffect(() => { loadPolicy(); }, [loadPolicy]);
   useEffect(() => { loadRewards(); }, [loadRewards]);
@@ -262,23 +287,34 @@ const InviteManagePage: React.FC = () => {
         reward_only_paid_purchase: true,
         exclude_exchange_orders: true,
         default_policy: {
-          reward_mode: payload.reward_mode,
+          reward_mode: 'duration',
           reward_ratio: payload.reward_ratio,
           max_reward_order_count: payload.max_reward_order_count,
-          min_withdraw_amount: payload.min_withdraw_amount,
         },
         package_rules: payload.package_rules,
       };
       const response = await adminApiService.updateInvitePolicy(policy);
-      if (response.code !== 20000) {
-        throw new Error(response.msg || '保存邀请规则失败');
-      }
+      if (response.code !== 20000) throw new Error(response.msg || '保存邀请规则失败');
       showToast('全局邀请规则已保存', 'success');
       loadPolicy();
     } catch (error) {
       showToast(error instanceof Error ? error.message : '保存邀请规则失败', 'error');
     } finally {
       setSavingPolicy(false);
+    }
+  };
+
+  const handleSaveCashbackConfig = async () => {
+    setSavingCashback(true);
+    try {
+      const response = await adminApiService.updateInviteCashback(cashbackConfig);
+      if (response.code !== 20000) throw new Error(response.msg || '保存返现活动配置失败');
+      showToast('返现活动配置已保存', 'success');
+      loadCashbackConfig();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '保存返现活动配置失败', 'error');
+    } finally {
+      setSavingCashback(false);
     }
   };
 
@@ -395,6 +431,13 @@ const InviteManagePage: React.FC = () => {
         <Card><CardBody><div className="text-sm text-default-500">返现奖励单</div><div className="text-2xl font-bold mt-1">{rewardStats.cashCount}</div></CardBody></Card>
         <Card><CardBody><div className="text-sm text-default-500">提现处理中</div><div className="text-2xl font-bold mt-1">{rewardStats.withdrawPendingCount}</div></CardBody></Card>
       </div>
+      <InviteCashbackConfigEditor
+        config={cashbackConfig}
+        isLoading={cashbackLoading}
+        isSaving={savingCashback}
+        onChange={setCashbackConfig}
+        onSave={handleSaveCashbackConfig}
+      />
 
       <Card>
         <CardHeader className="flex items-center justify-between gap-3 flex-wrap">
@@ -458,9 +501,11 @@ const InviteManagePage: React.FC = () => {
                   </TableCell>
                   <TableCell>{renderRewardMode(item.invite_reward_mode)}</TableCell>
                   <TableCell>
-                    {item.invite_reward_mode === 'cash'
-                      ? `¥${Number(item.invite_reward_amount || 0).toFixed(2)}`
-                      : `${Number(item.invite_reward_days || 0).toFixed(2)} 天`}
+                    <div className="text-sm">
+                      <div>{item.invite_reward_mode === 'cash' ? `¥${Number(item.invite_reward_amount || 0).toFixed(2)}` : `${Number(item.invite_reward_days || 0).toFixed(2)} 天`}</div>
+                      {item.invite_cashback_campaign_id && <div className="text-xs text-default-500">活动：{item.invite_cashback_campaign_id}</div>}
+                      {item.invite_reward_mode === 'cash' && <div className="text-xs text-default-500">返现基数：¥{Number(item.invite_cashback_basis_amount || 0).toFixed(2)}</div>}
+                    </div>
                   </TableCell>
                   <TableCell>{renderStatusChip(item.invite_reward_status)}</TableCell>
                   <TableCell>
@@ -526,8 +571,8 @@ const InviteManagePage: React.FC = () => {
                   <TableCell>{renderStatusChip(item.status)}</TableCell>
                   <TableCell>
                     <div className="text-sm">
-                      <div>{item.extra_data?.withdraw_account?.channel || '-'}</div>
-                      <div className="text-xs text-default-500 truncate max-w-48">{item.extra_data?.withdraw_account?.account_name || '-'}</div>
+                      <div>支付宝 · {item.extra_data?.withdraw_account?.real_name || '-'}</div>
+                      <div className="text-xs text-default-500 truncate max-w-48">{item.extra_data?.withdraw_account?.account || '-'}</div>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -609,62 +654,31 @@ const InviteManagePage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <Switch isSelected={globalPolicyForm.enabled} onValueChange={(checked) => setGlobalPolicyForm((prev) => ({ ...prev, enabled: checked }))}>
-                  启用邀请奖励
+                  启用邀请返时长奖励
                 </Switch>
               </div>
-              <Select label="默认奖励模式" selectedKeys={[globalPolicyForm.reward_mode]} onSelectionChange={(keys) => setGlobalPolicyForm((prev) => ({ ...prev, reward_mode: String(Array.from(keys)[0] || 'duration') as 'duration' | 'cash' }))}>
-                <SelectItem key="duration">返时长</SelectItem>
-                <SelectItem key="cash">返现</SelectItem>
-              </Select>
               <NumberInput label="默认奖励比例" value={globalPolicyForm.reward_ratio === '' ? undefined : Number(globalPolicyForm.reward_ratio)} onValueChange={(reward_ratio) => setGlobalPolicyForm((prev) => ({ ...prev, reward_ratio: Number.isNaN(reward_ratio) ? '' : String(reward_ratio) }))} minValue={0} maxValue={1} step={0.01} description="0.15 表示 15%" />
               <NumberInput label="默认奖励前 N 单" value={globalPolicyForm.max_reward_order_count === '' ? undefined : Number(globalPolicyForm.max_reward_order_count)} onValueChange={(max_reward_order_count) => setGlobalPolicyForm((prev) => ({ ...prev, max_reward_order_count: Number.isNaN(max_reward_order_count) ? '' : String(max_reward_order_count) }))} minValue={0} step={1} />
-              <NumberInput label="默认最低提现金额" value={globalPolicyForm.min_withdraw_amount === '' ? undefined : Number(globalPolicyForm.min_withdraw_amount)} onValueChange={(min_withdraw_amount) => setGlobalPolicyForm((prev) => ({ ...prev, min_withdraw_amount: Number.isNaN(min_withdraw_amount) ? '' : String(min_withdraw_amount) }))} minValue={0} step={0.01} />
               <div className="md:col-span-2">
-                <Textarea
-                  label="套餐覆盖规则 JSON（可选）"
-                  value={globalPolicyForm.package_rules}
-                  onValueChange={(package_rules) => setGlobalPolicyForm((prev) => ({ ...prev, package_rules }))}
-                  minRows={6}
-                  placeholder={'例如：{\n  "5": { "reward_mode": "cash", "reward_ratio": 0.15 }\n}'}
-                />
+                <Textarea label="套餐覆盖规则 JSON（可选）" value={globalPolicyForm.package_rules} onValueChange={(package_rules) => setGlobalPolicyForm((prev) => ({ ...prev, package_rules }))} minRows={6} placeholder={'例如：{\n  "5": { "reward_ratio": 0.15 }\n}'} />
               </div>
             </div>
           )}
         </CardBody>
       </Card>
-
       <Modal isOpen={isInviterOpen} onClose={onInviterClose} size="2xl" scrollBehavior="inside">
         <ModalContent>
           <ModalHeader>编辑邀请人专属规则</ModalHeader>
           <ModalBody>
             {selectedInviter && (
               <div className="space-y-4">
-                <Alert
-                  isVisible
-                  color="default"
-                  variant="flat"
-                  title={selectedInviter.username || selectedInviter.email}
-                  description={`邀请码：${selectedInviter.inviter_code || '-'}`}
-                />
-                <Switch isSelected={inviterPolicyForm.enabled} onValueChange={(checked) => setInviterPolicyForm((prev) => ({ ...prev, enabled: checked }))}>
-                  启用该邀请人的专属规则
-                </Switch>
+                <Alert isVisible color="default" variant="flat" title={selectedInviter.username || selectedInviter.email} description={`邀请码：${selectedInviter.inviter_code || '-'}`} />
+                <Switch isSelected={inviterPolicyForm.enabled} onValueChange={(checked) => setInviterPolicyForm((prev) => ({ ...prev, enabled: checked }))}>启用该邀请人的返时长规则</Switch>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Select label="奖励模式" selectedKeys={[inviterPolicyForm.reward_mode]} onSelectionChange={(keys) => setInviterPolicyForm((prev) => ({ ...prev, reward_mode: String(Array.from(keys)[0] || 'duration') as 'duration' | 'cash' }))}>
-                    <SelectItem key="duration">返时长</SelectItem>
-                    <SelectItem key="cash">返现</SelectItem>
-                  </Select>
                   <NumberInput label="奖励比例" value={inviterPolicyForm.reward_ratio === '' ? undefined : Number(inviterPolicyForm.reward_ratio)} onValueChange={(reward_ratio) => setInviterPolicyForm((prev) => ({ ...prev, reward_ratio: Number.isNaN(reward_ratio) ? '' : String(reward_ratio) }))} minValue={0} maxValue={1} step={0.01} description="0.15 表示 15%" />
                   <NumberInput label="奖励前 N 单" value={inviterPolicyForm.max_reward_order_count === '' ? undefined : Number(inviterPolicyForm.max_reward_order_count)} onValueChange={(max_reward_order_count) => setInviterPolicyForm((prev) => ({ ...prev, max_reward_order_count: Number.isNaN(max_reward_order_count) ? '' : String(max_reward_order_count) }))} minValue={0} step={1} />
-                  <NumberInput label="最低提现金额" value={inviterPolicyForm.min_withdraw_amount === '' ? undefined : Number(inviterPolicyForm.min_withdraw_amount)} onValueChange={(min_withdraw_amount) => setInviterPolicyForm((prev) => ({ ...prev, min_withdraw_amount: Number.isNaN(min_withdraw_amount) ? '' : String(min_withdraw_amount) }))} minValue={0} step={0.01} />
                 </div>
-                <Textarea
-                  label="套餐覆盖规则 JSON（可选）"
-                  value={inviterPolicyForm.package_rules}
-                  onValueChange={(package_rules) => setInviterPolicyForm((prev) => ({ ...prev, package_rules }))}
-                  minRows={6}
-                  placeholder={'例如：{\n  "5": { "reward_mode": "cash", "reward_ratio": 0.2 }\n}'}
-                />
+                <Textarea label="套餐覆盖规则 JSON（可选）" value={inviterPolicyForm.package_rules} onValueChange={(package_rules) => setInviterPolicyForm((prev) => ({ ...prev, package_rules }))} minRows={6} placeholder={'例如：{\n  "5": { "reward_ratio": 0.2 }\n}'} />
               </div>
             )}
           </ModalBody>
@@ -675,6 +689,7 @@ const InviteManagePage: React.FC = () => {
           </ModalFooter>
         </ModalContent>
       </Modal>
+
 
       <Modal isOpen={isWorkorderOpen} onClose={onWorkorderClose} size="lg">
         <ModalContent>

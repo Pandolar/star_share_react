@@ -24,6 +24,8 @@ import type {
     UpdateOrderRequest,
     OrderQueryParams,
     InvitePolicyResponseData,
+    InviteCashbackConfig,
+    InviteCashbackResponseData,
     InviteRewardRecord,
     InviteRewardQueryParams,
     WorkOrder,
@@ -548,6 +550,18 @@ class AdminApiService {
      */
     async updateInvitePolicy(policy: Record<string, any>): Promise<AdminApiResponse> {
         const response = await this.api.put('/star/invite_policy', { policy });
+        return response.data;
+    }
+
+    /** 获取限时邀请返现活动配置 */
+    async getInviteCashback(): Promise<AdminApiResponse<InviteCashbackResponseData>> {
+        const response = await this.api.get('/star/invite_cashback');
+        return response.data;
+    }
+
+    /** 更新限时邀请返现活动配置 */
+    async updateInviteCashback(config: InviteCashbackConfig): Promise<AdminApiResponse<InviteCashbackResponseData>> {
+        const response = await this.api.put('/star/invite_cashback', { config });
         return response.data;
     }
 
