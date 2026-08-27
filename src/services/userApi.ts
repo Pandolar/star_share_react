@@ -487,6 +487,7 @@ export const resetQuotaApi = {
 export interface InviteCashbackCampaign {
     id: string;
     name: string;
+    auto_enroll_eligible: boolean;
     starts_at: string;
     ends_at: string;
     copywriting: {
@@ -558,6 +559,9 @@ export interface InviteWithdrawalWorkorder {
 export const inviteCashbackApi = {
     getOverview: async (): Promise<ApiResponse<InviteCashbackOverview>> => {
         return createUserRequest(getUserApiUrl('/u/invite_cashback'), { method: 'GET' });
+    },
+    activate: async (): Promise<ApiResponse<InviteCashbackOverview>> => {
+        return createUserRequest(getUserApiUrl('/u/invite_cashback_activate'), { method: 'POST' });
     },
     withdraw: async (): Promise<ApiResponse<{ workorder_id: number; status: string; amount: number }>> => {
         return createUserRequest(getUserApiUrl('/u/invite_withdraw'), { method: 'POST' });

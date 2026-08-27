@@ -648,7 +648,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   </p>
                 </div>
                 <div className="p-3 bg-warning/10 border border-warning/20 rounded-lg">
-                  <p className="text-xs text-warning">⚠️ 请确保填写的信息准确无误，以免影响收款</p>
+                  <p className="text-xs text-warning">⚠️ 请确保填写的信息准确无误，以免影响收款，且支付宝必须打开手机或邮箱收款，务必确认！否则无法收到款项</p>
                 </div>
               </div>
             </Tab>

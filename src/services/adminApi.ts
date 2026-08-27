@@ -26,6 +26,8 @@ import type {
     InvitePolicyResponseData,
     InviteCashbackConfig,
     InviteCashbackResponseData,
+    InviteCashbackOverviewData,
+    InviteCashbackUserRecord,
     InviteRewardRecord,
     InviteRewardQueryParams,
     WorkOrder,
@@ -562,6 +564,16 @@ class AdminApiService {
     /** 更新限时邀请返现活动配置 */
     async updateInviteCashback(config: InviteCashbackConfig): Promise<AdminApiResponse<InviteCashbackResponseData>> {
         const response = await this.api.put('/star/invite_cashback', { config });
+        return response.data;
+    }
+
+    async getInviteCashbackOverview(campaignId: string): Promise<AdminApiResponse<InviteCashbackOverviewData>> {
+        const response = await this.api.get(`/star/invite_cashback/overview?campaign_id=${encodeURIComponent(campaignId)}`);
+        return response.data;
+    }
+
+    async getInviteCashbackUsers(params: { campaign_id: string; querystring?: string; rewarded_only?: boolean; current_page?: number; page_size?: number }): Promise<AdminApiResponse<InviteCashbackUserRecord[]>> {
+        const response = await this.api.get(`/star/invite_cashback/users?${this.buildQueryString(params)}`);
         return response.data;
     }
 

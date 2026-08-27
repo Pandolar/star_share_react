@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   Button,
@@ -33,6 +33,7 @@ import adminApiService from '../../services/adminApi';
 import { InviteCashbackConfig, InvitePolicyConfig, InviteRewardRecord, User, WorkOrder } from '../../types/admin';
 import { showToast } from '../../components/Toast';
 import InviteCashbackConfigEditor from './InviteCashbackConfigEditor';
+import { InviteCashbackDataCenter } from './InviteCashbackDataCenter';
 
 interface InvitePolicyFormState {
   enabled: boolean;
@@ -270,13 +271,6 @@ const InviteManagePage: React.FC = () => {
     setRewardSearch(nextSearch);
   };
 
-  const rewardStats = useMemo(() => {
-    const durationCount = inviteRewards.filter((item) => item.invite_reward_mode === 'duration').length;
-    const cashCount = inviteRewards.filter((item) => item.invite_reward_mode === 'cash').length;
-    const withdrawPendingCount = inviteRewards.filter((item) => item.invite_reward_status === 'withdraw_pending').length;
-    return { durationCount, cashCount, withdrawPendingCount };
-  }, [inviteRewards]);
-
   const handleSaveGlobalPolicy = async () => {
     setSavingPolicy(true);
     try {
@@ -426,11 +420,7 @@ const InviteManagePage: React.FC = () => {
         <h1 className="text-2xl font-bold text-default-800">邀请管理</h1>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card><CardBody><div className="text-sm text-default-500">返时长奖励单</div><div className="text-2xl font-bold mt-1">{rewardStats.durationCount}</div></CardBody></Card>
-        <Card><CardBody><div className="text-sm text-default-500">返现奖励单</div><div className="text-2xl font-bold mt-1">{rewardStats.cashCount}</div></CardBody></Card>
-        <Card><CardBody><div className="text-sm text-default-500">提现处理中</div><div className="text-2xl font-bold mt-1">{rewardStats.withdrawPendingCount}</div></CardBody></Card>
-      </div>
+      <InviteCashbackDataCenter campaigns={cashbackConfig.campaigns} />
       <InviteCashbackConfigEditor
         config={cashbackConfig}
         isLoading={cashbackLoading}

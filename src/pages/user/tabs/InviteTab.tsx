@@ -94,6 +94,7 @@ export const InviteTab: React.FC = () => {
   const [cashbackOverview, setCashbackOverview] = useState<InviteCashbackOverview | null>(null);
   const [invitees, setInvitees] = useState<InviteeRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activatingCashback, setActivatingCashback] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -164,6 +165,20 @@ export const InviteTab: React.FC = () => {
     }
   };
 
+
+  const activateCashback = async () => {
+    try {
+      setActivatingCashback(true);
+      const response = await inviteCashbackApi.activate();
+      if (response.code !== 20000) throw new Error(response.msg || '开启返现活动失败');
+      setCashbackOverview(response.data || null);
+      toast.success(response.msg || '返现活动已开启');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '开启返现活动失败');
+    } finally {
+      setActivatingCashback(false);
+    }
+  };
 
   const withdrawCashback = async () => {
     try {
@@ -252,9 +267,9 @@ export const InviteTab: React.FC = () => {
             </div>
             {activeCashbackCampaign ? <>
               {cashbackOverview.enrollment ? (
-                <div className="rounded-xl bg-success/10 border border-success/20 p-4 text-sm text-success-700">您已自动参加本期活动，好友完成符合条件的个人现金订阅后，返现将自动计入可提现余额。</div>
+                <div className="rounded-xl bg-success/10 border border-success/20 p-4 text-sm text-success-700">您已{activeCashbackCampaign.auto_enroll_eligible ? '自动' : ''}参加本期活动，好友完成符合条件的个人现金订阅后，返现将自动计入可提现余额。</div>
               ) : (
-                <div className="rounded-xl bg-warning/10 border border-warning/20 p-4 text-sm text-default-700 space-y-2"><div className="font-medium text-default-900">本期活动已自动开放，达到资格后立即生效</div><div>账号注册：{cashbackEligibility?.account_age_days ?? 0} / {cashbackEligibility?.account_age_required ?? 0} 天</div><div>累计实付：¥{(cashbackEligibility?.cash_paid_amount ?? 0).toFixed(2)} / ¥{(cashbackEligibility?.cash_paid_required ?? 0).toFixed(2)}，或累计套餐：{cashbackEligibility?.package_duration_days ?? 0} / {cashbackEligibility?.package_duration_required ?? 0} 天</div></div>
+                <div className="rounded-xl bg-warning/10 border border-warning/20 p-4 text-sm text-default-700 space-y-3"><div className="font-medium text-default-900">{activeCashbackCampaign.auto_enroll_eligible ? '本期活动已自动开放，达到资格后立即生效' : '达到资格后可手动开启本期返现'}</div><div>账号注册：{cashbackEligibility?.account_age_days ?? 0} / {cashbackEligibility?.account_age_required ?? 0} 天</div><div>累计实付：¥{(cashbackEligibility?.cash_paid_amount ?? 0).toFixed(2)} / ¥{(cashbackEligibility?.cash_paid_required ?? 0).toFixed(2)}，或累计套餐：{cashbackEligibility?.package_duration_days ?? 0} / {cashbackEligibility?.package_duration_required ?? 0} 天</div>{cashbackEligibility?.eligible && !activeCashbackCampaign.auto_enroll_eligible && <Button color="success" isLoading={activatingCashback} onPress={activateCashback}>开启本期返现</Button>}</div>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3"><div className="rounded-xl bg-default-50 p-4"><div className="text-sm text-default-500">可提现返现</div><div className="mt-1 text-xl font-bold">¥{cashbackAvailable.toFixed(2)}</div></div><div className="rounded-xl bg-default-50 p-4"><div className="text-sm text-default-500">提现处理中</div><div className="mt-1 text-xl font-bold">¥{(cashbackSummary?.withdraw_pending_amount ?? 0).toFixed(2)}</div></div><div className="rounded-xl bg-default-50 p-4"><div className="text-sm text-default-500">已提现</div><div className="mt-1 text-xl font-bold">¥{(cashbackSummary?.withdraw_done_amount ?? 0).toFixed(2)}</div></div></div>
               {cashbackOverview.enrollment && <Button variant="flat" color="primary" startContent={<Copy className="w-4 h-4" />} onPress={() => copyText(cashbackOverview.share_copy, '活动分享文案已复制')}>复制活动分享文案</Button>}

@@ -21,3 +21,10 @@ __pycache__
 .git
 data/
 重构说明.md
+
+# Local verification only: tests must never be committed or pushed.
+tests/
+**/tests/
+**/__tests__/
+**/*.test.*
+**/*.spec.*

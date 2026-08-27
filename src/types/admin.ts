@@ -134,6 +134,7 @@ export interface InviteCashbackCampaign {
     id: string;
     name: string;
     enabled: boolean;
+    auto_enroll_eligible: boolean;
     starts_at: string;
     ends_at: string;
     eligibility: {
@@ -166,12 +167,46 @@ export interface InviteCashbackConfig {
     };
     campaigns: InviteCashbackCampaign[];
 }
-
 export interface InviteCashbackResponseData {
     config?: InviteCashbackConfig;
     enabled?: boolean;
     withdrawal?: InviteCashbackConfig['withdrawal'];
     campaigns?: InviteCashbackCampaign[];
+    stats?: Record<string, { enrollments: number; reward_orders: number; reward_amount: number }>;
+}
+
+export interface InviteCashbackSummary {
+    enrolled_users: number;
+    rewarded_inviters: number;
+    rewarded_invitees: number;
+    reward_orders: number;
+    cashback_basis_amount: number;
+    reward_amount: number;
+    effective_rate: number;
+    available_amount: number;
+    withdraw_pending_amount: number;
+    withdraw_done_amount: number;
+    withdraw_ticket_count: number;
+}
+
+export interface InviteCashbackOverviewData {
+    campaign: InviteCashbackCampaign;
+    summary: InviteCashbackSummary;
+    generated_at: string;
+}
+
+export interface InviteCashbackUserRecord {
+    user_id: number;
+    username?: string;
+    email: string;
+    activated_at?: string | null;
+    reward_orders: number;
+    rewarded_invitees: number;
+    cashback_basis_amount: number;
+    reward_amount: number;
+    available_amount: number;
+    withdraw_pending_amount: number;
+    withdraw_done_amount: number;
 }
 
 export interface User {

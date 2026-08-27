@@ -37,6 +37,7 @@ import { PromotionCodeConfigEditor } from './PromotionCodeConfigEditor';
 import { BillRuleConfigEditor } from './BillRuleConfigEditor';
 import { InvoiceConfigEditor } from './InvoiceConfigEditor';
 import { InvitePolicyConfigEditor } from './InvitePolicyConfigEditor';
+import { InviteCashbackSettingsEditor } from './InviteCashbackSettingsEditor';
 import { SpeedTestNodesEditor } from './SpeedTestNodesEditor';
 import { WhiteLabelConfigEditor } from './WhiteLabelConfigEditor';
 import { BarkConfigEditor } from './BarkConfigEditor';
@@ -51,6 +52,7 @@ const VISUAL_CONFIG_KEYS: Record<string, true> = {
     WHITE_LABEL_CONFIG: true,
     INVOICE_CONFIG: true,
     INVITE_POLICY: true,
+    INVITE_CASHBACK_CONFIG: true,
     PROMOTION_CODE_CONFIG: true,
     COMPENSATION_CONFIG: true,
     BILL_RULE: true,
@@ -427,6 +429,8 @@ const SettingsManagePage: React.FC = () => {
                     <InvoiceConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} />
                 ) : config.key === 'INVITE_POLICY' ? (
                     <InvitePolicyConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} packages={packageOptions} />
+                ) : config.key === 'INVITE_CASHBACK_CONFIG' ? (
+                    <InviteCashbackSettingsEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} />
                 ) : config.key === 'TEAM_PLAN_CONFIG' ? (
                     <TeamPlanConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} packages={packageOptions} />
                 ) : config.key === 'BILL_RULE' ? (

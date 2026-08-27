@@ -12,7 +12,7 @@ interface Props {
 }
 
 const createCampaign = (): InviteCashbackCampaign => ({
-  id: '', name: '', enabled: false, starts_at: '', ends_at: '',
+  id: '', name: '', enabled: false, auto_enroll_eligible: false, starts_at: '', ends_at: '',
   eligibility: { min_account_age_days: 0, min_cash_paid_amount: 0, min_package_duration_days: 0 },
   cashback: { default_rate: 0, max_reward_orders_per_invitee: 0, package_rules: {} },
   invitee_reward: { enabled: false, duration_ratio: 0 },
@@ -33,7 +33,7 @@ const InviteCashbackConfigEditor: React.FC<Props> = ({ config, isLoading, isSavi
 
   return <Card>
     <CardHeader className="flex items-center justify-between gap-3 flex-wrap">
-      <div><div className="font-medium">限时邀请返现活动</div><p className="text-sm text-default-500">仅自营站生效；总开关、提现及每项活动均默认关闭。</p></div>
+      <div><div className="font-medium">限时邀请返现活动</div><p className="text-sm text-default-500">仅自营站生效；每场活动可选择是否给全部符合资格用户默认开启。</p></div>
       <Button color="primary" startContent={<Save className="w-4 h-4" />} isLoading={isSaving} isDisabled={isLoading} onPress={onSave}>保存返现配置</Button>
     </CardHeader>
     <CardBody className="space-y-6">
@@ -52,6 +52,7 @@ const InviteCashbackConfigEditor: React.FC<Props> = ({ config, isLoading, isSavi
               <Input label="活动 ID" value={campaign.id} onValueChange={id => updateCampaign(index, c => ({ ...c, id }))} description="字母、数字、下划线或连字符" />
               <Input label="活动名称" value={campaign.name} onValueChange={name => updateCampaign(index, c => ({ ...c, name }))} />
               <Switch isSelected={campaign.enabled} onValueChange={enabled => updateCampaign(index, c => ({ ...c, enabled }))}>启用本活动</Switch>
+              <Switch isSelected={campaign.auto_enroll_eligible} onValueChange={auto_enroll_eligible => updateCampaign(index, c => ({ ...c, auto_enroll_eligible }))}>符合资格用户默认开启</Switch>
               <Input type="datetime-local" label="开始时间" value={toLocalDateTime(campaign.starts_at)} onValueChange={starts_at => updateCampaign(index, c => ({ ...c, starts_at: toIsoDateTime(starts_at) }))} />
               <Input type="datetime-local" label="结束时间" value={toLocalDateTime(campaign.ends_at)} onValueChange={ends_at => updateCampaign(index, c => ({ ...c, ends_at: toIsoDateTime(ends_at) }))} />
             </div>
