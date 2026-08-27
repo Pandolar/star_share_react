@@ -12,7 +12,7 @@ interface Props {
 const createCampaign = (): InviteCashbackCampaign => ({
   id: '', name: '', enabled: false, auto_enroll_eligible: false, starts_at: '', ends_at: '',
   eligibility: { min_account_age_days: 0, min_cash_paid_amount: 0, min_package_duration_days: 0 },
-  cashback: { default_rate: 0, max_reward_orders_per_invitee: 0, package_rules: {} },
+  cashback: { default_rate: 0, min_order_basis_amount: 0, max_reward_orders_per_invitee: 0, package_rules: {} },
   invitee_reward: { enabled: false, duration_ratio: 0 },
   copywriting: { headline: '', share_template: '', ended_message: '' },
 });
@@ -56,6 +56,7 @@ export const InviteCashbackSettingsEditor: React.FC<Props> = ({ value, onChange,
         <NumberInput label="累计现金实付" value={campaign.eligibility.min_cash_paid_amount} minValue={0} onValueChange={amount => updateCampaign(index, current => ({ ...current, eligibility: { ...current.eligibility, min_cash_paid_amount: amount || 0 } }))} isDisabled={disabled} />
         <NumberInput label="累计套餐时长（天）" value={campaign.eligibility.min_package_duration_days} minValue={0} onValueChange={amount => updateCampaign(index, current => ({ ...current, eligibility: { ...current.eligibility, min_package_duration_days: Math.trunc(amount || 0) } }))} isDisabled={disabled} />
         <NumberInput label="默认返现比例" value={campaign.cashback.default_rate} minValue={0} maxValue={1} step={0.01} description="0.08 表示 8%" onValueChange={default_rate => updateCampaign(index, current => ({ ...current, cashback: { ...current.cashback, default_rate: default_rate || 0 } }))} isDisabled={disabled} />
+        <NumberInput label="最低返现订单金额" value={campaign.cashback.min_order_basis_amount || 0} minValue={0} step={0.01} description="按净套餐实付判断；低于该值跳过，0 表示不限" onValueChange={min_order_basis_amount => updateCampaign(index, current => ({ ...current, cashback: { ...current.cashback, min_order_basis_amount: min_order_basis_amount || 0 } }))} isDisabled={disabled} />
         <NumberInput label="每个下级最多奖励订单" value={campaign.cashback.max_reward_orders_per_invitee} minValue={0} description="0 表示不限" onValueChange={count => updateCampaign(index, current => ({ ...current, cashback: { ...current.cashback, max_reward_orders_per_invitee: Math.trunc(count || 0) } }))} isDisabled={disabled} />
         <Switch isSelected={campaign.invitee_reward.enabled} onValueChange={enabled => updateCampaign(index, current => ({ ...current, invitee_reward: { ...current.invitee_reward, enabled } }))} isDisabled={disabled}>被邀请人返时长</Switch>
         <NumberInput label="被邀请人时长比例" value={campaign.invitee_reward.duration_ratio} minValue={0} maxValue={1} step={0.01} onValueChange={duration_ratio => updateCampaign(index, current => ({ ...current, invitee_reward: { ...current.invitee_reward, duration_ratio: duration_ratio || 0 } }))} isDisabled={disabled} />

@@ -144,6 +144,7 @@ export interface InviteCashbackCampaign {
     };
     cashback: {
         default_rate: number;
+        min_order_basis_amount: number;
         max_reward_orders_per_invitee: number;
         package_rules: Record<string, InviteCashbackPackageRule>;
     };
