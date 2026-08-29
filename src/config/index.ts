@@ -51,7 +51,6 @@ const config = {
     links: {
         openPlatform: `https://api.${domainConfig.mainDomain}/`,
         chatService: `https://share.${domainConfig.mainDomain}/`,
-        plusService: `https://goplus.${domainConfig.mainDomain}/`,
         apiDocumentation: `https://api.${domainConfig.mainDomain}/`,
     },
 

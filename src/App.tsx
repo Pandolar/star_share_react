@@ -7,14 +7,12 @@ import { WhiteLabelProvider, useWhiteLabel } from './contexts/WhiteLabelContext'
 
 const HomePage = lazyWithRetry(() => import('./pages/HomePage'), 'HomePage');
 const UserCenter = lazyWithRetry(() => import('./pages/user/UserCenter'), 'UserCenter');
-const GoPlusPage = lazyWithRetry(() => import('./pages/features/GoPlusPage'), 'GoPlusPage');
 const ShareSpeedTestPage = lazyWithRetry(() => import('./pages/features/ShareSpeedTestPage'), 'ShareSpeedTestPage');
 const JumpNsPage = lazyWithRetry(() => import('./pages/features/JumpNsPage'), 'JumpNsPage');
 const RedirectPage = lazyWithRetry(() => import('./pages/features/RedirectPage'), 'RedirectPage');
 const LoginPage = lazyWithRetry(() => import('./pages/auth/LoginPage'), 'LoginPage');
 const RegisterPage = lazyWithRetry(() => import('./pages/auth/RegisterPage'), 'RegisterPage');
 const ForgotPasswordPage = lazyWithRetry(() => import('./pages/auth/ForgotPasswordPage'), 'ForgotPasswordPage');
-const NewApiPage = lazyWithRetry(() => import('./pages/features/NewApiPage'), 'NewApiPage');
 const CustomerServicePage = lazyWithRetry(() => import('./pages/features/CustomerServicePage'), 'CustomerServicePage');
 const AdminLoginPage = lazyWithRetry(() => import('./pages/admin/AdminLoginPage'), 'AdminLoginPage');
 const AdminLayout = lazyWithRetry(() => import('./components/admin/AdminLayout'), 'AdminLayout');
@@ -91,10 +89,8 @@ const App: React.FC = () => {
 
               {/* 其他功能路由 */}
               <Route path="/handle_callback" element={<SelfSiteOnly><RedirectPage /></SelfSiteOnly>} />
-              <Route path="/goplus" element={<SelfSiteOnly><GoPlusPage /></SelfSiteOnly>} />
               <Route path="/sharespeedtest" element={<SelfSiteOnly><ShareSpeedTestPage /></SelfSiteOnly>} />
               <Route path="/jumpns" element={<SelfSiteOnly><JumpNsPage /></SelfSiteOnly>} />
-              <Route path="/new-api" element={<SelfSiteOnly><NewApiPage /></SelfSiteOnly>} />
               <Route path="/customer-service" element={<SelfSiteOnly><CustomerServicePage /></SelfSiteOnly>} />
 
               {/* 分销商路由（结构对齐 /star-admin/：登录页独立，其余在 /distributor 受保护壳下） */}
