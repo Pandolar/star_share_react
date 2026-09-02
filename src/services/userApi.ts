@@ -527,12 +527,13 @@ export interface InviteCashbackOverview {
     enrollment: {
         id: number;
         campaign_id: string;
+        status: 'active' | 'opted_out' | 'completed';
         activated_at: string | null;
+        opted_out_at: string | null;
         activation_source: string;
     } | null;
     eligibility: InviteCashbackEligibility | null;
     cashback_summary: InviteCashbackSummary;
-    auto_join_enabled: boolean;
     withdrawal: {
         enabled: boolean;
         min_amount: number;
@@ -562,6 +563,9 @@ export const inviteCashbackApi = {
     },
     activate: async (): Promise<ApiResponse<InviteCashbackOverview>> => {
         return createUserRequest(getUserApiUrl('/u/invite_cashback_activate'), { method: 'POST' });
+    },
+    optOut: async (): Promise<ApiResponse<InviteCashbackOverview>> => {
+        return createUserRequest(getUserApiUrl('/u/invite_cashback_opt_out'), { method: 'POST' });
     },
     withdraw: async (): Promise<ApiResponse<{ workorder_id: number; status: string; amount: number }>> => {
         return createUserRequest(getUserApiUrl('/u/invite_withdraw'), { method: 'POST' });
