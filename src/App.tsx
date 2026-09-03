@@ -14,6 +14,7 @@ const LoginPage = lazyWithRetry(() => import('./pages/auth/LoginPage'), 'LoginPa
 const RegisterPage = lazyWithRetry(() => import('./pages/auth/RegisterPage'), 'RegisterPage');
 const ForgotPasswordPage = lazyWithRetry(() => import('./pages/auth/ForgotPasswordPage'), 'ForgotPasswordPage');
 const CustomerServicePage = lazyWithRetry(() => import('./pages/features/CustomerServicePage'), 'CustomerServicePage');
+const IOSInstallPage = lazyWithRetry(() => import('./pages/features/IOSInstallPage'), 'IOSInstallPage');
 const AdminLoginPage = lazyWithRetry(() => import('./pages/admin/AdminLoginPage'), 'AdminLoginPage');
 const AdminLayout = lazyWithRetry(() => import('./components/admin/AdminLayout'), 'AdminLayout');
 const OverviewDashboardPage = lazyWithRetry(() => import('./pages/admin/OverviewDashboardPage'), 'OverviewDashboardPage');
@@ -92,6 +93,7 @@ const App: React.FC = () => {
               <Route path="/handle_callback" element={<SelfSiteOnly><RedirectPage /></SelfSiteOnly>} />
               <Route path="/sharespeedtest" element={<SelfSiteOnly><ShareSpeedTestPage /></SelfSiteOnly>} />
               <Route path="/jumpns" element={<SelfSiteOnly><JumpNsPage /></SelfSiteOnly>} />
+              <Route path="/ios" element={<IOSInstallPage />} />
               <Route path="/customer-service" element={<SelfSiteOnly><CustomerServicePage /></SelfSiteOnly>} />
 
               {/* 分销商路由（结构对齐 /star-admin/：登录页独立，其余在 /distributor 受保护壳下） */}
