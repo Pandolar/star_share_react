@@ -398,7 +398,7 @@ const SettingsManagePage: React.FC = () => {
                     <BarkConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} />
                 ) : config.key === 'DISTRIBUTOR_LEVEL_DISCOUNTS' ? (
                     <DistributorLevelDiscountsEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} packages={packageOptions} />
-                ) : (config.key === 'NOTICE' || config.key === 'ABOUT_US_CONTENT' || config.key.startsWith('SUBSCRIPTION_NOTICE_')) ? (
+                ) : (config.key === 'NOTICE' || config.key === 'ABOUT_US_CONTENT' || config.key === 'LIMITED_ACTIVITY_CONTENT' || config.key.startsWith('SUBSCRIPTION_NOTICE_')) ? (
                     <Textarea
                         value={value}
                         onValueChange={(nextValue) => updateConfigValue(config.key, nextValue)}
@@ -407,7 +407,7 @@ const SettingsManagePage: React.FC = () => {
                         color={isChanged ? 'warning' : 'default'}
                         placeholder={`请输入${config.description}（支持Markdown格式）`}
                         minRows={5}
-                        description={config.key === 'ABOUT_US_CONTENT' || config.key.startsWith('SUBSCRIPTION_NOTICE_') ? '支持Markdown：标题、列表、**粗体**、链接等' : undefined}
+                        description={config.key === 'ABOUT_US_CONTENT' || config.key === 'LIMITED_ACTIVITY_CONTENT' || config.key.startsWith('SUBSCRIPTION_NOTICE_') ? '支持Markdown：标题、列表、**粗体**、链接等' : undefined}
                     />
                 ) : config.key === 'PROMOTION_CODE_CONFIG' ? (
                     <PromotionCodeConfigEditor

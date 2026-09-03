@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import { inviteCashbackApi, inviteUserApi, type InviteCashbackOverview } from '../../../services/userApi';
 import { useWhiteLabel } from '../../../contexts/WhiteLabelContext';
 import { toast } from '../../../utils/toast';
+import { FeedbackPanel } from './FeedbackPanel';
 
 interface InviteOverviewData {
   inviter_id: number;
@@ -386,6 +387,7 @@ export const InviteTab: React.FC = () => {
         </CardBody>
       </Card>
 
+      <FeedbackPanel />
       <Card>
         <CardBody className="p-6 space-y-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">

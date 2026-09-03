@@ -603,6 +603,21 @@ class AdminApiService {
         return response.data;
     }
 
+    async getFeedbackTickets(params: { status?: string; category_id?: string; querystring?: string } = {}): Promise<AdminApiResponse<WorkOrder[]>> {
+        const response = await this.api.get(`/star/feedback_ticket?${this.buildQueryString(params)}`);
+        return response.data;
+    }
+
+    async updateFeedbackTicket(data: { id: number; status?: string; reply?: string; internal_remark?: string }): Promise<AdminApiResponse<WorkOrder>> {
+        const response = await this.api.put('/star/feedback_ticket', data);
+        return response.data;
+    }
+
+    async getFeedbackAttachment(id: string): Promise<AdminApiResponse<{ id: string; mime_type: string; data_base64: string }>> {
+        const response = await this.api.get(`/star/feedback_attachment/${encodeURIComponent(id)}`);
+        return response.data;
+    }
+
     // ==================== 仪表盘 ====================
 
     /**

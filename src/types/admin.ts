@@ -776,6 +776,14 @@ export interface InviteRewardQueryParams extends CommonQueryParams {
     invite_reward_mode?: 'duration' | 'cash';
 }
 
+export interface WorkOrderMessage {
+    id: string;
+    role: 'user' | 'admin';
+    content: string;
+    attachments: Array<{ id: string; mime_type: string; bytes: number; width: number; height: number }>;
+    created_at: string;
+}
+
 export interface WorkOrder {
     id: number;
     user_id: number;
@@ -784,7 +792,11 @@ export interface WorkOrder {
     title: string;
     content?: string;
     amount?: number;
-    extra_data?: Record<string, any>;
+    category_id?: string | null;
+    messages?: WorkOrderMessage[];
+    last_reply_at?: string | null;
+    closed_at?: string | null;
+    extra_data?: Record<string, unknown> & { withdraw_account?: { real_name?: string; account?: string } };
     admin_remark?: string;
     handled_admin?: string;
     handled_at?: string | null;

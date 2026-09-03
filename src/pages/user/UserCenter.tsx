@@ -19,6 +19,7 @@ import {
   Home,
   AlertCircle,
   Building2,
+  Sparkles,
 } from 'lucide-react';
 // Tab页面组件导入
 import { AnnouncementTab } from './tabs/AnnouncementTab';
@@ -27,6 +28,7 @@ import { SubscriptionTab } from './tabs/SubscriptionTab';
 import { OrderHistoryTab } from './tabs/OrderHistoryTab';
 import { InviteTab } from './tabs/InviteTab';
 import { TeamTab } from './tabs/TeamTab';
+import { LimitedActivityTab } from './tabs/LimitedActivityTab';
 import { AboutUsTab } from './tabs/AboutUsTab';
 
 // 组件和工具导入
@@ -34,7 +36,7 @@ import { LogoutConfirmModal } from '../../components/LogoutConfirmModal';
 import { ChatwootFloatingButton } from '../../components/chat/ChatwootFloatingButton';
 import { clearAuthCookies, getCookie } from '../../utils/cookies';
 import { useAuthCheck } from '../../hooks/useAuthCheck';
-import { announcementApi, teamUserApi, userInfoApi } from '../../services/userApi';
+import { announcementApi, feedbackApi, teamUserApi, userInfoApi } from '../../services/userApi';
 import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
 
 // Tab配置接口
@@ -78,6 +80,12 @@ const ALL_TAB_CONFIGS: TabConfig[] = [
     component: OrderHistoryTab
   },
   {
+    key: 'activity',
+    label: '限时活动',
+    icon: <Sparkles size={20} />,
+    component: LimitedActivityTab
+  },
+  {
     key: 'invite',
     label: '邀请好友',
     icon: <MessageCircle size={20} />,
@@ -117,17 +125,21 @@ const UserCenter: React.FC = () => {
   const [teamTabVisible, setTeamTabVisible] = useState(true);
   const [aboutVisible, setAboutVisible] = useState(false);
   const [aboutVisibilityResolved, setAboutVisibilityResolved] = useState(false);
+  const [tabBadges, setTabBadges] = useState<Record<string, string>>({});
+  const [inviteUnreadCount, setInviteUnreadCount] = useState(0);
+  const [activityVisible, setActivityVisible] = useState(false);
+  const [activityTitle, setActivityTitle] = useState('限时活动');
   const navigate = useNavigate();
 
-  // 白牌模式只保留公告、基础资料和无价格套餐兑换目录。
-  // wlLoading：白牌判定完成前不挂载客服，避免注入并持久残留 Chatwoot SDK。
+  // White-label mode hides self-site business tabs.
   const { isWhiteLabel, loading: wlLoading } = useWhiteLabel();
   const tabConfigs = React.useMemo(() => ALL_TAB_CONFIGS.filter((tab) => {
-    if (isWhiteLabel && (tab.key === 'invite' || tab.key === 'orders' || tab.key === 'about' || tab.key === 'team')) return false;
+    if (isWhiteLabel && (tab.key === 'invite' || tab.key === 'orders' || tab.key === 'activity' || tab.key === 'about' || tab.key === 'team')) return false;
     if (tab.key === 'team' && !teamTabVisible) return false;
+    if (tab.key === 'activity' && !activityVisible) return false;
     if (tab.key === 'about' && !aboutVisible) return false;
     return true;
-  }), [aboutVisible, isWhiteLabel, teamTabVisible]);
+  }).map((tab) => tab.key === 'activity' ? { ...tab, label: activityTitle } : tab), [aboutVisible, activityTitle, activityVisible, isWhiteLabel, teamTabVisible]);
 
   // 使用认证检查Hook
   const { isAuthenticated, isChecking, countdown, handleAuthFailure } = useAuthCheck({
@@ -192,27 +204,57 @@ const UserCenter: React.FC = () => {
     let cancelled = false;
     if (!isAuthenticated || wlLoading) {
       setAboutVisible(false);
+      setActivityVisible(false);
       setAboutVisibilityResolved(false);
       return;
     }
     if (isWhiteLabel) {
       setAboutVisible(false);
+      setActivityVisible(false);
       setAboutVisibilityResolved(true);
       return;
     }
     setAboutVisibilityResolved(false);
     announcementApi.getPublicInfo()
       .then((response) => {
-        if (!cancelled) setAboutVisible(response.code === 20000 && response.data?.about_enabled === true);
+        if (cancelled) return;
+        setAboutVisible(response.code === 20000 && response.data?.about_enabled === true);
+        setActivityVisible(response.code === 20000 && response.data?.limited_activity_enabled === true);
+        setActivityTitle(response.data?.limited_activity_title || '限时活动');
       })
       .catch(() => {
-        if (!cancelled) setAboutVisible(false);
+        if (!cancelled) {
+          setAboutVisible(false);
+          setActivityVisible(false);
+        }
       })
       .finally(() => {
         if (!cancelled) setAboutVisibilityResolved(true);
       });
     return () => { cancelled = true; };
   }, [isAuthenticated, isWhiteLabel, wlLoading]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!isAuthenticated || wlLoading || isWhiteLabel) return;
+    feedbackApi.getBadges().then((response) => {
+      if (cancelled || response.code !== 20000) return;
+      setInviteUnreadCount(Number(response.data?.tabs?.invite?.unread_count || 0));
+      const defaults = response.data?.defaults;
+      const overrides = response.data?.overrides || {};
+      const next: Record<string, string> = {};
+      if (defaults?.enabled) Object.entries(defaults.tabs || {}).forEach(([key, value]) => { if (value.enabled) next[key] = value.emoji; });
+      Object.entries(overrides).forEach(([key, emoji]) => { next[key] = emoji; });
+      setTabBadges(next);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [isAuthenticated, isWhiteLabel, wlLoading, activeTab]);
+
+  useEffect(() => {
+    const clearInviteBadge = () => setInviteUnreadCount(0);
+    window.addEventListener('feedbackRead', clearInviteBadge);
+    return () => window.removeEventListener('feedbackRead', clearInviteBadge);
+  }, []);
 
   // 一键跳转到绑定邮箱（profile tab，并通过 query 携带 openEdit=email 由 ProfileTab 自动打开弹窗）
   const goBindEmail = () => {
@@ -226,7 +268,7 @@ const UserCenter: React.FC = () => {
   // 根据 URL 查询参数同步激活的 Tab（支持 ?tab=subscription 等）
   useEffect(() => {
     const urlTab = searchParams.get('tab');
-    if (urlTab === 'about' && !aboutVisibilityResolved) return;
+    if ((urlTab === 'about' || urlTab === 'activity') && !aboutVisibilityResolved) return;
     const validKeys = tabConfigs.map(t => t.key);
     if (urlTab && validKeys.includes(urlTab) && urlTab !== activeTab) {
       setActiveTab(urlTab);
@@ -318,6 +360,7 @@ const UserCenter: React.FC = () => {
   // 渲染导航项
   const renderTabItem = (tab: TabConfig, isMobile = false) => {
     const isActive = activeTab === tab.key;
+    const badge = tab.key === 'invite' && inviteUnreadCount > 0 ? String(Math.min(inviteUnreadCount, 99)) : tabBadges[tab.key];
 
     return (
       <motion.button
@@ -335,6 +378,7 @@ const UserCenter: React.FC = () => {
       >
         <span className="flex-shrink-0">{tab.icon}</span>
         <span className="flex-1 font-medium">{tab.label}</span>
+        {badge && <span className={tab.key === 'invite' && inviteUnreadCount > 0 ? 'min-w-5 rounded-full bg-danger px-1.5 py-0.5 text-center text-xs font-semibold text-white' : 'text-base'}>{badge}</span>}
       </motion.button>
     );
   };

@@ -137,7 +137,7 @@ export const userAuthApi = {
 // 公告API
 export const announcementApi = {
     // 获取公告信息
-    getPublicInfo: async (): Promise<ApiResponse<{ notice: string; about_enabled?: boolean; about_content?: string }>> => {
+    getPublicInfo: async (): Promise<ApiResponse<{ notice: string; about_enabled?: boolean; about_content?: string; limited_activity_enabled?: boolean; limited_activity_title?: string; limited_activity_content?: string }>> => {
         return createUserRequest(getUserApiUrl('/u/get_public_info'), {
             method: 'GET',
         });
@@ -556,6 +556,66 @@ export interface InviteWithdrawalWorkorder {
     created_at: string | null;
     updated_at: string | null;
 }
+
+export interface FeedbackAttachment {
+    id: string;
+    mime_type: string;
+    bytes: number;
+    width: number;
+    height: number;
+}
+
+export interface FeedbackMessage {
+    id: string;
+    role: 'user' | 'admin';
+    content: string;
+    attachments: FeedbackAttachment[];
+    created_at: string;
+}
+
+export interface FeedbackTicket {
+    id: number;
+    ticket_type: 'user_feedback';
+    status: 'open' | 'processing' | 'resolved' | 'closed';
+    category_id: string;
+    title: string;
+    content: string;
+    admin_remark?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
+    last_reply_at?: string | null;
+    closed_at?: string | null;
+    messages: FeedbackMessage[];
+    linked_order_id?: string | null;
+}
+
+export interface UserFeedbackConfig {
+    enabled: boolean;
+    entry_title: string;
+    entry_description: string;
+    notice: string;
+    categories: Array<{ id: string; name: string; enabled: boolean; description: string }>;
+    attachments: { enabled: boolean; max_count: number; max_upload_mb: number; max_compressed_mb: number; allowed_mime_types: string[] };
+    limits: { max_title_length: number; max_content_length: number; max_open_tickets_per_user: number; max_messages_per_ticket: number; submit_cooldown_seconds: number };
+}
+
+export interface UserBadgeData {
+    tabs: { invite: { unread_count: number } };
+    defaults: { enabled: boolean; tabs: Record<string, { enabled: boolean; emoji: string }> };
+    overrides: Record<string, string>;
+}
+
+export const feedbackApi = {
+    getConfig: async (): Promise<ApiResponse<UserFeedbackConfig>> => createUserRequest(getUserApiUrl('/u/feedback_config'), { method: 'GET' }),
+    getTickets: async (): Promise<ApiResponse<FeedbackTicket[]>> => createUserRequest(getUserApiUrl('/u/feedback_ticket'), { method: 'GET' }),
+    createTicket: async (data: { category_id: string; title: string; content: string; attachment_ids?: string[]; linked_order_id?: string; client_context?: Record<string, string> }): Promise<ApiResponse<FeedbackTicket>> => createUserRequest(getUserApiUrl('/u/feedback_ticket'), { method: 'POST', body: JSON.stringify(data) }),
+    updateTicket: async (id: number, action: 'close' | 'append', content?: string, attachment_ids?: string[]): Promise<ApiResponse<FeedbackTicket>> => createUserRequest(getUserApiUrl('/u/feedback_ticket'), { method: 'PUT', body: JSON.stringify({ id, action, content, attachment_ids }) }),
+    markRead: async (): Promise<ApiResponse<{ read_at: string }>> => createUserRequest(getUserApiUrl('/u/feedback_ticket_read'), { method: 'POST' }),
+    getAttachment: async (id: string): Promise<ApiResponse<{ id: string; mime_type: string; data_base64: string }>> => createUserRequest(getUserApiUrl(`/u/feedback_attachment/${encodeURIComponent(id)}`), { method: 'GET' }),
+    uploadAttachment: async (data_base64: string, mime_type: string): Promise<ApiResponse<FeedbackAttachment>> => createUserRequest(getUserApiUrl('/u/feedback_attachment'), { method: 'POST', body: JSON.stringify({ data_base64, mime_type }) }),
+    getBadges: async (): Promise<ApiResponse<UserBadgeData>> => createUserRequest(getUserApiUrl('/u/user_badges'), { method: 'GET' }),
+    setTabBadges: async (tab_badges: Record<string, string>): Promise<ApiResponse<{ tab_badges: Record<string, string> }>> => createUserRequest(getUserApiUrl('/u/user_badges'), { method: 'PUT', body: JSON.stringify({ tab_badges }) }),
+};
 
 export const inviteCashbackApi = {
     getOverview: async (): Promise<ApiResponse<InviteCashbackOverview>> => {

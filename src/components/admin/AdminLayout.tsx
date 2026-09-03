@@ -34,6 +34,7 @@ import {
     ReceiptText,
     ScrollText,
     FileText,
+    MessageSquare,
 } from 'lucide-react';
 import adminApiService from '../../services/adminApi';
 
@@ -142,6 +143,12 @@ const AdminLayout: React.FC = () => {
             label: '邀请管理',
             icon: <Gift className="w-5 h-5" />,
             path: '/star-admin/invites',
+        },
+        {
+            key: 'feedback',
+            label: '工单管理',
+            icon: <MessageSquare className="w-5 h-5" />,
+            path: '/star-admin/feedback',
         },
     ];
 

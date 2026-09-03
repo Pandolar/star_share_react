@@ -30,6 +30,7 @@ const DistributorsManagePage = lazyWithRetry(() => import('./pages/admin/Distrib
 const InvoicesManagePage = lazyWithRetry(() => import('./pages/admin/InvoicesManagePage'), 'InvoicesManagePage');
 const AuditLogsPage = lazyWithRetry(() => import('./pages/admin/AuditLogsPage'), 'AuditLogsPage');
 const ArticlesManagePage = lazyWithRetry(() => import('./pages/admin/ArticlesManagePage'), 'ArticlesManagePage');
+const FeedbackManagePage = lazyWithRetry(() => import('./pages/admin/FeedbackManagePage'), 'FeedbackManagePage');
 const DistributorLoginPage = lazyWithRetry(() => import('./pages/distributor/DistributorLoginPage'), 'DistributorLoginPage');
 const DistributorDashboardPage = lazyWithRetry(() => import('./pages/distributor/DistributorDashboardPage'), 'DistributorDashboardPage');
 const DistributorProtectedRoute = lazyWithRetry(() => import('./components/distributor/DistributorProtectedRoute'), 'DistributorProtectedRoute');
@@ -119,6 +120,7 @@ const App: React.FC = () => {
                 <Route path="articles" element={<ArticlesManagePage />} />
                 <Route path="settings" element={<SettingsManagePage />} />
                 <Route path="invites" element={<InviteManagePage />} />
+                <Route path="feedback" element={<FeedbackManagePage />} />
               </Route>
               </Routes>
             </Suspense>
