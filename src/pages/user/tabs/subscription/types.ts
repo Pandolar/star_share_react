@@ -39,6 +39,15 @@ export interface OrderInfo {
   discount_amount?: string;
   promotion_code?: string | null;
   promotion_snapshot?: PromotionSnapshot | null;
+  cashback_credit_amount?: string;
+  cashback_credit_snapshot?: { non_refundable: boolean; pricing_before_credit: string } | null;
+  cashback_credit?: {
+    enabled: boolean;
+    available_amount: string;
+    selected: boolean;
+    applied_amount: string;
+  };
+  settled?: boolean;
   expires_at?: string | null;
   expires_in_seconds?: number;
   invoice_snapshot?: {
@@ -50,6 +59,7 @@ export interface OrderInfo {
     original_amount?: string;
     base_amount?: string;
     discount_amount?: string;
+    cashback_credit_amount?: string;
     promotion_code?: string | null;
     payable_amount?: string;
     delivery_workdays: number;

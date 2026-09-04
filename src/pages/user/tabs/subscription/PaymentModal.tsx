@@ -15,7 +15,7 @@ import {
   Tooltip,
 } from '@heroui/react';
 import { motion } from 'framer-motion';
-import { CheckCircle, AlertCircle, QrCode, ExternalLink, ReceiptText, UserRoundCog, TicketPercent } from 'lucide-react';
+import { CheckCircle, AlertCircle, QrCode, ExternalLink, ReceiptText, UserRoundCog, TicketPercent, WalletCards } from 'lucide-react';
 import { orderUserApi, type InvoiceEligibility } from '../../../../services/userApi';
 import { toast } from '../../../../utils/toast';
 import { celebrateSuccess } from '../../../../utils/confetti';
@@ -35,6 +35,8 @@ interface PaymentModalProps {
   onCreateInvoiceOrder: () => Promise<OrderInfo | null>;
   promotionActionLoading: boolean;
   onApplyPromotionCode: (promotionCode: string) => Promise<OrderInfo | null>;
+  cashbackActionLoading: boolean;
+  onApplyCashbackCredit: (useCashback: boolean) => Promise<OrderInfo | null>;
   agreementAccepted: boolean;
   onAgreementValueChange: (selected: boolean) => void;
   onClose: () => void;
@@ -77,6 +79,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   onCreateInvoiceOrder,
   promotionActionLoading,
   onApplyPromotionCode,
+  cashbackActionLoading,
+  onApplyCashbackCredit,
   agreementAccepted,
   onAgreementValueChange,
   onClose,
@@ -102,6 +106,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const activeOrder = invoiceSelected && invoiceOrder ? invoiceOrder : ordinaryOrder;
   const checkoutId = ordinaryOrder?.checkout_id;
   const activePromotion = ordinaryOrder?.promotion_snapshot || null;
+  const cashbackCredit = ordinaryOrder?.cashback_credit;
+  const cashbackSelected = Boolean(ordinaryOrder?.cashback_credit_amount && Number(ordinaryOrder.cashback_credit_amount) > 0);
 
   const cleanup = () => {
     clearInterval(checkIntervalRef.current);
@@ -269,6 +275,16 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     }
   };
 
+  const handleCashbackSwitch = async (selected: boolean) => {
+    if (!ensureAgreementAccepted()) return;
+    const nextOrder = await onApplyCashbackCredit(selected);
+    if (nextOrder?.settled) {
+      setPaymentStatus('success');
+      cleanup();
+      setTimeout(() => window.location.reload(), 2000);
+    }
+  };
+
   const handleManualCheck = async () => {
     if (!ensureAgreementAccepted()) return;
     if (!checkoutId) return;
@@ -311,7 +327,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   };
 
   const handleClose = () => {
-    if (checkoutId && activePromotion && paymentStatus === 'pending') {
+    if (checkoutId && (activePromotion || cashbackSelected) && paymentStatus === 'pending') {
       void orderUserApi.cancelCheckout(checkoutId).catch(() => undefined);
     }
     closeModal();
@@ -381,6 +397,18 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             </Card>
           )}
 
+          {cashbackCredit?.enabled && Number(cashbackCredit.available_amount || 0) > 0 && paymentStatus === 'pending' && !qrCodeExpired && (
+            <Card shadow="none" className="border border-success-200 bg-success-50/40">
+              <CardBody className="gap-3 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-start gap-2"><WalletCards className="mt-0.5 h-4 w-4 text-success" /><div><p className="text-sm font-medium">返现余额抵扣</p><p className="text-xs text-default-500">可用余额 ¥{cashbackCredit.available_amount}，开启后自动最大抵扣</p></div></div>
+                  <Switch aria-label="使用返现余额抵扣" isSelected={cashbackSelected} onValueChange={handleCashbackSwitch} isDisabled={cashbackActionLoading || invoiceSelected} />
+                </div>
+                <p className="text-xs text-danger">成功购买后，返现余额抵扣部分不支持退回。</p>
+              </CardBody>
+            </Card>
+          )}
+
           {activeOrder && (
             <div className="space-y-6">
               {paymentReady && (
@@ -393,7 +421,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                         <div className="flex items-center justify-between text-sm"><span className="flex items-center gap-2 text-default-500">优惠码 <Chip size="sm" color="success" variant="flat">{activePromotion.code}</Chip></span><span className="font-medium text-success">-¥{activePromotion.discount_amount}</span></div>
                       </>
                     )}
-                    <div className="flex items-center justify-between"><span className="text-default-500">{activeOrder.invoice_requested ? getInvoicePriceLabel(activeOrder.invoice_snapshot?.surcharge_rate || eligibility?.surcharge_rate) : '支付金额'}</span><span className="text-2xl font-bold text-primary">¥{activeOrder.payable_amount || selectedPackage?.price}</span></div>
+                    {cashbackSelected && <div className="flex items-center justify-between text-sm"><span className="text-default-500">返现余额抵扣</span><span className="font-medium text-success">-¥{ordinaryOrder?.cashback_credit_amount}</span></div>}
+                    <div className="flex items-center justify-between"><span className="text-default-500">{activeOrder.invoice_requested ? getInvoicePriceLabel(activeOrder.invoice_snapshot?.surcharge_rate || eligibility?.surcharge_rate) : '现金支付金额'}</span><span className="text-2xl font-bold text-primary">¥{activeOrder.payable_amount || selectedPackage?.price}</span></div>
                     <div className="flex items-center justify-between"><span className="text-default-500">套餐时长</span><span className="font-medium">{selectedPackage ? getDurationText(selectedPackage.duration) : ''}</span></div>
                   </CardBody>
                 </Card>

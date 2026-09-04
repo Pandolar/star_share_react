@@ -54,6 +54,7 @@ const createDefaultPolicyForm = (): InvitePolicyFormState => ({
 const createDefaultCashbackConfig = (): InviteCashbackConfig => ({
   enabled: false,
   withdrawal: { enabled: false, min_amount: 100, notice: '提现暂未开放' },
+  purchase_credit: { enabled: false },
   campaigns: [],
 });
 
@@ -157,6 +158,7 @@ const InviteManagePage: React.FC = () => {
       setCashbackConfig(data?.config || {
         enabled: data?.enabled ?? false,
         withdrawal: data?.withdrawal || createDefaultCashbackConfig().withdrawal,
+        purchase_credit: data?.purchase_credit || createDefaultCashbackConfig().purchase_credit,
         campaigns: data?.campaigns || [],
       });
     } catch (error) {

@@ -38,11 +38,12 @@ const InviteCashbackConfigEditor: React.FC<Props> = ({ config, isLoading, isSavi
     </CardHeader>
     <CardBody className="space-y-6">
       {isLoading ? <div className="py-8 text-center text-default-500">加载返现配置中...</div> : <>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Switch isSelected={config.enabled} onValueChange={enabled => onChange({ ...config, enabled })}>启用返现活动</Switch>
           <Switch isSelected={config.withdrawal.enabled} onValueChange={enabled => onChange({ ...config, withdrawal: { ...config.withdrawal, enabled } })}>开放提现</Switch>
+          <Switch isSelected={config.purchase_credit.enabled} onValueChange={enabled => onChange({ ...config, purchase_credit: { enabled } })}>允许返现余额抵扣个人套餐</Switch>
           <NumberInput label="最低提现金额" value={config.withdrawal.min_amount} onValueChange={min_amount => onChange({ ...config, withdrawal: { ...config.withdrawal, min_amount: Number.isNaN(min_amount) ? 0 : min_amount } })} minValue={0} step={0.01} />
-          <Textarea className="md:col-span-3" label="提现提示" value={config.withdrawal.notice} onValueChange={notice => onChange({ ...config, withdrawal: { ...config.withdrawal, notice } })} minRows={2} />
+          <Textarea className="md:col-span-2" label="提现提示" value={config.withdrawal.notice} onValueChange={notice => onChange({ ...config, withdrawal: { ...config.withdrawal, notice } })} minRows={2} />
         </div>
         <div className="flex items-center justify-between"><h2 className="font-medium">活动列表</h2><Button size="sm" variant="flat" color="primary" startContent={<Plus className="w-4 h-4" />} onPress={() => onChange({ ...config, campaigns: [...config.campaigns, createCampaign()] })}>新增活动</Button></div>
         {config.campaigns.map((campaign, index) => <Card key={index} className="border border-default-200">

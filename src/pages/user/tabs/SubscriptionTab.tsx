@@ -227,6 +227,35 @@ export const SubscriptionTab: React.FC = () => {
     }
   };
 
+  const applyCashbackCredit = async (useCashback: boolean) => {
+    if (isAgreementRequired && !agreementAccepted) return null;
+    if (!selectedPackage || !ordinaryOrder?.checkout_id) return null;
+    setOrderLoading(true);
+    try {
+      const response = await orderUserApi.createOrder(selectedPackage.id, {
+        ...(isMobileDevice ? { device: 'mobile' as const } : {}),
+        promotion_code: ordinaryOrder.promotion_code || undefined,
+        use_cashback_credit: useCashback,
+        replace_checkout_id: ordinaryOrder.checkout_id,
+      });
+      if (response.code !== 20000) {
+        toast.error(response.msg || '返现余额抵扣失败');
+        return null;
+      }
+      const nextOrder = { ...response.data, invoice_snapshot: response.data.invoice_snapshot || null };
+      setOrdinaryOrder(nextOrder);
+      setInvoiceOrder(null);
+      if (nextOrder.settled) toast.success('返现余额支付成功');
+      else toast.success(useCashback ? `已抵扣 ¥${nextOrder.cashback_credit_amount}` : '已取消返现抵扣');
+      return nextOrder;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '返现余额抵扣失败');
+      return null;
+    } finally {
+      setOrderLoading(false);
+    }
+  };
+
   const getMostPopularPackage = (categoryPackages: PackageInfo[]) => {
     if (categoryPackages.length <= 1) return null;
     const sortedByPrice = [...categoryPackages].sort((a, b) => a.price - b.price);
@@ -766,6 +795,8 @@ export const SubscriptionTab: React.FC = () => {
         onCreateInvoiceOrder={createInvoiceOrder}
         promotionActionLoading={orderLoading}
         onApplyPromotionCode={applyPromotionCode}
+        cashbackActionLoading={orderLoading}
+        onApplyCashbackCredit={applyCashbackCredit}
         agreementAccepted={agreementAccepted}
         onAgreementValueChange={setAgreementAccepted}
         onClose={() => {

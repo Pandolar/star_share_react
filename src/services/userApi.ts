@@ -306,6 +306,7 @@ export interface InvoiceEligibility {
     surcharge_rate: string;
     surcharge_amount: string;
     payable_amount: string;
+    cashback_credit_amount: string;
     delivery_workdays: number;
     email: string;
     billing_profile: { title: string; tax_number: string } | null;
@@ -326,6 +327,7 @@ export interface CreateOrderOptions {
     checkout_id?: string;
     promotion_code?: string;
     replace_checkout_id?: string;
+    use_cashback_credit?: boolean;
 }
 
 export interface PromotionOrderSnapshot {
@@ -371,6 +373,15 @@ export const orderUserApi = {
         discount_amount?: string;
         promotion_code?: string | null;
         promotion_snapshot?: PromotionOrderSnapshot | null;
+        cashback_credit_amount?: string;
+        cashback_credit_snapshot?: { non_refundable: boolean; pricing_before_credit: string } | null;
+        cashback_credit?: {
+            enabled: boolean;
+            available_amount: string;
+            selected: boolean;
+            applied_amount: string;
+        };
+        settled?: boolean;
         expires_at?: string | null;
         expires_in_seconds?: number;
     }>> => {
@@ -512,6 +523,8 @@ export interface InviteCashbackEligibility {
 
 export interface InviteCashbackSummary {
     available_amount: number;
+    reserved_amount?: number;
+    purchase_consumed_amount?: number;
     withdraw_pending_amount: number;
     withdraw_done_amount: number;
 }
@@ -539,6 +552,7 @@ export interface InviteCashbackOverview {
         min_amount: number;
         notice: string;
     };
+    purchase_credit?: { enabled: boolean };
     invite_code: string;
     invite_link: string;
     share_copy: string;

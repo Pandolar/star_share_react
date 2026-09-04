@@ -166,12 +166,16 @@ export interface InviteCashbackConfig {
         min_amount: number;
         notice: string;
     };
+    purchase_credit: {
+        enabled: boolean;
+    };
     campaigns: InviteCashbackCampaign[];
 }
 export interface InviteCashbackResponseData {
     config?: InviteCashbackConfig;
     enabled?: boolean;
     withdrawal?: InviteCashbackConfig['withdrawal'];
+    purchase_credit?: InviteCashbackConfig['purchase_credit'];
     campaigns?: InviteCashbackCampaign[];
     stats?: Record<string, { enrollments: number; reward_orders: number; reward_amount: number }>;
 }
@@ -183,6 +187,8 @@ export interface InviteCashbackSummary {
     reward_orders: number;
     cashback_basis_amount: number;
     reward_amount: number;
+    reserved_amount?: number;
+    purchase_consumed_amount?: number;
     effective_rate: number;
     available_amount: number;
     withdraw_pending_amount: number;
@@ -506,6 +512,7 @@ export interface InvoiceRecord {
     paid_amount: number;
     discount_amount?: number;
     invoice_base_amount?: number;
+    cashback_credit_amount?: number;
     promotion_code?: string | null;
     title: string;
     tax_number: string;

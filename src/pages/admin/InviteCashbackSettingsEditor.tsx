@@ -16,7 +16,7 @@ const createCampaign = (): InviteCashbackCampaign => ({
   invitee_reward: { enabled: false, duration_ratio: 0 },
   copywriting: { headline: '', share_template: '', ended_message: '' },
 });
-const fallback: InviteCashbackConfig = { enabled: false, withdrawal: { enabled: false, min_amount: 100, notice: '提现暂未开放' }, campaigns: [] };
+const fallback: InviteCashbackConfig = { enabled: false, withdrawal: { enabled: false, min_amount: 100, notice: '提现暂未开放' }, purchase_credit: { enabled: false }, campaigns: [] };
 const localValue = (value: string) => value ? value.slice(0, 16) : '';
 const isoValue = (value: string) => value ? new Date(value).toISOString() : '';
 
@@ -25,7 +25,7 @@ export const InviteCashbackSettingsEditor: React.FC<Props> = ({ value, onChange,
   const parsed = useMemo(() => {
     try {
       const source = JSON.parse(value || '{}');
-      return { config: { ...fallback, ...source, withdrawal: { ...fallback.withdrawal, ...(source.withdrawal || {}) }, campaigns: Array.isArray(source.campaigns) ? source.campaigns : [] } as InviteCashbackConfig, error: '' };
+      return { config: { ...fallback, ...source, withdrawal: { ...fallback.withdrawal, ...(source.withdrawal || {}) }, purchase_credit: { ...fallback.purchase_credit, ...(source.purchase_credit || {}) }, campaigns: Array.isArray(source.campaigns) ? source.campaigns : [] } as InviteCashbackConfig, error: '' };
     } catch {
       return { config: fallback, error: '现有返现活动配置不是合法 JSON，请切换原始 JSON 修复。' };
     }
@@ -37,8 +37,9 @@ export const InviteCashbackSettingsEditor: React.FC<Props> = ({ value, onChange,
   return <div className="space-y-5">
     {parsed.error && <Alert color="danger" title="返现活动配置需要修复" description={parsed.error} />}
     <Alert color={parsed.config.enabled ? 'success' : 'default'} title="自营限时返现" description="白牌和代理站不参与；总开关与每场活动默认关闭。" endContent={<Switch aria-label="返现总开关" isSelected={parsed.config.enabled} onValueChange={enabled => emit({ ...parsed.config, enabled })} isDisabled={disabled} />} />
-    <div className="grid gap-3 md:grid-cols-3">
+    <div className="grid gap-3 md:grid-cols-2">
       <Switch isSelected={parsed.config.withdrawal.enabled} onValueChange={enabled => emit({ ...parsed.config, withdrawal: { ...parsed.config.withdrawal, enabled } })} isDisabled={disabled}>开放提现</Switch>
+      <Switch isSelected={parsed.config.purchase_credit.enabled} onValueChange={enabled => emit({ ...parsed.config, purchase_credit: { enabled } })} isDisabled={disabled}>允许返现余额抵扣个人套餐</Switch>
       <NumberInput label="最低提现金额" value={parsed.config.withdrawal.min_amount} minValue={0} onValueChange={min_amount => emit({ ...parsed.config, withdrawal: { ...parsed.config.withdrawal, min_amount: min_amount || 0 } })} isDisabled={disabled} />
       <Input label="提现提示" value={parsed.config.withdrawal.notice} onValueChange={notice => emit({ ...parsed.config, withdrawal: { ...parsed.config.withdrawal, notice } })} isDisabled={disabled} />
     </div>
