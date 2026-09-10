@@ -20,6 +20,7 @@ import {
   AlertCircle,
   Building2,
   Sparkles,
+  Headphones,
 } from 'lucide-react';
 // Tab页面组件导入
 import { AnnouncementTab } from './tabs/AnnouncementTab';
@@ -30,14 +31,16 @@ import { InviteTab } from './tabs/InviteTab';
 import { TeamTab } from './tabs/TeamTab';
 import { LimitedActivityTab } from './tabs/LimitedActivityTab';
 import { AboutUsTab } from './tabs/AboutUsTab';
+import CustomerServiceTab from './tabs/CustomerServiceTab';
 
 // 组件和工具导入
 import { LogoutConfirmModal } from '../../components/LogoutConfirmModal';
-import { ChatwootFloatingButton } from '../../components/chat/ChatwootFloatingButton';
+import CustomerServiceEntry from '../../components/chat/CustomerServiceEntry';
 import { clearAuthCookies, getCookie } from '../../utils/cookies';
 import { useAuthCheck } from '../../hooks/useAuthCheck';
-import { announcementApi, feedbackApi, teamUserApi, userInfoApi } from '../../services/userApi';
+import { announcementApi, customerServiceApi, feedbackApi, teamUserApi, userInfoApi } from '../../services/userApi';
 import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
+import { useCustomerService } from '../../contexts/CustomerServiceContext';
 
 // Tab配置接口
 interface TabConfig {
@@ -78,6 +81,12 @@ const ALL_TAB_CONFIGS: TabConfig[] = [
     label: '订单记录',
     icon: <FileText size={20} />,
     component: OrderHistoryTab
+  },
+  {
+    key: 'support',
+    label: '在线客服',
+    icon: <Headphones size={20} />,
+    component: CustomerServiceTab
   },
   {
     key: 'activity',
@@ -130,6 +139,8 @@ const UserCenter: React.FC = () => {
   const [activityVisible, setActivityVisible] = useState(false);
   const [activityTitle, setActivityTitle] = useState('限时活动');
   const navigate = useNavigate();
+  const [supportUnreadCount, setSupportUnreadCount] = useState(0);
+  const { config: customerServiceConfig, loading: customerServiceLoading } = useCustomerService();
 
   // White-label mode hides self-site business tabs.
   const { isWhiteLabel, loading: wlLoading } = useWhiteLabel();
@@ -137,9 +148,9 @@ const UserCenter: React.FC = () => {
     if (isWhiteLabel && (tab.key === 'invite' || tab.key === 'orders' || tab.key === 'activity' || tab.key === 'about' || tab.key === 'team')) return false;
     if (tab.key === 'team' && !teamTabVisible) return false;
     if (tab.key === 'activity' && !activityVisible) return false;
-    if (tab.key === 'about' && !aboutVisible) return false;
+    if (tab.key === 'support' && (customerServiceConfig === null || customerServiceConfig.provider !== 'builtin' || !customerServiceConfig.entry?.tab_enabled)) return false;
     return true;
-  }).map((tab) => tab.key === 'activity' ? { ...tab, label: activityTitle } : tab), [aboutVisible, activityTitle, activityVisible, isWhiteLabel, teamTabVisible]);
+  }).map((tab) => tab.key === 'activity' ? { ...tab, label: activityTitle } : tab), [aboutVisible, activityTitle, activityVisible, customerServiceConfig, isWhiteLabel, teamTabVisible]);
 
   // 使用认证检查Hook
   const { isAuthenticated, isChecking, countdown, handleAuthFailure } = useAuthCheck({
@@ -256,6 +267,28 @@ const UserCenter: React.FC = () => {
     return () => window.removeEventListener('feedbackRead', clearInviteBadge);
   }, []);
 
+  useEffect(() => {
+    if (!isAuthenticated || customerServiceConfig?.provider !== 'builtin' || !customerServiceConfig.badge?.enabled) {
+      setSupportUnreadCount(0);
+      return;
+    }
+    let cancelled = false;
+    const refreshUnread = () => {
+      if (document.hidden) return;
+      customerServiceApi.getUnread().then((data) => { if (!cancelled) setSupportUnreadCount(Number(data.unread || 0)); }).catch(() => {});
+    };
+    refreshUnread();
+    const interval = window.setInterval(refreshUnread, 30000);
+    document.addEventListener('visibilitychange', refreshUnread);
+    return () => { cancelled = true; window.clearInterval(interval); document.removeEventListener('visibilitychange', refreshUnread); };
+  }, [customerServiceConfig, isAuthenticated]);
+
+  useEffect(() => {
+    const clearSupportBadge = () => setSupportUnreadCount(0);
+    window.addEventListener('csRead', clearSupportBadge);
+    return () => window.removeEventListener('csRead', clearSupportBadge);
+  }, []);
+
   // 一键跳转到绑定邮箱（profile tab，并通过 query 携带 openEdit=email 由 ProfileTab 自动打开弹窗）
   const goBindEmail = () => {
     const params = new URLSearchParams(searchParams);
@@ -268,6 +301,8 @@ const UserCenter: React.FC = () => {
   // 根据 URL 查询参数同步激活的 Tab（支持 ?tab=subscription 等）
   useEffect(() => {
     const urlTab = searchParams.get('tab');
+    // 客服配置仍在加载时保留 ?tab=support 深链；配置返回 null 也可能是“客服已关闭”，不能据此清掉参数
+    if (urlTab === 'support' && customerServiceLoading) return;
     if ((urlTab === 'about' || urlTab === 'activity') && !aboutVisibilityResolved) return;
     const validKeys = tabConfigs.map(t => t.key);
     if (urlTab && validKeys.includes(urlTab) && urlTab !== activeTab) {
@@ -286,7 +321,7 @@ const UserCenter: React.FC = () => {
     if (!urlTab && searchParams.get('action') === 'reset_quota' && activeTab !== 'profile') {
       setActiveTab('profile');
     }
-  }, [searchParams, activeTab, tabConfigs, setSearchParams, aboutVisibilityResolved]);
+  }, [searchParams, activeTab, tabConfigs, setSearchParams, aboutVisibilityResolved, customerServiceLoading]);
 
   // 切换 Tab 并将 tab 写入 URL 查询参数
   const switchTab = (key: string, isMobile = false) => {
@@ -360,7 +395,7 @@ const UserCenter: React.FC = () => {
   // 渲染导航项
   const renderTabItem = (tab: TabConfig, isMobile = false) => {
     const isActive = activeTab === tab.key;
-    const badge = tab.key === 'invite' && inviteUnreadCount > 0 ? String(Math.min(inviteUnreadCount, 99)) : tabBadges[tab.key];
+    const badge = tab.key === 'invite' && inviteUnreadCount > 0 ? String(Math.min(inviteUnreadCount, 99)) : tab.key === 'support' && supportUnreadCount > 0 ? String(Math.min(supportUnreadCount, customerServiceConfig?.badge?.max_display || 99)) : tabBadges[tab.key];
 
     return (
       <motion.button
@@ -378,7 +413,7 @@ const UserCenter: React.FC = () => {
       >
         <span className="flex-shrink-0">{tab.icon}</span>
         <span className="flex-1 font-medium">{tab.label}</span>
-        {badge && <span className={tab.key === 'invite' && inviteUnreadCount > 0 ? 'min-w-5 rounded-full bg-danger px-1.5 py-0.5 text-center text-xs font-semibold text-white' : 'text-base'}>{badge}</span>}
+        {badge && <span className={(tab.key === 'invite' && inviteUnreadCount > 0) || (tab.key === 'support' && supportUnreadCount > 0) ? 'min-w-5 rounded-full bg-danger px-1.5 py-0.5 text-center text-xs font-semibold text-white' : 'text-base'}>{badge}</span>}
       </motion.button>
     );
   };
@@ -435,20 +470,8 @@ const UserCenter: React.FC = () => {
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
             {tabConfigs.map(tab => {
               const isActive = activeTab === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => switchTab(tab.key)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-full whitespace-nowrap transition-colors text-sm ${isActive
-                    ? 'bg-blue-600 text-white shadow'
-                    : 'bg-white text-default-700 border border-default-200 hover:bg-default-50'
-                    }`}
-                  aria-pressed={isActive}
-                >
-                  <span className="flex-shrink-0">{tab.icon}</span>
-                  <span className="font-medium">{tab.label}</span>
-                </button>
-              );
+              const badge = tab.key === 'support' && supportUnreadCount > 0 ? String(Math.min(supportUnreadCount, customerServiceConfig?.badge?.max_display || 99)) : undefined;
+              return <Button key={tab.key} size="sm" variant={isActive ? 'solid' : 'bordered'} color={isActive ? 'primary' : 'default'} className="flex-shrink-0" onPress={() => switchTab(tab.key)} startContent={tab.icon} endContent={badge ? <span className="min-w-5 rounded-full bg-danger px-1.5 py-0.5 text-center text-xs font-semibold text-white">{badge}</span> : undefined}>{tab.label}</Button>;
             })}
           </div>
         </div>
@@ -641,8 +664,8 @@ const UserCenter: React.FC = () => {
         onConfirm={handleLogout}
       />
 
-      {/* 浮动客服按钮 - 用户模式（白牌模式不加载客服；判定完成前也不加载） */}
-      {!wlLoading && !isWhiteLabel && <ChatwootFloatingButton mode="user" />}
+      {/* 浮动客服入口：是否展示由 CustomerServiceEntry 依据后端配置与 provider 决定 */}
+      <CustomerServiceEntry mode="user" />
     </div>
   );
 };

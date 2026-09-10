@@ -44,12 +44,14 @@ import { BarkConfigEditor } from './BarkConfigEditor';
 import { DistributorLevelDiscountsEditor } from './DistributorLevelDiscountsEditor';
 import { HomeInfoConfigEditor } from './HomeInfoConfigEditor';
 import { TeamPlanConfigEditor } from './TeamPlanConfigEditor';
+import { CustomerServiceConfigEditor } from './CustomerServiceConfigEditor';
 const VISUAL_CONFIG_KEYS: Record<string, true> = {
     SPEEDTEST_URL_LIST: true,
     HOME_INFO: true,
     SEND_BARK_CONFIG: true,
     DISTRIBUTOR_LEVEL_DISCOUNTS: true,
     WHITE_LABEL_CONFIG: true,
+    CUSTOMER_SERVICE_CONFIG: true,
     INVOICE_CONFIG: true,
     INVITE_POLICY: true,
     INVITE_CASHBACK_CONFIG: true,
@@ -425,6 +427,8 @@ const SettingsManagePage: React.FC = () => {
                     />
                 ) : config.key === 'WHITE_LABEL_CONFIG' ? (
                     <WhiteLabelConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} />
+                ) : config.key === 'CUSTOMER_SERVICE_CONFIG' ? (
+                    <CustomerServiceConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} />
                 ) : config.key === 'INVOICE_CONFIG' ? (
                     <InvoiceConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} />
                 ) : config.key === 'INVITE_POLICY' ? (

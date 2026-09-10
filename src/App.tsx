@@ -4,6 +4,7 @@ import { HelmetProvider } from 'react-helmet-async';
 import ErrorBoundary from './components/ErrorBoundary';
 import { lazyWithRetry } from './utils/lazyWithRetry';
 import { WhiteLabelProvider, useWhiteLabel } from './contexts/WhiteLabelContext';
+import { CustomerServiceProvider } from './contexts/CustomerServiceContext';
 
 const HomePage = lazyWithRetry(() => import('./pages/HomePage'), 'HomePage');
 const UserCenter = lazyWithRetry(() => import('./pages/user/UserCenter'), 'UserCenter');
@@ -32,6 +33,7 @@ const InvoicesManagePage = lazyWithRetry(() => import('./pages/admin/InvoicesMan
 const AuditLogsPage = lazyWithRetry(() => import('./pages/admin/AuditLogsPage'), 'AuditLogsPage');
 const ArticlesManagePage = lazyWithRetry(() => import('./pages/admin/ArticlesManagePage'), 'ArticlesManagePage');
 const FeedbackManagePage = lazyWithRetry(() => import('./pages/admin/FeedbackManagePage'), 'FeedbackManagePage');
+const AdminCustomerServicePage = lazyWithRetry(() => import('./pages/admin/CustomerServicePage'), 'CustomerServicePage');
 const DistributorLoginPage = lazyWithRetry(() => import('./pages/distributor/DistributorLoginPage'), 'DistributorLoginPage');
 const DistributorDashboardPage = lazyWithRetry(() => import('./pages/distributor/DistributorDashboardPage'), 'DistributorDashboardPage');
 const DistributorProtectedRoute = lazyWithRetry(() => import('./components/distributor/DistributorProtectedRoute'), 'DistributorProtectedRoute');
@@ -70,62 +72,65 @@ const App: React.FC = () => {
             {/* 全局兜底：任何路由的渲染/懒加载错误都进入恢复流程，避免整页白屏 */}
             <ErrorBoundary autoReload={true} reloadDelay={1500}>
               <Suspense fallback={<RouteLoadingFallback />}>
-                <Routes>
-              {/* 主页路由 */}
-              <Route
-                path="/"
-                element={
-                  <ErrorBoundary autoReload={true} reloadDelay={1500}>
-                    <HomePage />
-                  </ErrorBoundary>
-                }
-              />
+                <CustomerServiceProvider>
+                  <Routes>
+                    {/* 主页路由 */}
+                    <Route
+                      path="/"
+                      element={
+                        <ErrorBoundary autoReload={true} reloadDelay={1500}>
+                          <HomePage />
+                        </ErrorBoundary>
+                      }
+                    />
 
-              {/* 认证路由 */}
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                    {/* 认证路由 */}
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route path="/register" element={<RegisterPage />} />
+                    <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
-              {/* 用户中心路由 */}
-              <Route path="/user-center" element={<UserCenter />} />
+                    {/* 用户中心路由 */}
+                    <Route path="/user-center" element={<UserCenter />} />
 
-              {/* 其他功能路由 */}
-              <Route path="/handle_callback" element={<SelfSiteOnly><RedirectPage /></SelfSiteOnly>} />
-              <Route path="/sharespeedtest" element={<SelfSiteOnly><ShareSpeedTestPage /></SelfSiteOnly>} />
-              <Route path="/jumpns" element={<SelfSiteOnly><JumpNsPage /></SelfSiteOnly>} />
-              <Route path="/ios" element={<IOSInstallPage />} />
-              <Route path="/customer-service" element={<SelfSiteOnly><CustomerServicePage /></SelfSiteOnly>} />
+                    {/* 其他功能路由 */}
+                    <Route path="/handle_callback" element={<SelfSiteOnly><RedirectPage /></SelfSiteOnly>} />
+                    <Route path="/sharespeedtest" element={<SelfSiteOnly><ShareSpeedTestPage /></SelfSiteOnly>} />
+                    <Route path="/jumpns" element={<SelfSiteOnly><JumpNsPage /></SelfSiteOnly>} />
+                    <Route path="/ios" element={<IOSInstallPage />} />
+                    <Route path="/customer-service" element={<SelfSiteOnly><CustomerServicePage /></SelfSiteOnly>} />
 
-              {/* 分销商路由（结构对齐 /star-admin/：登录页独立，其余在 /distributor 受保护壳下） */}
-              <Route path="/distributor/login" element={<DistributorLoginPage />} />
-              <Route path="/distributor" element={<DistributorRouteShell />}>
-                {/* 默认重定向到控制面板 */}
-                <Route index element={<Navigate to="/distributor/dashboard" replace />} />
-                <Route path="dashboard" element={<DistributorDashboardPage />} />
-              </Route>
+                    {/* 分销商路由（结构对齐 /star-admin/：登录页独立，其余在 /distributor 受保护壳下） */}
+                    <Route path="/distributor/login" element={<DistributorLoginPage />} />
+                    <Route path="/distributor" element={<DistributorRouteShell />}>
+                      {/* 默认重定向到控制面板 */}
+                      <Route index element={<Navigate to="/distributor/dashboard" replace />} />
+                      <Route path="dashboard" element={<DistributorDashboardPage />} />
+                    </Route>
 
-              {/* Admin管理后台路由 */}
-              <Route path="/star-admin/login" element={<AdminLoginPage />} />
-              <Route path="/star-admin" element={<AdminRouteShell />}>
-                {/* Admin子路由 - 默认重定向到用户管理 */}
-                <Route index element={<Navigate to="/star-admin/overview" replace />} />
-                <Route path="overview" element={<OverviewDashboardPage />} />
-                <Route path="users" element={<UsersManagePage />} />
-                <Route path="packages" element={<PackagesManagePage />} />
-                <Route path="user-packages" element={<UserPackagesManagePage />} />
-                <Route path="teams" element={<TeamsManagePage />} />
-                <Route path="orders" element={<OrdersManagePage />} />
-                <Route path="invoices" element={<InvoicesManagePage />} />
-                <Route path="cdk" element={<CDKManagePage />} />
-                <Route path="distributors" element={<DistributorsManagePage />} />
-                <Route path="audit-logs" element={<AuditLogsPage />} />
-                <Route path="articles" element={<ArticlesManagePage />} />
-                <Route path="settings" element={<SettingsManagePage />} />
-                <Route path="invites" element={<InviteManagePage />} />
-                <Route path="feedback" element={<FeedbackManagePage />} />
-              </Route>
-              </Routes>
-            </Suspense>
+                    {/* Admin管理后台路由 */}
+                    <Route path="/star-admin/login" element={<AdminLoginPage />} />
+                    <Route path="/star-admin" element={<AdminRouteShell />}>
+                      {/* Admin子路由 - 默认重定向到用户管理 */}
+                      <Route index element={<Navigate to="/star-admin/overview" replace />} />
+                      <Route path="overview" element={<OverviewDashboardPage />} />
+                      <Route path="users" element={<UsersManagePage />} />
+                      <Route path="packages" element={<PackagesManagePage />} />
+                      <Route path="user-packages" element={<UserPackagesManagePage />} />
+                      <Route path="teams" element={<TeamsManagePage />} />
+                      <Route path="orders" element={<OrdersManagePage />} />
+                      <Route path="invoices" element={<InvoicesManagePage />} />
+                      <Route path="cdk" element={<CDKManagePage />} />
+                      <Route path="distributors" element={<DistributorsManagePage />} />
+                      <Route path="audit-logs" element={<AuditLogsPage />} />
+                      <Route path="articles" element={<ArticlesManagePage />} />
+                      <Route path="settings" element={<SettingsManagePage />} />
+                      <Route path="invites" element={<InviteManagePage />} />
+                      <Route path="feedback" element={<FeedbackManagePage />} />
+                      <Route path="customer-service" element={<AdminCustomerServicePage />} />
+                    </Route>
+                  </Routes>
+                </CustomerServiceProvider>
+              </Suspense>
           </ErrorBoundary>
           </div>
         </WhiteLabelProvider>

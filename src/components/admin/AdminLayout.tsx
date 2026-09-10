@@ -35,6 +35,7 @@ import {
     ScrollText,
     FileText,
     MessageSquare,
+    Headphones,
 } from 'lucide-react';
 import adminApiService from '../../services/adminApi';
 
@@ -149,6 +150,12 @@ const AdminLayout: React.FC = () => {
             label: '工单管理',
             icon: <MessageSquare className="w-5 h-5" />,
             path: '/star-admin/feedback',
+        },
+        {
+            key: 'customer-service',
+            label: '在线客服',
+            icon: <Headphones className="w-[18px] h-[18px]" />,
+            path: '/star-admin/customer-service',
         },
     ];
 

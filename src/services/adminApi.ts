@@ -47,7 +47,10 @@ import type {
     AdminTeamDetailData,
     AdminTeamQueryParams,
     AdminTeamRecord,
+    AdminCsConversation,
+    AdminCsStats,
 } from '../types/admin';
+import type { ChatAttachment, ChatConversation, ChatMessage } from '../components/chat/types';
 
 /**
  * 管理后台API服务类
@@ -616,6 +619,53 @@ class AdminApiService {
     async getFeedbackAttachment(id: string): Promise<AdminApiResponse<{ id: string; mime_type: string; data_base64: string }>> {
         const response = await this.api.get(`/star/feedback_attachment/${encodeURIComponent(id)}`);
         return response.data;
+    }
+
+    // ==================== 在线客服 ====================
+
+    async getCsConversations(params: { current_page?: number; page_size?: number; filter?: string; category_id?: string; querystring?: string; order_column?: string; order?: 'asc' | 'desc' } = {}): Promise<{ data: AdminCsConversation[]; total: number }> {
+        const response = await this.api.get(`/star/cs_conversations?${this.buildQueryString(params)}`);
+        return { data: response.data.data || [], total: Number(response.data.total) || 0 };
+    }
+
+    async getCsStats(): Promise<AdminCsStats> {
+        const response = await this.api.get('/star/cs_conversations/stats');
+        return response.data.data;
+    }
+
+    async getCsConversation(id: number): Promise<AdminCsConversation> {
+        const response = await this.api.get(`/star/cs_conversations/${id}`);
+        return response.data.data;
+    }
+
+    async updateCsConversation(data: { id: number; status?: string; internal_remark?: string; priority?: string }): Promise<AdminCsConversation> {
+        const response = await this.api.put('/star/cs_conversations', data);
+        return response.data.data;
+    }
+
+    async getCsMessages(params: { conversation_id: number; after_id?: number; before_id?: number; limit?: number }): Promise<{ conversation: ChatConversation; messages: ChatMessage[]; has_more: boolean }> {
+        const response = await this.api.get(`/star/cs_messages?${this.buildQueryString(params)}`);
+        return response.data.data;
+    }
+
+    async sendCsMessage(data: { conversation_id: number; content: string; attachment_ids: string[]; quick_reply_id?: string; client_msg_id?: string }): Promise<ChatMessage> {
+        const response = await this.api.post('/star/cs_messages', data);
+        return response.data.data;
+    }
+
+    async markCsRead(conversation_id?: number): Promise<{ read_at: string }> {
+        const response = await this.api.post('/star/cs_conversation_read', conversation_id === undefined ? {} : { conversation_id });
+        return response.data.data;
+    }
+
+    async uploadCsAttachment(data: { data_base64: string; filename: string; mime_type?: string; conversation_id: number }): Promise<ChatAttachment> {
+        const response = await this.api.post('/star/cs_attachment', data);
+        return response.data.data;
+    }
+
+    csAttachmentUrl(id: string): string {
+        const baseUrl = process.env.REACT_APP_API_BASE_URL || '';
+        return `${baseUrl}/star/cs_attachment/${encodeURIComponent(id)}`;
     }
 
     // ==================== 仪表盘 ====================

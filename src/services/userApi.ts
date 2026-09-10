@@ -1,5 +1,7 @@
 import config from '../config';
 import { getCookie } from '../utils/cookies';
+import type { ChatAttachment, ChatConfig, ChatConversation, ChatMessage } from '../components/chat/types';
+
 
 // 请求响应类型定义
 interface ApiResponse<T = any> {
@@ -571,6 +573,63 @@ export interface InviteWithdrawalWorkorder {
     updated_at: string | null;
 }
 
+
+/** 客服公开配置：未开启时后端只回 { enabled: false, provider: 'off' }，开启后回完整配置（去掉 admin/scope 等敏感字段）。 */
+export type ChatPublicConfigRaw = { enabled: false; provider: 'off' } | ChatConfig;
+
+export const getCsConfig = async (): Promise<ChatPublicConfigRaw> => {
+    const response = await createUserRequest(getUserApiUrl('/u/cs_config'), { method: 'GET' });
+    if (response.code !== 20000) throw new Error(response.msg || '获取客服配置失败');
+    return response.data as ChatPublicConfigRaw;
+};
+
+export const customerServiceApi = {
+    getConfig: getCsConfig,
+    getConversations: async (params?: { status?: string }): Promise<ChatConversation[]> => {
+        const query = params?.status ? `?status=${encodeURIComponent(params.status)}` : '';
+        const response = await createUserRequest(getUserApiUrl(`/u/cs_conversations${query}`), { method: 'GET' });
+        if (response.code !== 20000) throw new Error(response.msg || '获取会话失败');
+        return response.data as ChatConversation[];
+    },
+    createConversation: async (payload: { category_id: string; subject: string; content: string; attachment_ids: string[]; client_msg_id?: string; client_context?: Record<string, unknown> }): Promise<ChatConversation> => {
+        const response = await createUserRequest(getUserApiUrl('/u/cs_conversations'), { method: 'POST', body: JSON.stringify(payload) });
+        if (response.code !== 20000) throw new Error(response.msg || '创建会话失败');
+        return response.data as ChatConversation;
+    },
+    updateConversation: async (payload: { id: number; action: 'close' | 'reopen' }): Promise<ChatConversation> => {
+        const response = await createUserRequest(getUserApiUrl('/u/cs_conversations'), { method: 'PUT', body: JSON.stringify(payload) });
+        if (response.code !== 20000) throw new Error(response.msg || '更新会话失败');
+        return response.data as ChatConversation;
+    },
+    getMessages: async (params: { conversation_id: number; after_id?: number; before_id?: number; limit?: number }): Promise<{ conversation: ChatConversation; messages: ChatMessage[]; has_more: boolean }> => {
+        const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)])).toString();
+        const response = await createUserRequest(getUserApiUrl(`/u/cs_messages?${query}`), { method: 'GET' });
+        if (response.code !== 20000) throw new Error(response.msg || '获取消息失败');
+        return response.data as { conversation: ChatConversation; messages: ChatMessage[]; has_more: boolean };
+    },
+    sendMessage: async (payload: { conversation_id: number; content: string; attachment_ids: string[]; client_msg_id?: string }): Promise<ChatMessage> => {
+        const response = await createUserRequest(getUserApiUrl('/u/cs_messages'), { method: 'POST', body: JSON.stringify(payload) });
+        if (response.code !== 20000) throw new Error(response.msg || '发送消息失败');
+        return response.data as ChatMessage;
+    },
+    markRead: async (conversation_id?: number): Promise<{ read_at: string; unread: number }> => {
+        const response = await createUserRequest(getUserApiUrl('/u/cs_conversation_read'), { method: 'POST', body: JSON.stringify(conversation_id ? { conversation_id } : {}) });
+        if (response.code !== 20000) throw new Error(response.msg || '标记已读失败');
+        return response.data as { read_at: string; unread: number };
+    },
+    getUnread: async (): Promise<{ unread: number; by_conversation: Record<string, number> }> => {
+        const response = await createUserRequest(getUserApiUrl('/u/cs_unread'), { method: 'GET' });
+        if (response.code !== 20000) throw new Error(response.msg || '获取未读消息失败');
+        return response.data as { unread: number; by_conversation: Record<string, number> };
+    },
+    uploadAttachment: async (payload: { data_base64: string; filename: string; mime_type?: string; conversation_id?: number }): Promise<ChatAttachment> => {
+        const response = await createUserRequest(getUserApiUrl('/u/cs_attachment'), { method: 'POST', body: JSON.stringify(payload) });
+        if (response.code !== 20000) throw new Error(response.msg || '上传附件失败');
+        return response.data as ChatAttachment;
+    },
+    attachmentUrl: (id: string): string => getUserApiUrl(`/u/cs_attachment/${encodeURIComponent(id)}`),
+};
+
 export interface FeedbackAttachment {
     id: string;
     mime_type: string;
@@ -864,6 +923,7 @@ const userApi = {
     inviteCashback: inviteCashbackApi,
     team: teamUserApi,
     limitUsage: limitUsageApi,
+    customerService: customerServiceApi,
 };
 
 export default userApi; 

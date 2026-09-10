@@ -2,6 +2,8 @@
  * 管理后台相关类型定义
  */
 
+import type { ChatConversation } from '../components/chat/types';
+
 // 通用响应接口
 export interface AdminApiResponse<T = any> {
     code: number;
@@ -821,4 +823,28 @@ export interface UpdateWorkOrderRequest {
     id: number;
     status?: string;
     admin_remark?: string;
+}
+
+export interface AdminCsUserSummary {
+    id: number;
+    username: string | null;
+    email: string | null;
+    status: number;
+    created_at: string | null;
+}
+
+export interface AdminCsConversation extends ChatConversation {
+    user: AdminCsUserSummary;
+    waiting_seconds: number | null;
+    assigned_admin: string | null;
+}
+
+export interface AdminCsStats {
+    total: number;
+    open: number;
+    processing: number;
+    resolved: number;
+    closed: number;
+    unread_total: number;
+    awaiting_reply: number;
 }
