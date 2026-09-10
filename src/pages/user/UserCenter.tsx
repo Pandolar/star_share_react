@@ -148,6 +148,7 @@ const UserCenter: React.FC = () => {
     if (isWhiteLabel && (tab.key === 'invite' || tab.key === 'orders' || tab.key === 'activity' || tab.key === 'about' || tab.key === 'team')) return false;
     if (tab.key === 'team' && !teamTabVisible) return false;
     if (tab.key === 'activity' && !activityVisible) return false;
+    if (tab.key === 'about' && !aboutVisible) return false;
     if (tab.key === 'support' && (customerServiceConfig === null || customerServiceConfig.provider !== 'builtin' || !customerServiceConfig.entry?.tab_enabled)) return false;
     return true;
   }).map((tab) => tab.key === 'activity' ? { ...tab, label: activityTitle } : tab), [aboutVisible, activityTitle, activityVisible, customerServiceConfig, isWhiteLabel, teamTabVisible]);
