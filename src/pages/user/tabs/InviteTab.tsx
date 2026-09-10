@@ -222,6 +222,7 @@ export const InviteTab: React.FC = () => {
   const canWithdraw = Boolean(cashbackWithdrawal?.enabled && cashbackAvailable >= (cashbackWithdrawal?.min_amount ?? 0));
   const cashbackOptedOut = cashbackOverview?.enrollment?.status === 'opted_out';
   const cashbackActiveForUser = Boolean(activeCashbackCampaign && cashbackOverview?.enrollment?.status === 'active');
+  const cashbackReward = cashbackOverview?.campaign_reward_summary;
 
   if (loading) {
 
@@ -295,6 +296,13 @@ export const InviteTab: React.FC = () => {
                 <div className="rounded-xl bg-primary/10 border border-primary/20 p-4 text-sm text-default-700">您已关闭本期返现活动。本期后续符合条件订单将按普通邀请规则返时长；已入账的返现不受影响。</div>
               ) : (
                 <div className="rounded-xl bg-warning/10 border border-warning/20 p-4 text-sm text-default-700 space-y-3"><div className="font-medium text-default-900">{activeCashbackCampaign.auto_enroll_eligible ? '本期活动已自动开放，达到资格后立即生效' : '达到资格后可手动开启本期返现'}</div><div>账号注册：{cashbackEligibility?.account_age_days ?? 0} / {cashbackEligibility?.account_age_required ?? 0} 天</div><div>累计实付：¥{(cashbackEligibility?.cash_paid_amount ?? 0).toFixed(2)} / ¥{(cashbackEligibility?.cash_paid_required ?? 0).toFixed(2)}，或累计套餐：{cashbackEligibility?.package_duration_days ?? 0} / {cashbackEligibility?.package_duration_required ?? 0} 天</div>{cashbackEligibility?.eligible && !activeCashbackCampaign.auto_enroll_eligible && <Button color="success" isLoading={activatingCashback} onPress={activateCashback}>开启本期返现</Button>}</div>
+              )}
+              {cashbackReward && (
+                <div className="flex flex-col gap-2 rounded-xl border border-default-200 p-4 text-sm text-default-600 sm:flex-row sm:items-center sm:gap-8">
+                  <div>邀请人返现比例：<span className="font-semibold text-default-900">{cashbackReward.cashback_rate_percent}%</span></div>
+                  <div>新用户加赠时长：{cashbackReward.invitee_reward_enabled ? <>套餐时长的 <span className="font-semibold text-default-900">{cashbackReward.invitee_duration_ratio_percent}%</span></> : '本期未开启'}</div>
+                  {cashbackReward.has_package_specific_rules && <div className="text-xs text-default-400">部分套餐另有专属返现比例，以实际订单结算为准。</div>}
+                </div>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3"><div className="rounded-xl bg-default-50 p-4"><div className="text-sm text-default-500">可用返现余额</div><div className="mt-1 text-xl font-bold">¥{cashbackAvailable.toFixed(2)}</div><div className="mt-1 text-xs text-default-400">可提现{cashbackOverview.purchase_credit?.enabled ? '，也可在个人套餐支付时抵扣' : ''}</div></div><div className="rounded-xl bg-default-50 p-4"><div className="text-sm text-default-500">提现处理中</div><div className="mt-1 text-xl font-bold">¥{(cashbackSummary?.withdraw_pending_amount ?? 0).toFixed(2)}</div></div><div className="rounded-xl bg-default-50 p-4"><div className="text-sm text-default-500">已提现</div><div className="mt-1 text-xl font-bold">¥{(cashbackSummary?.withdraw_done_amount ?? 0).toFixed(2)}</div></div></div>
               {cashbackActiveForUser && <div className="flex flex-wrap gap-2"><Button variant="flat" color="primary" startContent={<Copy className="w-4 h-4" />} onPress={() => copyText(cashbackOverview.share_copy, '活动分享文案已复制')}>复制活动分享文案</Button><Button variant="light" color="warning" onPress={() => setOptOutConfirmOpen(true)}>关闭本期返现，改为返时长</Button></div>}

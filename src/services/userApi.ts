@@ -531,9 +531,18 @@ export interface InviteCashbackSummary {
     withdraw_done_amount: number;
 }
 
+/** 返现活动奖励展示值，由后端按活动配置计算，仅用于页面文案。 */
+export interface InviteCashbackRewardSummary {
+    cashback_rate_percent: number;
+    has_package_specific_rules: boolean;
+    invitee_reward_enabled: boolean;
+    invitee_duration_ratio_percent: number;
+}
+
 export interface InviteCashbackOverview {
     config_enabled: boolean;
     active_campaign: InviteCashbackCampaign | null;
+    campaign_reward_summary: InviteCashbackRewardSummary | null;
     ended_campaign: {
         id: string;
         name: string;
