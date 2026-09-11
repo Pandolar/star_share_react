@@ -122,6 +122,12 @@ const AdminLayout: React.FC = () => {
             path: '/star-admin/distributors',
         },
         {
+            key: 'customer-service',
+            label: '在线客服',
+            icon: <Headphones className="w-[18px] h-[18px]" />,
+            path: '/star-admin/customer-service',
+        },
+        {
             key: 'articles',
             label: '文章管理',
             icon: <FileText className="w-5 h-5" />,
@@ -150,12 +156,6 @@ const AdminLayout: React.FC = () => {
             label: '工单管理',
             icon: <MessageSquare className="w-5 h-5" />,
             path: '/star-admin/feedback',
-        },
-        {
-            key: 'customer-service',
-            label: '在线客服',
-            icon: <Headphones className="w-[18px] h-[18px]" />,
-            path: '/star-admin/customer-service',
         },
     ];
 

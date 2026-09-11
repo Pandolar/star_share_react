@@ -33,6 +33,8 @@ import type {
     WorkOrder,
     WorkOrderQueryParams,
     UpdateWorkOrderRequest,
+    BatchUpdateWorkOrderRequest,
+    BatchUpdateWorkOrderResult,
     InvoiceRecord,
     InvoiceQueryParams,
     AuditLogQueryParams,
@@ -602,6 +604,14 @@ class AdminApiService {
      * 更新工单
      */
     async updateWorkorder(data: UpdateWorkOrderRequest): Promise<AdminApiResponse> {
+        const response = await this.api.put('/star/workorder', data);
+        return response.data;
+    }
+
+    /**
+     * 将选中的待处理提现工单直接批量标记为已打款
+     */
+    async markWorkordersPaid(data: BatchUpdateWorkOrderRequest): Promise<AdminApiResponse<BatchUpdateWorkOrderResult>> {
         const response = await this.api.put('/star/workorder', data);
         return response.data;
     }

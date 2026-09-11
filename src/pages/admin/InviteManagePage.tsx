@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Button,
   Card,
   CardBody,
   CardHeader,
+  Checkbox,
   Chip,
   Input,
   Modal,
@@ -27,7 +28,7 @@ import {
   Textarea,
   useDisclosure,
 } from '@heroui/react';
-import { Filter, Gift, RefreshCw, Save, Search, Settings2, Ticket, Users, Wallet } from 'lucide-react';
+import { CheckCheck, Filter, Gift, RefreshCw, Save, Search, Settings2, Ticket, Users, Wallet } from 'lucide-react';
 import dayjs from 'dayjs';
 import adminApiService from '../../services/adminApi';
 import { InviteCashbackConfig, InvitePolicyConfig, InviteRewardRecord, User, WorkOrder } from '../../types/admin';
@@ -113,6 +114,27 @@ const InviteManagePage: React.FC = () => {
   const [workorderStatus, setWorkorderStatus] = useState('pending');
   const [workorderRemark, setWorkorderRemark] = useState('');
   const [updatingWorkorder, setUpdatingWorkorder] = useState(false);
+  const [selectedWorkorders, setSelectedWorkorders] = useState<Map<number, WorkOrder>>(new Map());
+  const [batchPaying, setBatchPaying] = useState(false);
+  const {
+    isOpen: isBatchPaidOpen,
+    onOpen: onBatchPaidOpen,
+    onClose: onBatchPaidClose,
+  } = useDisclosure();
+  const payableWorkorders = useMemo(
+    () => workorders.filter((item) => ['pending', 'processing', 'approved'].includes(item.status)),
+    [workorders],
+  );
+  const selectedPayableWorkorders = useMemo(
+    () => Array.from(selectedWorkorders.values()).filter((item) => ['pending', 'processing', 'approved'].includes(item.status)),
+    [selectedWorkorders],
+  );
+  const payableOnPageSelected = payableWorkorders.reduce(
+    (count, item) => count + Number(selectedWorkorders.has(item.id)),
+    0,
+  );
+  const allPayableOnPageSelected = payableWorkorders.length > 0 && payableOnPageSelected === payableWorkorders.length;
+  const somePayableOnPageSelected = payableOnPageSelected > 0 && !allPayableOnPageSelected;
   const { isOpen: isWorkorderOpen, onOpen: onWorkorderOpen, onClose: onWorkorderClose } = useDisclosure();
 
   const [usersLoading, setUsersLoading] = useState(true);
@@ -210,15 +232,65 @@ const InviteManagePage: React.FC = () => {
       if (response.code !== 20000) {
         throw new Error(response.msg || '获取提现工单失败');
       }
-      setWorkorders(Array.isArray(response.data) ? response.data : []);
+      const nextWorkorders = Array.isArray(response.data) ? response.data : [];
+      setWorkorders(nextWorkorders);
+      const payableById = new Map(
+        nextWorkorders
+          .filter((item) => ['pending', 'processing', 'approved'].includes(item.status))
+          .map((item) => [item.id, item]),
+      );
+      setSelectedWorkorders((current) => new Map(
+        Array.from(current.keys())
+          .filter((id) => payableById.has(id))
+          .map((id) => [id, payableById.get(id)!]),
+      ));
     } catch (error) {
       showToast(error instanceof Error ? error.message : '获取提现工单失败', 'error');
       setWorkorders([]);
+      setSelectedWorkorders(new Map());
     } finally {
       setWorkordersLoading(false);
     }
   }, []);
 
+
+  const togglePayableWorkorders = (selected: boolean) => setSelectedWorkorders((current) => {
+    const next = new Map(current);
+    payableWorkorders.forEach((item) => selected ? next.set(item.id, item) : next.delete(item.id));
+    return next;
+  });
+
+  const toggleWorkorder = (workorder: WorkOrder, selected: boolean) => setSelectedWorkorders((current) => {
+    const next = new Map(current);
+    if (selected) next.set(workorder.id, workorder); else next.delete(workorder.id);
+    return next;
+  });
+
+  const handleBatchPaid = async () => {
+    const ids = selectedPayableWorkorders.map((item) => item.id);
+    if (!ids.length) {
+      showToast('请先选择待处理、处理中或已审核的提现工单', 'warning');
+      return;
+    }
+    setBatchPaying(true);
+    try {
+      const response = await adminApiService.markWorkordersPaid({ ids, status: 'paid' });
+      if (response.code !== 20000) throw new Error(response.msg || '批量完成打款失败');
+      const updatedCount = Number(response.data?.updated_count) || ids.length;
+      showToast(`已将 ${updatedCount} 条提现工单标记为已打款`, 'success');
+      setSelectedWorkorders((current) => {
+        const next = new Map(current);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
+      onBatchPaidClose();
+      await Promise.all([loadWorkorders(), loadRewards()]);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '批量完成打款失败', 'error');
+    } finally {
+      setBatchPaying(false);
+    }
+  };
   const loadUsers = useCallback(async () => {
     setUsersLoading(true);
     try {
@@ -540,13 +612,32 @@ const InviteManagePage: React.FC = () => {
       </Card>
 
       <Card>
-        <CardHeader className="flex items-center justify-between gap-3">
+        <CardHeader className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2"><Ticket className="w-4 h-4" /><span className="font-medium">提现工单</span></div>
-          <Button variant="flat" color="primary" startContent={<RefreshCw className="w-4 h-4" />} onPress={loadWorkorders}>刷新工单</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              color="success"
+              variant="flat"
+              startContent={<CheckCheck className="w-4 h-4" />}
+              isDisabled={!selectedPayableWorkorders.length}
+              onPress={onBatchPaidOpen}
+            >
+              批量完成已打款{selectedPayableWorkorders.length ? `（${selectedPayableWorkorders.length}）` : ''}
+            </Button>
+            <Button variant="flat" color="primary" startContent={<RefreshCw className="w-4 h-4" />} onPress={loadWorkorders}>刷新工单</Button>
+          </div>
         </CardHeader>
         <CardBody>
           <Table aria-label="提现工单表格">
             <TableHeader>
+              <TableColumn width={56}>
+                <Checkbox
+                  aria-label="选择全部可打款提现工单"
+                  isSelected={allPayableOnPageSelected}
+                  isIndeterminate={somePayableOnPageSelected}
+                  onValueChange={togglePayableWorkorders}
+                />
+              </TableColumn>
               <TableColumn>ID</TableColumn>
               <TableColumn>用户</TableColumn>
               <TableColumn>金额</TableColumn>
@@ -555,23 +646,34 @@ const InviteManagePage: React.FC = () => {
               <TableColumn>操作</TableColumn>
             </TableHeader>
             <TableBody isLoading={workordersLoading} loadingContent={<Spinner label="加载中..." />} emptyContent="暂无提现工单">
-              {workorders.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell>{item.id}</TableCell>
-                  <TableCell>{item.user_id}</TableCell>
-                  <TableCell>¥{Number(item.amount || 0).toFixed(2)}</TableCell>
-                  <TableCell>{renderStatusChip(item.status)}</TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <div>支付宝 · {item.extra_data?.withdraw_account?.real_name || '-'}</div>
-                      <div className="text-xs text-default-500 truncate max-w-48">{item.extra_data?.withdraw_account?.account || '-'}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Button size="sm" color="primary" variant="flat" onPress={() => openWorkorderModal(item)}>处理</Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {workorders.map((item) => {
+                const payable = ['pending', 'processing', 'approved'].includes(item.status);
+                return (
+                  <TableRow key={item.id}>
+                    <TableCell>
+                      <Checkbox
+                        aria-label={`选择提现工单 ${item.id}`}
+                        isSelected={selectedWorkorders.has(item.id)}
+                        isDisabled={!payable}
+                        onValueChange={(selected) => toggleWorkorder(item, selected)}
+                      />
+                    </TableCell>
+                    <TableCell>{item.id}</TableCell>
+                    <TableCell>{item.user_id}</TableCell>
+                    <TableCell>¥{Number(item.amount || 0).toFixed(2)}</TableCell>
+                    <TableCell>{renderStatusChip(item.status)}</TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        <div>支付宝 · {item.extra_data?.withdraw_account?.real_name || '-'}</div>
+                        <div className="text-xs text-default-500 truncate max-w-48">{item.extra_data?.withdraw_account?.account || '-'}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Button size="sm" color="primary" variant="flat" isDisabled={!payable} onPress={() => openWorkorderModal(item)}>处理</Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardBody>
@@ -682,6 +784,27 @@ const InviteManagePage: React.FC = () => {
         </ModalContent>
       </Modal>
 
+
+      <Modal isOpen={isBatchPaidOpen} onClose={onBatchPaidClose} size="lg">
+        <ModalContent>
+          <ModalHeader>确认批量完成打款</ModalHeader>
+          <ModalBody className="gap-3">
+            <Alert
+              color="warning"
+              variant="flat"
+              title={`将 ${selectedPayableWorkorders.length} 条提现工单直接标记为已打款`}
+              description="仅在支付宝实际转账完成后确认。提交后会同步结算返现订单，已打款状态不可撤回。"
+            />
+            <div className="text-sm text-default-600">
+              合计金额：¥{selectedPayableWorkorders.reduce((sum, item) => sum + Number(item.amount || 0), 0).toFixed(2)}
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" onPress={onBatchPaidClose} isDisabled={batchPaying}>取消</Button>
+            <Button color="success" onPress={() => void handleBatchPaid()} isLoading={batchPaying}>确认已打款</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
 
       <Modal isOpen={isWorkorderOpen} onClose={onWorkorderClose} size="lg">
         <ModalContent>

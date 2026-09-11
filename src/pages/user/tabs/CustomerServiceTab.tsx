@@ -195,7 +195,7 @@ export default function CustomerServiceTab(): React.ReactElement {
   if (!config || config.provider !== 'builtin') return <div className="py-12 text-center text-default-500">在线客服暂未开启</div>;
 
   return (
-    <div className="flex h-[min(70vh,720px)] min-h-[520px] overflow-hidden rounded-xl border border-default-200 bg-content1">
+    <div className="flex h-[calc(100dvh-12rem)] min-h-[360px] max-h-[720px] overflow-hidden rounded-xl border border-default-200 bg-content1 sm:h-[min(70vh,720px)] sm:min-h-[520px]">
       <aside className={`${mobileChat ? 'hidden md:flex' : 'flex'} w-full shrink-0 flex-col border-r border-default-200 md:w-60`}>
         <div className="flex items-center gap-2 border-b border-default-200 p-3">
           <span className="flex-1 font-semibold">我的咨询</span>
@@ -203,7 +203,7 @@ export default function CustomerServiceTab(): React.ReactElement {
             新建对话
           </Button>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {conversations.map((conversation) => (
             <Button
               key={conversation.id}
@@ -225,7 +225,7 @@ export default function CustomerServiceTab(): React.ReactElement {
           {!conversations.length && <p className="p-6 text-center text-sm text-default-500">暂无咨询记录</p>}
         </div>
       </aside>
-      <section className={`${mobileChat || !conversations.length ? 'flex' : 'hidden md:flex'} min-w-0 flex-1 flex-col`}>
+      <section className={`${mobileChat || !conversations.length ? 'flex' : 'hidden md:flex'} min-h-0 min-w-0 flex-1 flex-col overflow-hidden`}>
         <div className="flex items-center border-b border-default-200 p-3">
           {selected && <Button className="md:hidden" size="sm" variant="light" onPress={() => setMobileChat(false)}>返回</Button>}
           <p className="flex-1 font-semibold">在线客服</p>

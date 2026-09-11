@@ -116,7 +116,7 @@ export default function ChatMessageList({
     );
   return (
     <>
-      <ScrollShadow className="h-full min-h-0 space-y-3 px-1" hideScrollBar>
+      <ScrollShadow className="h-full min-h-0 overflow-y-auto space-y-3 px-1" hideScrollBar>
         {hasMore && (
           <div className="text-center">
             <Button size="sm" variant="light" isLoading={loadingMore} onPress={onLoadMore}>

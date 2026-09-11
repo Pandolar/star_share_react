@@ -4,11 +4,6 @@ import {
   Card,
   CardBody,
   CardHeader,
-  Chip,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownTrigger,
   Input,
   Pagination,
   Spinner,
@@ -16,7 +11,7 @@ import {
   Tabs,
   Tooltip,
 } from '@heroui/react';
-import { Headphones, RefreshCw, Search, UserRound } from 'lucide-react';
+import { ArrowLeft, Headphones, RefreshCw, Search, UserRound } from 'lucide-react';
 import adminApiService from '../../services/adminApi';
 import type { AdminCsConversation } from '../../types/admin';
 import type { ChatAttachment, ChatAttachmentConfig, ChatMessage } from '../../components/chat/types';
@@ -70,6 +65,7 @@ const CustomerServicePage: React.FC = () => {
   const [sending, setSending] = useState(false);
   const [reply, setReply] = useState('');
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
+  const [mobileChat, setMobileChat] = useState(false);
   const pageSize = 20;
   const loadList = useCallback(
     async (silent = false) => {
@@ -84,9 +80,14 @@ const CustomerServicePage: React.FC = () => {
           order_column: 'last_message_at',
           order: 'desc',
         });
-        setRows(result.data);
+        const nextRows = result.data;
+        setRows(nextRows);
         setTotal(result.total);
-        setSelected((current) => (current ? result.data.find((item) => item.id === current.id) || current : null));
+        setSelected((current) => {
+          if (!current) return null;
+          const refreshed = nextRows.find((item) => item.id === current.id);
+          return refreshed ? { ...refreshed, admin_unread: 0, unread: 0 } : current;
+        });
       } catch (error) {
         if (!silent) showToast(error instanceof Error ? error.message : '获取客服会话失败', 'error');
       } finally {
@@ -101,33 +102,46 @@ const CustomerServicePage: React.FC = () => {
       setMessages([]);
       setAttachments([]);
       setReply('');
+      setMobileChat(true);
       setMessageLoading(true);
       try {
         const result = await adminApiService.getCsMessages({ conversation_id: conversation.id, limit: 50 });
         setMessages(result.messages);
         await adminApiService.markCsRead(conversation.id);
-        void loadList(true);
+        const readConversation = { ...result.conversation, admin_unread: 0, unread: 0 } as AdminCsConversation;
+        setSelected((current) => (current?.id === conversation.id ? { ...current, ...readConversation } : current));
+        setRows((current) => current.map((item) => (
+          item.id === conversation.id ? { ...item, ...readConversation } : item
+        )));
       } catch (error) {
         showToast(error instanceof Error ? error.message : '获取消息失败', 'error');
       } finally {
         setMessageLoading(false);
       }
     },
-    [loadList]
+    []
   );
   const refreshMessages = useCallback(async () => {
-    if (!selected || document.hidden) return;
+    if (!selected || !mobileChat || document.hidden) return;
     try {
       const afterId = messages.length ? messages[messages.length - 1].id : undefined;
       const result = await adminApiService.getCsMessages({ conversation_id: selected.id, after_id: afterId, limit: 50 });
       setMessages((current) =>
         afterId && result.messages.length ? [...current, ...result.messages] : afterId ? current : result.messages
       );
-      setSelected((current) => (current ? { ...current, ...result.conversation } : current));
+      const hasIncoming = result.messages.some((message) => message.role === 'user');
+      if (hasIncoming || result.conversation.admin_unread > 0) {
+        await adminApiService.markCsRead(selected.id);
+      }
+      const readConversation = { ...result.conversation, admin_unread: 0, unread: 0 } as AdminCsConversation;
+      setSelected((current) => (current ? { ...current, ...readConversation } : current));
+      setRows((current) => current.map((item) => (
+        item.id === selected.id ? { ...item, ...readConversation } : item
+      )));
     } catch {
       /* 下次轮询重试 */
     }
-  }, [messages, selected]);
+  }, [messages, mobileChat, selected]);
   useEffect(() => {
     void loadList();
   }, [loadList]);
@@ -167,6 +181,20 @@ const CustomerServicePage: React.FC = () => {
   }, []);
   const builtinConfig = config?.provider === 'builtin' ? config : null;
   const attachmentConfig: ChatAttachmentConfig | null = builtinConfig?.attachments ?? null;
+  const applySentMessage = (conversation: AdminCsConversation, message: ChatMessage) => {
+    const next: AdminCsConversation = {
+      ...conversation,
+      status: conversation.status === 'open' || conversation.status === 'closed' ? 'processing' : conversation.status,
+      last_message_at: message.created_at,
+      last_message_preview: message.content || '附件消息',
+      last_message_role: 'admin',
+      admin_unread: 0,
+      unread: 0,
+    };
+    setMessages((current) => [...current, message]);
+    setSelected(next);
+    setRows((current) => current.map((item) => item.id === next.id ? next : item));
+  };
   const sendMessage = async () => {
     if (!selected || (!reply.trim() && !attachments.length)) return;
     setSending(true);
@@ -177,7 +205,7 @@ const CustomerServicePage: React.FC = () => {
         attachment_ids: attachments.map((item) => item.id),
         client_msg_id: newClientMessageId(),
       });
-      setMessages((current) => [...current, message]);
+      applySentMessage(selected, message);
       setReply('');
       setAttachments([]);
       void loadList(true);
@@ -198,7 +226,7 @@ const CustomerServicePage: React.FC = () => {
         quick_reply_id: quickReplyId,
         client_msg_id: newClientMessageId(),
       });
-      setMessages((current) => [...current, message]);
+      applySentMessage(selected, message);
       void loadList(true);
     } catch (error) {
       showToast(error instanceof Error ? error.message : '发送快捷回复失败', 'error');
@@ -226,9 +254,9 @@ const CustomerServicePage: React.FC = () => {
           </Button>
         </CardHeader>
       </Card>
-      <div className="grid min-h-[680px] gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <Card className="min-h-0">
-          <CardBody className="gap-3 overflow-hidden p-3">
+      <div className="grid h-[calc(100dvh-9rem)] min-h-[360px] max-h-[760px] grid-cols-1 gap-4 overflow-hidden lg:h-[min(72vh,760px)] lg:min-h-[520px] lg:grid-cols-[320px_minmax(0,1fr)]">
+        <Card className={`${mobileChat ? 'hidden lg:block' : 'block'} min-h-0 overflow-hidden`}>
+          <CardBody className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-3">
             <Tabs
               selectedKey={filter}
               onSelectionChange={(key) => {
@@ -267,18 +295,25 @@ const CustomerServicePage: React.FC = () => {
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        {item.admin_unread > 0 ? (
-                          <Chip size="sm" color="danger" variant="flat">
-                            {item.admin_unread} 未读
-                          </Chip>
-                        ) : item.last_message_role === 'admin' ? (
-                          <span className="text-xs text-success">已回复</span>
-                        ) : (
-                          <span className="text-xs text-warning">待回复</span>
-                        )}
-                        <span className="ml-auto shrink-0 text-xs text-default-500">{relativeTime(item.last_message_at)}</span>
+                        <span
+                          className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                            ['resolved', 'closed'].includes(item.status)
+                              ? 'bg-success-700'
+                              : item.admin_unread > 0
+                                ? 'bg-danger'
+                                : 'bg-success-300'
+                          }`}
+                          aria-label={['resolved', 'closed'].includes(item.status) ? '已完成' : item.admin_unread > 0 ? '未查看' : '已查看'}
+                        />
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                          {item.user.profile.username || item.user.profile.email || `用户 ${item.user.id}`}
+                        </span>
+                        <span className="shrink-0 text-xs text-default-500">{relativeTime(item.last_message_at)}</span>
                       </div>
-                      <div className="mt-1 truncate text-xs text-default-500">{item.last_message_preview || '暂无消息'}</div>
+                      <div className="mt-1 flex items-center gap-2 text-xs text-default-500">
+                        <span className="shrink-0">{['resolved', 'closed'].includes(item.status) ? '已完成' : item.admin_unread > 0 ? '未查看' : '已查看'}</span>
+                        <span className="truncate">{item.last_message_preview || '暂无消息'}</span>
+                      </div>
                     </div>
                   </Button>
                 ))
@@ -289,11 +324,14 @@ const CustomerServicePage: React.FC = () => {
             {pages > 1 && <Pagination page={page} total={pages} size="sm" onChange={setPage} className="justify-center" />}
           </CardBody>
         </Card>
-        <Card className="min-h-0">
-          <CardBody className="min-h-0 gap-3 p-4">
+        <Card className={`${mobileChat ? 'block' : 'hidden lg:block'} min-h-0 min-w-0 overflow-hidden`}>
+          <CardBody className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-3 sm:p-4">
             {selected ? (
               <>
                 <div className="flex items-center justify-between gap-3 border-b border-divider pb-3">
+                  <Button isIconOnly className="lg:hidden" size="sm" variant="light" aria-label="返回会话列表" onPress={() => setMobileChat(false)}>
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 font-semibold">
                       <span className="truncate">{selected.user.profile.username || selected.user.profile.email || '用户'}</span>
@@ -329,7 +367,7 @@ const CustomerServicePage: React.FC = () => {
                   .map((attachment) => (
                     <AttachmentSummary key={attachment.id} attachment={attachment} />
                   ))}
-                <div className="min-h-0 flex-1">
+                <div className="min-h-0 flex-1 overflow-hidden">
                   <ChatMessageList messages={messages} selfRole="admin" loading={messageLoading} emptyText="暂无消息" scope="admin" />
                 </div>
                 {attachmentConfig ? (
@@ -343,20 +381,8 @@ const CustomerServicePage: React.FC = () => {
                     attachments={attachments}
                     onAttachmentsChange={setAttachments}
                     uploadAttachment={uploadAttachment}
-                    extraActions={
-                      <Dropdown>
-                        <DropdownTrigger>
-                          <Button size="sm" variant="light">快捷回复</Button>
-                        </DropdownTrigger>
-                        <DropdownMenu aria-label="客服快捷回复" onAction={(key) => void sendQuickReply(String(key))}>
-                          {quickReplies.map((item) => (
-                            <DropdownItem key={item.id} description={`${item.content || '图片回复'}${item.attachments?.length ? ` · ${item.attachments.length} 张图片` : ''}`}>
-                              {item.title}
-                            </DropdownItem>
-                          ))}
-                        </DropdownMenu>
-                      </Dropdown>
-                    }
+                    quickReplies={quickReplies}
+                    onPickQuickReply={(id) => void sendQuickReply(id)}
                   />
                 ) : (
                   <div className="text-sm text-warning">客服配置尚未加载，暂不能发送消息。</div>

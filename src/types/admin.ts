@@ -825,6 +825,18 @@ export interface UpdateWorkOrderRequest {
     admin_remark?: string;
 }
 
+export interface BatchUpdateWorkOrderRequest {
+    ids: number[];
+    status: 'paid';
+    admin_remark?: string;
+}
+
+export interface BatchUpdateWorkOrderResult {
+    ids: number[];
+    status: 'paid';
+    updated_count: number;
+}
+
 export interface AdminCsUserProfile {
     username: string | null;
     email: string | null;

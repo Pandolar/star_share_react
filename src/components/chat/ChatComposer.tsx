@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Chip, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, Progress, Textarea } from '@heroui/react';
 import { Paperclip, Send } from 'lucide-react';
 import type { ChatAttachment, ChatAttachmentConfig, ChatAttachmentKind } from './types';
@@ -19,7 +19,7 @@ export interface ChatComposerProps {
   onAttachmentsChange: (next: ChatAttachment[]) => void;
   uploadAttachment: (file: File) => Promise<ChatAttachment>;
   quickReplies?: { id: string; title: string; content: string }[];
-  onPickQuickReply?: (content: string) => void;
+  onPickQuickReply?: (id: string, content: string) => void;
   extraActions?: React.ReactNode;
   footerNote?: React.ReactNode;
 }
@@ -53,6 +53,19 @@ export default function ChatComposer({
 }: ChatComposerProps): React.ReactElement {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [quickRepliesOpen, setQuickRepliesOpen] = useState(false);
+  const closeQuickRepliesTimer = useRef<number | null>(null);
+  const openQuickReplies = () => {
+    if (closeQuickRepliesTimer.current !== null) window.clearTimeout(closeQuickRepliesTimer.current);
+    setQuickRepliesOpen(true);
+  };
+  const closeQuickReplies = () => {
+    if (closeQuickRepliesTimer.current !== null) window.clearTimeout(closeQuickRepliesTimer.current);
+    closeQuickRepliesTimer.current = window.setTimeout(() => setQuickRepliesOpen(false), 150);
+  };
+  useEffect(() => () => {
+    if (closeQuickRepliesTimer.current !== null) window.clearTimeout(closeQuickRepliesTimer.current);
+  }, []);
   const [dragging, setDragging] = useState(false);
   const accept = (Object.keys(attachmentConfig.types) as ChatAttachmentKind[])
     .filter((kind) => attachmentConfig.types[kind].enabled)
@@ -175,17 +188,29 @@ export default function ChatComposer({
           <Paperclip size={18} />
         </Button>
         {quickReplies?.length ? (
-          <Dropdown>
+          <Dropdown isOpen={quickRepliesOpen} onOpenChange={setQuickRepliesOpen} closeOnSelect>
             <DropdownTrigger>
-              <Button size="sm" variant="flat">
+              <Button
+                size="sm"
+                variant="flat"
+                onMouseEnter={openQuickReplies}
+                onMouseLeave={closeQuickReplies}
+              >
                 快捷回复
               </Button>
             </DropdownTrigger>
-            <DropdownMenu aria-label="快捷回复">
+            <DropdownMenu
+              aria-label="快捷回复"
+              onMouseEnter={openQuickReplies}
+              onMouseLeave={closeQuickReplies}
+              onAction={(key) => {
+                const reply = quickReplies.find((item) => item.id === String(key));
+                setQuickRepliesOpen(false);
+                if (reply) onPickQuickReply?.(reply.id, reply.content);
+              }}
+            >
               {quickReplies.map((reply) => (
-                <DropdownItem key={reply.id} onPress={() => onPickQuickReply?.(reply.content)}>
-                  {reply.title}
-                </DropdownItem>
+                <DropdownItem key={reply.id}>{reply.title}</DropdownItem>
               ))}
             </DropdownMenu>
           </Dropdown>
