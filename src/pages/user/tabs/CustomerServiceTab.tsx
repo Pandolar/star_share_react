@@ -89,10 +89,11 @@ export default function CustomerServiceTab(): React.ReactElement {
     let timeout: number | undefined;
     let delay = 15_000;
     const schedule = () => {
-      if (!cancelled && !document.hidden) timeout = window.setTimeout(tick, delay);
+      window.clearTimeout(timeout);
+      if (!cancelled && !document.hidden && document.hasFocus()) timeout = window.setTimeout(tick, delay);
     };
     const tick = async () => {
-      if (cancelled || document.hidden) return;
+      if (cancelled || document.hidden || !document.hasFocus()) return;
       try {
         const response = await loadMessages(conversationId, { after_id: lastMessageId.current ?? undefined, silent: true });
         const incomingAdminMessages = response.messages.filter((message) => message.role === 'admin');
@@ -107,19 +108,27 @@ export default function CustomerServiceTab(): React.ReactElement {
       }
       schedule();
     };
-    const onVisible = () => {
-      if (!document.hidden) {
-        window.clearTimeout(timeout);
+    const refreshActivePage = () => {
+      window.clearTimeout(timeout);
+      if (!cancelled && !document.hidden && document.hasFocus()) {
         delay = 15_000;
+        void loadConversations();
         void tick();
       }
     };
+    const pause = () => {
+      window.clearTimeout(timeout);
+    };
     schedule();
-    document.addEventListener('visibilitychange', onVisible);
+    document.addEventListener('visibilitychange', refreshActivePage);
+    window.addEventListener('focus', refreshActivePage);
+    window.addEventListener('blur', pause);
     return () => {
       cancelled = true;
       window.clearTimeout(timeout);
-      document.removeEventListener('visibilitychange', onVisible);
+      document.removeEventListener('visibilitychange', refreshActivePage);
+      window.removeEventListener('focus', refreshActivePage);
+      window.removeEventListener('blur', pause);
     };
   }, [selectedId, config?.provider]);
 

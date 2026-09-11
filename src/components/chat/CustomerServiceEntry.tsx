@@ -30,21 +30,21 @@ export default function CustomerServiceEntry({ mode }: { mode: 'user' | 'guest' 
     }
 
     const handleRead = () => setUnread(0);
-    const handleVisibilityChange = () => {
-      if (!document.hidden) void refreshUnread();
+    const refreshActivePage = () => {
+      if (!document.hidden && document.hasFocus()) void refreshUnread();
     };
 
-    void refreshUnread();
-    const timer = window.setInterval(() => {
-      if (!document.hidden) void refreshUnread();
-    }, 60_000);
+    refreshActivePage();
+    const timer = window.setInterval(refreshActivePage, 60_000);
     window.addEventListener('csRead', handleRead);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('visibilitychange', refreshActivePage);
+    window.addEventListener('focus', refreshActivePage);
 
     return () => {
       window.clearInterval(timer);
       window.removeEventListener('csRead', handleRead);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('visibilitychange', refreshActivePage);
+      window.removeEventListener('focus', refreshActivePage);
     };
   }, [builtin, mode, refreshUnread]);
 

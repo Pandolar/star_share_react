@@ -188,7 +188,7 @@ export default function ChatComposer({
           <Paperclip size={18} />
         </Button>
         {quickReplies?.length ? (
-          <Dropdown isOpen={quickRepliesOpen} onOpenChange={setQuickRepliesOpen} closeOnSelect>
+          <Dropdown placement="top-start" isOpen={quickRepliesOpen} onOpenChange={setQuickRepliesOpen} closeOnSelect>
             <DropdownTrigger>
               <Button
                 size="sm"

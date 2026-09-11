@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Button,
   Card,
@@ -66,10 +66,18 @@ const CustomerServicePage: React.FC = () => {
   const [reply, setReply] = useState('');
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [mobileChat, setMobileChat] = useState(false);
+  const listRequestId = useRef(0);
+  const lastListRequest = useRef({ key: '', at: 0 });
+  const activeRefreshAt = useRef(0);
   const pageSize = 20;
   const loadList = useCallback(
     async (silent = false) => {
-      if (document.hidden) return;
+      if (silent && (document.hidden || !document.hasFocus())) return;
+      const requestKey = `${page}:${filter}:${query.trim()}`;
+      const now = Date.now();
+      if (lastListRequest.current.key === requestKey && now - lastListRequest.current.at < 250) return;
+      lastListRequest.current = { key: requestKey, at: now };
+      const requestId = ++listRequestId.current;
       if (!silent) setListLoading(true);
       try {
         const result = await adminApiService.getCsConversations({
@@ -80,6 +88,7 @@ const CustomerServicePage: React.FC = () => {
           order_column: 'last_message_at',
           order: 'desc',
         });
+        if (requestId !== listRequestId.current) return;
         const nextRows = result.data;
         setRows(nextRows);
         setTotal(result.total);
@@ -89,9 +98,11 @@ const CustomerServicePage: React.FC = () => {
           return refreshed ? { ...refreshed, admin_unread: 0, unread: 0 } : current;
         });
       } catch (error) {
-        if (!silent) showToast(error instanceof Error ? error.message : '获取客服会话失败', 'error');
+        if (requestId === listRequestId.current && !silent) {
+          showToast(error instanceof Error ? error.message : '获取客服会话失败', 'error');
+        }
       } finally {
-        if (!silent) setListLoading(false);
+        if (requestId === listRequestId.current && !silent) setListLoading(false);
       }
     },
     [filter, page, query]
@@ -122,7 +133,7 @@ const CustomerServicePage: React.FC = () => {
     []
   );
   const refreshMessages = useCallback(async () => {
-    if (!selected || !mobileChat || document.hidden) return;
+    if (!selected || !mobileChat || document.hidden || !document.hasFocus()) return;
     try {
       const afterId = messages.length ? messages[messages.length - 1].id : undefined;
       const result = await adminApiService.getCsMessages({ conversation_id: selected.id, after_id: afterId, limit: 50 });
@@ -146,20 +157,25 @@ const CustomerServicePage: React.FC = () => {
     void loadList();
   }, [loadList]);
   useEffect(() => {
-    const timer = window.setInterval(() => void loadList(true), 15_000);
-    const visible = () => {
-      if (!document.hidden) void loadList(true);
+    const refreshActivePage = () => {
+      if (document.hidden || !document.hasFocus()) return;
+      const now = Date.now();
+      if (now - activeRefreshAt.current < 250) return;
+      activeRefreshAt.current = now;
+      void loadList(true);
+      void refreshMessages();
     };
-    document.addEventListener('visibilitychange', visible);
+    const listTimer = window.setInterval(() => void loadList(true), 15_000);
+    const messageTimer = window.setInterval(() => void refreshMessages(), 10_000);
+    document.addEventListener('visibilitychange', refreshActivePage);
+    window.addEventListener('focus', refreshActivePage);
     return () => {
-      window.clearInterval(timer);
-      document.removeEventListener('visibilitychange', visible);
+      window.clearInterval(listTimer);
+      window.clearInterval(messageTimer);
+      document.removeEventListener('visibilitychange', refreshActivePage);
+      window.removeEventListener('focus', refreshActivePage);
     };
-  }, [loadList]);
-  useEffect(() => {
-    const timer = window.setInterval(() => void refreshMessages(), 10_000);
-    return () => window.clearInterval(timer);
-  }, [refreshMessages]);
+  }, [loadList, refreshMessages]);
   useEffect(() => {
     const loadQuickReplies = async () => {
       try {
@@ -260,7 +276,14 @@ const CustomerServicePage: React.FC = () => {
             <Tabs
               selectedKey={filter}
               onSelectionChange={(key) => {
-                setFilter(String(key));
+                const nextFilter = String(key);
+                if (nextFilter === filter) {
+                  void loadList();
+                  return;
+                }
+                setRows([]);
+                setTotal(0);
+                setFilter(nextFilter);
                 setPage(1);
               }}
               aria-label="会话筛选"

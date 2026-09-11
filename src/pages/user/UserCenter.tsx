@@ -275,13 +275,19 @@ const UserCenter: React.FC = () => {
     }
     let cancelled = false;
     const refreshUnread = () => {
-      if (document.hidden) return;
+      if (document.hidden || !document.hasFocus()) return;
       customerServiceApi.getUnread().then((data) => { if (!cancelled) setSupportUnreadCount(Number(data.unread || 0)); }).catch(() => {});
     };
     refreshUnread();
     const interval = window.setInterval(refreshUnread, 30000);
     document.addEventListener('visibilitychange', refreshUnread);
-    return () => { cancelled = true; window.clearInterval(interval); document.removeEventListener('visibilitychange', refreshUnread); };
+    window.addEventListener('focus', refreshUnread);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', refreshUnread);
+      window.removeEventListener('focus', refreshUnread);
+    };
   }, [customerServiceConfig, isAuthenticated]);
 
   useEffect(() => {
