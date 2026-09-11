@@ -1,7 +1,40 @@
-# Netlify redirects file for SPA routing
-# API routes should not be affected
+# SPA 兜底重写清单。
+#
+# 事故背景：线上源站（Caddy）对任何未命中的路径都返回 200 + index.html，EdgeOne 又把
+# 这份 HTML 缓存到 .js/.css 的 URL 上。于是「构建引用了不存在的 chunk」不会暴露成 404，
+# 而是变成 200 text/html，浏览器执行时报 ChunkLoadError: Unexpected token '<'，
+# 前端再重试/跳转，最终形成整站循环。
+#
+# 因此：静态资源路径缺失时必须 404，绝不回落 index.html。
+# 命中真实文件时仍直接返回文件，不影响正常资源。
+#
+# 生产实际生效的是 CDN / Caddy 侧配置，改本文件不改变线上行为，
+# 这里保留正确写法供任何读取本文件的环境使用，并作为源站配置的依据。
+
+# 1) 后端接口路径不参与 SPA 兜底
 /star/* /star/:splat 200
 /u/* /u/:splat 200
 
-# All other routes should serve index.html for client-side routing
+# 2) 静态路径缺失一律 404
+/starstatic/* /404.html 404
+/img/* /404.html 404
+/*.js /404.html 404
+/*.css /404.html 404
+/*.mjs /404.html 404
+/*.json /404.html 404
+/*.map /404.html 404
+/*.ico /404.html 404
+/*.png /404.html 404
+/*.jpg /404.html 404
+/*.jpeg /404.html 404
+/*.gif /404.html 404
+/*.svg /404.html 404
+/*.webp /404.html 404
+/*.woff /404.html 404
+/*.woff2 /404.html 404
+/*.ttf /404.html 404
+/*.txt /404.html 404
+/*.xml /404.html 404
+
+# 3) 其余（无扩展名的前端路由）才回落 index.html
 /* /index.html 200

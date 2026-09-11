@@ -29,12 +29,14 @@ export const useAuthCheck = (options: AuthCheckOptions = {}) => {
     const [countdown, setCountdown] = useState(0);
 
     // 检查cookie中的认证信息
+    // 后端只校验 xuserid + xtoken（app/tools/check_tools.py: verify_token 查 redis xtoken_{xuserid}），
+    // xy_uuid_token 仅用于 Casdoor code 流程与节点回跳 ticket，不是登录态的必要条件。
+    // 若把它纳入判定，只缺这一件的已登录用户会被误判为过期并 3 秒后强制回首页。
     const checkCookieAuth = useCallback((): boolean => {
         // 统一用工具函数读取；当 Cookie 以 Host-Only 形式写入时，只会在当前域名可见
         const xuserid = getCookie('xuserid');
-        const xy_uuid_token = getCookie('xy_uuid_token');
         const xtoken = getCookie('xtoken');
-        return !!(xuserid && xtoken && xy_uuid_token);
+        return !!(xuserid && xtoken);
     }, []);
 
     // 处理认证失败

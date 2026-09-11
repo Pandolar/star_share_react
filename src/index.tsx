@@ -4,6 +4,10 @@ import { HeroUIProvider, ToastProvider } from '@heroui/react';
 import './styles/globals.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
+import { stripRecoveryParam } from './utils/assetRecovery';
+
+// 自愈重载会带一次性时间戳参数绕过缓存，进入应用后立即清理，保持地址栏干净
+stripRecoveryParam();
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement

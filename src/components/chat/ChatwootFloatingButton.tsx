@@ -4,6 +4,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { MessageCircle, X } from 'lucide-react';
+import { Button } from '@heroui/react';
 import { ChatwootWidget, toggleChatwoot } from './ChatwootWidget';
 import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
 
@@ -41,9 +42,11 @@ export const ChatwootFloatingButton: React.FC<ChatwootFloatingButtonProps> = ({
     <>
       <ChatwootWidget mode={mode} hideMessageBubble />
       <div className="fixed bottom-5 right-5 z-50">
-        <button
-          onClick={() => toggleChatwoot(isOpen ? 'close' : 'open')}
-          className={`relative h-14 w-14 rounded-full shadow-lg transition-all duration-300 ease-in-out hover:scale-110 active:scale-95 ${isOpen ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-600 hover:bg-blue-700'}`}
+        <Button
+          isIconOnly
+          disableRipple
+          onPress={() => toggleChatwoot(isOpen ? 'close' : 'open')}
+          className={`relative h-14 w-14 min-w-14 rounded-full shadow-lg transition-all duration-300 ease-in-out hover:scale-110 active:scale-95 ${isOpen ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-600 hover:bg-blue-700'}`}
           aria-label={isOpen ? '关闭客服' : '打开客服'}
           title={isOpen ? '关闭客服' : '联系客服'}
         >
@@ -56,7 +59,7 @@ export const ChatwootFloatingButton: React.FC<ChatwootFloatingButtonProps> = ({
             </div>
           )}
           {!isOpen && <div className="absolute inset-0 animate-ping rounded-full bg-blue-600 opacity-75" />}
-        </button>
+        </Button>
         {!isOpen && (
           <div className="pointer-events-none absolute bottom-full right-0 mb-2 opacity-0 transition-opacity duration-200 hover:opacity-100">
             <div className="whitespace-nowrap rounded-lg bg-default-900 px-3 py-1.5 text-sm text-white shadow-lg">

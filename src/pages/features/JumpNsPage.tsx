@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { getCookie, setCookie, deleteCookie } from '../../utils/cookies';
 
 // 校验跳转参数页面，对应 /jumpns
 const JumpNsPage: React.FC = () => {
@@ -10,31 +11,9 @@ const JumpNsPage: React.FC = () => {
       return value && value.trim() !== '' ? value : null;
     };
 
-    // 获取 Cookie 值
-    const getCookie = (name: string): string | null => {
-      const cookieArr = document.cookie.split('; ');
-      for (const cookie of cookieArr) {
-        if (cookie.startsWith(name + '=')) {
-          return cookie.substring(name.length + 1);
-        }
-      }
-      return null;
-    };
-
-    // 设置 Cookie（默认有效期 7 天）
-    const setCookie = (name: string, value: string, days = 7) => {
-      const expires = new Date();
-      expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
-      // 对 value 进行 encodeURIComponent 防止特殊字符破坏 cookie
-      document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires.toUTCString()}; path=/`;
-    };
-
-    // 清除指定的 Cookie
+    // 清除指定的 Cookie（会同时清理 Host-Only 与主域名两种写法）
     const clearCookies = () => {
-      const cookiesToClear = ['xuserid', 'xtoken', 'xy_uuid_token', 'lastCheckTime'];
-      cookiesToClear.forEach((cookie) => {
-        document.cookie = `${cookie}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC`;
-      });
+      ['xuserid', 'xtoken', 'xy_uuid_token', 'lastCheckTime'].forEach((name) => deleteCookie(name));
     };
 
     const currentUrl = window.location.href;
@@ -69,9 +48,9 @@ const JumpNsPage: React.FC = () => {
 
       // 4. 如果 URL 中提供了参数，则覆盖本地 Cookie（确保最新）
       if (hasAllUrlParams) {
-        setCookie('xuserid', xUserId, 7);
-        setCookie('xtoken', xToken, 7);
-        setCookie('xy_uuid_token', xyUuidToken, 7);
+        setCookie('xuserid', xUserId, { days: 7 });
+        setCookie('xtoken', xToken, { days: 7 });
+        setCookie('xy_uuid_token', xyUuidToken, { days: 7 });
       }
 
       try {
@@ -95,7 +74,7 @@ const JumpNsPage: React.FC = () => {
         // 6. 校验成功：code 为 20000
         if (data && data.code === 20000) {
           // 记录本次校验时间（有效期 1 天）
-          setCookie('lastCheckTime', String(Date.now()), 1);
+          setCookie('lastCheckTime', String(Date.now()), { days: 1 });
 
           // 构造目标跳转地址
           const targetUrl = `https://${currentDomain}/service-api/chat/select-car/callback?ticket=${encodeURIComponent(xyUuidToken)}&isPlus=1`;

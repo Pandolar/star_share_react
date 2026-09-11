@@ -22,8 +22,12 @@ module.exports = {
         filename: isProd
           ? 'starstatic/js/[name].[contenthash:8].js'
           : 'starstatic/js/bundle.js',
+        // 异步 chunk 用 [id] 而非 [name]：cacheGroup 的 name（如 admin-pages）只影响
+        // webpack 生成的运行时映射表，第 4e3 号 chunk 因 name/id 不一致被写成
+        // 4000.<hash>.chunk.js，运行时却按 4e3.<hash>.chunk.js 请求，线上必然 404。
+        // 用 [id] 让「发射的文件名」与「运行时请求的文件名」同源，杜绝该类错位。
         chunkFilename: isProd
-          ? 'starstatic/js/[name].[contenthash:8].chunk.js'
+          ? 'starstatic/js/[id].[contenthash:8].chunk.js'
           : 'starstatic/js/[name].chunk.js',
         // Asset modules (images, fonts, etc.)
         assetModuleFilename: 'starstatic/media/[name].[hash:8][ext]'
@@ -56,14 +60,6 @@ module.exports = {
                 name: 'heroui',
                 priority: 30,
                 chunks: 'all',
-                reuseExistingChunk: true
-              },
-              adminPages: {
-                test: /[\\/]src[\\/]pages[\\/]admin[\\/]/,
-                name: 'admin-pages',
-                priority: 20,
-                chunks: 'async',
-                minChunks: 1,
                 reuseExistingChunk: true
               }
             }

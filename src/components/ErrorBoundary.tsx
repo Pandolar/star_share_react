@@ -1,70 +1,76 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Button } from '@heroui/react';
+import {
+  clearRecoveryAttempts,
+  isStaleAssetError,
+  purgeClientCaches,
+  recoverStaleAssets,
+  reloadDocumentBypassingCache,
+} from '../utils/assetRecovery';
 
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
+  /** 是否允许对「资源版本不一致」错误做一次自动恢复（默认允许）。 */
   autoReload?: boolean;
+  /** 自动恢复前的等待时间，留出提示动画与用户感知。 */
   reloadDelay?: number;
 }
 
 interface State {
   hasError: boolean;
   error: Error | null;
-  isReloading: boolean;
+  isRecovering: boolean;
 }
 
 class ErrorBoundary extends Component<Props, State> {
-  private reloadTimer: NodeJS.Timeout | null = null;
+  private reloadTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null, isReloading: false };
+    this.state = { hasError: false, error: null, isRecovering: false };
   }
 
   static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error, isReloading: false };
+    return { hasError: true, error, isRecovering: false };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // 自动刷新逻辑
-    if (this.props.autoReload !== false) {
-      const delay = this.props.reloadDelay || 2000;
-      this.scheduleReload(delay);
-    }
+    // 只有「资源版本不一致」才自动恢复；其余运行时错误立即展示终态页面，
+    // 既不掩盖真实问题，也不会因为反复 reload 形成死循环。
+    if (this.props.autoReload === false) return;
+    if (!isStaleAssetError(error)) return;
+
+    console.error('[ErrorBoundary] 资源版本不一致，准备清理缓存后重载', error, errorInfo.componentStack);
+    this.setState({ isRecovering: true });
+    this.reloadTimer = setTimeout(() => {
+      void recoverStaleAssets().then((recovered) => {
+        // 自愈额度用尽：停止自动重载，交给用户手动处理
+        if (!recovered) {
+          this.setState({ isRecovering: false });
+          return;
+        }
+        // 重载已发起但未生效（导航被拦截 / 离线）时，兜底回到可操作状态，
+        // 避免用户被永久困在「页面正在恢复中」。
+        this.reloadTimer = setTimeout(() => this.setState({ isRecovering: false }), 10000);
+      });
+    }, this.props.reloadDelay ?? 1500);
   }
 
   componentWillUnmount() {
-    if (this.reloadTimer) {
-      clearTimeout(this.reloadTimer);
-    }
+    if (this.reloadTimer) clearTimeout(this.reloadTimer);
   }
 
-  private scheduleReload(delay: number) {
-    this.setState({ isReloading: true });
-    
-    this.reloadTimer = setTimeout(() => {
-      // 避免无限刷新，检查刷新次数
-      const reloadCount = parseInt(sessionStorage.getItem('errorReloadCount') || '0');
-      if (reloadCount < 3) {
-        sessionStorage.setItem('errorReloadCount', (reloadCount + 1).toString());
-        window.location.reload();
-      } else {
-        // 超过3次仍失败，强制跳转到分享测速页
-        sessionStorage.removeItem('errorReloadCount');
-        window.location.href = '/sharespeedtest';
-      }
-    }, delay);
-  }
-
-  private handleManualReload = () => {
-    // 清除错误计数，允许手动刷新
-    sessionStorage.removeItem('errorReloadCount');
-    window.location.reload();
+  /** 手动刷新：清空自愈额度并清理缓存，确保用户这一次能拿到最新资源。 */
+  private handleManualReload = async () => {
+    clearRecoveryAttempts();
+    await purgeClientCaches();
+    reloadDocumentBypassingCache();
   };
 
   render() {
     if (this.state.hasError) {
-      if (this.state.isReloading) {
+      if (this.state.isRecovering) {
         return (
           <div className="min-h-screen flex items-center justify-center bg-default-50">
             <div className="text-center">
@@ -85,21 +91,20 @@ class ErrorBoundary extends Component<Props, State> {
               </svg>
             </div>
             <h2 className="text-2xl font-bold text-default-900 mb-4">页面加载出现问题</h2>
-            <p className="text-default-600 mb-6">抱歉给您带来不便，页面遇到了一些技术问题</p>
-            <div className="space-x-4">
-              <button 
-                onClick={this.handleManualReload} 
-                className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-              >
+            <p className="text-default-600 mb-6">
+              抱歉给您带来不便，请点击下方按钮重新加载；若仍无法访问，请联系客服协助处理。
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              <Button color="primary" onPress={this.handleManualReload}>
                 立即刷新
-              </button>
-              <button 
-                onClick={() => window.location.href = '/'} 
-                className="px-6 py-3 border border-default-300 text-default-700 rounded-lg hover:bg-default-50 transition-colors"
-              >
+              </Button>
+              <Button variant="bordered" onPress={() => window.location.assign('/')}>
                 返回首页
-              </button>
+              </Button>
             </div>
+            {this.state.error?.message ? (
+              <p className="mt-6 break-all text-xs text-default-400">错误信息：{this.state.error.message}</p>
+            ) : null}
           </div>
         </div>
       );

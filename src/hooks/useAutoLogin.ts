@@ -12,9 +12,9 @@ export const useAutoLogin = () => {
         const autoLogin = async () => {
             const xuserid = getCookie('xuserid');
             const xtoken = getCookie('xtoken');
-            const xyUuidToken = getCookie('xy_uuid_token');
 
-            if (xuserid && xtoken && xyUuidToken) {
+            // 与后端契约一致：登录态只由 xuserid + xtoken 决定
+            if (xuserid && xtoken) {
                 try {
                     const response = await checkToken(xuserid, xtoken);
                     if (response.code === 20000) {

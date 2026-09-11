@@ -583,8 +583,12 @@ export interface InviteWithdrawalWorkorder {
 }
 
 
-/** 客服公开配置：未开启时后端只回 { enabled: false, provider: 'off' }，开启后回完整配置（去掉 admin/scope 等敏感字段）。 */
-export type ChatPublicConfigRaw = { enabled: false; provider: 'off' } | ChatConfig;
+/**
+ * 客服公开配置：内置客服不可用或 provider=off 时，后端只回 { enabled: false, provider }；
+ * 可用时才回完整配置（已去掉 admin/scope 等敏感字段）。
+ */
+export type ChatDisabledConfig = { enabled: false; provider: 'chatwoot' | 'off' };
+export type ChatPublicConfigRaw = ChatDisabledConfig | ChatConfig;
 
 export const getCsConfig = async (): Promise<ChatPublicConfigRaw> => {
     const response = await createUserRequest(getUserApiUrl('/u/cs_config'), { method: 'GET' });

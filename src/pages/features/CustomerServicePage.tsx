@@ -5,13 +5,13 @@ import { ChatwootWidget, toggleChatwoot } from '../../components/chat/ChatwootWi
 import { useCustomerService } from '../../contexts/CustomerServiceContext';
 
 const CustomerServicePage: React.FC = () => {
-  const { config, loading } = useCustomerService();
+  const { provider, loading } = useCustomerService();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (loading) return;
 
-    if (config?.provider === 'chatwoot') {
+    if (provider === 'chatwoot') {
       const timer = setTimeout(() => {
         toggleChatwoot('open');
       }, 1000);
@@ -19,7 +19,7 @@ const CustomerServicePage: React.FC = () => {
     }
 
     navigate('/user-center?tab=support', { replace: true });
-  }, [config, loading, navigate]);
+  }, [provider, loading, navigate]);
 
   if (loading) {
     return (
@@ -29,7 +29,7 @@ const CustomerServicePage: React.FC = () => {
     );
   }
 
-  if (config?.provider === 'chatwoot') {
+  if (provider === 'chatwoot') {
     return <ChatwootWidget mode="auto" hideMessageBubble={false} />;
   }
 
