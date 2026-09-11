@@ -18,7 +18,7 @@ import {
 } from '@heroui/react';
 import { Headphones, RefreshCw, Search, UserRound } from 'lucide-react';
 import adminApiService from '../../services/adminApi';
-import type { AdminCsConversation, AdminCsStats } from '../../types/admin';
+import type { AdminCsConversation } from '../../types/admin';
 import type { ChatAttachment, ChatAttachmentConfig, ChatMessage } from '../../components/chat/types';
 import { newClientMessageId } from '../../components/chat/types';
 import ChatMessageList from '../../components/chat/ChatMessageList';
@@ -31,7 +31,6 @@ const FILTERS = [
   ['all', '全部'],
   ['unread', '未读'],
 ];
-const EMPTY_STATS: AdminCsStats = { total: 0, open: 0, processing: 0, resolved: 0, closed: 0, unread_total: 0, awaiting_reply: 0 };
 const relativeTime = (value: string | null) => {
   if (!value) return '-';
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
@@ -59,7 +58,7 @@ const AttachmentSummary: React.FC<{ attachment: ChatAttachment }> = ({ attachmen
 const CustomerServicePage: React.FC = () => {
   const { config } = useCustomerService();
   const [rows, setRows] = useState<AdminCsConversation[]>([]);
-  const [stats, setStats] = useState<AdminCsStats>(EMPTY_STATS);
+  const [quickReplies, setQuickReplies] = useState<Array<{ id: string; title: string; content: string; attachments?: ChatAttachment[] }>>([]);
   const [selected, setSelected] = useState<AdminCsConversation | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [filter, setFilter] = useState('unread');
@@ -71,7 +70,6 @@ const CustomerServicePage: React.FC = () => {
   const [sending, setSending] = useState(false);
   const [reply, setReply] = useState('');
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
-  const [quickReplies, setQuickReplies] = useState<{ id: string; title: string; content: string }[]>([]);
   const pageSize = 20;
   const loadList = useCallback(
     async (silent = false) => {
@@ -97,14 +95,6 @@ const CustomerServicePage: React.FC = () => {
     },
     [filter, page, query]
   );
-  const loadStats = useCallback(async () => {
-    if (document.hidden) return;
-    try {
-      setStats(await adminApiService.getCsStats());
-    } catch {
-      /* 保持上一次统计 */
-    }
-  }, []);
   const openConversation = useCallback(
     async (conversation: AdminCsConversation) => {
       setSelected(conversation);
@@ -117,14 +107,13 @@ const CustomerServicePage: React.FC = () => {
         setMessages(result.messages);
         await adminApiService.markCsRead(conversation.id);
         void loadList(true);
-        void loadStats();
       } catch (error) {
         showToast(error instanceof Error ? error.message : '获取消息失败', 'error');
       } finally {
         setMessageLoading(false);
       }
     },
-    [loadList, loadStats]
+    [loadList]
   );
   const refreshMessages = useCallback(async () => {
     if (!selected || document.hidden) return;
@@ -141,27 +130,20 @@ const CustomerServicePage: React.FC = () => {
   }, [messages, selected]);
   useEffect(() => {
     void loadList();
-    void loadStats();
-  }, [loadList, loadStats]);
+  }, [loadList]);
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      void loadList(true);
-      void loadStats();
-    }, 5000);
+    const timer = window.setInterval(() => void loadList(true), 15_000);
     const visible = () => {
-      if (!document.hidden) {
-        void loadList(true);
-        void loadStats();
-      }
+      if (!document.hidden) void loadList(true);
     };
     document.addEventListener('visibilitychange', visible);
     return () => {
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', visible);
     };
-  }, [loadList, loadStats]);
+  }, [loadList]);
   useEffect(() => {
-    const timer = window.setInterval(() => void refreshMessages(), 3000);
+    const timer = window.setInterval(() => void refreshMessages(), 10_000);
     return () => window.clearInterval(timer);
   }, [refreshMessages]);
   useEffect(() => {
@@ -175,7 +157,7 @@ const CustomerServicePage: React.FC = () => {
             parsed.quick_replies.filter(
               (item: { id?: unknown; title?: unknown; content?: unknown; enabled?: unknown }) =>
                 item.enabled !== false && typeof item.id === 'string' && typeof item.title === 'string' && typeof item.content === 'string'
-            )
+            ) as Array<{ id: string; title: string; content: string; attachments?: ChatAttachment[] }>
           );
       } catch {
         /* 不影响会话处理 */
@@ -199,9 +181,27 @@ const CustomerServicePage: React.FC = () => {
       setReply('');
       setAttachments([]);
       void loadList(true);
-      void loadStats();
     } catch (error) {
       showToast(error instanceof Error ? error.message : '发送消息失败', 'error');
+    } finally {
+      setSending(false);
+    }
+  };
+  const sendQuickReply = async (quickReplyId: string) => {
+    if (!selected || sending) return;
+    setSending(true);
+    try {
+      const message = await adminApiService.sendCsMessage({
+        conversation_id: selected.id,
+        content: '',
+        attachment_ids: [],
+        quick_reply_id: quickReplyId,
+        client_msg_id: newClientMessageId(),
+      });
+      setMessages((current) => [...current, message]);
+      void loadList(true);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '发送快捷回复失败', 'error');
     } finally {
       setSending(false);
     }
@@ -220,33 +220,11 @@ const CustomerServicePage: React.FC = () => {
     <div className="space-y-4">
       <Card>
         <CardHeader className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 font-semibold">
-            <Headphones className="h-5 w-5 text-primary" />
-            在线客服
-          </div>
-          <Button
-            variant="flat"
-            isLoading={listLoading}
-            startContent={!listLoading && <RefreshCw className="h-4 w-4" />}
-            onPress={() => {
-              void loadList();
-              void loadStats();
-            }}
-          >
+          <div className="flex items-center gap-2 font-semibold"><Headphones className="h-5 w-5 text-primary" />在线客服</div>
+          <Button variant="flat" isLoading={listLoading} startContent={!listLoading && <RefreshCw className="h-4 w-4" />} onPress={() => void loadList()}>
             刷新
           </Button>
         </CardHeader>
-        <CardBody className="flex flex-wrap gap-3 py-3">
-          {[
-            ['未读会话', stats.unread_total],
-            ['等待回复', stats.awaiting_reply],
-          ].map(([label, value]) => (
-            <div key={String(label)} className="min-w-28 rounded-lg bg-default-50 px-3 py-2">
-              <div className="text-xs text-default-500">{label}</div>
-              <div className="text-xl font-semibold">{value}</div>
-            </div>
-          ))}
-        </CardBody>
       </Card>
       <div className="grid min-h-[680px] gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
         <Card className="min-h-0">
@@ -365,24 +343,16 @@ const CustomerServicePage: React.FC = () => {
                     attachments={attachments}
                     onAttachmentsChange={setAttachments}
                     uploadAttachment={uploadAttachment}
-                    quickReplies={quickReplies}
-                    onPickQuickReply={setReply}
                     extraActions={
                       <Dropdown>
                         <DropdownTrigger>
-                          <Button size="sm" variant="light">
-                            快捷回复
-                          </Button>
+                          <Button size="sm" variant="light">快捷回复</Button>
                         </DropdownTrigger>
-                        <DropdownMenu
-                          aria-label="客服快捷回复"
-                          onAction={(key) => {
-                            const item = quickReplies.find((entry) => entry.id === key);
-                            if (item) setReply(item.content);
-                          }}
-                        >
+                        <DropdownMenu aria-label="客服快捷回复" onAction={(key) => void sendQuickReply(String(key))}>
                           {quickReplies.map((item) => (
-                            <DropdownItem key={item.id}>{item.title}</DropdownItem>
+                            <DropdownItem key={item.id} description={`${item.content || '图片回复'}${item.attachments?.length ? ` · ${item.attachments.length} 张图片` : ''}`}>
+                              {item.title}
+                            </DropdownItem>
                           ))}
                         </DropdownMenu>
                       </Dropdown>

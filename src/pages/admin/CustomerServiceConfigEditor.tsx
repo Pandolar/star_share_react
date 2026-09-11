@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
-import { Alert, Button, Chip, Input, NumberInput, Select, SelectItem, Switch, Textarea } from '@heroui/react';
-import { Plus, Trash2 } from 'lucide-react';
+import React, { useMemo, useRef, useState } from 'react';
+import { Alert, Button, Chip, Image, Input, NumberInput, Select, SelectItem, Switch, Textarea } from '@heroui/react';
+import { ImagePlus, Plus, Trash2 } from 'lucide-react';
+import adminApiService from '../../services/adminApi';
 
 interface Props {
   value: string;
@@ -46,7 +47,7 @@ const DEFAULT_CONFIG: JsonRecord = {
     auto_reply_enabled: false,
     auto_reply_message: '已收到您的消息，客服会尽快回复。',
   },
-  quick_replies: [{ id: 'greet', title: '问候', content: '您好，很高兴为您服务，请描述您遇到的问题。', enabled: true }],
+  quick_replies: [{ id: 'greet', title: '问候', content: '您好，很高兴为您服务，请描述您遇到的问题。', attachments: [], enabled: true }],
   attachments: {
     enabled: true,
     max_count_per_message: 6,
@@ -110,7 +111,7 @@ const normalizeConfig = (source: unknown): JsonRecord => {
       : defaults.categories,
     welcome,
     quick_replies: Array.isArray(raw.quick_replies)
-      ? raw.quick_replies.map((item) => mergeRecord({ id: '', title: '', content: '', enabled: true }, item))
+      ? raw.quick_replies.map((item) => mergeRecord({ id: '', title: '', content: '', attachments: [], enabled: true }, item))
       : defaults.quick_replies,
     attachments,
     limits: mergeRecord(record(defaults.limits), raw.limits),
@@ -121,6 +122,9 @@ const normalizeConfig = (source: unknown): JsonRecord => {
 
 export const CustomerServiceConfigEditor: React.FC<Props> = ({ value, onChange, disabled }) => {
   const [extensionInputs, setExtensionInputs] = useState<Partial<Record<AttachmentKind, string>>>({});
+  const quickReplyImageInput = useRef<HTMLInputElement>(null);
+  const [quickReplyImageIndex, setQuickReplyImageIndex] = useState<number | null>(null);
+  const [quickReplyImageUploading, setQuickReplyImageUploading] = useState(false);
   const parsed = useMemo(() => {
     try {
       return { config: normalizeConfig(JSON.parse(value || '{}')), error: '' };
@@ -138,6 +142,34 @@ export const CustomerServiceConfigEditor: React.FC<Props> = ({ value, onChange, 
     emit({
       quick_replies: (config.quick_replies as JsonRecord[]).map((item, current) => (current === index ? { ...item, ...patch } : item)),
     });
+  const fileData = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error('读取图片失败'));
+      reader.readAsDataURL(file);
+    });
+  const uploadQuickReplyImages = async (files: FileList | null) => {
+    if (quickReplyImageIndex === null || !files?.length) return;
+    const reply = (config.quick_replies as JsonRecord[])[quickReplyImageIndex];
+    const existing = Array.isArray(reply.attachments) ? reply.attachments.map(record) : [];
+    if (existing.length + files.length > 4) return;
+    setQuickReplyImageUploading(true);
+    try {
+      const uploaded = [];
+      for (const file of Array.from(files)) {
+        uploaded.push(await adminApiService.uploadCsQuickReplyImage({
+          data_base64: await fileData(file),
+          filename: file.name,
+          mime_type: file.type,
+        }));
+      }
+      updateReply(quickReplyImageIndex, { attachments: [...existing, ...uploaded.map(({ id, name, mime_type }) => ({ id, name, mime_type }))] });
+    } finally {
+      setQuickReplyImageUploading(false);
+      setQuickReplyImageIndex(null);
+    }
+  };
   const attachmentTypes = record(section('attachments').types);
   const updateType = (kind: AttachmentKind, patch: JsonRecord) =>
     patchSection('attachments', { types: { ...attachmentTypes, [kind]: { ...record(attachmentTypes[kind]), ...patch } } });
@@ -445,45 +477,54 @@ export const CustomerServiceConfigEditor: React.FC<Props> = ({ value, onChange, 
             variant="flat"
             startContent={<Plus className="h-4 w-4" />}
             onPress={() =>
-              emit({ quick_replies: [...(config.quick_replies as JsonRecord[]), { id: '', title: '', content: '', enabled: true }] })
+              emit({ quick_replies: [...(config.quick_replies as JsonRecord[]), { id: '', title: '', content: '', attachments: [], enabled: true }] })
             }
             isDisabled={disabled}
           >
             新增快捷回复
           </Button>
         </div>
+        <input
+          ref={quickReplyImageInput}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          multiple
+          className="hidden"
+          onChange={(event) => {
+            void uploadQuickReplyImages(event.target.files);
+            event.target.value = '';
+          }}
+        />
         {(config.quick_replies as JsonRecord[]).map((reply, index) => (
-          <div
-            key={`${String(reply.id)}-${index}`}
-            className="grid gap-3 rounded-medium border border-divider p-4 md:grid-cols-[1fr_1fr_2fr_auto_auto]"
-          >
-            <Input label="ID" value={String(reply.id)} onValueChange={(id) => updateReply(index, { id })} isDisabled={disabled} />
-            <Input
-              label="标题"
-              value={String(reply.title)}
-              onValueChange={(title) => updateReply(index, { title })}
-              isDisabled={disabled}
-            />
-            <Textarea
-              label="内容"
-              value={String(reply.content)}
-              onValueChange={(content) => updateReply(index, { content })}
-              minRows={1}
-              isDisabled={disabled}
-            />
-            <Switch isSelected={reply.enabled === true} onValueChange={(enabled) => updateReply(index, { enabled })} isDisabled={disabled}>
-              启用
-            </Switch>
-            <Button
-              isIconOnly
-              color="danger"
-              variant="light"
-              aria-label={`删除快捷回复 ${index + 1}`}
-              onPress={() => emit({ quick_replies: (config.quick_replies as JsonRecord[]).filter((_, current) => current !== index) })}
-              isDisabled={disabled}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+          <div key={`${String(reply.id)}-${index}`} className="space-y-3 rounded-medium border border-divider p-4">
+            <div className="grid gap-3 md:grid-cols-[1fr_1fr_2fr_auto_auto]">
+              <Input label="ID" value={String(reply.id)} onValueChange={(id) => updateReply(index, { id })} isDisabled={disabled} />
+              <Input label="标题" value={String(reply.title)} onValueChange={(title) => updateReply(index, { title })} isDisabled={disabled} />
+              <Textarea label="内容" value={String(reply.content)} onValueChange={(content) => updateReply(index, { content })} minRows={1} isDisabled={disabled} />
+              <Switch isSelected={reply.enabled === true} onValueChange={(enabled) => updateReply(index, { enabled })} isDisabled={disabled}>
+                启用
+              </Switch>
+              <Button isIconOnly color="danger" variant="light" aria-label={`删除快捷回复 ${index + 1}`} onPress={() => emit({ quick_replies: (config.quick_replies as JsonRecord[]).filter((_, current) => current !== index) })} isDisabled={disabled}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {(Array.isArray(reply.attachments) ? reply.attachments : []).map((item, attachmentIndex) => {
+                const attachment = record(item);
+                return (
+                  <div key={String(attachment.id)} className="relative overflow-hidden rounded-lg border border-divider">
+                    <Image src={adminApiService.csAttachmentUrl(String(attachment.id))} alt={`快捷回复图片${attachmentIndex + 1}`} className="h-20 w-20 object-cover" />
+                    <Button isIconOnly size="sm" color="danger" className="absolute right-1 top-1 h-6 min-w-6" aria-label={`删除快捷回复图片 ${attachmentIndex + 1}`} onPress={() => updateReply(index, { attachments: (reply.attachments as unknown[]).filter((_, current) => current !== attachmentIndex) })}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                );
+              })}
+              <Button size="sm" variant="flat" isLoading={quickReplyImageUploading && quickReplyImageIndex === index} isDisabled={disabled || (Array.isArray(reply.attachments) && reply.attachments.length >= 4)} startContent={<ImagePlus className="h-4 w-4" />} onPress={() => { setQuickReplyImageIndex(index); window.setTimeout(() => quickReplyImageInput.current?.click(), 0); }}>
+                添加图片
+              </Button>
+            </div>
+            <p className="text-xs text-default-400">最多 4 张，可仅图片或图文混合；图片独立存储，不占用配置 JSON。</p>
           </div>
         ))}
       </section>

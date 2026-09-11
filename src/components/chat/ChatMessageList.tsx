@@ -106,7 +106,7 @@ export default function ChatMessageList({
   const bottomRef = useRef<HTMLDivElement>(null);
   const [previewUrl, setPreviewUrl] = useState('');
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    bottomRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
   }, [messages.length]);
   if (loading)
     return (
@@ -145,8 +145,11 @@ export default function ChatMessageList({
                   className={`rounded-2xl px-3 py-2 text-sm ${mine ? 'bg-primary text-primary-foreground' : 'bg-default-100 text-default-800'}`}
                 >
                   {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
-                  {message.attachments?.map((attachment) => (
-                    <AttachmentView key={attachment.id} attachment={attachment} scope={scope} onPreview={setPreviewUrl} />
+                  {message.attachments?.map((attachment, attachmentIndex) => (
+                    <div key={attachment.id}>
+                      {attachment.kind === 'image' && <p className="mb-1 text-xs opacity-70">图片{attachmentIndex + 1}</p>}
+                      <AttachmentView attachment={attachment} scope={scope} onPreview={setPreviewUrl} />
+                    </div>
                   ))}
                 </div>
                 <Tooltip content={new Date(message.created_at).toLocaleString()}>

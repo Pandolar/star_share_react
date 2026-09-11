@@ -77,7 +77,8 @@ export default function ChatComposer({
     setUploading(true);
     try {
       const uploaded: ChatAttachment[] = [];
-      for (const file of selected) {
+      for (let index = 0; index < selected.length; index += 1) {
+        const file = selected[index];
         const kind = kindFor(file, attachmentConfig);
         if (!kind) {
           toast.error(`不支持的文件类型：${file.name}`);
@@ -92,7 +93,10 @@ export default function ChatComposer({
           kind === 'image' && type.compress && type.max_edge && type.quality && type.max_compressed_mb
             ? await compressImageFile(file, { max_edge: type.max_edge, quality: type.quality, max_compressed_mb: type.max_compressed_mb })
             : file;
-        uploaded.push(await uploadAttachment(prepared));
+        const uploadFile = kind === 'image'
+          ? new File([prepared], `图片${attachments.length + uploaded.length + 1}.${prepared.name.split('.').pop() || 'webp'}`, { type: prepared.type })
+          : prepared;
+        uploaded.push(await uploadAttachment(uploadFile));
       }
       if (uploaded.length) onAttachmentsChange([...attachments, ...uploaded]);
     } catch (error) {
@@ -122,9 +126,9 @@ export default function ChatComposer({
       {disabled && disabledHint && <Alert color="warning" title={disabledHint} className="mb-2" />}
       {attachments.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-2">
-          {attachments.map((attachment) => (
+          {attachments.map((attachment, index) => (
             <Chip key={attachment.id} onClose={() => onAttachmentsChange(attachments.filter((item) => item.id !== attachment.id))}>
-              {attachment.name}
+              {attachment.kind === 'image' ? `图片${index + 1}` : attachment.name}
             </Chip>
           ))}
         </div>
@@ -134,12 +138,13 @@ export default function ChatComposer({
         value={value}
         onValueChange={onValueChange}
         placeholder={placeholder}
-        minRows={1}
-        maxRows={6}
+        minRows={3}
+        maxRows={10}
         maxLength={maxLength}
         isDisabled={disabled}
         onKeyDown={(event) => {
-          if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+          if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+            if (event.ctrlKey || event.metaKey || event.shiftKey) return;
             event.preventDefault();
             send();
           }
@@ -148,6 +153,7 @@ export default function ChatComposer({
           if (event.clipboardData.files.length) void uploadFiles(event.clipboardData.files);
         }}
       />
+      <p className="mt-1 text-right text-[11px] text-default-400">Enter 发送 · Ctrl/⌘/Shift + Enter 换行</p>
       <div className="mt-2 flex items-center gap-2">
         <input
           ref={inputRef}

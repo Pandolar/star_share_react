@@ -663,6 +663,11 @@ class AdminApiService {
         return response.data.data;
     }
 
+    async uploadCsQuickReplyImage(data: { data_base64: string; filename: string; mime_type: string }): Promise<ChatAttachment> {
+        const response = await this.api.post('/star/cs_attachment', { ...data, quick_reply_asset: true });
+        return response.data.data;
+    }
+
     csAttachmentUrl(id: string): string {
         const baseUrl = process.env.REACT_APP_API_BASE_URL || '';
         return `${baseUrl}/star/cs_attachment/${encodeURIComponent(id)}`;

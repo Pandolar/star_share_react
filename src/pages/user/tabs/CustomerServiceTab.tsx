@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Button, Skeleton } from '@heroui/react';
-import { Headphones } from 'lucide-react';
+import { Headphones, Plus } from 'lucide-react';
 import { customerServiceApi } from '../../../services/userApi';
 import { useCustomerService } from '../../../contexts/CustomerServiceContext';
 import ChatComposer from '../../../components/chat/ChatComposer';
@@ -44,7 +44,7 @@ export default function CustomerServiceTab(): React.ReactElement {
     try {
       const next = await customerServiceApi.getConversations();
       setConversations(next);
-      setSelected((current) => next.find((item) => item.id === current?.id) || next[0] || null);
+      setSelected((current) => next.find((item) => item.id === current?.id) || current || next[0] || null);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '获取会话失败');
     }
@@ -54,7 +54,7 @@ export default function CustomerServiceTab(): React.ReactElement {
     setLoadingMessages(!params.after_id);
     try {
       const response = await customerServiceApi.getMessages({ conversation_id: conversationId, limit: 30, after_id: params.after_id, before_id: params.before_id });
-      setSelected(response.conversation);
+      setSelected((current) => (current?.id === conversationId ? response.conversation : current));
       setMessages((previous) =>
         params.after_id
           ? [...previous, ...response.messages.filter((item) => !previous.some((known) => known.id === item.id))]
@@ -63,7 +63,7 @@ export default function CustomerServiceTab(): React.ReactElement {
             : response.messages
       );
       setHasMore(response.has_more);
-      return response.messages;
+      return response;
     } catch (error) {
       if (!params.silent) toast.error(error instanceof Error ? error.message : '获取消息失败');
       throw error;
@@ -81,36 +81,40 @@ export default function CustomerServiceTab(): React.ReactElement {
   useEffect(() => {
     if (!selectedId) return;
     void loadMessages(selectedId).catch(() => {});
-    void customerServiceApi.markRead(selectedId).then(() => window.dispatchEvent(new Event('csRead'))).catch(() => {});
   }, [selectedId]);
   useEffect(() => {
     if (!selectedId || config?.provider !== 'builtin') return;
     const conversationId = selectedId;
     let cancelled = false;
-    let timeout = 0;
-    let delay = 3000;
+    let timeout: number | undefined;
+    let delay = 15_000;
+    const schedule = () => {
+      if (!cancelled && !document.hidden) timeout = window.setTimeout(tick, delay);
+    };
     const tick = async () => {
-      if (!cancelled && !document.hidden) {
-        try {
-          const incoming = await loadMessages(conversationId, { after_id: lastMessageId.current ?? undefined, silent: true });
-          if (incoming.length) {
-            await customerServiceApi.markRead(conversationId);
-            window.dispatchEvent(new Event('csRead'));
-          }
-          delay = 3000;
-        } catch {
-          delay = Math.min(delay * 2, 12000);
+      if (cancelled || document.hidden) return;
+      try {
+        const response = await loadMessages(conversationId, { after_id: lastMessageId.current ?? undefined, silent: true });
+        const incomingAdminMessages = response.messages.filter((message) => message.role === 'admin');
+        if (incomingAdminMessages.length) {
+          setConversations((previous) => previous.map((item) => (item.id === conversationId ? response.conversation : item)));
+          await customerServiceApi.markRead(conversationId);
+          window.dispatchEvent(new Event('csRead'));
         }
+        delay = 15_000;
+      } catch {
+        delay = Math.min(delay * 2, 60_000);
       }
-      if (!cancelled) timeout = window.setTimeout(tick, delay);
+      schedule();
     };
     const onVisible = () => {
       if (!document.hidden) {
         window.clearTimeout(timeout);
+        delay = 15_000;
         void tick();
       }
     };
-    timeout = window.setTimeout(tick, delay);
+    schedule();
     document.addEventListener('visibilitychange', onVisible);
     return () => {
       cancelled = true;
@@ -121,6 +125,37 @@ export default function CustomerServiceTab(): React.ReactElement {
 
   const uploadAttachment = async (file: File) =>
     customerServiceApi.uploadAttachment({ data_base64: await fileData(file), filename: file.name, mime_type: file.type, conversation_id: selected?.id });
+
+  const updateConversationAfterSend = (conversation: ChatConversation, message: ChatMessage) => {
+    const next = {
+      ...conversation,
+      last_message_at: message.created_at,
+      last_message_preview: message.content || '附件消息',
+      last_message_role: message.role,
+    };
+    setSelected((current) => (current?.id === next.id ? next : current));
+    setConversations((previous) => [next, ...previous.filter((item) => item.id !== next.id)]);
+  };
+
+  const startNewConversation = () => {
+    lastMessageId.current = null;
+    setSelected(null);
+    setMessages([]);
+    setHasMore(false);
+    setComposerValue('');
+    setAttachments([]);
+    setMobileChat(true);
+  };
+
+  const openConversation = (conversation: ChatConversation) => {
+    if (conversation.id !== selected?.id) {
+      lastMessageId.current = null;
+      setMessages([]);
+      setHasMore(false);
+      setSelected(conversation);
+    }
+    setMobileChat(true);
+  };
 
   const send = async () => {
     if (!composerValue.trim() && !attachments.length) return;
@@ -134,6 +169,7 @@ export default function CustomerServiceTab(): React.ReactElement {
           client_msg_id: newClientMessageId(),
         });
         setMessages((previous) => [...previous, message]);
+        updateConversationAfterSend(selected, message);
       } else {
         const conversation = await customerServiceApi.createConversation({
           content: composerValue,
@@ -141,13 +177,13 @@ export default function CustomerServiceTab(): React.ReactElement {
           client_msg_id: newClientMessageId(),
           client_context: { page: window.location.pathname, user_agent: navigator.userAgent },
         });
-        await loadConversations();
+        setConversations((previous) => [conversation, ...previous.filter((item) => item.id !== conversation.id)]);
         setSelected(conversation);
+        setMessages(conversation.messages || []);
         setMobileChat(true);
       }
       setComposerValue('');
       setAttachments([]);
-      void loadConversations();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '发送失败');
     } finally {
@@ -161,7 +197,12 @@ export default function CustomerServiceTab(): React.ReactElement {
   return (
     <div className="flex h-[min(70vh,720px)] min-h-[520px] overflow-hidden rounded-xl border border-default-200 bg-content1">
       <aside className={`${mobileChat ? 'hidden md:flex' : 'flex'} w-full shrink-0 flex-col border-r border-default-200 md:w-60`}>
-        <div className="border-b border-default-200 p-3 font-semibold">我的咨询</div>
+        <div className="flex items-center gap-2 border-b border-default-200 p-3">
+          <span className="flex-1 font-semibold">我的咨询</span>
+          <Button aria-label="新建对话" size="sm" variant="light" startContent={<Plus size={16} />} onPress={startNewConversation}>
+            新建对话
+          </Button>
+        </div>
         <div className="flex-1 overflow-y-auto">
           {conversations.map((conversation) => (
             <Button
@@ -169,14 +210,11 @@ export default function CustomerServiceTab(): React.ReactElement {
               fullWidth
               variant="light"
               className={`h-auto justify-start rounded-none border-b border-default-100 px-3 py-2.5 text-left ${selected?.id === conversation.id ? 'bg-primary/10' : ''}`}
-              onPress={() => {
-                setSelected(conversation);
-                setMobileChat(true);
-              }}
+              onPress={() => openConversation(conversation)}
             >
               <div className="w-full min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{conversation.last_message_preview || '附件消息'}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{conversation.subject || '在线咨询'}</span>
                   {conversation.unread > 0 && <span className="flex h-2 w-2 shrink-0 rounded-full bg-danger" aria-label={`${conversation.unread} 条未读`} />}
                   <span className="shrink-0 text-xs text-default-400">{relativeTime(conversation.last_message_at)}</span>
                 </div>

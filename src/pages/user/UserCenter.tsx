@@ -83,12 +83,6 @@ const ALL_TAB_CONFIGS: TabConfig[] = [
     component: OrderHistoryTab
   },
   {
-    key: 'support',
-    label: '在线客服',
-    icon: <Headphones size={20} />,
-    component: CustomerServiceTab
-  },
-  {
     key: 'activity',
     label: '限时活动',
     icon: <Sparkles size={20} />,
@@ -99,6 +93,12 @@ const ALL_TAB_CONFIGS: TabConfig[] = [
     label: '邀请好友',
     icon: <MessageCircle size={20} />,
     component: InviteTab
+  },
+  {
+    key: 'support',
+    label: '在线客服',
+    icon: <Headphones size={20} />,
+    component: CustomerServiceTab
   },
   {
     key: 'about',
