@@ -137,7 +137,7 @@ export default function ChatComposer({
       <Textarea
         value={value}
         onValueChange={onValueChange}
-        placeholder={placeholder}
+        placeholder={`${placeholder}（Enter 发送，Ctrl/⌘/Shift + Enter 换行）`}
         minRows={3}
         maxRows={10}
         maxLength={maxLength}
@@ -153,7 +153,6 @@ export default function ChatComposer({
           if (event.clipboardData.files.length) void uploadFiles(event.clipboardData.files);
         }}
       />
-      <p className="mt-1 text-right text-[11px] text-default-400">Enter 发送 · Ctrl/⌘/Shift + Enter 换行</p>
       <div className="mt-2 flex items-center gap-2">
         <input
           ref={inputRef}
