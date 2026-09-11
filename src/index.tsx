@@ -5,8 +5,10 @@ import './styles/globals.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { stripRecoveryParam } from './utils/assetRecovery';
+import { enableChunkCacheBypass } from './utils/chunkCacheBypass';
 
-// 自愈重载会带一次性时间戳参数绕过缓存，进入应用后立即清理，保持地址栏干净
+// 自愈重载会带一次性时间戳参数绕过缓存；异步 chunk 也复用该参数
+enableChunkCacheBypass();
 stripRecoveryParam();
 
 const root = ReactDOM.createRoot(
