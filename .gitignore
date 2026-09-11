@@ -28,3 +28,7 @@ tests/
 **/__tests__/
 **/*.test.*
 **/*.spec.*
+
+# Production release credentials and local overrides
+.env.release
+release.env
