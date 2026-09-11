@@ -604,7 +604,7 @@ export const customerServiceApi = {
         if (response.code !== 20000) throw new Error(response.msg || '获取会话失败');
         return response.data as ChatConversation[];
     },
-    createConversation: async (payload: { category_id: string; subject: string; content: string; attachment_ids: string[]; client_msg_id?: string; client_context?: Record<string, unknown> }): Promise<ChatConversation> => {
+    createConversation: async (payload: { category_id?: string; subject?: string; content: string; attachment_ids: string[]; client_msg_id?: string; client_context?: Record<string, unknown> }): Promise<ChatConversation> => {
         const response = await createUserRequest(getUserApiUrl('/u/cs_conversations'), { method: 'POST', body: JSON.stringify(payload) });
         if (response.code !== 20000) throw new Error(response.msg || '创建会话失败');
         return response.data as ChatConversation;

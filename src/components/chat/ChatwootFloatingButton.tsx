@@ -46,28 +46,17 @@ export const ChatwootFloatingButton: React.FC<ChatwootFloatingButtonProps> = ({
           isIconOnly
           disableRipple
           onPress={() => toggleChatwoot(isOpen ? 'close' : 'open')}
-          className={`relative h-14 w-14 min-w-14 rounded-full shadow-lg transition-all duration-300 ease-in-out hover:scale-110 active:scale-95 ${isOpen ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-600 hover:bg-blue-700'}`}
+          className={`relative h-12 w-12 min-w-12 rounded-xl border border-white/20 text-white shadow-md transition-colors duration-200 ${isOpen ? 'bg-default-800 hover:bg-default-700' : 'bg-primary hover:bg-primary-600'}`}
           aria-label={isOpen ? '关闭客服' : '打开客服'}
           title={isOpen ? '关闭客服' : '联系客服'}
         >
-          <div className="absolute inset-0 flex items-center justify-center text-white">
-            {isOpen ? <X size={24} strokeWidth={2.5} /> : <MessageCircle size={24} strokeWidth={2.5} />}
-          </div>
+          {isOpen ? <X size={21} strokeWidth={2.25} /> : <MessageCircle size={22} strokeWidth={2.25} />}
           {!isOpen && unreadCount > 0 && (
-            <div className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full border-2 border-white bg-red-500 px-1.5 text-xs font-bold text-white">
+            <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-background bg-danger px-1 text-[10px] font-bold leading-none text-danger-foreground">
               {unreadCount > 99 ? '99+' : unreadCount}
-            </div>
+            </span>
           )}
-          {!isOpen && <div className="absolute inset-0 animate-ping rounded-full bg-blue-600 opacity-75" />}
         </Button>
-        {!isOpen && (
-          <div className="pointer-events-none absolute bottom-full right-0 mb-2 opacity-0 transition-opacity duration-200 hover:opacity-100">
-            <div className="whitespace-nowrap rounded-lg bg-default-900 px-3 py-1.5 text-sm text-white shadow-lg">
-              需要帮助？联系客服
-              <div className="absolute right-4 top-full h-0 w-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-default-900" />
-            </div>
-          </div>
-        )}
       </div>
     </>
   );

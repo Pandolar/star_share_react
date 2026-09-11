@@ -66,8 +66,8 @@ export default function CustomerServiceEntry({ mode }: { mode: 'user' | 'guest' 
 
   return (
     <>
-      <div className={`fixed bottom-6 ${isLeft ? 'left-6' : 'right-6'} z-50 flex items-center gap-3`}>
-        <div className="pointer-events-none rounded-lg bg-default-900 px-3 py-1.5 text-sm text-white shadow-lg">
+      <div className={`fixed bottom-5 ${isLeft ? 'left-5' : 'right-5'} z-50 flex items-center gap-2.5`}>
+        <div className="pointer-events-none rounded-xl border border-default-200 bg-content1 px-3 py-2 text-sm font-medium text-default-700 shadow-sm">
           {builtin.entry.floating_bubble}
         </div>
         <Badge
@@ -76,8 +76,15 @@ export default function CustomerServiceEntry({ mode }: { mode: 'user' | 'guest' 
           isInvisible={mode !== 'user' || !builtin.badge.enabled || !builtin.badge.show_on_floating || unread <= 0}
           shape="circle"
         >
-          <Button isIconOnly aria-label="联系客服" title="联系客服" onPress={handleClick}>
-            <MessageCircle size={24} strokeWidth={2.5} />
+          <Button
+            isIconOnly
+            disableRipple
+            aria-label="联系客服"
+            title="联系客服"
+            onPress={handleClick}
+            className="h-12 w-12 min-w-12 rounded-xl border border-white/20 bg-primary text-white shadow-md transition-colors hover:bg-primary-600"
+          >
+            <MessageCircle size={22} strokeWidth={2.25} />
           </Button>
         </Badge>
       </div>

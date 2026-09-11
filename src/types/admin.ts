@@ -825,12 +825,26 @@ export interface UpdateWorkOrderRequest {
     admin_remark?: string;
 }
 
-export interface AdminCsUserSummary {
-    id: number;
+export interface AdminCsUserProfile {
     username: string | null;
     email: string | null;
+    tel: string | null;
     status: number;
     created_at: string | null;
+}
+
+export interface AdminCsBillingSummary {
+    billing_profile: { title: string } | null;
+    current_package: { name: string; category: string; level: string; status: string; remaining_duration: number | null; activated_at: string | null } | null;
+    paid_orders: number;
+    paid_amount: number;
+    last_paid_at: string | null;
+}
+
+export interface AdminCsUserSummary {
+    id: number;
+    profile: AdminCsUserProfile;
+    billing: AdminCsBillingSummary;
 }
 
 export interface AdminCsConversation extends ChatConversation {

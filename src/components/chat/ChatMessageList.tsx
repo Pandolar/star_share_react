@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Avatar, Button, Card, Image, Modal, ModalBody, ModalContent, ModalHeader, ScrollShadow, Spinner, Tooltip } from '@heroui/react';
 import { Download, FileText } from 'lucide-react';
 import type { ChatAttachment, ChatMessage } from './types';
@@ -23,6 +23,11 @@ const relativeTime = (value: string): string => {
   return `${Math.floor(seconds / 86400)} 天前`;
 };
 
+const senderName = (message: ChatMessage): string => {
+  if (message.role === 'admin') return 'Nice';
+  return message.sender_name || '用户';
+};
+
 const AttachmentView: React.FC<{ attachment: ChatAttachment; scope: 'user' | 'admin'; onPreview: (url: string) => void }> = ({
   attachment,
   scope,
@@ -30,14 +35,14 @@ const AttachmentView: React.FC<{ attachment: ChatAttachment; scope: 'user' | 'ad
 }) => {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       return URL.createObjectURL(await fetchAttachmentBlob(buildAttachmentUrl(scope, attachment.id)));
     } finally {
       setLoading(false);
     }
-  };
+  }, [attachment.id, scope]);
   useEffect(() => {
     if (attachment.kind !== 'image') return;
     let cancelled = false;
@@ -49,7 +54,7 @@ const AttachmentView: React.FC<{ attachment: ChatAttachment; scope: 'user' | 'ad
     return () => {
       cancelled = true;
     };
-  }, [attachment.id]);
+  }, [attachment.kind, load]);
   if (attachment.kind === 'image')
     return url ? (
       <Image src={url} alt={attachment.name} className="max-h-40 max-w-[220px] cursor-zoom-in" onClick={() => onPreview(url)} />
@@ -132,10 +137,10 @@ export default function ChatMessageList({
           return (
             <div key={message.id} className={`flex gap-2 ${mine ? 'justify-end' : 'justify-start'} ${grouped ? '-mt-1' : 'mt-3'}`}>
               {!mine && (
-                <Avatar size="sm" name={message.role === 'admin' ? '客' : message.sender_name.slice(0, 1)} className="flex-shrink-0" />
+                <Avatar size="sm" name={senderName(message).slice(0, 1)} className="flex-shrink-0" />
               )}
               <div className={`max-w-[80%] ${mine ? 'items-end' : 'items-start'} flex flex-col`}>
-                {!grouped && <span className="mb-1 text-xs text-default-500">{message.sender_name}</span>}
+                {!grouped && <span className="mb-1 text-xs text-default-500">{senderName(message)}</span>}
                 <div
                   className={`rounded-2xl px-3 py-2 text-sm ${mine ? 'bg-primary text-primary-foreground' : 'bg-default-100 text-default-800'}`}
                 >
@@ -149,7 +154,7 @@ export default function ChatMessageList({
                 </Tooltip>
               </div>
               {mine && (
-                <Avatar size="sm" name={message.role === 'admin' ? '客' : message.sender_name.slice(0, 1)} className="flex-shrink-0" />
+                <Avatar size="sm" name={senderName(message).slice(0, 1)} className="flex-shrink-0" />
               )}
             </div>
           );

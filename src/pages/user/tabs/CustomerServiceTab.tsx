@@ -1,22 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  Button,
-  Chip,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownTrigger,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Select,
-  SelectItem,
-  Skeleton,
-} from '@heroui/react';
-import { Headphones, MessageSquarePlus, MoreVertical } from 'lucide-react';
+import { Button, Skeleton } from '@heroui/react';
+import { Headphones } from 'lucide-react';
 import { customerServiceApi } from '../../../services/userApi';
 import { useCustomerService } from '../../../contexts/CustomerServiceContext';
 import ChatComposer from '../../../components/chat/ChatComposer';
@@ -25,19 +9,15 @@ import type { ChatAttachment, ChatConversation, ChatMessage } from '../../../com
 import { newClientMessageId } from '../../../components/chat/types';
 import { toast } from '../../../utils/toast';
 
-const statusLabel: Record<ChatConversation['status'], string> = {
-  open: '待处理',
-  processing: '处理中',
-  resolved: '已解决',
-  closed: '已关闭',
+const relativeTime = (value: string | null) => {
+  if (!value) return '';
+  const date = new Date(value);
+  const today = new Date();
+  return date.toDateString() === today.toDateString()
+    ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : date.toLocaleDateString([], { month: 'numeric', day: 'numeric' });
 };
-const statusColor: Record<ChatConversation['status'], 'warning' | 'primary' | 'success' | 'default'> = {
-  open: 'warning',
-  processing: 'primary',
-  resolved: 'success',
-  closed: 'default',
-};
-const relativeTime = (value: string | null) => (value ? new Date(value).toLocaleDateString() : '');
+
 const fileData = (file: File) =>
   new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -55,33 +35,25 @@ export default function CustomerServiceTab(): React.ReactElement {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [composerValue, setComposerValue] = useState('');
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
-  const [newAttachments, setNewAttachments] = useState<ChatAttachment[]>([]);
-  const [newOpen, setNewOpen] = useState(false);
-  const [categoryId, setCategoryId] = useState('');
-  const [subject, setSubject] = useState('');
-  const [initialContent, setInitialContent] = useState('');
-  const [creating, setCreating] = useState(false);
+  const [sending, setSending] = useState(false);
   const [mobileChat, setMobileChat] = useState(false);
   const lastMessageId = useRef<number | null>(null);
+  const selectedId = selected?.id;
 
   const loadConversations = async () => {
     try {
       const next = await customerServiceApi.getConversations();
       setConversations(next);
-      setSelected((current) => next.find((item) => item.id === current?.id) || current);
+      setSelected((current) => next.find((item) => item.id === current?.id) || next[0] || null);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '获取会话失败');
     }
   };
+
   const loadMessages = async (conversationId: number, params: { after_id?: number; before_id?: number; silent?: boolean } = {}) => {
     setLoadingMessages(!params.after_id);
     try {
-      const response = await customerServiceApi.getMessages({
-        conversation_id: conversationId,
-        limit: 30,
-        after_id: params.after_id,
-        before_id: params.before_id,
-      });
+      const response = await customerServiceApi.getMessages({ conversation_id: conversationId, limit: 30, after_id: params.after_id, before_id: params.before_id });
       setSelected(response.conversation);
       setMessages((previous) =>
         params.after_id
@@ -99,6 +71,7 @@ export default function CustomerServiceTab(): React.ReactElement {
       setLoadingMessages(false);
     }
   };
+
   useEffect(() => {
     lastMessageId.current = messages.length ? messages[messages.length - 1].id : null;
   }, [messages]);
@@ -106,16 +79,13 @@ export default function CustomerServiceTab(): React.ReactElement {
     if (config?.provider === 'builtin') void loadConversations();
   }, [config?.provider]);
   useEffect(() => {
-    if (!selected) return;
-    void loadMessages(selected.id).catch(() => {});
-    void customerServiceApi
-      .markRead(selected.id)
-      .then(() => window.dispatchEvent(new Event('csRead')))
-      .catch(() => {});
-  }, [selected?.id]);
+    if (!selectedId) return;
+    void loadMessages(selectedId).catch(() => {});
+    void customerServiceApi.markRead(selectedId).then(() => window.dispatchEvent(new Event('csRead'))).catch(() => {});
+  }, [selectedId]);
   useEffect(() => {
-    if (!selected || config?.provider !== 'builtin') return;
-    const conversationId = selected.id;
+    if (!selectedId || config?.provider !== 'builtin') return;
+    const conversationId = selectedId;
     let cancelled = false;
     let timeout = 0;
     let delay = 3000;
@@ -147,230 +117,116 @@ export default function CustomerServiceTab(): React.ReactElement {
       window.clearTimeout(timeout);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [selected?.id, config?.provider]);
+  }, [selectedId, config?.provider]);
+
   const uploadAttachment = async (file: File) =>
-    customerServiceApi.uploadAttachment({
-      data_base64: await fileData(file),
-      filename: file.name,
-      mime_type: file.type,
-      conversation_id: selected?.id,
-    });
+    customerServiceApi.uploadAttachment({ data_base64: await fileData(file), filename: file.name, mime_type: file.type, conversation_id: selected?.id });
+
   const send = async () => {
-    if (!selected) return;
+    if (!composerValue.trim() && !attachments.length) return;
+    setSending(true);
     try {
-      const message = await customerServiceApi.sendMessage({
-        conversation_id: selected.id,
-        content: composerValue,
-        attachment_ids: attachments.map((item) => item.id),
-        client_msg_id: newClientMessageId(),
-      });
-      setMessages((previous) => [...previous, message]);
+      if (selected) {
+        const message = await customerServiceApi.sendMessage({
+          conversation_id: selected.id,
+          content: composerValue,
+          attachment_ids: attachments.map((item) => item.id),
+          client_msg_id: newClientMessageId(),
+        });
+        setMessages((previous) => [...previous, message]);
+      } else {
+        const conversation = await customerServiceApi.createConversation({
+          content: composerValue,
+          attachment_ids: attachments.map((attachment) => attachment.id),
+          client_msg_id: newClientMessageId(),
+          client_context: { page: window.location.pathname, user_agent: navigator.userAgent },
+        });
+        await loadConversations();
+        setSelected(conversation);
+        setMobileChat(true);
+      }
       setComposerValue('');
       setAttachments([]);
       void loadConversations();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '发送失败');
-    }
-  };
-  const createConversation = async () => {
-    if (!categoryId || (!initialContent.trim() && !newAttachments.length)) {
-      toast.warning('请选择分类并填写问题描述');
-      return;
-    }
-    setCreating(true);
-    try {
-      const conversation = await customerServiceApi.createConversation({
-        category_id: categoryId,
-        subject,
-        content: initialContent,
-        attachment_ids: newAttachments.map((attachment) => attachment.id),
-        client_msg_id: newClientMessageId(),
-        client_context: { page: window.location.pathname, user_agent: navigator.userAgent },
-      });
-      setNewOpen(false);
-      setCategoryId('');
-      setSubject('');
-      setInitialContent('');
-      setNewAttachments([]);
-      await loadConversations();
-      setSelected(conversation);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : '创建会话失败');
     } finally {
-      setCreating(false);
+      setSending(false);
     }
   };
-  const changeStatus = async (action: 'close' | 'reopen') => {
-    if (!selected) return;
-    try {
-      const next = await customerServiceApi.updateConversation({ id: selected.id, action });
-      setSelected(next);
-      setConversations((previous) => previous.map((item) => (item.id === next.id ? next : item)));
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : '操作失败');
-    }
-  };
-  const content = (
+
+  if (loading) return <Skeleton className="h-96 rounded-xl" />;
+  if (!config || config.provider !== 'builtin') return <div className="py-12 text-center text-default-500">在线客服暂未开启</div>;
+
+  return (
     <div className="flex h-[min(70vh,720px)] min-h-[520px] overflow-hidden rounded-xl border border-default-200 bg-content1">
-      <aside className={`${mobileChat ? 'hidden md:flex' : 'flex'} w-full shrink-0 flex-col border-r border-default-200 md:w-80`}>
-        <div className="flex items-center justify-between border-b border-default-200 p-3">
-          <span className="font-semibold">我的会话</span>
-          <Button isIconOnly size="sm" color="primary" aria-label="新建会话" onPress={() => setNewOpen(true)}>
-            <MessageSquarePlus size={18} />
-          </Button>
-        </div>
+      <aside className={`${mobileChat ? 'hidden md:flex' : 'flex'} w-full shrink-0 flex-col border-r border-default-200 md:w-60`}>
+        <div className="border-b border-default-200 p-3 font-semibold">我的咨询</div>
         <div className="flex-1 overflow-y-auto">
           {conversations.map((conversation) => (
             <Button
               key={conversation.id}
               fullWidth
               variant="light"
-              className={`h-auto justify-start rounded-none border-b border-default-100 p-3 text-left ${selected?.id === conversation.id ? 'bg-primary/10' : ''}`}
+              className={`h-auto justify-start rounded-none border-b border-default-100 px-3 py-2.5 text-left ${selected?.id === conversation.id ? 'bg-primary/10' : ''}`}
               onPress={() => {
                 setSelected(conversation);
                 setMobileChat(true);
               }}
             >
-              <div className="w-full">
+              <div className="w-full min-w-0">
                 <div className="flex items-center gap-2">
-                  <Chip size="sm" variant="flat">
-                    {conversation.category_name}
-                  </Chip>
-                  <span className="truncate font-medium">{conversation.subject}</span>
-                  {conversation.unread > 0 && (
-                    <Chip size="sm" color="danger" variant="flat">
-                      {conversation.unread}
-                    </Chip>
-                  )}
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{conversation.last_message_preview || '附件消息'}</span>
+                  {conversation.unread > 0 && <span className="flex h-2 w-2 shrink-0 rounded-full bg-danger" aria-label={`${conversation.unread} 条未读`} />}
+                  <span className="shrink-0 text-xs text-default-400">{relativeTime(conversation.last_message_at)}</span>
                 </div>
-                <p className="mt-1 truncate text-xs text-default-500">{conversation.last_message_preview}</p>
-                <div className="mt-1 flex justify-between">
-                  <Chip size="sm" color={statusColor[conversation.status]} variant="flat">
-                    {statusLabel[conversation.status]}
-                  </Chip>
-                  <span className="text-xs text-default-400">{relativeTime(conversation.last_message_at)}</span>
-                </div>
+                <p className="mt-1 truncate text-xs text-default-500">{conversation.last_message_preview || '暂无消息'}</p>
               </div>
             </Button>
           ))}
-          {!conversations.length && <p className="p-6 text-center text-sm text-default-500">暂无会话</p>}
+          {!conversations.length && <p className="p-6 text-center text-sm text-default-500">暂无咨询记录</p>}
         </div>
       </aside>
-      <section className={`${mobileChat ? 'flex' : 'hidden md:flex'} min-w-0 flex-1 flex-col`}>
+      <section className={`${mobileChat || !conversations.length ? 'flex' : 'hidden md:flex'} min-w-0 flex-1 flex-col`}>
+        <div className="flex items-center border-b border-default-200 p-3">
+          {selected && <Button className="md:hidden" size="sm" variant="light" onPress={() => setMobileChat(false)}>返回</Button>}
+          <p className="flex-1 font-semibold">在线客服</p>
+        </div>
         {selected ? (
-          <>
-            <div className="flex items-center gap-2 border-b border-default-200 p-3">
-              <Button className="md:hidden" size="sm" variant="light" onPress={() => setMobileChat(false)}>
-                返回
-              </Button>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold">{selected.subject}</p>
-                <Chip size="sm" color={statusColor[selected.status]} variant="flat">
-                  {statusLabel[selected.status]}
-                </Chip>
-              </div>
-              <Dropdown>
-                <DropdownTrigger>
-                  <Button isIconOnly size="sm" variant="light" aria-label="会话操作">
-                    <MoreVertical size={18} />
-                  </Button>
-                </DropdownTrigger>
-                <DropdownMenu aria-label="会话操作">
-                  {selected.status === 'closed' ? (
-                    <DropdownItem key="reopen" isDisabled={!config?.limits.allow_reopen} onPress={() => void changeStatus('reopen')}>
-                      重新开启
-                    </DropdownItem>
-                  ) : (
-                    <DropdownItem key="close" onPress={() => void changeStatus('close')}>
-                      结束会话
-                    </DropdownItem>
-                  )}
-                </DropdownMenu>
-              </Dropdown>
-            </div>
-            <div className="min-h-0 flex-1 p-3">
-              <ChatMessageList
-                messages={messages}
-                selfRole="user"
-                loading={loadingMessages}
-                hasMore={hasMore}
-                onLoadMore={() => {
-                  if (messages[0]) void loadMessages(selected.id, { before_id: messages[0].id }).catch(() => {});
-                }}
-                scope="user"
-              />
-            </div>
-            <div className="border-t border-default-200 p-3">
-              <ChatComposer
-                value={composerValue}
-                onValueChange={setComposerValue}
-                onSend={() => void send()}
-                disabled={selected.status === 'closed'}
-                disabledHint="会话已关闭，请重新开启后发送"
-                maxLength={config!.limits.max_content_length}
-                attachmentConfig={config!.attachments}
-                attachments={attachments}
-                onAttachmentsChange={setAttachments}
-                uploadAttachment={uploadAttachment}
-              />
-            </div>
-          </>
+          <div className="min-h-0 flex-1 p-3">
+            <ChatMessageList
+              messages={messages}
+              selfRole="user"
+              loading={loadingMessages}
+              hasMore={hasMore}
+              onLoadMore={() => {
+                if (messages[0]) void loadMessages(selected.id, { before_id: messages[0].id }).catch(() => {});
+              }}
+              scope="user"
+            />
+          </div>
         ) : (
-          <div className="flex flex-1 flex-col items-center justify-center text-center">
+          <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
             <Headphones size={36} className="mb-3 text-primary" />
-            <p className="font-semibold">{config?.welcome.title}</p>
-            <p className="mt-2 max-w-sm text-sm text-default-500">{config?.welcome.message}</p>
-            <Button color="primary" className="mt-4" onPress={() => setNewOpen(true)}>
-              新建会话
-            </Button>
+            <p className="font-semibold">{config.welcome.title}</p>
+            <p className="mt-2 max-w-sm text-sm text-default-500">{config.welcome.message}</p>
           </div>
         )}
+        <div className="border-t border-default-200 p-3">
+          <ChatComposer
+            value={composerValue}
+            onValueChange={setComposerValue}
+            onSend={() => void send()}
+            sending={sending}
+            placeholder={selected ? '输入消息…' : '输入消息，开始咨询…'}
+            maxLength={config.limits.max_content_length}
+            attachmentConfig={config.attachments}
+            attachments={attachments}
+            onAttachmentsChange={setAttachments}
+            uploadAttachment={uploadAttachment}
+          />
+        </div>
       </section>
     </div>
-  );
-  if (loading) return <Skeleton className="h-96 rounded-xl" />;
-  if (!config || config.provider !== 'builtin') return <div className="py-12 text-center text-default-500">在线客服暂未开启</div>;
-  return (
-    <>
-      <div>{content}</div>
-      <Modal isOpen={newOpen} onOpenChange={setNewOpen}>
-        <ModalContent>
-          <ModalHeader>新建咨询</ModalHeader>
-          <ModalBody>
-            <Select
-              label="咨询分类"
-              selectedKeys={categoryId ? [categoryId] : []}
-              onSelectionChange={(keys) => setCategoryId(Array.from(keys)[0] as string)}
-            >
-              {config.categories.map((category) => (
-                <SelectItem key={category.id}>{category.name}</SelectItem>
-              ))}
-            </Select>
-            <Input label="主题" value={subject} onValueChange={setSubject} maxLength={config.limits.max_subject_length} />
-            <ChatComposer
-              value={initialContent}
-              onValueChange={setInitialContent}
-              onSend={() => {}}
-              sending={creating}
-              placeholder="问题描述"
-              maxLength={config.limits.max_content_length}
-              attachmentConfig={config.attachments}
-              attachments={newAttachments}
-              onAttachmentsChange={setNewAttachments}
-              uploadAttachment={uploadAttachment}
-              footerNote="可添加附件后提交咨询"
-            />
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="light" onPress={() => setNewOpen(false)}>
-              取消
-            </Button>
-            <Button color="primary" isLoading={creating} onPress={() => void createConversation()}>
-              提交
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-    </>
   );
 }
