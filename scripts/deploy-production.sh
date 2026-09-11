@@ -58,34 +58,6 @@ while IFS= read -r -d '' asset; do
 done < <(find "$shared_assets" -type f -mtime "+$ASSET_RETENTION_DAYS" -print0)
 find "$shared_assets" -type d -empty -delete
 
-# Purge document URLs only. Hashed /starstatic resources are immutable and are
-# intentionally never purged. TCCLI credentials remain in /root/.tccli or the
-# root-readable environment file, never in Git.
-if [[ -n "${EO_ZONE_ID:-}" && -n "${EO_DOMAINS:-}" ]] && command -v tccli >/dev/null 2>&1; then
-  read -r -a domains <<<"$EO_DOMAINS"
-  document_paths=(
-    / /index.html /login /register /forgot-password /user-center
-    /handle_callback /sharespeedtest /jumpns /ios /customer-service
-    /distributor /distributor/login /distributor/dashboard
-    /star-admin /star-admin/login /star-admin/overview /star-admin/users
-    /star-admin/packages /star-admin/user-packages /star-admin/teams
-    /star-admin/orders /star-admin/invoices /star-admin/cdk
-    /star-admin/distributors /star-admin/audit-logs /star-admin/articles
-    /star-admin/settings /star-admin/invites /star-admin/feedback
-    /star-admin/customer-service /sw.js /offline.html /manifest.json
-  )
-  targets=()
-  for domain in "${domains[@]}"; do
-    domain="${domain%/}"
-    [[ "$domain" =~ ^https?:// ]] || domain="https://$domain"
-    for path in "${document_paths[@]}"; do
-      targets+=("$domain$path")
-    done
-  done
-  targets_json="$(printf '%s\n' "${targets[@]}" | python3 -c 'import json,sys; print(json.dumps([line.strip() for line in sys.stdin if line.strip()]))')"
-  tccli teo CreatePurgeTask --ZoneId "$EO_ZONE_ID" --Type purge_url --Targets "$targets_json"
-else
-  printf 'EdgeOne purge skipped: set EO_ZONE_ID/EO_DOMAINS and install/configure tccli.\n'
-fi
 
 printf 'Deployed %s; retained assets for at least %s days.\n' "$release_id" "$ASSET_RETENTION_DAYS"
+printf 'No EdgeOne purge submitted: hashed static URLs are immutable.\n'
