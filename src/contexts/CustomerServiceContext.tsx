@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { ChatConfig, ChatProvider } from '../components/chat/types';
-import { customerServiceApi } from '../services/userApi';
+import userApi, { customerServiceApi } from '../services/userApi';
 
 interface CustomerServiceContextValue {
   /**
@@ -12,6 +12,11 @@ interface CustomerServiceContextValue {
   provider: ChatProvider | null;
   loading: boolean;
   refresh: () => Promise<void>;
+  unread: number;
+  unreadByConversation: Record<string, number>;
+  refreshUnread: (force?: boolean) => Promise<void>;
+  markConversationRead: (conversationId: number) => Promise<void>;
+  applyConversationRead: (conversationId: number, totalUnread: number) => void;
 }
 
 interface ResolvedConfig {
@@ -61,6 +66,65 @@ const loadConfig = (): Promise<ResolvedConfig> => {
 export function CustomerServiceProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   const [resolved, setResolved] = useState<ResolvedConfig>(cachedConfig ?? EMPTY_CONFIG);
   const [loading, setLoading] = useState(cachedConfig === undefined);
+  const [unread, setUnread] = useState(0);
+  const [unreadByConversation, setUnreadByConversation] = useState<Record<string, number>>({});
+  const unreadRequest = useRef<Promise<void> | null>(null);
+  const unreadUpdatedAt = useRef(0);
+  const activeRefreshAt = useRef(0);
+  const unreadByConversationRef = useRef<Record<string, number>>({});
+  const refreshUnread = useCallback(async (force = false): Promise<void> => {
+    if (resolved.config?.provider !== 'builtin' || !userApi.auth.isAuthenticated() || document.hidden || !document.hasFocus()) return;
+    if (!force && Date.now() - unreadUpdatedAt.current < 15_000) return;
+    if (unreadRequest.current) return unreadRequest.current;
+    const request = customerServiceApi.getUnread()
+      .then((result) => {
+        setUnread(Number(result.unread) || 0);
+        const next = result.by_conversation || {};
+        unreadByConversationRef.current = next;
+        setUnreadByConversation(next);
+        unreadUpdatedAt.current = Date.now();
+      })
+      .catch(() => {})
+      .finally(() => {
+        unreadRequest.current = null;
+      });
+    unreadRequest.current = request;
+    return request;
+  }, [resolved.config?.provider]);
+  const applyConversationRead = useCallback((conversationId: number, totalUnread: number): void => {
+    const key = String(conversationId);
+    const next = { ...unreadByConversationRef.current };
+    delete next[key];
+    unreadByConversationRef.current = next;
+    setUnreadByConversation(next);
+    setUnread(Math.max(0, Number(totalUnread) || 0));
+    unreadUpdatedAt.current = Date.now();
+  }, []);
+
+  const markConversationRead = useCallback(async (conversationId: number): Promise<void> => {
+    const key = String(conversationId);
+    const cleared = Number(unreadByConversationRef.current[key]) || 0;
+    if (cleared) {
+      const optimistic = { ...unreadByConversationRef.current };
+      delete optimistic[key];
+      unreadByConversationRef.current = optimistic;
+      setUnreadByConversation(optimistic);
+      setUnread((current) => Math.max(0, current - cleared));
+    }
+    try {
+      const result = await customerServiceApi.markRead(conversationId);
+      setUnread(Number(result.unread) || 0);
+      const next = { ...unreadByConversationRef.current };
+      delete next[key];
+      unreadByConversationRef.current = next;
+      setUnreadByConversation(next);
+      unreadUpdatedAt.current = Date.now();
+    } catch (error) {
+      unreadUpdatedAt.current = 0;
+      void refreshUnread(true);
+      throw error;
+    }
+  }, [refreshUnread]);
 
   const refresh = async (): Promise<void> => {
     setLoading(true);
@@ -78,9 +142,44 @@ export function CustomerServiceProvider({ children }: { children: React.ReactNod
     });
   }, []);
 
+  useEffect(() => {
+    if (resolved.config?.provider !== 'builtin') {
+      setUnread(0);
+      unreadByConversationRef.current = {};
+      setUnreadByConversation({});
+      return;
+    }
+    const refreshActivePage = () => {
+      if (document.hidden || !document.hasFocus()) return;
+      const now = Date.now();
+      if (now - activeRefreshAt.current < 250) return;
+      activeRefreshAt.current = now;
+      void refreshUnread(true);
+    };
+    refreshActivePage();
+    const timer = window.setInterval(() => void refreshUnread(), 30_000);
+    document.addEventListener('visibilitychange', refreshActivePage);
+    window.addEventListener('focus', refreshActivePage);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refreshActivePage);
+      window.removeEventListener('focus', refreshActivePage);
+    };
+  }, [refreshUnread, resolved.config?.provider]);
+
   return (
     <CustomerServiceContext.Provider
-      value={{ config: resolved.config, provider: resolved.provider, loading, refresh }}
+      value={{
+        config: resolved.config,
+        provider: resolved.provider,
+        loading,
+        refresh,
+        unread,
+        unreadByConversation,
+        refreshUnread,
+        markConversationRead,
+        applyConversationRead,
+      }}
     >
       {children}
     </CustomerServiceContext.Provider>

@@ -38,7 +38,7 @@ import { LogoutConfirmModal } from '../../components/LogoutConfirmModal';
 import CustomerServiceEntry from '../../components/chat/CustomerServiceEntry';
 import { clearAuthCookies, getCookie } from '../../utils/cookies';
 import { useAuthCheck } from '../../hooks/useAuthCheck';
-import { announcementApi, customerServiceApi, feedbackApi, teamUserApi, userInfoApi } from '../../services/userApi';
+import { announcementApi, feedbackApi, teamUserApi, userInfoApi } from '../../services/userApi';
 import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
 import { useCustomerService } from '../../contexts/CustomerServiceContext';
 
@@ -139,8 +139,7 @@ const UserCenter: React.FC = () => {
   const [activityVisible, setActivityVisible] = useState(false);
   const [activityTitle, setActivityTitle] = useState('限时活动');
   const navigate = useNavigate();
-  const [supportUnreadCount, setSupportUnreadCount] = useState(0);
-  const { config: customerServiceConfig, loading: customerServiceLoading } = useCustomerService();
+  const { config: customerServiceConfig, loading: customerServiceLoading, unread: supportUnreadCount } = useCustomerService();
 
   // White-label mode hides self-site business tabs.
   const { isWhiteLabel, loading: wlLoading } = useWhiteLabel();
@@ -268,33 +267,6 @@ const UserCenter: React.FC = () => {
     return () => window.removeEventListener('feedbackRead', clearInviteBadge);
   }, []);
 
-  useEffect(() => {
-    if (!isAuthenticated || customerServiceConfig?.provider !== 'builtin' || !customerServiceConfig.badge?.enabled) {
-      setSupportUnreadCount(0);
-      return;
-    }
-    let cancelled = false;
-    const refreshUnread = () => {
-      if (document.hidden || !document.hasFocus()) return;
-      customerServiceApi.getUnread().then((data) => { if (!cancelled) setSupportUnreadCount(Number(data.unread || 0)); }).catch(() => {});
-    };
-    refreshUnread();
-    const interval = window.setInterval(refreshUnread, 30000);
-    document.addEventListener('visibilitychange', refreshUnread);
-    window.addEventListener('focus', refreshUnread);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-      document.removeEventListener('visibilitychange', refreshUnread);
-      window.removeEventListener('focus', refreshUnread);
-    };
-  }, [customerServiceConfig, isAuthenticated]);
-
-  useEffect(() => {
-    const clearSupportBadge = () => setSupportUnreadCount(0);
-    window.addEventListener('csRead', clearSupportBadge);
-    return () => window.removeEventListener('csRead', clearSupportBadge);
-  }, []);
 
   // 一键跳转到绑定邮箱（profile tab，并通过 query 携带 openEdit=email 由 ProfileTab 自动打开弹窗）
   const goBindEmail = () => {

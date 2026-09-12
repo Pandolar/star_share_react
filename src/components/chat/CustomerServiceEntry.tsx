@@ -1,52 +1,18 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Badge, Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@heroui/react';
 import { MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCustomerService } from '../../contexts/CustomerServiceContext';
-import { customerServiceApi } from '../../services/userApi';
 import { ChatwootFloatingButton } from './ChatwootFloatingButton';
 
 export default function CustomerServiceEntry({ mode }: { mode: 'user' | 'guest' }): React.ReactElement | null {
-  const { config, provider } = useCustomerService();
+  const { config, provider, unread } = useCustomerService();
   const navigate = useNavigate();
   const [guestHintOpen, setGuestHintOpen] = useState(false);
-  const [unread, setUnread] = useState(0);
 
   // 只有内置客服才会上报未读数：Chatwoot 入口与关闭状态都走不到这里。
   const builtin = config?.provider === 'builtin' ? config : null;
 
-  const refreshUnread = useCallback(async () => {
-    try {
-      const result = await customerServiceApi.getUnread();
-      setUnread(Number(result.unread) || 0);
-    } catch {
-      setUnread(0);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (mode !== 'user' || !builtin?.badge.enabled || !builtin.badge.show_on_floating) {
-      return;
-    }
-
-    const handleRead = () => setUnread(0);
-    const refreshActivePage = () => {
-      if (!document.hidden && document.hasFocus()) void refreshUnread();
-    };
-
-    refreshActivePage();
-    const timer = window.setInterval(refreshActivePage, 60_000);
-    window.addEventListener('csRead', handleRead);
-    document.addEventListener('visibilitychange', refreshActivePage);
-    window.addEventListener('focus', refreshActivePage);
-
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener('csRead', handleRead);
-      document.removeEventListener('visibilitychange', refreshActivePage);
-      window.removeEventListener('focus', refreshActivePage);
-    };
-  }, [builtin, mode, refreshUnread]);
 
   // Chatwoot 是独立入口，不随内置客服开关消失；配置缺失时同样安全返回。
   if (provider === 'chatwoot') return <ChatwootFloatingButton mode={mode} />;

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Skeleton } from '@heroui/react';
 import { Headphones, Plus } from 'lucide-react';
 import { customerServiceApi } from '../../../services/userApi';
@@ -27,7 +27,7 @@ const fileData = (file: File) =>
   });
 
 export default function CustomerServiceTab(): React.ReactElement {
-  const { config, loading } = useCustomerService();
+  const { config, loading, unreadByConversation, applyConversationRead, markConversationRead, refreshUnread } = useCustomerService();
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [selected, setSelected] = useState<ChatConversation | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -40,21 +40,26 @@ export default function CustomerServiceTab(): React.ReactElement {
   const lastMessageId = useRef<number | null>(null);
   const selectedId = selected?.id;
 
-  const loadConversations = async () => {
+  const loadConversations = useCallback(async () => {
     try {
-      const next = await customerServiceApi.getConversations();
+      const next = (await customerServiceApi.getConversations()).map((conversation) => ({
+        ...conversation,
+        unread: Number(unreadByConversation[String(conversation.id)] ?? conversation.unread) || 0,
+      }));
       setConversations(next);
       setSelected((current) => next.find((item) => item.id === current?.id) || current || next[0] || null);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '获取会话失败');
     }
-  };
+  }, [unreadByConversation]);
 
-  const loadMessages = async (conversationId: number, params: { after_id?: number; before_id?: number; silent?: boolean } = {}) => {
-    setLoadingMessages(!params.after_id);
+  const loadMessages = useCallback(async (conversationId: number, params: { after_id?: number; before_id?: number; silent?: boolean } = {}) => {
+    setLoadingMessages(!params.after_id && !params.silent);
     try {
       const response = await customerServiceApi.getMessages({ conversation_id: conversationId, limit: 30, after_id: params.after_id, before_id: params.before_id });
-      setSelected((current) => (current?.id === conversationId ? response.conversation : current));
+      const readConversation = { ...response.conversation, unread: 0, user_unread: 0 };
+      setSelected((current) => (current?.id === conversationId ? readConversation : current));
+      setConversations((current) => current.map((item) => item.id === conversationId ? { ...item, ...readConversation } : item));
       setMessages((previous) =>
         params.after_id
           ? [...previous, ...response.messages.filter((item) => !previous.some((known) => known.id === item.id))]
@@ -63,25 +68,26 @@ export default function CustomerServiceTab(): React.ReactElement {
             : response.messages
       );
       setHasMore(response.has_more);
-      return response;
+      if (!params.before_id) applyConversationRead(conversationId, response.unread);
+      return { ...response, conversation: readConversation };
     } catch (error) {
       if (!params.silent) toast.error(error instanceof Error ? error.message : '获取消息失败');
       throw error;
     } finally {
       setLoadingMessages(false);
     }
-  };
+  }, [applyConversationRead]);
 
   useEffect(() => {
     lastMessageId.current = messages.length ? messages[messages.length - 1].id : null;
   }, [messages]);
   useEffect(() => {
     if (config?.provider === 'builtin') void loadConversations();
-  }, [config?.provider]);
+  }, [config?.provider, loadConversations]);
   useEffect(() => {
     if (!selectedId) return;
     void loadMessages(selectedId).catch(() => {});
-  }, [selectedId]);
+  }, [loadMessages, selectedId]);
   useEffect(() => {
     if (!selectedId || config?.provider !== 'builtin') return;
     const conversationId = selectedId;
@@ -98,9 +104,9 @@ export default function CustomerServiceTab(): React.ReactElement {
         const response = await loadMessages(conversationId, { after_id: lastMessageId.current ?? undefined, silent: true });
         const incomingAdminMessages = response.messages.filter((message) => message.role === 'admin');
         if (incomingAdminMessages.length) {
-          setConversations((previous) => previous.map((item) => (item.id === conversationId ? response.conversation : item)));
-          await customerServiceApi.markRead(conversationId);
-          window.dispatchEvent(new Event('csRead'));
+          setConversations((previous) => previous.map((item) => (
+            item.id === conversationId ? { ...response.conversation, unread: 0, user_unread: 0 } : item
+          )));
         }
         delay = 15_000;
       } catch {
@@ -112,6 +118,7 @@ export default function CustomerServiceTab(): React.ReactElement {
       window.clearTimeout(timeout);
       if (!cancelled && !document.hidden && document.hasFocus()) {
         delay = 15_000;
+        void refreshUnread(true);
         void loadConversations();
         void tick();
       }
@@ -130,7 +137,7 @@ export default function CustomerServiceTab(): React.ReactElement {
       window.removeEventListener('focus', refreshActivePage);
       window.removeEventListener('blur', pause);
     };
-  }, [selectedId, config?.provider]);
+  }, [config?.provider, loadConversations, loadMessages, refreshUnread, selectedId]);
 
   const uploadAttachment = async (file: File) =>
     customerServiceApi.uploadAttachment({ data_base64: await fileData(file), filename: file.name, mime_type: file.type, conversation_id: selected?.id });
@@ -157,11 +164,16 @@ export default function CustomerServiceTab(): React.ReactElement {
   };
 
   const openConversation = (conversation: ChatConversation) => {
+    const readConversation = { ...conversation, unread: 0, user_unread: 0 };
+    setConversations((current) => current.map((item) => item.id === conversation.id ? readConversation : item));
     if (conversation.id !== selected?.id) {
       lastMessageId.current = null;
       setMessages([]);
       setHasMore(false);
-      setSelected(conversation);
+      setSelected(readConversation);
+    }
+    if (conversation.unread > 0 || conversation.user_unread > 0 || Number(unreadByConversation[String(conversation.id)]) > 0) {
+      void markConversationRead(conversation.id).catch(() => void refreshUnread(true));
     }
     setMobileChat(true);
   };

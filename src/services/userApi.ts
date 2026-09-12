@@ -614,11 +614,11 @@ export const customerServiceApi = {
         if (response.code !== 20000) throw new Error(response.msg || '更新会话失败');
         return response.data as ChatConversation;
     },
-    getMessages: async (params: { conversation_id: number; after_id?: number; before_id?: number; limit?: number }): Promise<{ conversation: ChatConversation; messages: ChatMessage[]; has_more: boolean }> => {
+    getMessages: async (params: { conversation_id: number; after_id?: number; before_id?: number; limit?: number }): Promise<{ conversation: ChatConversation; messages: ChatMessage[]; has_more: boolean; unread: number }> => {
         const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)])).toString();
         const response = await createUserRequest(getUserApiUrl(`/u/cs_messages?${query}`), { method: 'GET' });
         if (response.code !== 20000) throw new Error(response.msg || '获取消息失败');
-        return response.data as { conversation: ChatConversation; messages: ChatMessage[]; has_more: boolean };
+        return response.data as { conversation: ChatConversation; messages: ChatMessage[]; has_more: boolean; unread: number };
     },
     sendMessage: async (payload: { conversation_id: number; content: string; attachment_ids: string[]; client_msg_id?: string }): Promise<ChatMessage> => {
         const response = await createUserRequest(getUserApiUrl('/u/cs_messages'), { method: 'POST', body: JSON.stringify(payload) });
