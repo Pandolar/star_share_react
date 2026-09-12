@@ -5,13 +5,18 @@ import {
   CardBody,
   CardHeader,
   Input,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
   Pagination,
   Spinner,
   Tab,
   Tabs,
   Tooltip,
 } from '@heroui/react';
-import { ArrowLeft, Headphones, RefreshCw, Search, UserRound } from 'lucide-react';
+import { ArrowLeft, Bell, BellOff, Headphones, RefreshCw, Search, UserRound } from 'lucide-react';
 import adminApiService from '../../services/adminApi';
 import type { AdminCsConversation } from '../../types/admin';
 import type { ChatAttachment, ChatAttachmentConfig, ChatMessage } from '../../components/chat/types';
@@ -63,12 +68,24 @@ const CustomerServicePage: React.FC = () => {
   const [listLoading, setListLoading] = useState(false);
   const [messageLoading, setMessageLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  // 撤回时限来自后台配置的原始 JSON（用户侧 public_config 会剔除 admin 段）。
+  const [recallWindowMinutes, setRecallWindowMinutes] = useState(10);
+  const [recallTarget, setRecallTarget] = useState<ChatMessage | null>(null);
+  const [recalling, setRecalling] = useState(false);
   const [reply, setReply] = useState('');
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [mobileChat, setMobileChat] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>(() => (
+    typeof Notification === 'undefined' ? 'unsupported' : Notification.permission
+  ));
   const listRequestId = useRef(0);
   const lastListRequest = useRef({ key: '', at: 0 });
   const activeRefreshAt = useRef(0);
+  const notifiedMessageAt = useRef(new Map<number, string>());
+  const notificationBaselineReady = useRef(false);
+  const openConversationRef = useRef<((conversation: AdminCsConversation) => void) | null>(null);
+  const notificationPermissionRef = useRef(notificationPermission);
+  notificationPermissionRef.current = notificationPermission;
   const pageSize = 20;
   const loadList = useCallback(
     async (silent = false) => {
@@ -92,6 +109,33 @@ const CustomerServicePage: React.FC = () => {
         const nextRows = result.data;
         setRows(nextRows);
         setTotal(result.total);
+        if (notificationBaselineReady.current && notificationPermissionRef.current === 'granted') {
+          nextRows.forEach((item) => {
+            const lastNotifiedAt = notifiedMessageAt.current.get(item.id);
+            if (
+              item.admin_unread > 0
+              && item.last_message_role === 'user'
+              && item.last_message_at
+              && lastNotifiedAt !== item.last_message_at
+            ) {
+              const displayName = item.user.profile.username || item.user.profile.email || `用户 ${item.user.id}`;
+              const notification = new Notification(`在线客服新消息 · ${displayName}`, {
+                body: item.last_message_preview || '用户发来了一条新消息',
+                icon: '/logo192.png',
+                tag: `cs-conversation-${item.id}`,
+              });
+              notification.onclick = () => {
+                window.focus();
+                notification.close();
+                openConversationRef.current?.(item);
+              };
+            }
+          });
+        }
+        nextRows.forEach((item) => {
+          if (item.last_message_at) notifiedMessageAt.current.set(item.id, item.last_message_at);
+        });
+        notificationBaselineReady.current = true;
         setSelected((current) => {
           if (!current) return null;
           const refreshed = nextRows.find((item) => item.id === current.id);
@@ -132,6 +176,9 @@ const CustomerServicePage: React.FC = () => {
     },
     []
   );
+  openConversationRef.current = (conversation) => {
+    void openConversation(conversation);
+  };
   const refreshMessages = useCallback(async () => {
     if (!selected || !mobileChat || document.hidden || !document.hasFocus()) return;
     try {
@@ -153,11 +200,27 @@ const CustomerServicePage: React.FC = () => {
       /* 下次轮询重试 */
     }
   }, [messages, mobileChat, selected]);
+  const requestBrowserNotificationPermission = async () => {
+    if (typeof Notification === 'undefined') {
+      showToast('当前浏览器不支持系统通知', 'warning');
+      return;
+    }
+    if (Notification.permission === 'denied') {
+      setNotificationPermission('denied');
+      showToast('通知权限已被浏览器拒绝，请在地址栏的网站设置中改为允许', 'warning');
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    setNotificationPermission(permission);
+    if (permission === 'granted') showToast('浏览器通知已开启', 'success');
+    else showToast('浏览器通知未开启', 'warning');
+  };
   useEffect(() => {
     void loadList();
   }, [loadList]);
   useEffect(() => {
     const refreshActivePage = () => {
+      if (typeof Notification !== 'undefined') setNotificationPermission(Notification.permission);
       if (document.hidden || !document.hasFocus()) return;
       const now = Date.now();
       if (now - activeRefreshAt.current < 250) return;
@@ -165,7 +228,7 @@ const CustomerServicePage: React.FC = () => {
       void loadList(true);
       void refreshMessages();
     };
-    const listTimer = window.setInterval(() => void loadList(true), 15_000);
+    const listTimer = window.setInterval(() => void loadList(true), 10_000);
     const messageTimer = window.setInterval(() => void refreshMessages(), 10_000);
     document.addEventListener('visibilitychange', refreshActivePage);
     window.addEventListener('focus', refreshActivePage);
@@ -177,7 +240,7 @@ const CustomerServicePage: React.FC = () => {
     };
   }, [loadList, refreshMessages]);
   useEffect(() => {
-    const loadQuickReplies = async () => {
+    const loadAdminConfig = async () => {
       try {
         const response = await adminApiService.getConfigs();
         const raw = response.code === 20000 ? response.data.find((item) => item.key === 'CUSTOMER_SERVICE_CONFIG')?.value : null;
@@ -189,11 +252,13 @@ const CustomerServicePage: React.FC = () => {
                 item.enabled !== false && typeof item.id === 'string' && typeof item.title === 'string' && typeof item.content === 'string'
             ) as Array<{ id: string; title: string; content: string; attachments?: ChatAttachment[] }>
           );
+        const minutes = Number(parsed?.admin?.recall_window_minutes);
+        if (Number.isFinite(minutes) && minutes >= 1 && minutes <= 1440) setRecallWindowMinutes(Math.trunc(minutes));
       } catch {
         /* 不影响会话处理 */
       }
     };
-    void loadQuickReplies();
+    void loadAdminConfig();
   }, []);
   const builtinConfig = config?.provider === 'builtin' ? config : null;
   const attachmentConfig: ChatAttachmentConfig | null = builtinConfig?.attachments ?? null;
@@ -250,6 +315,31 @@ const CustomerServicePage: React.FC = () => {
       setSending(false);
     }
   };
+  const confirmRecall = async () => {
+    if (!recallTarget || !selected) return;
+    setRecalling(true);
+    try {
+      const result = await adminApiService.recallCsMessage({ message_id: recallTarget.id });
+      setMessages((current) => {
+        const next = current.map((item) => (item.id === result.message.id ? result.message : item));
+        return result.event ? [...next, result.event] : next;
+      });
+      const patch = {
+        last_message_at: result.conversation.last_message_at,
+        last_message_preview: result.conversation.last_message_preview,
+        last_message_role: result.conversation.last_message_role,
+      };
+      setSelected((current) => (current && current.id === selected.id ? { ...current, ...patch } : current));
+      setRows((current) => current.map((item) => (item.id === selected.id ? { ...item, ...patch } : item)));
+      setRecallTarget(null);
+      showToast('消息已撤回', 'success');
+      void loadList(true);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '撤回消息失败', 'error');
+    } finally {
+      setRecalling(false);
+    }
+  };
   const uploadAttachment = async (file: File): Promise<ChatAttachment> => {
     if (!selected) throw new Error('请先选择会话');
     return adminApiService.uploadCsAttachment({
@@ -265,9 +355,26 @@ const CustomerServicePage: React.FC = () => {
       <Card>
         <CardHeader className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 font-semibold"><Headphones className="h-5 w-5 text-primary" />在线客服</div>
-          <Button variant="flat" isLoading={listLoading} startContent={!listLoading && <RefreshCw className="h-4 w-4" />} onPress={() => void loadList()}>
-            刷新
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {notificationPermission !== 'granted' && notificationPermission !== 'unsupported' && (
+              <Button
+                color={notificationPermission === 'denied' ? 'warning' : 'primary'}
+                variant="flat"
+                startContent={notificationPermission === 'denied' ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
+                onPress={() => void requestBrowserNotificationPermission()}
+              >
+                {notificationPermission === 'denied' ? '通知权限已拒绝' : '开启浏览器通知'}
+              </Button>
+            )}
+            {notificationPermission === 'granted' && (
+              <Button variant="flat" color="success" startContent={<Bell className="h-4 w-4" />} isDisabled>
+                浏览器通知已开启
+              </Button>
+            )}
+            <Button variant="flat" isLoading={listLoading} startContent={!listLoading && <RefreshCw className="h-4 w-4" />} onPress={() => void loadList()}>
+              刷新
+            </Button>
+          </div>
         </CardHeader>
       </Card>
       <div className="grid h-[calc(100dvh-9rem)] min-h-[360px] max-h-[760px] grid-cols-1 gap-4 overflow-hidden lg:h-[min(72vh,760px)] lg:min-h-[520px] lg:grid-cols-[320px_minmax(0,1fr)]">
@@ -391,7 +498,7 @@ const CustomerServicePage: React.FC = () => {
                     <AttachmentSummary key={attachment.id} attachment={attachment} />
                   ))}
                 <div className="min-h-0 flex-1 overflow-hidden">
-                  <ChatMessageList messages={messages} selfRole="admin" loading={messageLoading} emptyText="暂无消息" scope="admin" />
+                  <ChatMessageList messages={messages} selfRole="admin" loading={messageLoading} emptyText="暂无消息" scope="admin" recallWindowMinutes={recallWindowMinutes} onRecall={setRecallTarget} />
                 </div>
                 {attachmentConfig ? (
                   <ChatComposer
@@ -420,6 +527,35 @@ const CustomerServicePage: React.FC = () => {
           </CardBody>
         </Card>
       </div>
+      <Modal
+        isOpen={Boolean(recallTarget)}
+        onOpenChange={(open) => {
+          if (!open && !recalling) setRecallTarget(null);
+        }}
+        size="md"
+      >
+        <ModalContent>
+          <ModalHeader>撤回消息</ModalHeader>
+          <ModalBody>
+            <p className="text-sm text-default-600">
+              撤回后用户将无法再看到这条消息的内容与附件，会话中会显示“客服撤回了一条消息”。撤回操作会记入审计日志，且不可撤销。
+            </p>
+            {recallTarget?.content && (
+              <div className="rounded-medium bg-default-100 p-3 text-sm text-default-700">
+                <p className="whitespace-pre-wrap break-words">{recallTarget.content}</p>
+              </div>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" isDisabled={recalling} onPress={() => setRecallTarget(null)}>
+              取消
+            </Button>
+            <Button color="danger" isLoading={recalling} onPress={() => void confirmRecall()}>
+              确认撤回
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </div>
   );
 };

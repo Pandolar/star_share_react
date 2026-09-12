@@ -22,7 +22,18 @@ export interface ChatMessage {
   attachments: ChatAttachment[];
   created_at: string;
   client_msg_id: string | null;
+  /** 软撤回：后端不再下发正文与附件，仅保留撤回标记。 */
+  is_recalled?: boolean;
+  recalled_at?: string | null;
+  /** 仅管理端下发，用于审计展示。 */
+  recalled_by?: string | null;
+  /** 撤回事件（content_type='recall'）指向的原消息 ID。 */
+  related_message_id?: number | null;
 }
+
+/** 撤回占位文案：前后端共用同一句，避免用户端与后台显示不一致。 */
+export const CHAT_RECALL_NOTICE = '客服撤回了一条消息';
+export const CHAT_RECALL_CONTENT_TYPE = 'recall';
 
 export interface ChatConversation {
   id: number;

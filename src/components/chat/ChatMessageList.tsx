@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Avatar, Button, Card, Image, Modal, ModalBody, ModalContent, ModalHeader, ScrollShadow, Spinner, Tooltip } from '@heroui/react';
-import { Download, FileText } from 'lucide-react';
+import { Download, FileText, Undo2 } from 'lucide-react';
 import type { ChatAttachment, ChatMessage } from './types';
+import { CHAT_RECALL_CONTENT_TYPE, CHAT_RECALL_NOTICE } from './types';
 import { buildAttachmentUrl, fetchAttachmentBlob, formatBytes } from './attachmentCache';
 
 export interface ChatMessageListProps {
@@ -13,6 +14,9 @@ export interface ChatMessageListProps {
   onLoadMore?: () => void;
   emptyText?: string;
   scope: 'user' | 'admin';
+  /** 撤回时限（分钟）；提供后管理端可对窗口内的自己消息发起撤回。 */
+  recallWindowMinutes?: number;
+  onRecall?: (message: ChatMessage) => void;
 }
 
 const relativeTime = (value: string): string => {
@@ -93,6 +97,10 @@ const AttachmentView: React.FC<{ attachment: ChatAttachment; scope: 'user' | 'ad
   );
 };
 
+/** 撤回时限判定：仅用于隐藏失效按钮，真正的权限与时限由后端校验。 */
+const withinRecallWindow = (createdAt: string, minutes: number): boolean =>
+  Date.now() - new Date(createdAt).getTime() <= minutes * 60_000;
+
 export default function ChatMessageList({
   messages,
   selfRole,
@@ -102,12 +110,25 @@ export default function ChatMessageList({
   onLoadMore,
   emptyText = '暂无消息',
   scope,
+  recallWindowMinutes,
+  onRecall,
 }: ChatMessageListProps): React.ReactElement {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [previewUrl, setPreviewUrl] = useState('');
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
   }, [messages.length]);
+  // 撤回事件是独立消息（增量轮询的唯一感知途径）：按 related_message_id 归并到原消息，
+  // 事件本身不渲染，这样首屏、after_id、before_id 三条路径都得到同一结果。
+  const recallNotices = new Map<number, string>();
+  const visible: ChatMessage[] = [];
+  for (const message of messages) {
+    if (message.content_type === CHAT_RECALL_CONTENT_TYPE) {
+      if (message.related_message_id) recallNotices.set(message.related_message_id, message.content || CHAT_RECALL_NOTICE);
+      continue;
+    }
+    visible.push(message);
+  }
   if (loading)
     return (
       <div className="flex min-h-48 items-center justify-center">
@@ -124,8 +145,9 @@ export default function ChatMessageList({
             </Button>
           </div>
         )}
-        {messages.length === 0 && <p className="py-10 text-center text-sm text-default-500">{emptyText}</p>}
-        {messages.map((message, index) => {
+        {visible.length === 0 && <p className="py-10 text-center text-sm text-default-500">{emptyText}</p>}
+        {visible.map((message, index) => {
+          const recalled = message.is_recalled === true || recallNotices.has(message.id);
           if (message.role === 'system')
             return (
               <p key={message.id} className="py-1 text-center text-xs text-default-400">
@@ -133,7 +155,13 @@ export default function ChatMessageList({
               </p>
             );
           const mine = message.role === selfRole;
-          const grouped = index > 0 && messages[index - 1].role === message.role;
+          const grouped = index > 0 && visible[index - 1].role === message.role;
+          const canRecall =
+            !recalled
+            && mine
+            && Boolean(onRecall)
+            && recallWindowMinutes !== undefined
+            && withinRecallWindow(message.created_at, recallWindowMinutes);
           return (
             <div key={message.id} className={`flex gap-2 ${mine ? 'justify-end' : 'justify-start'} ${grouped ? '-mt-1' : 'mt-3'}`}>
               {!mine && (
@@ -144,17 +172,32 @@ export default function ChatMessageList({
                 <div
                   className={`rounded-2xl px-3 py-2 text-sm ${mine ? 'bg-primary text-primary-foreground' : 'bg-default-100 text-default-800'}`}
                 >
-                  {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
-                  {message.attachments?.map((attachment, attachmentIndex) => (
-                    <div key={attachment.id}>
-                      {attachment.kind === 'image' && <p className="mb-1 text-xs opacity-70">图片{attachmentIndex + 1}</p>}
-                      <AttachmentView attachment={attachment} scope={scope} onPreview={setPreviewUrl} />
-                    </div>
-                  ))}
+                  {recalled ? (
+                    <p className="whitespace-pre-wrap break-words text-xs italic opacity-70">{recallNotices.get(message.id) ?? CHAT_RECALL_NOTICE}</p>
+                  ) : (
+                    <>
+                      {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
+                      {message.attachments?.map((attachment, attachmentIndex) => (
+                        <div key={attachment.id}>
+                          {attachment.kind === 'image' && <p className="mb-1 text-xs opacity-70">图片{attachmentIndex + 1}</p>}
+                          <AttachmentView attachment={attachment} scope={scope} onPreview={setPreviewUrl} />
+                        </div>
+                      ))}
+                    </>
+                  )}
                 </div>
-                <Tooltip content={new Date(message.created_at).toLocaleString()}>
-                  <span className="mt-1 text-xs text-default-400">{relativeTime(message.created_at)}</span>
-                </Tooltip>
+                <div className="mt-1 flex items-center gap-1">
+                  <Tooltip content={new Date(message.created_at).toLocaleString()}>
+                    <span className="text-xs text-default-400">{relativeTime(message.created_at)}</span>
+                  </Tooltip>
+                  {canRecall && (
+                    <Tooltip content={`撤回这条消息（${recallWindowMinutes} 分钟内可撤回）`}>
+                      <Button isIconOnly size="sm" variant="light" aria-label="撤回消息" onPress={() => onRecall?.(message)}>
+                        <Undo2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </Tooltip>
+                  )}
+                </div>
               </div>
               {mine && (
                 <Avatar size="sm" name={senderName(message).slice(0, 1)} className="flex-shrink-0" />

@@ -83,7 +83,7 @@ const DEFAULT_CONFIG: JsonRecord = {
     max_message_page_size: 50,
   },
   badge: { enabled: true, max_display: 99, show_on_floating: true },
-  admin: { notify_enabled: false, notify_bark: false, notify_email: false, notify_email_to: '', default_filter: 'unread', page_size: 20 },
+  admin: { notify_enabled: false, notify_bark: false, notify_email: false, notify_email_to: '', default_filter: 'unread', page_size: 20, recall_window_minutes: 10 },
 };
 
 const record = (value: unknown): JsonRecord => (value && typeof value === 'object' && !Array.isArray(value) ? (value as JsonRecord) : {});
@@ -722,6 +722,11 @@ export const CustomerServiceConfigEditor: React.FC<Props> = ({ value, onChange, 
             <SelectItem key="closed">已关闭</SelectItem>
           </Select>
           {numeric('管理端每页数量', admin.page_size, (page_size) => patchSection('admin', { page_size }), { min: 5, max: 100 })}
+          {numeric('撤回时限（分钟）', admin.recall_window_minutes, (recall_window_minutes) => patchSection('admin', { recall_window_minutes }), {
+            min: 1,
+            max: 1440,
+            description: '客服可撤回自己消息的时间窗口，超出后不可撤回',
+          })}
         </div>
       </section>
     </div>

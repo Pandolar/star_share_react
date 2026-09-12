@@ -61,6 +61,7 @@ import type { ChatAttachment, ChatConversation, ChatMessage } from '../component
 class AdminApiService {
     private api: AxiosInstance;
     private readonly tokenKey: string;
+    private csConversationRequests = new Map<string, Promise<{ data: AdminCsConversation[]; total: number }>>();
 
     constructor() {
         // 读取存储key（默认使用配置中的 key）
@@ -634,8 +635,14 @@ class AdminApiService {
     // ==================== 在线客服 ====================
 
     async getCsConversations(params: { current_page?: number; page_size?: number; filter?: string; category_id?: string; querystring?: string; order_column?: string; order?: 'asc' | 'desc' } = {}): Promise<{ data: AdminCsConversation[]; total: number }> {
-        const response = await this.api.get(`/star/cs_conversations?${this.buildQueryString(params)}`);
-        return { data: response.data.data || [], total: Number(response.data.total) || 0 };
+        const queryString = this.buildQueryString(params);
+        const active = this.csConversationRequests.get(queryString);
+        if (active) return active;
+        const request = this.api.get(`/star/cs_conversations?${queryString}`)
+            .then((response) => ({ data: response.data.data || [], total: Number(response.data.total) || 0 }))
+            .finally(() => this.csConversationRequests.delete(queryString));
+        this.csConversationRequests.set(queryString, request);
+        return request;
     }
 
     async getCsStats(): Promise<AdminCsStats> {
@@ -660,6 +667,18 @@ class AdminApiService {
 
     async sendCsMessage(data: { conversation_id: number; content: string; attachment_ids: string[]; quick_reply_id?: string; client_msg_id?: string }): Promise<ChatMessage> {
         const response = await this.api.post('/star/cs_messages', data);
+        return response.data.data;
+    }
+
+    /**
+     * 撤回客服消息：后端软撤回，返回被撤回消息、撤回事件与刷新后的会话。
+     * 后台接口的业务失败是 HTTP 200 + code!=20000 + data=[]，这里必须转成异常：
+     * 撤回失败是常态（超出时限、已被其他客服撤回、消息不存在），
+     * 直接返回空载荷会让调用方在渲染期解引用 undefined。
+     */
+    async recallCsMessage(data: { message_id: number }): Promise<{ message: ChatMessage; event: ChatMessage | null; conversation: ChatConversation }> {
+        const response = await this.api.post('/star/cs_messages/recall', data);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '撤回消息失败');
         return response.data.data;
     }
 
