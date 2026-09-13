@@ -7,6 +7,7 @@ import {
   recoverStaleAssets,
   reloadDocumentBypassingCache,
 } from '../utils/assetRecovery';
+import { reportClientEvent } from '../services/clientLogger';
 
 interface Props {
   children: ReactNode;
@@ -36,12 +37,17 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    reportClientEvent({
+      event: isStaleAssetError(error) ? 'frontend.chunk_load_failed' : 'frontend.error_boundary',
+      message: error.message,
+      stack: error.stack,
+      component_stack: errorInfo.componentStack || undefined,
+    });
     // 只有「资源版本不一致」才自动恢复；其余运行时错误立即展示终态页面，
     // 既不掩盖真实问题，也不会因为反复 reload 形成死循环。
     if (this.props.autoReload === false) return;
     if (!isStaleAssetError(error)) return;
 
-    console.error('[ErrorBoundary] 资源版本不一致，准备清理缓存后重载', error, errorInfo.componentStack);
     this.setState({ isRecovering: true });
     this.reloadTimer = setTimeout(() => {
       void recoverStaleAssets().then((recovered) => {

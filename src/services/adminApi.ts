@@ -842,6 +842,16 @@ class AdminApiService {
         const response = await this.api.put('/star/distributor/discounts', { level_discounts });
         return response.data;
     }
+    async getRuntimeLogs(params: { file: string; level?: string; lines?: number }): Promise<AdminApiResponse<{ file: string; lines: string[] }>> {
+        const queryString = this.buildQueryString(params);
+        const response = await this.api.get(`/star/runtime_logs?${queryString}`);
+        return response.data;
+    }
+
+    async getRuntimeLogFiles(): Promise<AdminApiResponse<{ files: Array<{ name: string; bytes: number; modified_at: number }> }>> {
+        const response = await this.api.get('/star/runtime_logs/files');
+        return response.data;
+    }
 }
 
 // 创建单例实例

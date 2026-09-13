@@ -6,10 +6,12 @@ import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { stripRecoveryParam } from './utils/assetRecovery';
 import { enableChunkCacheBypass } from './utils/chunkCacheBypass';
+import { installGlobalClientErrorHandlers } from './services/clientLogger';
 
 // 自愈重载会带一次性时间戳参数绕过缓存；异步 chunk 也复用该参数
 enableChunkCacheBypass();
 stripRecoveryParam();
+installGlobalClientErrorHandlers();
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement

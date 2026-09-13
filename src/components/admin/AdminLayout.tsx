@@ -33,6 +33,7 @@ import {
     Gift,
     ReceiptText,
     ScrollText,
+    FileSearch,
     FileText,
     MessageSquare,
     Headphones,
@@ -138,6 +139,12 @@ const AdminLayout: React.FC = () => {
             label: '审计日志',
             icon: <ScrollText className="w-5 h-5" />,
             path: '/star-admin/audit-logs',
+        },
+        {
+            key: 'runtime-logs',
+            label: '运行日志',
+            icon: <FileSearch className="w-5 h-5" />,
+            path: '/star-admin/runtime-logs',
         },
         {
             key: 'settings',
