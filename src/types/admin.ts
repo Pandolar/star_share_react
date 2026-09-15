@@ -335,6 +335,8 @@ export interface UserPackageQueryParams extends CommonQueryParams {
     id?: number;
     user_id?: number;
     package_id?: number;
+    email?: string;
+    order_id?: string;
     created_at?: string;
     status?: 'active' | 'frozen' | 'expired';
     remaining_duration?: number;
@@ -489,6 +491,8 @@ export interface OrderQueryParams extends CommonQueryParams {
     id?: number;
     user_id?: number;
     package_id?: number;
+    email?: string;
+    trade_no?: string;
     order_id?: string;
     status?: 'pending' | 'paid' | 'failed';
     created_at?: string;

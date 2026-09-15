@@ -41,6 +41,7 @@ const LoginPage: React.FC = () => {
   const [bindCountdown, setBindCountdown] = useState(0);
   const [bindLoading, setBindLoading] = useState(false);
   const [bindError, setBindError] = useState('');
+  const [bindEmailError, setBindEmailError] = useState('');
   const [showBindPassword, setShowBindPassword] = useState(false);
   const [showBindPasswordConfirm, setShowBindPasswordConfirm] = useState(false);
   const [showBindEmailCode, setShowBindEmailCode] = useState(false);
@@ -340,9 +341,11 @@ const LoginPage: React.FC = () => {
   const sendBindEmailCode = async () => {
     // 清空之前的错误
     setBindError('');
+    setBindEmailError('');
 
     // 验证邮箱是否为空
     if (!bindEmail.trim()) {
+      setBindEmailError('请输入邮箱地址');
       setBindError('请输入邮箱地址');
       return;
     }
@@ -350,6 +353,7 @@ const LoginPage: React.FC = () => {
     // 验证邮箱格式
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(bindEmail.trim())) {
+      setBindEmailError('邮箱格式不正确，请检查后重新输入');
       setBindError('邮箱格式不正确，请检查后重新输入');
       return;
     }
@@ -363,10 +367,18 @@ const LoginPage: React.FC = () => {
         setBindCountdown(60);
         toast.success('验证码已发送至您的邮箱，请查收');
       } else {
-        setBindError(response.msg || '发送验证码失败，请稍后重试');
+        const message = response.msg || '发送验证码失败，请稍后重试';
+        setBindEmailCodeSent(false);
+        setBindEmailError(message);
+        setBindError(message);
+        toast.error(message);
       }
     } catch (err) {
-      setBindError(err instanceof Error ? err.message : '发送验证码失败，请检查网络后重试');
+      const message = err instanceof Error ? err.message : '发送验证码失败，请检查网络后重试';
+      setBindEmailCodeSent(false);
+      setBindEmailError(message);
+      setBindError(message);
+      toast.error(message);
     } finally {
       setBindEmailCodeSending(false);
     }
@@ -374,17 +386,19 @@ const LoginPage: React.FC = () => {
 
   // 提交邮箱绑定
   const handleSubmitEmailBind = async () => {
-    // 清空之前的错误
     setBindError('');
+    setBindEmailError('');
 
     // 验证邮箱
     if (!bindEmail.trim()) {
+      setBindEmailError('请输入邮箱地址');
       setBindError('请输入邮箱地址');
       return;
     }
 
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(bindEmail.trim())) {
+      setBindEmailError('邮箱格式不正确，请检查后重新输入');
       setBindError('邮箱格式不正确，请检查后重新输入');
       return;
     }
@@ -797,11 +811,16 @@ const LoginPage: React.FC = () => {
                 <div className="flex gap-2">
                   <Input
                     value={bindEmail}
-                    onChange={(e) => setBindEmail(e.target.value)}
+                    onChange={(e) => {
+                      setBindEmail(e.target.value);
+                      setBindEmailError('');
+                      setBindError('');
+                      setBindEmailCodeSent(false);
+                    }}
                     placeholder="请输入您的邮箱地址"
                     variant="bordered"
-                    isInvalid={!!bindError && !bindEmail.trim()}
-                    className="flex-1"
+                    isInvalid={!!bindEmailError}
+                    errorMessage={bindEmailError || undefined}
                     type="email"
                   />
                   <button
@@ -930,7 +949,6 @@ const LoginPage: React.FC = () => {
                   }
                 />
               </div>
-
               {/* 联系邮箱提示 */}
               <div className="p-3 bg-default/10 border border-default/20 rounded-lg">
                 <p className="text-xs text-default-600 text-center">
@@ -939,8 +957,8 @@ const LoginPage: React.FC = () => {
               </div>
             </div>
 
-            {/* 错误提示 */}
-            {bindError && (
+            {/* 非邮箱输入类错误仍固定显示在弹窗底部。 */}
+            {bindError && !bindEmailError && (
               <div className="p-3 bg-danger/10 border border-danger/20 rounded-lg mt-4">
                 <div className="flex items-start gap-2">
                   <AlertCircle size={16} className="text-danger flex-shrink-0 mt-0.5" />

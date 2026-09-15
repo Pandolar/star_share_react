@@ -3,7 +3,7 @@
  * 显示用户的历史订单记录
  */
 import React, { useState, useEffect, useMemo } from 'react';
-import { Card, CardBody, Button, Chip, Input, Spinner, Select, SelectItem, Pagination } from '@heroui/react';
+import { Card, CardBody, Button, Chip, Input, Spinner, Select, SelectItem, Pagination, Tooltip } from '@heroui/react';
 import { motion } from 'framer-motion';
 import {
   FileText,
@@ -24,6 +24,11 @@ interface OrderInfo {
   package_name: string;
   status: string;
   created_at: string;
+  is_cdk: boolean;
+  invoice_requested: boolean;
+  invoice_status?: 'not_requested' | 'awaiting_payment' | 'pending_issue' | 'processing' | 'issued' | 'cancelled' | 'payment_exception' | null;
+  payable_amount?: number | null;
+  paid_amount?: number | null;
 }
 
 type OrderStatus = 'all' | 'completed' | 'pending' | 'failed';
@@ -98,6 +103,25 @@ export const OrderHistoryTab: React.FC = () => {
     }
   };
 
+const INVOICE_STATUS: Record<string, { label: string; color: 'default' | 'warning' | 'primary' | 'success' | 'danger' }> = {
+  awaiting_payment: { label: '开票待支付', color: 'warning' },
+  pending_issue: { label: '待开票', color: 'warning' },
+  processing: { label: '开票中', color: 'primary' },
+  issued: { label: '已开票', color: 'success' },
+  cancelled: { label: '开票已取消', color: 'default' },
+  payment_exception: { label: '开票异常到账', color: 'danger' },
+};
+
+const invoiceStatusChip = (order: OrderInfo) => {
+  if (!order.invoice_requested) return <Chip size="sm" variant="flat">未选择开票，无法后补</Chip>;
+  const config = INVOICE_STATUS[order.invoice_status || 'awaiting_payment'] || { label: '开票状态未知', color: 'default' as const };
+  const chip = <Chip size="sm" variant="flat" color={config.color}>{config.label}</Chip>;
+  return order.invoice_status === 'issued' ? (
+    <Tooltip content="已发送到邮箱，请注意查收，若未收到可以查看垃圾箱或联系客服" placement="top">
+      <span className="inline-flex cursor-help">{chip}</span>
+    </Tooltip>
+  ) : chip;
+};
   // 过滤和搜索订单
   const filteredOrders = useMemo(() => {
     let result = Array.isArray(orders) ? orders : [];
@@ -385,15 +409,19 @@ export const OrderHistoryTab: React.FC = () => {
                               </Chip>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                            <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
                               <div className="flex items-center gap-2 text-default-600">
                                 <Calendar size={16} />
                                 <span>{order.created_at}</span>
                               </div>
-                              <div className="font-medium text-default-900">
-                                {order.package_name}
-                              </div>
+                              <div className="font-medium text-default-900">{order.package_name}</div>
+                              {!order.is_cdk && (
+                                <div className="font-medium text-success">
+                                  实付金额：{order.paid_amount != null ? `¥${Number(order.paid_amount).toFixed(2)}` : '尚未支付'}
+                                </div>
+                              )}
                             </div>
+                            {!order.is_cdk && <div className="flex flex-wrap items-center gap-2">{invoiceStatusChip(order)}</div>}
                           </div>
                         </div>
                       </CardBody>

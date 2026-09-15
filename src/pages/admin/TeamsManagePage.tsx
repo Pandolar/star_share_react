@@ -100,7 +100,7 @@ const TeamsManagePage: React.FC = () => {
   const [loadError, setLoadError] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [query, setQuery] = useState('');
-  const [status, setStatus] = useState<'all' | AdminTeamStatus>('all');
+  const [status, setStatus] = useState<'all' | AdminTeamStatus>('active');
   const [packageId, setPackageId] = useState('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -185,7 +185,7 @@ const TeamsManagePage: React.FC = () => {
   const resetFilters = () => {
     setSearchInput('');
     setQuery('');
-    setStatus('all');
+    setStatus('active');
     setPackageId('all');
     setPage(1);
   };

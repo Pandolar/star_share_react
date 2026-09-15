@@ -47,6 +47,7 @@ import { Order, UpdateOrderRequest, OrderQueryParams } from '../../types/admin';
 import { showToast } from '../../components/Toast';
 import type { SourceDomainStats } from '../../types/admin';
 import { LongTextPreview, PackageSummary, UserSummary } from '../../components/admin/AdminEntitySummary';
+import ExactSearchPopover from '../../components/admin/ExactSearchPopover';
 
 /**
  * 订单管理页面
@@ -62,6 +63,8 @@ const OrdersManagePage: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState(urlQuery);
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [sourceDomainFilter, setSourceDomainFilter] = useState('');
+    const [exactDraft, setExactDraft] = useState<Record<string, string>>({});
+    const [exactFilters, setExactFilters] = useState<Record<string, string>>({});
     const [sourceStats, setSourceStats] = useState<SourceDomainStats | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
@@ -105,6 +108,12 @@ const OrdersManagePage: React.FC = () => {
             if (sourceDomainFilter.trim()) {
                 params.source_domain = sourceDomainFilter.trim().toLowerCase();
             }
+            if (exactFilters.id) params.id = Number(exactFilters.id);
+            if (exactFilters.user_id) params.user_id = Number(exactFilters.user_id);
+            if (exactFilters.email) params.email = exactFilters.email;
+            if (exactFilters.package_id) params.package_id = Number(exactFilters.package_id);
+            if (exactFilters.order_id) params.order_id = exactFilters.order_id;
+            if (exactFilters.trade_no) params.trade_no = exactFilters.trade_no;
 
             const response = await adminApiService.getOrders(params);
 
@@ -131,7 +140,7 @@ const OrdersManagePage: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [currentPage, searchQuery, statusFilter, sourceDomainFilter, pageSize]);
+    }, [currentPage, exactFilters, searchQuery, statusFilter, sourceDomainFilter, pageSize]);
 
 
     useEffect(() => {
@@ -168,6 +177,8 @@ const OrdersManagePage: React.FC = () => {
         setSearchInput('');
         setSearchQuery('');
         setStatusFilter('all');
+        setExactDraft({});
+        setExactFilters({});
         setCurrentPage(1);
         setUrlSearchParams({}, { replace: true });
     };
@@ -391,6 +402,20 @@ const OrdersManagePage: React.FC = () => {
                             value={sourceDomainFilter}
                             onValueChange={(value) => { setSourceDomainFilter(value); setCurrentPage(1); }}
                             className="w-full sm:w-56"
+                        />
+                        <ExactSearchPopover
+                            fields={[
+                                { key: 'id', label: '记录 ID', type: 'number' },
+                                { key: 'user_id', label: '用户 ID', type: 'number' },
+                                { key: 'email', label: '用户邮箱', type: 'email' },
+                                { key: 'package_id', label: '套餐 ID', type: 'number' },
+                                { key: 'order_id', label: '订单号' },
+                                { key: 'trade_no', label: '交易号' },
+                            ]}
+                            values={exactDraft}
+                            onChange={(key, value) => setExactDraft((current) => ({ ...current, [key]: value }))}
+                            onApply={() => { setExactFilters({ ...exactDraft }); setCurrentPage(1); }}
+                            onClear={() => { setExactDraft({}); setExactFilters({}); setCurrentPage(1); }}
                         />
                         <div className="flex gap-2">
                             <Button

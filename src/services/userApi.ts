@@ -428,9 +428,12 @@ export const orderUserApi = {
         package_name: string;
         status: string;
         created_at: string;
+        is_cdk: boolean;
         invoice_requested: boolean;
-        invoice_status?: string | null;
+        invoice_status?: 'not_requested' | 'awaiting_payment' | 'pending_issue' | 'processing' | 'issued' | 'cancelled' | 'payment_exception' | null;
+        base_amount?: number | null;
         payable_amount?: number | null;
+        paid_amount?: number | null;
     }>>> => {
         return createUserRequest(getUserApiUrl('/u/pay_order'), {
             method: 'GET',

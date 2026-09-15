@@ -38,6 +38,7 @@ import adminApiService from '../../services/adminApi';
 import { UserPackage, UserPackageQueryParams } from '../../types/admin';
 import { showToast } from '../../components/Toast';
 import { LongTextPreview, PackageSummary, UserSummary } from '../../components/admin/AdminEntitySummary';
+import ExactSearchPopover from '../../components/admin/ExactSearchPopover';
 
 const WAY_LABELS: Record<string, string> = {
     purchase: '购买',
@@ -57,6 +58,8 @@ const UserPackagesManagePage: React.FC = () => {
     const [searchInput, setSearchInput] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [exactDraft, setExactDraft] = useState<Record<string, string>>({});
+    const [exactFilters, setExactFilters] = useState<Record<string, string>>({});
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
@@ -91,6 +94,11 @@ const UserPackagesManagePage: React.FC = () => {
             if (statusFilter !== 'all') {
                 params.status = statusFilter as 'active' | 'frozen' | 'expired';
             }
+            if (exactFilters.id) params.id = Number(exactFilters.id);
+            if (exactFilters.user_id) params.user_id = Number(exactFilters.user_id);
+            if (exactFilters.email) params.email = exactFilters.email;
+            if (exactFilters.package_id) params.package_id = Number(exactFilters.package_id);
+            if (exactFilters.order_id) params.order_id = exactFilters.order_id;
 
             const response = await adminApiService.getUserPackages(params);
 
@@ -117,7 +125,7 @@ const UserPackagesManagePage: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [currentPage, searchQuery, statusFilter, pageSize]);
+    }, [currentPage, exactFilters, searchQuery, statusFilter, pageSize]);
 
     // 初始化和依赖更新
     useEffect(() => {
@@ -140,6 +148,8 @@ const UserPackagesManagePage: React.FC = () => {
         setSearchInput('');
         setSearchQuery('');
         setStatusFilter('all');
+        setExactDraft({});
+        setExactFilters({});
         setCurrentPage(1);
     };
 
@@ -239,6 +249,19 @@ const UserPackagesManagePage: React.FC = () => {
                                 </SelectItem>
                             ))}
                         </Select>
+                        <ExactSearchPopover
+                            fields={[
+                                { key: 'id', label: '记录 ID', type: 'number' },
+                                { key: 'user_id', label: '用户 ID', type: 'number' },
+                                { key: 'email', label: '用户邮箱', type: 'email' },
+                                { key: 'package_id', label: '套餐 ID', type: 'number' },
+                                { key: 'order_id', label: '订单号' },
+                            ]}
+                            values={exactDraft}
+                            onChange={(key, value) => setExactDraft((current) => ({ ...current, [key]: value }))}
+                            onApply={() => { setExactFilters({ ...exactDraft }); setCurrentPage(1); }}
+                            onClear={() => { setExactDraft({}); setExactFilters({}); setCurrentPage(1); }}
+                        />
                         <div className="flex gap-2">
                             <Button
                                 color="primary"

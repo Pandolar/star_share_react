@@ -49,6 +49,7 @@ import dayjs from 'dayjs';
 import adminApiService from '../../services/adminApi';
 import { User, CreateUserRequest, UpdateUserRequest, UserQueryParams, UserPackage, Order } from '../../types/admin';
 import { showToast } from '../../components/Toast';
+import ExactSearchPopover from '../../components/admin/ExactSearchPopover';
 
 /**
  * 用户管理页面
@@ -61,6 +62,8 @@ const UsersManagePage: React.FC = () => {
     const [searchInput, setSearchInput] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [exactDraft, setExactDraft] = useState<Record<string, string>>({});
+    const [exactFilters, setExactFilters] = useState<Record<string, string>>({});
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
@@ -117,6 +120,9 @@ const UsersManagePage: React.FC = () => {
             if (statusFilter !== 'all') {
                 params.status = statusFilter === 'active' ? 1 : 0;
             }
+            if (exactFilters.id) params.id = Number(exactFilters.id);
+            if (exactFilters.email) params.email = exactFilters.email;
+            if (exactFilters.username) params.username = exactFilters.username;
 
             const response = await adminApiService.getUsers(params);
 
@@ -143,7 +149,7 @@ const UsersManagePage: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [currentPage, searchQuery, statusFilter, pageSize]);
+    }, [currentPage, exactFilters, searchQuery, statusFilter, pageSize]);
 
     // 初始化和依赖更新
     useEffect(() => {
@@ -230,6 +236,8 @@ const UsersManagePage: React.FC = () => {
         setSearchInput('');
         setSearchQuery('');
         setStatusFilter('all');
+        setExactDraft({});
+        setExactFilters({});
         setCurrentPage(1);
     };
 
@@ -586,6 +594,17 @@ const UsersManagePage: React.FC = () => {
                                 </SelectItem>
                             ))}
                         </Select>
+                        <ExactSearchPopover
+                            fields={[
+                                { key: 'id', label: '用户 ID', type: 'number' },
+                                { key: 'email', label: '邮箱', type: 'email' },
+                                { key: 'username', label: '用户名' },
+                            ]}
+                            values={exactDraft}
+                            onChange={(key, value) => setExactDraft((current) => ({ ...current, [key]: value }))}
+                            onApply={() => { setExactFilters({ ...exactDraft }); setCurrentPage(1); }}
+                            onClear={() => { setExactDraft({}); setExactFilters({}); setCurrentPage(1); }}
+                        />
                         <div className="flex gap-2">
                             <Button
                                 color="primary"
