@@ -77,9 +77,7 @@ const DEFAULT_CONFIG: JsonRecord = {
     max_content_length: 2000,
     max_messages_per_minute: 12,
     send_cooldown_seconds: 1,
-    max_open_conversations_per_user: 3,
     auto_close_days: 7,
-    allow_reopen: true,
     max_message_page_size: 50,
   },
   badge: { enabled: true, max_display: 99, show_on_floating: true },
@@ -638,24 +636,11 @@ export const CustomerServiceConfigEditor: React.FC<Props> = ({ value, onChange, 
             (send_cooldown_seconds) => patchSection('limits', { send_cooldown_seconds }),
             { min: 0, max: 60 }
           )}
-          {numeric(
-            '并发开放会话数',
-            limits.max_open_conversations_per_user,
-            (max_open_conversations_per_user) => patchSection('limits', { max_open_conversations_per_user }),
-            { min: 1, max: 20 }
-          )}
           {numeric('自动关闭天数', limits.auto_close_days, (auto_close_days) => patchSection('limits', { auto_close_days }), {
             min: 0,
             max: 365,
             description: '0 表示不自动关闭',
           })}
-          <Switch
-            isSelected={limits.allow_reopen === true}
-            onValueChange={(allow_reopen) => patchSection('limits', { allow_reopen })}
-            isDisabled={disabled}
-          >
-            允许重开
-          </Switch>
           {numeric(
             '消息单页数量',
             limits.max_message_page_size,

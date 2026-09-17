@@ -5,6 +5,8 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { lazyWithRetry } from './utils/lazyWithRetry';
 import { WhiteLabelProvider, useWhiteLabel } from './contexts/WhiteLabelContext';
 import { CustomerServiceProvider } from './contexts/CustomerServiceContext';
+import { AdminAuthProvider, useAdminAuth } from './contexts/AdminAuthContext';
+import AdminPermissionRoute from './components/admin/AdminPermissionRoute';
 
 const HomePage = lazyWithRetry(() => import('./pages/HomePage'), 'HomePage');
 const UserCenter = lazyWithRetry(() => import('./pages/user/UserCenter'), 'UserCenter');
@@ -36,6 +38,8 @@ const ArticlesManagePage = lazyWithRetry(() => import('./pages/admin/ArticlesMan
 const FeedbackManagePage = lazyWithRetry(() => import('./pages/admin/FeedbackManagePage'), 'FeedbackManagePage');
 const AdminCustomerServicePage = lazyWithRetry(() => import('./pages/admin/CustomerServicePage'), 'CustomerServicePage');
 const DistributorLoginPage = lazyWithRetry(() => import('./pages/distributor/DistributorLoginPage'), 'DistributorLoginPage');
+const AdministratorManagePage = lazyWithRetry(() => import('./pages/admin/AdministratorManagePage'), 'AdministratorManagePage');
+const AdminSecurityPage = lazyWithRetry(() => import('./pages/admin/AdminSecurityPage'), 'AdminSecurityPage');
 const DistributorDashboardPage = lazyWithRetry(() => import('./pages/distributor/DistributorDashboardPage'), 'DistributorDashboardPage');
 const DistributorProtectedRoute = lazyWithRetry(() => import('./components/distributor/DistributorProtectedRoute'), 'DistributorProtectedRoute');
 
@@ -58,6 +62,20 @@ const AdminRouteShell: React.FC = () => (
   </AdminProtectedRoute>
 );
 
+const AdminIndexRedirect: React.FC = () => {
+  const { can } = useAdminAuth();
+  const first = [
+    ['dashboard.read', 'overview'], ['user.read', 'users'], ['package.read', 'packages'],
+    ['order.read', 'orders'], ['customer_service.conversation.read', 'customer-service'],
+    ['administrator.account.read', 'administrators'], ['config.read', 'settings'],
+  ].find(([permission]) => can(permission));
+  return <Navigate to={`/star-admin/${first?.[1] || 'security'}`} replace />;
+};
+
+const RequireAdminPermission: React.FC<{ permission?: string; anyOf?: string[]; children: React.ReactNode }> = ({ permission, anyOf, children }) => (
+  <AdminPermissionRoute permission={permission} anyOf={anyOf}>{children}</AdminPermissionRoute>
+);
+
 const DistributorRouteShell: React.FC = () => (
   <DistributorProtectedRoute>
     <Outlet />
@@ -68,6 +86,7 @@ const App: React.FC = () => {
   return (
     <HelmetProvider>
       <Router>
+        <AdminAuthProvider>
         <WhiteLabelProvider>
           <div className="App">
             {/* 全局兜底：任何路由的渲染/懒加载错误都进入恢复流程，避免整页白屏 */}
@@ -111,24 +130,25 @@ const App: React.FC = () => {
                     {/* Admin管理后台路由 */}
                     <Route path="/star-admin/login" element={<AdminLoginPage />} />
                     <Route path="/star-admin" element={<AdminRouteShell />}>
-                      {/* Admin子路由 - 默认重定向到用户管理 */}
-                      <Route index element={<Navigate to="/star-admin/overview" replace />} />
-                      <Route path="overview" element={<OverviewDashboardPage />} />
-                      <Route path="users" element={<UsersManagePage />} />
-                      <Route path="packages" element={<PackagesManagePage />} />
-                      <Route path="user-packages" element={<UserPackagesManagePage />} />
-                      <Route path="teams" element={<TeamsManagePage />} />
-                      <Route path="orders" element={<OrdersManagePage />} />
-                      <Route path="invoices" element={<InvoicesManagePage />} />
-                      <Route path="cdk" element={<CDKManagePage />} />
-                      <Route path="distributors" element={<DistributorsManagePage />} />
-                      <Route path="audit-logs" element={<AuditLogsPage />} />
-                      <Route path="runtime-logs" element={<RuntimeLogsPage />} />
-                      <Route path="articles" element={<ArticlesManagePage />} />
-                      <Route path="settings" element={<SettingsManagePage />} />
-                      <Route path="invites" element={<InviteManagePage />} />
-                      <Route path="feedback" element={<FeedbackManagePage />} />
-                      <Route path="customer-service" element={<AdminCustomerServicePage />} />
+                      <Route index element={<AdminIndexRedirect />} />
+                      <Route path="overview" element={<RequireAdminPermission permission="dashboard.read"><OverviewDashboardPage /></RequireAdminPermission>} />
+                      <Route path="users" element={<RequireAdminPermission permission="user.read"><UsersManagePage /></RequireAdminPermission>} />
+                      <Route path="packages" element={<RequireAdminPermission permission="package.read"><PackagesManagePage /></RequireAdminPermission>} />
+                      <Route path="user-packages" element={<RequireAdminPermission permission="user_package.read"><UserPackagesManagePage /></RequireAdminPermission>} />
+                      <Route path="teams" element={<RequireAdminPermission permission="team.read"><TeamsManagePage /></RequireAdminPermission>} />
+                      <Route path="orders" element={<RequireAdminPermission permission="order.read"><OrdersManagePage /></RequireAdminPermission>} />
+                      <Route path="invoices" element={<RequireAdminPermission permission="invoice.read"><InvoicesManagePage /></RequireAdminPermission>} />
+                      <Route path="cdk" element={<RequireAdminPermission permission="cdk.read"><CDKManagePage /></RequireAdminPermission>} />
+                      <Route path="distributors" element={<RequireAdminPermission permission="distributor.read"><DistributorsManagePage /></RequireAdminPermission>} />
+                      <Route path="audit-logs" element={<RequireAdminPermission permission="audit.read"><AuditLogsPage /></RequireAdminPermission>} />
+                      <Route path="runtime-logs" element={<RequireAdminPermission permission="runtime_log.read"><RuntimeLogsPage /></RequireAdminPermission>} />
+                      <Route path="articles" element={<RequireAdminPermission permission="article.read"><ArticlesManagePage /></RequireAdminPermission>} />
+                      <Route path="settings" element={<RequireAdminPermission permission="config.read"><SettingsManagePage /></RequireAdminPermission>} />
+                      <Route path="invites" element={<RequireAdminPermission anyOf={['invite.policy.read', 'invite.cashback.read', 'invite.analytics.read', 'invite.reward.read', 'invite.withdrawal.read']}><InviteManagePage /></RequireAdminPermission>} />
+                      <Route path="feedback" element={<RequireAdminPermission permission="feedback.read"><FeedbackManagePage /></RequireAdminPermission>} />
+                      <Route path="customer-service" element={<RequireAdminPermission permission="customer_service.conversation.read"><AdminCustomerServicePage /></RequireAdminPermission>} />
+                      <Route path="administrators" element={<RequireAdminPermission permission="administrator.account.read"><AdministratorManagePage /></RequireAdminPermission>} />
+                      <Route path="security" element={<AdminSecurityPage />} />
                     </Route>
                   </Routes>
                 </CustomerServiceProvider>
@@ -136,6 +156,7 @@ const App: React.FC = () => {
           </ErrorBoundary>
           </div>
         </WhiteLabelProvider>
+        </AdminAuthProvider>
       </Router>
     </HelmetProvider>
   );

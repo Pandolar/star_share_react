@@ -51,12 +51,18 @@ import dayjs from 'dayjs';
 import adminApiService from '../../services/adminApi';
 import { CDK, CreateCDKRequest, UpdateCDKRequest, CDKQueryParams, Package as PackageType, SourceDomainStats } from '../../types/admin';
 import { showToast } from '../../components/Toast';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
 /**
  * CDK管理页面
  * 提供CDK的增删改查功能
  */
 const CDKManagePage: React.FC = () => {
+    const { can } = useAdminAuth();
+    const canCreate = can('cdk.create');
+    const canUpdate = can('cdk.update');
+    const canDelete = can('cdk.delete');
+    const canExport = can('cdk.export');
     // 状态管理
     const [cdks, setCDKs] = useState<CDK[]>([]);
     const [packages, setPackages] = useState<PackageType[]>([]);
@@ -484,7 +490,7 @@ const CDKManagePage: React.FC = () => {
                     <MoreVertical className="w-4 h-4" />
                 </Button>
             </DropdownTrigger>
-            <DropdownMenu aria-label="CDK操作">
+            <DropdownMenu aria-label="CDK操作" disabledKeys={[...(!canUpdate ? ['edit'] : []), ...(!canDelete ? ['delete'] : [])]}>
                 <DropdownItem
                     key="copy"
                     startContent={<Copy className="w-4 h-4" />}
@@ -611,7 +617,7 @@ const CDKManagePage: React.FC = () => {
                     {crossPageSelection.size > 0 && <Chip size="sm" color="primary" variant="flat">已选 {crossPageSelection.size}</Chip>}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                    {crossPageSelection.size > 0 && (
+                    {canExport && crossPageSelection.size > 0 && (
                         <Button
                             variant="flat"
                             color="primary"
@@ -621,28 +627,20 @@ const CDKManagePage: React.FC = () => {
                             复制选中
                         </Button>
                     )}
-                    <Dropdown>
+                    {canExport && <Dropdown>
                         <DropdownTrigger>
                             <Button variant="flat" startContent={<Download className="w-4 h-4" />}>导出 / 复制</Button>
                         </DropdownTrigger>
                         <DropdownMenu aria-label="CDK导出与复制操作">
-                            <DropdownItem key="copy-filtered" startContent={<Copy className="w-4 h-4" />} onPress={handleCopyAllFiltered}>
-                                复制全部筛选结果
-                            </DropdownItem>
-                            <DropdownItem key="export-page" startContent={<Download className="w-4 h-4" />} onPress={handleExportTxt}>
-                                导出当前页 TXT
-                            </DropdownItem>
-                            <DropdownItem key="export-distribute" startContent={<Download className="w-4 h-4" />} onPress={() => handleExport('distribute')}>
-                                导出分发版
-                            </DropdownItem>
-                            <DropdownItem key="export-full" startContent={<Download className="w-4 h-4" />} onPress={() => handleExport('full')}>
-                                导出完整版
-                            </DropdownItem>
+                            <DropdownItem key="copy-filtered" startContent={<Copy className="w-4 h-4" />} onPress={handleCopyAllFiltered}>复制全部筛选结果</DropdownItem>
+                            <DropdownItem key="export-page" startContent={<Download className="w-4 h-4" />} onPress={handleExportTxt}>导出当前页 TXT</DropdownItem>
+                            <DropdownItem key="export-distribute" startContent={<Download className="w-4 h-4" />} onPress={() => handleExport('distribute')}>导出分发版</DropdownItem>
+                            <DropdownItem key="export-full" startContent={<Download className="w-4 h-4" />} onPress={() => handleExport('full')}>导出完整版</DropdownItem>
                         </DropdownMenu>
-                    </Dropdown>
-                    <Button color="primary" startContent={<Plus className="w-4 h-4" />} onPress={onCreateOpen}>
+                    </Dropdown>}
+                    {canCreate && <Button color="primary" startContent={<Plus className="w-4 h-4" />} onPress={onCreateOpen}>
                         批量生成
-                    </Button>
+                    </Button>}
                 </div>
             </div>
 
@@ -663,6 +661,7 @@ const CDKManagePage: React.FC = () => {
                                     aria-label="选择当前页全部CDK"
                                     isSelected={isCurrentPageSelected}
                                     isIndeterminate={isCurrentPagePartiallySelected}
+                                    isDisabled={!canExport}
                                     onValueChange={toggleCurrentPageSelection}
                                 />
                             </TableColumn>
@@ -684,11 +683,12 @@ const CDKManagePage: React.FC = () => {
                             emptyContent="暂无CDK数据"
                         >
                             {cdks.map((cdk) => (
-                                <TableRow key={cdk.id} onDoubleClick={() => openEditModal(cdk)}>
+                                <TableRow key={cdk.id} onDoubleClick={() => { if (canUpdate) openEditModal(cdk); }}>
                                     <TableCell>
                                         <Checkbox
                                             aria-label={`选择 CDK ${cdk.cdk}`}
                                             isSelected={crossPageSelection.has(cdk.id)}
+                                            isDisabled={!canExport}
                                             onValueChange={(isSelected) => toggleCDKSelection(cdk, isSelected)}
                                             onDoubleClick={(event) => event.stopPropagation()}
                                         />

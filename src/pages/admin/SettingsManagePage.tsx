@@ -45,6 +45,7 @@ import { DistributorLevelDiscountsEditor } from './DistributorLevelDiscountsEdit
 import { HomeInfoConfigEditor } from './HomeInfoConfigEditor';
 import { TeamPlanConfigEditor } from './TeamPlanConfigEditor';
 import { CustomerServiceConfigEditor } from './CustomerServiceConfigEditor';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 const VISUAL_CONFIG_KEYS: Record<string, true> = {
     SPEEDTEST_URL_LIST: true,
     HOME_INFO: true,
@@ -66,6 +67,14 @@ const VISUAL_CONFIG_KEYS: Record<string, true> = {
  * 提供系统配置的查看和编辑功能
  */
 const SettingsManagePage: React.FC = () => {
+    const { can } = useAdminAuth();
+    const canUpdate = can('config.update');
+    const canWriteSecret = can('config.secret.write');
+    const canReloadRuntime = can('config.runtime.reload');
+    const canReadPackages = can('package.read');
+    const canEditConfig = useCallback((config: SystemConfig) => (
+        config.editable && canUpdate && (!config.sensitive || canWriteSecret)
+    ), [canUpdate, canWriteSecret]);
     // 状态管理
     const [configs, setConfigs] = useState<SystemConfig[]>([]);
     const [loading, setLoading] = useState(false);
@@ -110,6 +119,7 @@ const SettingsManagePage: React.FC = () => {
 
     // 加载套餐等级（补偿活动固定等级下拉用，去重）
     useEffect(() => {
+            if (!canReadPackages) return;
         (async () => {
             try {
                 const resp = await adminApiService.getPackages({ page_size: 1000 });
@@ -135,7 +145,7 @@ const SettingsManagePage: React.FC = () => {
                 showToast('加载补偿套餐选项失败', 'error');
             }
         })();
-    }, []);
+    }, [canReadPackages]);
 
     // 更新配置值
     const updateConfigValue = (key: string, value: string) => {
@@ -194,7 +204,7 @@ const SettingsManagePage: React.FC = () => {
         try {
             const scope = selectedGroup ? (groupedConfigs[selectedGroup] || []) : configs;
             const changedConfigs = scope.filter(config =>
-                configValues[config.key] !== config.value && config.editable
+                configValues[config.key] !== config.value && canEditConfig(config)
             );
 
             if (changedConfigs.length === 0) {
@@ -311,7 +321,7 @@ const SettingsManagePage: React.FC = () => {
                     <Switch
                         isSelected={['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase())}
                         onValueChange={(selected) => updateConfigValue(config.key, selected ? 'true' : 'false')}
-                        isDisabled={!config.editable}
+                        isDisabled={!canEditConfig(config)}
                         color={isChanged ? 'warning' : 'primary'}
                     />
                 </div>
@@ -322,11 +332,11 @@ const SettingsManagePage: React.FC = () => {
             <div className="space-y-2">
                 <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
                     <div>
-                        <div className="font-medium">{config.description}</div>
+                        <div className="flex items-center gap-2"><div className="font-medium">{config.description}</div>{config.sensitive && <Chip size="sm" color={config.configured ? 'success' : 'warning'} variant="flat">{config.configured ? '已配置（不回显）' : '未配置'}</Chip>}</div>
                         <div className="text-sm text-default-500">配置键: {config.key}</div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        {config.key === 'BILL_RULE' && (
+                        {config.key === 'BILL_RULE' && canReloadRuntime && (
                             <Button
                                 size="sm"
                                 color="primary"
@@ -344,7 +354,7 @@ const SettingsManagePage: React.FC = () => {
                                 {showRawJson ? '切换可视化' : '查看原始 JSON'}
                             </Button>
                         )}
-                        {config.editable && isChanged && (
+                        {canEditConfig(config) && isChanged && (
                             <>
                                 <Button
                                     size="sm"
@@ -380,7 +390,7 @@ const SettingsManagePage: React.FC = () => {
                         aria-label={`${config.description} 原始 JSON`}
                         value={value}
                         onValueChange={(nextValue) => updateConfigValue(config.key, nextValue)}
-                        isDisabled={!config.editable}
+                        isDisabled={!canEditConfig(config)}
                         variant="bordered"
                         className="font-mono"
                         isInvalid={!isJsonValid}
@@ -389,22 +399,22 @@ const SettingsManagePage: React.FC = () => {
                         minRows={12}
                     />
                 ) : config.key === 'HOME_INFO' ? (
-                    <HomeInfoConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} />
+                    <HomeInfoConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!canEditConfig(config)} />
                 ) : config.key === 'SPEEDTEST_URL_LIST' ? (
                     <SpeedTestNodesEditor
                         value={value}
                         onChange={(nextValue) => updateConfigValue(config.key, nextValue)}
-                        disabled={!config.editable}
+                        disabled={!canEditConfig(config)}
                     />
                 ) : config.key === 'SEND_BARK_CONFIG' ? (
-                    <BarkConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} />
+                    <BarkConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!canEditConfig(config)} />
                 ) : config.key === 'DISTRIBUTOR_LEVEL_DISCOUNTS' ? (
-                    <DistributorLevelDiscountsEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} packages={packageOptions} />
+                    <DistributorLevelDiscountsEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!canEditConfig(config)} packages={packageOptions} />
                 ) : (config.key === 'NOTICE' || config.key === 'ABOUT_US_CONTENT' || config.key === 'LIMITED_ACTIVITY_CONTENT' || config.key.startsWith('SUBSCRIPTION_NOTICE_')) ? (
                     <Textarea
                         value={value}
                         onValueChange={(nextValue) => updateConfigValue(config.key, nextValue)}
-                        isDisabled={!config.editable}
+                        isDisabled={!canEditConfig(config)}
                         variant={isChanged ? 'bordered' : 'flat'}
                         color={isChanged ? 'warning' : 'default'}
                         placeholder={`请输入${config.description}（支持Markdown格式）`}
@@ -415,36 +425,36 @@ const SettingsManagePage: React.FC = () => {
                     <PromotionCodeConfigEditor
                         value={value}
                         onChange={(json) => updateConfigValue(config.key, json)}
-                        disabled={!config.editable}
+                        disabled={!canEditConfig(config)}
                         packages={packageOptions}
                     />
                 ) : config.key === 'COMPENSATION_CONFIG' ? (
                     <CompensationConfigEditor
                         value={value}
                         onChange={(json) => updateConfigValue(config.key, json)}
-                        disabled={!config.editable}
+                        disabled={!canEditConfig(config)}
                         levelOptions={packageLevels}
                     />
                 ) : config.key === 'WHITE_LABEL_CONFIG' ? (
-                    <WhiteLabelConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} />
+                    <WhiteLabelConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!canEditConfig(config)} />
                 ) : config.key === 'CUSTOMER_SERVICE_CONFIG' ? (
-                    <CustomerServiceConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} />
+                    <CustomerServiceConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!canEditConfig(config)} />
                 ) : config.key === 'INVOICE_CONFIG' ? (
-                    <InvoiceConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} />
+                    <InvoiceConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!canEditConfig(config)} />
                 ) : config.key === 'INVITE_POLICY' ? (
-                    <InvitePolicyConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} packages={packageOptions} />
+                    <InvitePolicyConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!canEditConfig(config)} packages={packageOptions} />
                 ) : config.key === 'INVITE_CASHBACK_CONFIG' ? (
-                    <InviteCashbackSettingsEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} />
+                    <InviteCashbackSettingsEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!canEditConfig(config)} />
                 ) : config.key === 'TEAM_PLAN_CONFIG' ? (
-                    <TeamPlanConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} packages={packageOptions} />
+                    <TeamPlanConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!canEditConfig(config)} packages={packageOptions} />
                 ) : config.key === 'BILL_RULE' ? (
-                    <BillRuleConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!config.editable} legacyType={configValues.BILL_RULE_TYPE || 'fixed'} packageLevels={Array.from(new Set(packageLevels.map((item) => item.level)))} />
+                    <BillRuleConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!canEditConfig(config)} legacyType={configValues.BILL_RULE_TYPE || 'fixed'} packageLevels={Array.from(new Set(packageLevels.map((item) => item.level)))} />
                 ) : config.key === 'BILL_RULE_TYPE' ? (
                     <Select
                         label="旧版规则模式"
                         selectedKeys={[value || 'fixed']}
                         onSelectionChange={(keys) => updateConfigValue(config.key, String(Array.from(keys)[0] || 'fixed'))}
-                        isDisabled={!config.editable}
+                        isDisabled={!canEditConfig(config)}
                         description="仅用于转换尚未升级到 v2 的 BILL_RULE；v2 中每条限额可单独选择固定或滑动窗口。"
                         className="max-w-md"
                     >
@@ -455,7 +465,7 @@ const SettingsManagePage: React.FC = () => {
                     <Textarea
                         value={value}
                         onValueChange={(nextValue) => updateConfigValue(config.key, nextValue)}
-                        isDisabled={!config.editable}
+                        isDisabled={!canEditConfig(config)}
                         variant="bordered"
                         className="font-mono"
                         isInvalid={!isJsonValid}
@@ -467,20 +477,20 @@ const SettingsManagePage: React.FC = () => {
                     <NumberInput
                         value={value === '' || Number.isNaN(Number(value)) ? undefined : Number(value)}
                         onValueChange={(nextValue) => updateConfigValue(config.key, Number.isNaN(nextValue) ? '' : String(nextValue))}
-                        isDisabled={!config.editable}
+                        isDisabled={!canEditConfig(config)}
                         variant={isChanged ? 'bordered' : 'flat'}
                         color={isChanged ? 'warning' : 'default'}
                         placeholder={`请输入${config.description}`}
                     />
                 ) : (
                     <Input
-                        type="text"
+                        type={config.sensitive ? 'password' : 'text'}
                         value={value}
                         onValueChange={(nextValue) => updateConfigValue(config.key, nextValue)}
-                        isDisabled={!config.editable}
+                        isDisabled={!canEditConfig(config)}
                         variant={isChanged ? 'bordered' : 'flat'}
                         color={isChanged ? 'warning' : 'default'}
-                        placeholder={`请输入${config.description}`}
+                        placeholder={config.sensitive && config.configured ? '输入新值以覆盖；现有值不会回显' : `请输入${config.description}`}
                     />
                 )}
 
@@ -495,8 +505,8 @@ const SettingsManagePage: React.FC = () => {
     const hasChanges = useMemo(() => {
         if (!selectedGroup) return false;
         const currentGroup = groupedConfigs[selectedGroup] || [];
-        return currentGroup.some(config => configValues[config.key] !== config.value && config.editable);
-    }, [groupedConfigs, selectedGroup, configValues]);
+        return currentGroup.some(config => configValues[config.key] !== config.value && canEditConfig(config));
+    }, [canEditConfig, groupedConfigs, selectedGroup, configValues]);
 
     if (loading) {
         return (
@@ -527,7 +537,7 @@ const SettingsManagePage: React.FC = () => {
                         color="primary"
                         onPress={saveAllConfigs}
                         isLoading={saving}
-                        isDisabled={!hasChanges}
+                        isDisabled={!hasChanges || !canUpdate}
                         startContent={<Save className="w-4 h-4" />}
                     >
                         {hasChanges ? '保存当前分类' : '无变更'}

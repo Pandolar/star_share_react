@@ -1,6 +1,5 @@
 import axios from 'axios';
 import type { AxiosInstance } from 'axios';
-import md5 from 'md5';
 import { storage as storageConfig } from '../config';
 import type {
     AdminApiResponse,
@@ -51,6 +50,13 @@ import type {
     AdminTeamRecord,
     AdminCsConversation,
     AdminCsStats,
+    AdminLoginResult,
+    AdminPermission,
+    AdminPrincipal,
+    AdminRole,
+    AdministratorAccount,
+    AdministratorAuditRecord,
+    AdministratorSession,
 } from '../types/admin';
 import type { ChatAttachment, ChatConversation, ChatMessage } from '../components/chat/types';
 
@@ -87,16 +93,23 @@ class AdminApiService {
 
         // 响应拦截器 - 处理认证错误
         this.api.interceptors.response.use(
-            (response) => response,
+            (response) => {
+                if (response.data?.code === 20009) this.invalidateAdminSession();
+                return response;
+            },
             (error) => {
-                if (error.response?.data?.code === 20009) {
-                    // 权限不足，清除token并跳转到登录页
-                    this.clearAdminToken();
-                    window.location.href = '/star-admin/login';
-                }
+                if (error.response?.data?.code === 20009) this.invalidateAdminSession();
                 return Promise.reject(error);
             }
         );
+    }
+
+    private invalidateAdminSession(): void {
+        this.clearAdminToken();
+        window.dispatchEvent(new Event('admin-auth-invalid'));
+        if (window.location.pathname.startsWith('/star-admin') && window.location.pathname !== '/star-admin/login') {
+            window.location.assign('/star-admin/login');
+        }
     }
 
     /**
@@ -125,6 +138,10 @@ class AdminApiService {
             // ignore
         }
         return null;
+    }
+
+    hasAdminToken(): boolean {
+        return Boolean(this.getAdminToken());
     }
 
     /**
@@ -197,35 +214,132 @@ class AdminApiService {
     /**
      * 管理员登录
      */
-    async login(username: string, password: string): Promise<AdminApiResponse<{ admin_token: string }>> {
-        // 使用MD5加密密码
-        const hashedPassword = md5(password);
-
-        const response = await this.api.post('/star/login', {
-            username,
-            password: hashedPassword,
-        });
+    async login(username: string, password: string): Promise<AdminApiResponse<AdminLoginResult>> {
+        const response = await this.api.post('/star/auth/login', { username, password });
         if (response.data.code === 20000 && response.data.data?.admin_token) {
             this.setAdminToken(response.data.data.admin_token);
         }
-
         return response.data;
     }
 
-    /**
-     * 检查管理员token有效性
-     */
-    async checkToken(): Promise<AdminApiResponse> {
-        const response = await this.api.post('/star/check_token');
+    async verifyMfa(challenge_token: string, code: string): Promise<AdminApiResponse<AdminLoginResult>> {
+        const response = await this.api.post('/star/auth/mfa/verify', { challenge_token, code });
+        if (response.data.code === 20000 && response.data.data?.admin_token) {
+            this.setAdminToken(response.data.data.admin_token);
+        }
         return response.data;
     }
 
-    /**
-     * 管理员登出
-     */
-    logout(): void {
+    async getMe(): Promise<AdminApiResponse<AdminPrincipal>> {
+        const response = await this.api.get('/star/auth/me');
+        return response.data;
+    }
+
+    async logout(): Promise<void> {
+        try {
+            if (this.getAdminToken()) await this.api.post('/star/auth/logout');
+        } finally {
+            this.clearAdminToken();
+            window.dispatchEvent(new Event('admin-auth-invalid'));
+        }
+    }
+
+    clearLocalSession(): void {
         this.clearAdminToken();
     }
+
+    async changeOwnPassword(current_password: string, new_password: string): Promise<AdminApiResponse> {
+        const response = await this.api.post('/star/auth/change-password', { current_password, new_password });
+        return response.data;
+    }
+
+    async setupMfa(): Promise<AdminApiResponse<{ secret: string; otpauth_uri: string }>> {
+        const response = await this.api.post('/star/auth/mfa/setup');
+        return response.data;
+    }
+
+    async enableMfa(code: string): Promise<AdminApiResponse> {
+        const response = await this.api.post('/star/auth/mfa/enable', { code });
+        return response.data;
+    }
+
+    async disableMfa(password: string, code: string): Promise<AdminApiResponse> {
+        const response = await this.api.post('/star/auth/mfa/disable', { password, code });
+        return response.data;
+    }
+
+    async getOwnSessions(): Promise<AdminApiResponse<AdministratorSession[]>> {
+        const response = await this.api.get('/star/auth/sessions');
+        return response.data;
+    }
+
+    async revokeOwnSession(id: string): Promise<AdminApiResponse<{ current: boolean }>> {
+        const response = await this.api.delete(`/star/auth/sessions/${encodeURIComponent(id)}`);
+        return response.data;
+    }
+
+    async getAdministratorAccounts(params: { current_page?: number; page_size?: number; querystring?: string; status?: string } = {}): Promise<AdminApiResponse<AdministratorAccount[]>> {
+        const response = await this.api.get(`/star/admin/accounts?${this.buildQueryString(params)}`);
+        return response.data;
+    }
+
+    async createAdministratorAccount(data: {
+        username: string; display_name: string; email?: string; password: string;
+        role_codes: string[]; remarks?: string;
+    }): Promise<AdminApiResponse<AdministratorAccount>> {
+        const response = await this.api.post('/star/admin/accounts', data);
+        return response.data;
+    }
+
+    async updateAdministratorAccount(data: {
+        id: number; display_name?: string; email?: string | null; status?: 'active' | 'disabled';
+        role_codes?: string[]; remarks?: string;
+    }): Promise<AdminApiResponse<AdministratorAccount>> {
+        const response = await this.api.put('/star/admin/accounts', data);
+        return response.data;
+    }
+
+    async deleteAdministratorAccount(id: number): Promise<AdminApiResponse> {
+        const response = await this.api.delete('/star/admin/accounts', { data: { id } });
+        return response.data;
+    }
+
+    async resetAdministratorPassword(id: number, new_password: string): Promise<AdminApiResponse<{ sessions_revoked: number }>> {
+        const response = await this.api.post(`/star/admin/accounts/${id}/reset-password`, { new_password });
+        return response.data;
+    }
+
+    async resetAdministratorMfa(id: number): Promise<AdminApiResponse<{ sessions_revoked: number }>> {
+        const response = await this.api.post(`/star/admin/accounts/${id}/reset-mfa`);
+        return response.data;
+    }
+
+    async getAdministratorRoles(): Promise<AdminApiResponse<AdminRole[]>> {
+        const response = await this.api.get('/star/admin/roles');
+        return response.data;
+    }
+
+
+    async getAdministratorPermissions(): Promise<AdminApiResponse<AdminPermission[]>> {
+        const response = await this.api.get('/star/admin/permissions');
+        return response.data;
+    }
+
+    async getAdministratorSessions(params: { admin_id?: number; active?: boolean } = {}): Promise<AdminApiResponse<AdministratorSession[]>> {
+        const response = await this.api.get(`/star/admin/sessions?${this.buildQueryString(params)}`);
+        return response.data;
+    }
+
+    async revokeAdministratorSession(id: string): Promise<AdminApiResponse<{ current: boolean }>> {
+        const response = await this.api.delete(`/star/admin/sessions/${encodeURIComponent(id)}`);
+        return response.data;
+    }
+
+    async getAdministratorAuditLogs(params: { current_page?: number; page_size?: number; admin_id?: number; action?: string; result?: string; permission_key?: string; querystring?: string } = {}): Promise<AdminApiResponse<AdministratorAuditRecord[]>> {
+        const response = await this.api.get(`/star/admin/audit-logs?${this.buildQueryString(params)}`);
+        return response.data;
+    }
+
 
     // ==================== 套餐管理 ====================
 
@@ -634,12 +748,21 @@ class AdminApiService {
 
     // ==================== 在线客服 ====================
 
+    async getCsRuntimeConfig(): Promise<{ quick_replies: Array<{ id: string; title: string; content: string; attachments?: ChatAttachment[]; enabled: boolean }>; recall_window_minutes: number }> {
+        const response = await this.api.get('/star/cs_runtime_config');
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '获取客服运行配置失败');
+        return response.data.data;
+    }
+
     async getCsConversations(params: { current_page?: number; page_size?: number; filter?: string; category_id?: string; querystring?: string; order_column?: string; order?: 'asc' | 'desc' } = {}): Promise<{ data: AdminCsConversation[]; total: number }> {
         const queryString = this.buildQueryString(params);
         const active = this.csConversationRequests.get(queryString);
         if (active) return active;
         const request = this.api.get(`/star/cs_conversations?${queryString}`)
-            .then((response) => ({ data: response.data.data || [], total: Number(response.data.total) || 0 }))
+            .then((response) => {
+                if (response.data.code !== 20000) throw new Error(response.data.msg || '获取客服会话失败');
+                return { data: response.data.data || [], total: Number(response.data.total) || 0 };
+            })
             .finally(() => this.csConversationRequests.delete(queryString));
         this.csConversationRequests.set(queryString, request);
         return request;
@@ -647,26 +770,43 @@ class AdminApiService {
 
     async getCsStats(): Promise<AdminCsStats> {
         const response = await this.api.get('/star/cs_conversations/stats');
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '获取客服统计失败');
         return response.data.data;
     }
 
     async getCsConversation(id: number): Promise<AdminCsConversation> {
         const response = await this.api.get(`/star/cs_conversations/${id}`);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '获取客服会话失败');
         return response.data.data;
     }
 
     async updateCsConversation(data: { id: number; status?: string; internal_remark?: string; priority?: string }): Promise<AdminCsConversation> {
         const response = await this.api.put('/star/cs_conversations', data);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '更新客服会话失败');
         return response.data.data;
     }
 
     async getCsMessages(params: { conversation_id: number; after_id?: number; before_id?: number; limit?: number }): Promise<{ conversation: ChatConversation; messages: ChatMessage[]; has_more: boolean }> {
         const response = await this.api.get(`/star/cs_messages?${this.buildQueryString(params)}`);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '获取客服消息失败');
         return response.data.data;
     }
 
     async sendCsMessage(data: { conversation_id: number; content: string; attachment_ids: string[]; quick_reply_id?: string; client_msg_id?: string }): Promise<ChatMessage> {
         const response = await this.api.post('/star/cs_messages', data);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '发送客服消息失败');
+        return response.data.data;
+    }
+
+    async batchSendCsMessages(data: { conversation_ids: number[]; content: string; quick_reply_id?: string; client_msg_id: string }): Promise<{ sent_count: number; conversation_ids: number[]; messages: ChatMessage[] }> {
+        const response = await this.api.post('/star/cs_messages/batch', data);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '批量回复失败');
+        return response.data.data;
+    }
+
+    async createCsQuickReply(data: { title: string; content: string }): Promise<{ id: string; title: string; content: string; attachments: ChatAttachment[]; enabled: boolean }> {
+        const response = await this.api.post('/star/cs_quick_replies', data);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '保存快捷短语失败');
         return response.data.data;
     }
 
@@ -684,16 +824,19 @@ class AdminApiService {
 
     async markCsRead(conversation_id?: number): Promise<{ read_at: string }> {
         const response = await this.api.post('/star/cs_conversation_read', conversation_id === undefined ? {} : { conversation_id });
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '标记客服消息已读失败');
         return response.data.data;
     }
 
     async uploadCsAttachment(data: { data_base64: string; filename: string; mime_type?: string; conversation_id: number }): Promise<ChatAttachment> {
         const response = await this.api.post('/star/cs_attachment', data);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '上传客服附件失败');
         return response.data.data;
     }
 
     async uploadCsQuickReplyImage(data: { data_base64: string; filename: string; mime_type: string }): Promise<ChatAttachment> {
         const response = await this.api.post('/star/cs_attachment', { ...data, quick_reply_asset: true });
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '上传快捷回复图片失败');
         return response.data.data;
     }
 

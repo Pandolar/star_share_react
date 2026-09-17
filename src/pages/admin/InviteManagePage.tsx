@@ -36,6 +36,7 @@ import { showToast } from '../../components/Toast';
 import InviteCashbackConfigEditor from './InviteCashbackConfigEditor';
 import { InviteCashbackDataCenter } from './InviteCashbackDataCenter';
 
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 interface InvitePolicyFormState {
   enabled: boolean;
   reward_mode: 'duration';
@@ -90,6 +91,17 @@ const formatInviterRuleSummary = (user: User) => {
 };
 
 const InviteManagePage: React.FC = () => {
+  const { can } = useAdminAuth();
+  const canReadPolicy = can('invite.policy.read');
+  const canUpdatePolicy = can('invite.policy.update');
+  const canReadCashback = can('invite.cashback.read');
+  const canUpdateCashback = can('invite.cashback.update');
+  const canReadAnalytics = can('invite.analytics.read');
+  const canReadRewards = can('invite.reward.read');
+  const canReadWithdrawals = can('invite.withdrawal.read');
+  const canReviewWithdrawals = can('invite.withdrawal.review');
+  const canReadUsers = can('user.read');
+  const canUpdateUserPolicy = can('user.invite_policy.update');
   const [policyLoading, setPolicyLoading] = useState(true);
   const [savingPolicy, setSavingPolicy] = useState(false);
   const [globalPolicyForm, setGlobalPolicyForm] = useState<InvitePolicyFormState>(createDefaultPolicyForm());
@@ -150,6 +162,7 @@ const InviteManagePage: React.FC = () => {
   const { isOpen: isInviterOpen, onOpen: onInviterOpen, onClose: onInviterClose } = useDisclosure();
 
   const loadPolicy = useCallback(async () => {
+    if (!canReadPolicy) { setPolicyLoading(false); return; }
     setPolicyLoading(true);
     try {
       const response = await adminApiService.getInvitePolicy();
@@ -169,9 +182,10 @@ const InviteManagePage: React.FC = () => {
     } finally {
       setPolicyLoading(false);
     }
-  }, []);
+  }, [canReadPolicy]);
 
   const loadCashbackConfig = useCallback(async () => {
+    if (!canReadCashback) { setCashbackLoading(false); return; }
     setCashbackLoading(true);
     try {
       const response = await adminApiService.getInviteCashback();
@@ -188,9 +202,10 @@ const InviteManagePage: React.FC = () => {
     } finally {
       setCashbackLoading(false);
     }
-  }, []);
+  }, [canReadCashback]);
 
   const loadRewards = useCallback(async () => {
+    if (!canReadRewards) { setRewardsLoading(false); return; }
     setRewardsLoading(true);
     try {
       const params: Record<string, any> = {
@@ -223,9 +238,10 @@ const InviteManagePage: React.FC = () => {
     } finally {
       setRewardsLoading(false);
     }
-  }, [rewardModeFilter, rewardSearch, rewardStatusFilter, rewardsPage, rewardsPageSize]);
+  }, [canReadRewards, rewardModeFilter, rewardSearch, rewardStatusFilter, rewardsPage, rewardsPageSize]);
 
   const loadWorkorders = useCallback(async () => {
+    if (!canReadWithdrawals) { setWorkordersLoading(false); return; }
     setWorkordersLoading(true);
     try {
       const response = await adminApiService.getWorkorders({ ticket_type: 'invite_withdraw' });
@@ -251,7 +267,7 @@ const InviteManagePage: React.FC = () => {
     } finally {
       setWorkordersLoading(false);
     }
-  }, []);
+  }, [canReadWithdrawals]);
 
 
   const togglePayableWorkorders = (selected: boolean) => setSelectedWorkorders((current) => {
@@ -292,6 +308,7 @@ const InviteManagePage: React.FC = () => {
     }
   };
   const loadUsers = useCallback(async () => {
+    if (!canReadUsers) { setUsersLoading(false); return; }
     setUsersLoading(true);
     try {
       const response = await adminApiService.getUsers({
@@ -317,7 +334,7 @@ const InviteManagePage: React.FC = () => {
     } finally {
       setUsersLoading(false);
     }
-  }, [inviterUsersPage, usersSearch]);
+  }, [canReadUsers, inviterUsersPage, usersSearch]);
   useEffect(() => { loadCashbackConfig(); }, [loadCashbackConfig]);
 
   useEffect(() => { loadPolicy(); }, [loadPolicy]);
@@ -494,15 +511,17 @@ const InviteManagePage: React.FC = () => {
         <h1 className="text-2xl font-bold text-default-800">邀请管理</h1>
       </div>
 
-      <InviteCashbackDataCenter campaigns={cashbackConfig.campaigns} />
-      <InviteCashbackConfigEditor
+      {canReadAnalytics && <InviteCashbackDataCenter campaigns={cashbackConfig.campaigns} />}
+      {canReadCashback && <InviteCashbackConfigEditor
         config={cashbackConfig}
         isLoading={cashbackLoading}
         isSaving={savingCashback}
+        readOnly={!canUpdateCashback}
         onChange={setCashbackConfig}
         onSave={handleSaveCashbackConfig}
-      />
+      />}
 
+      {canReadRewards && <>
       <Card>
         <CardHeader className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2"><Wallet className="w-4 h-4" /><span className="font-medium">邀请奖励流水</span></div>
@@ -610,12 +629,14 @@ const InviteManagePage: React.FC = () => {
           </div>
         </CardBody>
       </Card>
+      </>}
 
+      {canReadWithdrawals && <>
       <Card>
         <CardHeader className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2"><Ticket className="w-4 h-4" /><span className="font-medium">提现工单</span></div>
           <div className="flex flex-wrap gap-2">
-            <Button
+            {canReviewWithdrawals && <Button
               color="success"
               variant="flat"
               startContent={<CheckCheck className="w-4 h-4" />}
@@ -623,7 +644,7 @@ const InviteManagePage: React.FC = () => {
               onPress={onBatchPaidOpen}
             >
               批量完成已打款{selectedPayableWorkorders.length ? `（${selectedPayableWorkorders.length}）` : ''}
-            </Button>
+            </Button>}
             <Button variant="flat" color="primary" startContent={<RefreshCw className="w-4 h-4" />} onPress={loadWorkorders}>刷新工单</Button>
           </div>
         </CardHeader>
@@ -635,6 +656,7 @@ const InviteManagePage: React.FC = () => {
                   aria-label="选择全部可打款提现工单"
                   isSelected={allPayableOnPageSelected}
                   isIndeterminate={somePayableOnPageSelected}
+                  isDisabled={!canReviewWithdrawals}
                   onValueChange={togglePayableWorkorders}
                 />
               </TableColumn>
@@ -654,7 +676,7 @@ const InviteManagePage: React.FC = () => {
                       <Checkbox
                         aria-label={`选择提现工单 ${item.id}`}
                         isSelected={selectedWorkorders.has(item.id)}
-                        isDisabled={!payable}
+                        isDisabled={!canReviewWithdrawals || !payable}
                         onValueChange={(selected) => toggleWorkorder(item, selected)}
                       />
                     </TableCell>
@@ -669,7 +691,7 @@ const InviteManagePage: React.FC = () => {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Button size="sm" color="primary" variant="flat" isDisabled={!payable} onPress={() => openWorkorderModal(item)}>处理</Button>
+                      <Button size="sm" color="primary" variant="flat" isDisabled={canReviewWithdrawals ? !payable : false} onPress={() => openWorkorderModal(item)}>{canReviewWithdrawals ? '处理' : '查看'}</Button>
                     </TableCell>
                   </TableRow>
                 );
@@ -678,7 +700,9 @@ const InviteManagePage: React.FC = () => {
           </Table>
         </CardBody>
       </Card>
+      </>}
 
+      {canReadUsers && <>
       <Card>
         <CardHeader className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2"><Users className="w-4 h-4" /><span className="font-medium">邀请人专属规则</span></div>
@@ -715,7 +739,7 @@ const InviteManagePage: React.FC = () => {
                   <TableCell>{user.inviter_code || '-'}</TableCell>
                   <TableCell>{formatInviterRuleSummary(user)}</TableCell>
                   <TableCell>
-                    <Button size="sm" color="primary" variant="flat" onPress={() => openInviterModal(user)}>编辑规则</Button>
+                    <Button size="sm" color="primary" variant="flat" onPress={() => openInviterModal(user)}>{canUpdateUserPolicy ? '编辑规则' : '查看规则'}</Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -735,11 +759,13 @@ const InviteManagePage: React.FC = () => {
           </div>
         </CardBody>
       </Card>
+      </>}
 
+      {canReadPolicy && <>
       <Card>
         <CardHeader className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2"><Settings2 className="w-4 h-4" /><span className="font-medium">全局邀请规则</span></div>
-          <Button color="primary" startContent={<Save className="w-4 h-4" />} isLoading={savingPolicy} onPress={handleSaveGlobalPolicy}>保存规则</Button>
+          {canUpdatePolicy && <Button color="primary" startContent={<Save className="w-4 h-4" />} isLoading={savingPolicy} onPress={handleSaveGlobalPolicy}>保存规则</Button>}
         </CardHeader>
         <CardBody>
           {policyLoading ? (
@@ -747,19 +773,20 @@ const InviteManagePage: React.FC = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
-                <Switch isSelected={globalPolicyForm.enabled} onValueChange={(checked) => setGlobalPolicyForm((prev) => ({ ...prev, enabled: checked }))}>
+                <Switch isSelected={globalPolicyForm.enabled} onValueChange={(checked) => setGlobalPolicyForm((prev) => ({ ...prev, enabled: checked }))} isDisabled={!canUpdatePolicy}>
                   启用邀请返时长奖励
                 </Switch>
               </div>
-              <NumberInput label="默认奖励比例" value={globalPolicyForm.reward_ratio === '' ? undefined : Number(globalPolicyForm.reward_ratio)} onValueChange={(reward_ratio) => setGlobalPolicyForm((prev) => ({ ...prev, reward_ratio: Number.isNaN(reward_ratio) ? '' : String(reward_ratio) }))} minValue={0} maxValue={1} step={0.01} description="0.15 表示 15%" />
-              <NumberInput label="默认奖励前 N 单" value={globalPolicyForm.max_reward_order_count === '' ? undefined : Number(globalPolicyForm.max_reward_order_count)} onValueChange={(max_reward_order_count) => setGlobalPolicyForm((prev) => ({ ...prev, max_reward_order_count: Number.isNaN(max_reward_order_count) ? '' : String(max_reward_order_count) }))} minValue={0} step={1} />
+              <NumberInput label="默认奖励比例" value={globalPolicyForm.reward_ratio === '' ? undefined : Number(globalPolicyForm.reward_ratio)} onValueChange={(reward_ratio) => setGlobalPolicyForm((prev) => ({ ...prev, reward_ratio: Number.isNaN(reward_ratio) ? '' : String(reward_ratio) }))} minValue={0} maxValue={1} step={0.01} description="0.15 表示 15%" isDisabled={!canUpdatePolicy} />
+              <NumberInput label="默认奖励前 N 单" value={globalPolicyForm.max_reward_order_count === '' ? undefined : Number(globalPolicyForm.max_reward_order_count)} onValueChange={(max_reward_order_count) => setGlobalPolicyForm((prev) => ({ ...prev, max_reward_order_count: Number.isNaN(max_reward_order_count) ? '' : String(max_reward_order_count) }))} minValue={0} step={1} isDisabled={!canUpdatePolicy} />
               <div className="md:col-span-2">
-                <Textarea label="套餐覆盖规则 JSON（可选）" value={globalPolicyForm.package_rules} onValueChange={(package_rules) => setGlobalPolicyForm((prev) => ({ ...prev, package_rules }))} minRows={6} placeholder={'例如：{\n  "5": { "reward_ratio": 0.15 }\n}'} />
+                <Textarea label="套餐覆盖规则 JSON（可选）" value={globalPolicyForm.package_rules} onValueChange={(package_rules) => setGlobalPolicyForm((prev) => ({ ...prev, package_rules }))} minRows={6} placeholder={'例如：{\n  "5": { "reward_ratio": 0.15 }\n}'} isReadOnly={!canUpdatePolicy} />
               </div>
             </div>
           )}
         </CardBody>
       </Card>
+      </>}
       <Modal isOpen={isInviterOpen} onClose={onInviterClose} size="2xl" scrollBehavior="inside">
         <ModalContent>
           <ModalHeader>编辑邀请人专属规则</ModalHeader>
@@ -767,19 +794,19 @@ const InviteManagePage: React.FC = () => {
             {selectedInviter && (
               <div className="space-y-4">
                 <Alert isVisible color="default" variant="flat" title={selectedInviter.username || selectedInviter.email} description={`邀请码：${selectedInviter.inviter_code || '-'}`} />
-                <Switch isSelected={inviterPolicyForm.enabled} onValueChange={(checked) => setInviterPolicyForm((prev) => ({ ...prev, enabled: checked }))}>启用该邀请人的返时长规则</Switch>
+                <Switch isSelected={inviterPolicyForm.enabled} onValueChange={(checked) => setInviterPolicyForm((prev) => ({ ...prev, enabled: checked }))} isDisabled={!canUpdateUserPolicy}>启用该邀请人的返时长规则</Switch>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <NumberInput label="奖励比例" value={inviterPolicyForm.reward_ratio === '' ? undefined : Number(inviterPolicyForm.reward_ratio)} onValueChange={(reward_ratio) => setInviterPolicyForm((prev) => ({ ...prev, reward_ratio: Number.isNaN(reward_ratio) ? '' : String(reward_ratio) }))} minValue={0} maxValue={1} step={0.01} description="0.15 表示 15%" />
-                  <NumberInput label="奖励前 N 单" value={inviterPolicyForm.max_reward_order_count === '' ? undefined : Number(inviterPolicyForm.max_reward_order_count)} onValueChange={(max_reward_order_count) => setInviterPolicyForm((prev) => ({ ...prev, max_reward_order_count: Number.isNaN(max_reward_order_count) ? '' : String(max_reward_order_count) }))} minValue={0} step={1} />
+                  <NumberInput label="奖励比例" value={inviterPolicyForm.reward_ratio === '' ? undefined : Number(inviterPolicyForm.reward_ratio)} onValueChange={(reward_ratio) => setInviterPolicyForm((prev) => ({ ...prev, reward_ratio: Number.isNaN(reward_ratio) ? '' : String(reward_ratio) }))} minValue={0} maxValue={1} step={0.01} description="0.15 表示 15%" isDisabled={!canUpdateUserPolicy} />
+                  <NumberInput label="奖励前 N 单" value={inviterPolicyForm.max_reward_order_count === '' ? undefined : Number(inviterPolicyForm.max_reward_order_count)} onValueChange={(max_reward_order_count) => setInviterPolicyForm((prev) => ({ ...prev, max_reward_order_count: Number.isNaN(max_reward_order_count) ? '' : String(max_reward_order_count) }))} minValue={0} step={1} isDisabled={!canUpdateUserPolicy} />
                 </div>
-                <Textarea label="套餐覆盖规则 JSON（可选）" value={inviterPolicyForm.package_rules} onValueChange={(package_rules) => setInviterPolicyForm((prev) => ({ ...prev, package_rules }))} minRows={6} placeholder={'例如：{\n  "5": { "reward_ratio": 0.2 }\n}'} />
+                <Textarea label="套餐覆盖规则 JSON（可选）" value={inviterPolicyForm.package_rules} onValueChange={(package_rules) => setInviterPolicyForm((prev) => ({ ...prev, package_rules }))} minRows={6} placeholder={'例如：{\n  "5": { "reward_ratio": 0.2 }\n}'} isReadOnly={!canUpdateUserPolicy} />
               </div>
             )}
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" color="danger" onPress={handleResetInviterPolicy} isLoading={savingInviterPolicy}>恢复默认</Button>
-            <Button variant="light" onPress={onInviterClose}>取消</Button>
-            <Button color="primary" onPress={handleSaveInviterPolicy} isLoading={savingInviterPolicy}>保存</Button>
+            {canUpdateUserPolicy && <Button variant="light" color="danger" onPress={handleResetInviterPolicy} isLoading={savingInviterPolicy}>恢复默认</Button>}
+            <Button variant="light" onPress={onInviterClose}>关闭</Button>
+            {canUpdateUserPolicy && <Button color="primary" onPress={handleSaveInviterPolicy} isLoading={savingInviterPolicy}>保存</Button>}
           </ModalFooter>
         </ModalContent>
       </Modal>
@@ -808,26 +835,26 @@ const InviteManagePage: React.FC = () => {
 
       <Modal isOpen={isWorkorderOpen} onClose={onWorkorderClose} size="lg">
         <ModalContent>
-          <ModalHeader>处理提现工单</ModalHeader>
+          <ModalHeader>{canReviewWithdrawals ? '处理提现工单' : '查看提现工单'}</ModalHeader>
           <ModalBody>
             {selectedWorkorder && (
               <div className="space-y-4">
                 <div className="text-sm text-default-600">工单 #{selectedWorkorder.id} · 用户 {selectedWorkorder.user_id}</div>
                 <div className="text-sm text-default-600">申请金额：¥{Number(selectedWorkorder.amount || 0).toFixed(2)}</div>
-                <Select label="工单状态" selectedKeys={[workorderStatus]} onSelectionChange={(keys) => setWorkorderStatus(String(Array.from(keys)[0] || 'pending'))}>
+                <Select label="工单状态" selectedKeys={[workorderStatus]} onSelectionChange={(keys) => setWorkorderStatus(String(Array.from(keys)[0] || 'pending'))} isDisabled={!canReviewWithdrawals}>
                   <SelectItem key="pending">待处理</SelectItem>
                   <SelectItem key="processing">处理中</SelectItem>
                   <SelectItem key="paid">已打款</SelectItem>
                   <SelectItem key="rejected">已拒绝</SelectItem>
                   <SelectItem key="cancelled">已取消</SelectItem>
                 </Select>
-                <Textarea label="管理员备注" value={workorderRemark} onValueChange={setWorkorderRemark} minRows={4} />
+                <Textarea label="管理员备注" value={workorderRemark} onValueChange={setWorkorderRemark} minRows={4} isReadOnly={!canReviewWithdrawals} />
               </div>
             )}
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onPress={onWorkorderClose}>取消</Button>
-            <Button color="primary" isLoading={updatingWorkorder} onPress={handleUpdateWorkorder}>保存</Button>
+            <Button variant="light" onPress={onWorkorderClose}>关闭</Button>
+            {canReviewWithdrawals && <Button color="primary" isLoading={updatingWorkorder} onPress={handleUpdateWorkorder}>保存</Button>}
           </ModalFooter>
         </ModalContent>
       </Modal>

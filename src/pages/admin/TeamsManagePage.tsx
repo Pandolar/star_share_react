@@ -50,6 +50,7 @@ import type {
   Package,
 } from '../../types/admin';
 import { showToast } from '../../components/Toast';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
 type MemberAction = 'suspend' | 'resume' | 'remove' | 'revoke';
 type PendingAction =
@@ -94,6 +95,9 @@ const formatDate = (value?: string | null) => value ? dayjs(value).format('YYYY-
 const memberName = (member: AdminTeamMember) => member.username || member.email || `用户 #${member.user_id}`;
 
 const TeamsManagePage: React.FC = () => {
+  const { can } = useAdminAuth();
+  const canManageMembers = can('team.member.manage');
+  const canCancelPending = can('team.cancel_pending');
   const [teams, setTeams] = useState<AdminTeamRecord[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(false);
@@ -232,7 +236,7 @@ const TeamsManagePage: React.FC = () => {
   };
 
   const renderMemberActions = (member: AdminTeamMember) => {
-    if (member.role === 'owner' || selectedTeam?.status !== 'active') return <span className="text-xs text-default-400">-</span>;
+    if (!canManageMembers || member.role === 'owner' || selectedTeam?.status !== 'active') return <span className="text-xs text-default-400">-</span>;
     return (
       <div className="flex flex-wrap justify-end gap-2">
         {member.status === 'active' && <Button size="sm" variant="flat" color="warning" startContent={<PauseCircle className="h-3.5 w-3.5" />} onPress={() => requestMemberAction('suspend', member)}>暂停</Button>}
@@ -318,7 +322,7 @@ const TeamsManagePage: React.FC = () => {
                 <Card shadow="none" className="border border-divider"><CardBody><p className="text-xs text-default-500">席位使用</p><p className="mt-1 text-xl font-bold">{detail.team.member_counts.active + detail.team.member_counts.suspended} / {detail.team.seat_count}</p><p className="text-xs text-default-400">待接受邀请 {detail.team.member_counts.invited}</p></CardBody></Card>
               </div>
               {detail.team.pending_package_id && <Alert color="primary" variant="flat" title="已安排下周期变更" description={`${detail.pending_package?.package_name || `套餐 #${detail.team.pending_package_id}`} · ${detail.team.pending_seat_count || detail.team.seat_count} 席 · ${formatDate(detail.team.pending_effective_at)} 生效`} />}
-              {detail.team.status === 'pending' && <Alert color="warning" variant="flat" title="团队尚未付款生效" description="管理员可取消该团队并使待支付订单失效。" endContent={<Button size="sm" color="danger" variant="flat" startContent={<ShieldAlert className="h-4 w-4" />} onPress={() => requestCancelTeam(detail.team)}>取消待支付团队</Button>} />}
+              {detail.team.status === 'pending' && <Alert color="warning" variant="flat" title="团队尚未付款生效" description={canCancelPending ? '管理员可取消该团队并使待支付订单失效。' : '当前账号没有取消待支付团队的权限。'} endContent={canCancelPending ? <Button size="sm" color="danger" variant="flat" startContent={<ShieldAlert className="h-4 w-4" />} onPress={() => requestCancelTeam(detail.team)}>取消待支付团队</Button> : undefined} />}
               <Divider />
               <Tabs aria-label="团队详情" variant="underlined">
                 <Tab key="members" title={`成员与邀请 (${detail.members.length})`}>

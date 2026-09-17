@@ -50,12 +50,22 @@ import adminApiService from '../../services/adminApi';
 import { User, CreateUserRequest, UpdateUserRequest, UserQueryParams, UserPackage, Order } from '../../types/admin';
 import { showToast } from '../../components/Toast';
 import ExactSearchPopover from '../../components/admin/ExactSearchPopover';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
 /**
  * 用户管理页面
  * 提供用户的增删改查功能
  */
 const UsersManagePage: React.FC = () => {
+    const { can } = useAdminAuth();
+    const canCreate = can('user.create');
+    const canUpdate = can('user.update');
+    const canDelete = can('user.delete');
+    const canChangeStatus = can('user.status.update');
+    const canResetLimit = can('user.limit.reset');
+    const canRefreshPackages = can('user.package_cache.refresh');
+    const canGrantCompensation = can('user.compensation.grant');
+    const canReadPackages = can('package.read');
     // 状态管理
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(false);
@@ -158,6 +168,7 @@ const UsersManagePage: React.FC = () => {
 
     // 加载套餐等级/类别（用于补偿弹窗下拉，去重）
     useEffect(() => {
+            if (!canGrantCompensation || !canReadPackages) return;
         (async () => {
             try {
                 const resp = await adminApiService.getPackages({ page_size: 1000 });
@@ -177,7 +188,7 @@ const UsersManagePage: React.FC = () => {
                 showToast('加载补偿套餐选项失败', 'error');
             }
         })();
-    }, []);
+    }, [canGrantCompensation, canReadPackages]);
 
     // 打开补偿弹窗
     const openCompensationModal = (user: User) => {
@@ -269,9 +280,11 @@ const UsersManagePage: React.FC = () => {
         try {
             if (!selectedUser) return;
 
+            const { status, ...editableFields } = formData;
             const updateData = {
                 id: selectedUser.id,
-                ...formData
+                ...editableFields,
+                ...(canChangeStatus ? { status } : {}),
             } as UpdateUserRequest;
 
             const response = await adminApiService.updateUser(updateData);
@@ -505,7 +518,13 @@ const UsersManagePage: React.FC = () => {
                     <MoreVertical className="w-4 h-4" />
                 </Button>
             </DropdownTrigger>
-            <DropdownMenu aria-label="用户操作">
+            <DropdownMenu aria-label="用户操作" disabledKeys={[
+                ...(!canResetLimit ? ['clear-limit'] : []),
+                ...(!canRefreshPackages ? ['refresh-packages'] : []),
+                ...(!canGrantCompensation ? ['compensation'] : []),
+                ...(!canUpdate ? ['edit'] : []),
+                ...(!canDelete ? ['delete'] : []),
+            ]}>
                 <DropdownItem
                     key="view"
                     startContent={<Eye className="w-4 h-4" />}
@@ -631,7 +650,7 @@ const UsersManagePage: React.FC = () => {
                     共 {total} 个用户
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                    <Button
+                    {canResetLimit && <Button
                         variant="bordered"
                         color="primary"
                         startContent={<RefreshCw className="w-4 h-4" />}
@@ -642,14 +661,14 @@ const UsersManagePage: React.FC = () => {
                         }}
                     >
                         一键解除限速
-                    </Button>
-                    <Button
+                    </Button>}
+                    {canCreate && <Button
                         color="primary"
                         startContent={<Plus className="w-4 h-4" />}
                         onPress={onCreateOpen}
                     >
                         添加用户
-                    </Button>
+                    </Button>}
                 </div>
             </div>
 
@@ -681,7 +700,7 @@ const UsersManagePage: React.FC = () => {
                             emptyContent="暂无用户数据"
                         >
                             {users.map((user) => (
-                                <TableRow key={user.id} onDoubleClick={() => openEditModal(user)}>
+                                <TableRow key={user.id} onDoubleClick={() => { if (canUpdate) openEditModal(user); }}>
                                     <TableCell>{user.id}</TableCell>
                                     <TableCell><span className="font-medium">{user.username || '未设置用户名'}</span></TableCell>
                                     <TableCell>{renderMembership(user, true)}</TableCell>
@@ -832,6 +851,7 @@ const UsersManagePage: React.FC = () => {
                                 placeholder="选择用户状态"
                                 selectedKeys={formData.status !== undefined ? [String(formData.status)] : []}
                                 onSelectionChange={(keys) => setFormData({ ...formData, status: Number(Array.from(keys)[0] || 1) as 0 | 1 })}
+                                isDisabled={!canChangeStatus}
                             >
                                 <SelectItem key="1">正常</SelectItem>
                                 <SelectItem key="0">禁用</SelectItem>

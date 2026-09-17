@@ -7,6 +7,7 @@ interface Props {
   config: InviteCashbackConfig;
   isLoading: boolean;
   isSaving: boolean;
+  readOnly?: boolean;
   onChange: (config: InviteCashbackConfig) => void;
   onSave: () => void;
 }
@@ -22,7 +23,7 @@ const createCampaign = (): InviteCashbackCampaign => ({
 const toLocalDateTime = (value: string) => value ? value.slice(0, 16) : '';
 const toIsoDateTime = (value: string) => value ? new Date(value).toISOString() : '';
 
-const InviteCashbackConfigEditor: React.FC<Props> = ({ config, isLoading, isSaving, onChange, onSave }) => {
+const InviteCashbackConfigEditor: React.FC<Props> = ({ config, isLoading, isSaving, readOnly = false, onChange, onSave }) => {
   const [newPackageIds, setNewPackageIds] = useState<Record<number, string>>({});
   const updateCampaign = (index: number, update: (campaign: InviteCashbackCampaign) => InviteCashbackCampaign) => {
     onChange({ ...config, campaigns: config.campaigns.map((campaign, i) => i === index ? update(campaign) : campaign) });
@@ -34,9 +35,9 @@ const InviteCashbackConfigEditor: React.FC<Props> = ({ config, isLoading, isSavi
   return <Card>
     <CardHeader className="flex items-center justify-between gap-3 flex-wrap">
       <div><div className="font-medium">限时邀请返现活动</div><p className="text-sm text-default-500">仅自营站生效；每场活动可选择是否给全部符合资格用户默认开启。</p></div>
-      <Button color="primary" startContent={<Save className="w-4 h-4" />} isLoading={isSaving} isDisabled={isLoading} onPress={onSave}>保存返现配置</Button>
+      <Button color="primary" startContent={<Save className="w-4 h-4" />} isLoading={isSaving} isDisabled={isLoading || readOnly} onPress={onSave}>保存返现配置</Button>
     </CardHeader>
-    <CardBody className="space-y-6">
+    <CardBody className={`space-y-6 ${readOnly ? 'pointer-events-none opacity-70' : ''}`} aria-disabled={readOnly}>
       {isLoading ? <div className="py-8 text-center text-default-500">加载返现配置中...</div> : <>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Switch isSelected={config.enabled} onValueChange={enabled => onChange({ ...config, enabled })}>启用返现活动</Switch>
@@ -45,9 +46,9 @@ const InviteCashbackConfigEditor: React.FC<Props> = ({ config, isLoading, isSavi
           <NumberInput label="最低提现金额" value={config.withdrawal.min_amount} onValueChange={min_amount => onChange({ ...config, withdrawal: { ...config.withdrawal, min_amount: Number.isNaN(min_amount) ? 0 : min_amount } })} minValue={0} step={0.01} />
           <Textarea className="md:col-span-2" label="提现提示" value={config.withdrawal.notice} onValueChange={notice => onChange({ ...config, withdrawal: { ...config.withdrawal, notice } })} minRows={2} />
         </div>
-        <div className="flex items-center justify-between"><h2 className="font-medium">活动列表</h2><Button size="sm" variant="flat" color="primary" startContent={<Plus className="w-4 h-4" />} onPress={() => onChange({ ...config, campaigns: [...config.campaigns, createCampaign()] })}>新增活动</Button></div>
+        <div className="flex items-center justify-between"><h2 className="font-medium">活动列表</h2><Button size="sm" variant="flat" color="primary" startContent={<Plus className="w-4 h-4" />} onPress={() => onChange({ ...config, campaigns: [...config.campaigns, createCampaign()] })} isDisabled={readOnly}>新增活动</Button></div>
         {config.campaigns.map((campaign, index) => <Card key={index} className="border border-default-200">
-          <CardHeader className="flex items-center justify-between"><span className="font-medium">活动 {index + 1}</span><Button isIconOnly size="sm" color="danger" variant="light" aria-label="删除活动" onPress={() => onChange({ ...config, campaigns: config.campaigns.filter((_, i) => i !== index) })}><Trash2 className="w-4 h-4" /></Button></CardHeader>
+          <CardHeader className="flex items-center justify-between"><span className="font-medium">活动 {index + 1}</span><Button isIconOnly size="sm" color="danger" variant="light" aria-label="删除活动" onPress={() => onChange({ ...config, campaigns: config.campaigns.filter((_, i) => i !== index) })} isDisabled={readOnly}><Trash2 className="w-4 h-4" /></Button></CardHeader>
           <CardBody className="space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Input label="活动 ID" value={campaign.id} onValueChange={id => updateCampaign(index, c => ({ ...c, id }))} description="字母、数字、下划线或连字符" />

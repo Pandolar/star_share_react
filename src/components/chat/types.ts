@@ -102,9 +102,7 @@ export interface ChatConfig {
   limits: {
     max_subject_length: number;
     max_content_length: number;
-    max_open_conversations_per_user: number;
     auto_close_days: number;
-    allow_reopen: boolean;
   };
   badge: { enabled: boolean; max_display: number; show_on_floating: boolean };
 }

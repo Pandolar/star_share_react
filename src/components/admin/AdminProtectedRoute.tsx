@@ -1,24 +1,15 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { Spinner } from '@heroui/react';
-import { useAdminAuth } from '../../hooks/useAdminAuth';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
 interface AdminProtectedRouteProps {
     children: React.ReactNode;
 }
 
 const AdminProtectedRoute: React.FC<AdminProtectedRouteProps> = ({ children }) => {
-    const { isAuthenticated, isLoading, checkAuth } = useAdminAuth();
+    const { isAuthenticated, isLoading, principal } = useAdminAuth();
     const location = useLocation();
-
-    useEffect(() => {
-
-        // 如果在admin路径下且未认证，重新检查
-        if (location.pathname.startsWith('/star-admin') && !isAuthenticated && !isLoading) {
-            checkAuth();
-        }
-    }, [location.pathname, isAuthenticated, isLoading, checkAuth]);
-
 
     if (isLoading) {
         return (
@@ -32,10 +23,14 @@ const AdminProtectedRoute: React.FC<AdminProtectedRouteProps> = ({ children }) =
     }
 
     if (!isAuthenticated) {
-        return <Navigate to="/star-admin/login" replace />;
+        return <Navigate to="/star-admin/login" replace state={{ from: location.pathname }} />;
+    }
+
+    if (principal?.must_change_password && location.pathname !== '/star-admin/security') {
+        return <Navigate to="/star-admin/security?forcePassword=1" replace />;
     }
 
     return <>{children}</>;
 };
 
-export default AdminProtectedRoute; 
+export default AdminProtectedRoute;

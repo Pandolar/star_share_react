@@ -27,6 +27,7 @@ import { Eye, FileClock, RefreshCw, Save, Search, Settings2, ShieldCheck } from 
 import adminApiService from '../../services/adminApi';
 import { showToast } from '../../components/Toast';
 import type { AuditLogCatalogItem, AuditLogRecord, AuditLogRetentionMode, AuditLogRetentionPolicy } from '../../types/admin';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
 const PAGE_SIZE = 20;
 
@@ -108,6 +109,8 @@ const resultColor = (record: AuditLogRecord): 'success' | 'danger' | 'warning' |
 };
 
 const AuditLogsPage: React.FC = () => {
+  const { can } = useAdminAuth();
+  const canUpdateRetention = can('audit.retention.update');
   const [rows, setRows] = useState<AuditLogRecord[]>([]);
   const [catalog, setCatalog] = useState<AuditLogCatalogItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -254,7 +257,7 @@ const AuditLogsPage: React.FC = () => {
             <p className="text-sm text-default-500">统一查看安全审计、资金流水和关键业务记录</p>
           </div>
         </div>
-        <div className="flex gap-2"><Tooltip content="按日志类型设置永久、按天或按最新条数保留"><Button variant="flat" startContent={<Settings2 size={16} />} onPress={openRetention}>保留策略</Button></Tooltip><Button variant="flat" startContent={<RefreshCw size={16} />} onPress={load} isLoading={loading}>刷新</Button></div>
+        <div className="flex gap-2">{canUpdateRetention && <Tooltip content="按日志类型设置永久、按天或按最新条数保留"><Button variant="flat" startContent={<Settings2 size={16} />} onPress={openRetention}>保留策略</Button></Tooltip>}<Button variant="flat" startContent={<RefreshCw size={16} />} onPress={load} isLoading={loading}>刷新</Button></div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -342,7 +345,7 @@ const AuditLogsPage: React.FC = () => {
               );
             })}
           </ModalBody>
-          <ModalFooter><Button variant="light" onPress={() => setRetentionOpen(false)}>取消</Button><Button color="primary" startContent={<Save size={16} />} isLoading={retentionSaving} onPress={saveRetention}>保存并立即清理</Button></ModalFooter>
+          <ModalFooter><Button variant="light" onPress={() => setRetentionOpen(false)}>取消</Button>{canUpdateRetention && <Button color="primary" startContent={<Save size={16} />} isLoading={retentionSaving} onPress={saveRetention}>保存并立即清理</Button>}</ModalFooter>
         </ModalContent>
       </Modal>
 

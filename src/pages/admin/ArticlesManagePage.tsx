@@ -55,6 +55,7 @@ import remarkGfm from 'remark-gfm';
 import adminApiService from '../../services/adminApi';
 import { showToast } from '../../components/Toast';
 import type { ArticleStatus, ArticleSummary, SaveArticleRequest } from '../../types/admin';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
 const EMPTY_ARTICLE: SaveArticleRequest = {
   identifier: '',
@@ -97,6 +98,11 @@ const MarkdownPreview: FC<{ article: Pick<SaveArticleRequest, 'title' | 'descrip
 );
 
 const ArticlesManagePage: FC = () => {
+  const { can } = useAdminAuth();
+  const canCreate = can('article.create');
+  const canUpdate = can('article.update');
+  const canPublish = can('article.publish');
+  const canDelete = can('article.delete');
   const [rows, setRows] = useState<ArticleSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [queryInput, setQueryInput] = useState('');
@@ -273,7 +279,7 @@ const ArticlesManagePage: FC = () => {
         </div>
         <div className="flex gap-2">
           <Button variant="flat" startContent={<RefreshCw size={16} />} onPress={load} isLoading={loading}>刷新</Button>
-          <Button color="primary" startContent={<FilePlus2 size={16} />} onPress={openCreate}>新增文章</Button>
+          {canCreate && <Button color="primary" startContent={<FilePlus2 size={16} />} onPress={openCreate}>新增文章</Button>}
         </div>
       </div>
 
@@ -302,11 +308,11 @@ const ArticlesManagePage: FC = () => {
               <TableCell><span className="whitespace-nowrap text-sm">{formatTime(row.updated_at)}</span></TableCell>
               <TableCell>
                 <div className="flex justify-end gap-1">
-                  <Tooltip content="编辑"><Button isIconOnly size="sm" variant="light" aria-label={`编辑${row.title}`} onPress={() => void openEdit(row.identifier)}><Pencil size={16} /></Button></Tooltip>
+                  {canUpdate && <Tooltip content="编辑"><Button isIconOnly size="sm" variant="light" aria-label={`编辑${row.title}`} onPress={() => void openEdit(row.identifier)}><Pencil size={16} /></Button></Tooltip>}
                   <Tooltip content="复制链接"><Button isIconOnly size="sm" variant="light" aria-label={`复制${row.title}链接`} onPress={() => void copyLink(row.identifier)}><Copy size={16} /></Button></Tooltip>
                   <Tooltip content="打开公开页"><Button isIconOnly size="sm" variant="light" aria-label={`打开${row.title}`} onPress={() => window.open(publicUrl(row.identifier), '_blank', 'noopener,noreferrer')} isDisabled={row.status !== 'published'}><ExternalLink size={16} /></Button></Tooltip>
-                  <Button size="sm" variant="flat" color={row.status === 'published' ? 'warning' : 'success'} onPress={() => void changeStatus(row, row.status === 'published' ? 'draft' : 'published')} isDisabled={saving}>{row.status === 'published' ? '撤回' : '发布'}</Button>
-                  <Tooltip content="删除"><Button isIconOnly size="sm" color="danger" variant="light" aria-label={`删除${row.title}`} onPress={() => confirmDelete(row)}><Trash2 size={16} /></Button></Tooltip>
+                  {canPublish && <Button size="sm" variant="flat" color={row.status === 'published' ? 'warning' : 'success'} onPress={() => void changeStatus(row, row.status === 'published' ? 'draft' : 'published')} isDisabled={saving}>{row.status === 'published' ? '撤回' : '发布'}</Button>}
+                  {canDelete && <Tooltip content="删除"><Button isIconOnly size="sm" color="danger" variant="light" aria-label={`删除${row.title}`} onPress={() => confirmDelete(row)}><Trash2 size={16} /></Button></Tooltip>}
                 </div>
               </TableCell>
             </TableRow>
@@ -324,7 +330,7 @@ const ArticlesManagePage: FC = () => {
                 <Input label="文章标题" value={form.title} onValueChange={(title) => setForm((current) => ({ ...current, title }))} maxLength={120} isRequired />
                 <Input label="页面标识符" value={form.identifier} onValueChange={(identifier) => setForm((current) => ({ ...current, identifier: identifier.toLowerCase() }))} placeholder="getting-started" description={`公开地址：/star/doc/${form.identifier || '标识符'}`} maxLength={64} isRequired />
                 <Textarea className="md:col-span-2" label="SEO 摘要" value={form.description || ''} onValueChange={(description) => setForm((current) => ({ ...current, description }))} maxLength={300} minRows={2} description={`${(form.description || '').length}/300`} />
-                <Select label="发布状态" selectedKeys={[form.status]} onSelectionChange={(keys) => setForm((current) => ({ ...current, status: String(Array.from(keys)[0] || 'draft') as ArticleStatus }))}>
+                <Select label="发布状态" selectedKeys={[form.status]} onSelectionChange={(keys) => setForm((current) => ({ ...current, status: String(Array.from(keys)[0] || 'draft') as ArticleStatus }))} isDisabled={!canPublish}>
                   <SelectItem key="draft">草稿（公开页 404）</SelectItem>
                   <SelectItem key="published">已发布（公开可访问）</SelectItem>
                 </Select>
@@ -351,7 +357,7 @@ const ArticlesManagePage: FC = () => {
           <ModalFooter>
             <Button variant="light" onPress={() => setEditorOpen(false)}>关闭</Button>
             {currentIdentifier && form.status === 'published' && <Button variant="flat" startContent={<ExternalLink size={16} />} onPress={() => window.open(publicUrl(form.identifier), '_blank', 'noopener,noreferrer')}>打开公开页</Button>}
-            <Button color="primary" startContent={<Save size={16} />} isLoading={saving} isDisabled={editorLoading} onPress={() => void save()}>保存文章</Button>
+            <Button color="primary" startContent={<Save size={16} />} isLoading={saving} isDisabled={editorLoading || (currentIdentifier ? !canUpdate : !canCreate) || (form.status === 'published' && !canPublish)} onPress={() => void save()}>保存文章</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

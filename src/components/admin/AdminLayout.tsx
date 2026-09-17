@@ -37,8 +37,10 @@ import {
     FileText,
     MessageSquare,
     Headphones,
+    UserCog,
+    KeyRound,
 } from 'lucide-react';
-import adminApiService from '../../services/adminApi';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
 /**
  * 管理后台布局组件
@@ -48,6 +50,7 @@ const AdminLayout: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const { principal, can, canAny, logout } = useAdminAuth();
 
     // 获取当前激活的Tab
     const getCurrentTab = (): string => {
@@ -61,110 +64,32 @@ const AdminLayout: React.FC = () => {
     };
 
     // 处理登出
-    const handleLogout = (): void => {
-        adminApiService.logout();
-        navigate('/star-admin/login');
+    const handleLogout = async (): Promise<void> => {
+        await logout();
+        navigate('/star-admin/login', { replace: true });
     };
 
-    // 导航菜单项配置
+    // 导航与后端权限一一对应；无权限页面不显示入口，直接访问仍由路由守卫和后端拒绝。
     const menuItems = [
-        {
-            key: 'overview',
-            label: '系统总览',
-            icon: <BarChart3 className="w-5 h-5" />,
-            path: '/star-admin/overview',
-        },
-        {
-            key: 'users',
-            label: '用户管理',
-            icon: <Users className="w-5 h-5" />,
-            path: '/star-admin/users',
-        },
-        {
-            key: 'packages',
-            label: '套餐管理',
-            icon: <Package className="w-5 h-5" />,
-            path: '/star-admin/packages',
-        },
-        {
-            key: 'user-packages',
-            label: '用户套餐',
-            icon: <UserCheck className="w-5 h-5" />,
-            path: '/star-admin/user-packages',
-        },
-        {
-            key: 'teams',
-            label: '团队管理',
-            icon: <Users className="w-5 h-5" />,
-            path: '/star-admin/teams',
-        },
-        {
-            key: 'orders',
-            label: '订单管理',
-            icon: <ShoppingCart className="w-5 h-5" />,
-            path: '/star-admin/orders',
-        },
-        {
-            key: 'invoices',
-            label: '开票管理',
-            icon: <ReceiptText className="w-5 h-5" />,
-            path: '/star-admin/invoices',
-        },
-        {
-            key: 'cdk',
-            label: 'CDK管理',
-            icon: <CreditCard className="w-5 h-5" />,
-            path: '/star-admin/cdk',
-        },
-        {
-            key: 'distributors',
-            label: '分销商管理',
-            icon: <Users className="w-5 h-5" />,
-            path: '/star-admin/distributors',
-        },
-        {
-            key: 'customer-service',
-            label: '在线客服',
-            icon: <Headphones className="w-[18px] h-[18px]" />,
-            path: '/star-admin/customer-service',
-        },
-        {
-            key: 'articles',
-            label: '文章管理',
-            icon: <FileText className="w-5 h-5" />,
-            path: '/star-admin/articles',
-        },
-        {
-            key: 'audit-logs',
-            label: '审计日志',
-            icon: <ScrollText className="w-5 h-5" />,
-            path: '/star-admin/audit-logs',
-        },
-        {
-            key: 'runtime-logs',
-            label: '运行日志',
-            icon: <FileSearch className="w-5 h-5" />,
-            path: '/star-admin/runtime-logs',
-        },
-        {
-            key: 'settings',
-            label: '系统配置',
-            icon: <Settings className="w-5 h-5" />,
-            path: '/star-admin/settings',
-        },
-        {
-            key: 'invites',
-            label: '邀请管理',
-            icon: <Gift className="w-5 h-5" />,
-            path: '/star-admin/invites',
-        },
-        {
-            key: 'feedback',
-            label: '工单管理',
-            icon: <MessageSquare className="w-5 h-5" />,
-            path: '/star-admin/feedback',
-        },
-    ];
+        { key: 'overview', label: '系统总览', icon: <BarChart3 className="w-5 h-5" />, path: '/star-admin/overview', permission: 'dashboard.read' },
+        { key: 'users', label: '用户管理', icon: <Users className="w-5 h-5" />, path: '/star-admin/users', permission: 'user.read' },
+        { key: 'packages', label: '套餐管理', icon: <Package className="w-5 h-5" />, path: '/star-admin/packages', permission: 'package.read' },
+        { key: 'user-packages', label: '用户套餐', icon: <UserCheck className="w-5 h-5" />, path: '/star-admin/user-packages', permission: 'user_package.read' },
+        { key: 'teams', label: '团队管理', icon: <Users className="w-5 h-5" />, path: '/star-admin/teams', permission: 'team.read' },
+        { key: 'orders', label: '订单管理', icon: <ShoppingCart className="w-5 h-5" />, path: '/star-admin/orders', permission: 'order.read' },
+        { key: 'invoices', label: '开票管理', icon: <ReceiptText className="w-5 h-5" />, path: '/star-admin/invoices', permission: 'invoice.read' },
+        { key: 'cdk', label: 'CDK管理', icon: <CreditCard className="w-5 h-5" />, path: '/star-admin/cdk', permission: 'cdk.read' },
+        { key: 'distributors', label: '分销商管理', icon: <Users className="w-5 h-5" />, path: '/star-admin/distributors', permission: 'distributor.read' },
+        { key: 'customer-service', label: '在线客服', icon: <Headphones className="w-[18px] h-[18px]" />, path: '/star-admin/customer-service', permission: 'customer_service.conversation.read' },
+        { key: 'articles', label: '文章管理', icon: <FileText className="w-5 h-5" />, path: '/star-admin/articles', permission: 'article.read' },
+        { key: 'audit-logs', label: '审计日志', icon: <ScrollText className="w-5 h-5" />, path: '/star-admin/audit-logs', permission: 'audit.read' },
+        { key: 'runtime-logs', label: '运行日志', icon: <FileSearch className="w-5 h-5" />, path: '/star-admin/runtime-logs', permission: 'runtime_log.read' },
+        { key: 'settings', label: '系统配置', icon: <Settings className="w-5 h-5" />, path: '/star-admin/settings', permission: 'config.read' },
+        { key: 'invites', label: '邀请管理', icon: <Gift className="w-5 h-5" />, path: '/star-admin/invites', permission: null, anyOf: ['invite.policy.read', 'invite.cashback.read', 'invite.analytics.read', 'invite.reward.read', 'invite.withdrawal.read'] },
+        { key: 'feedback', label: '工单管理', icon: <MessageSquare className="w-5 h-5" />, path: '/star-admin/feedback', permission: 'feedback.read' },
+        { key: 'administrators', label: '管理员与角色', icon: <UserCog className="w-5 h-5" />, path: '/star-admin/administrators', permission: 'administrator.account.read' },
+        { key: 'security', label: '账号安全', icon: <KeyRound className="w-5 h-5" />, path: '/star-admin/security', permission: null },
+    ].filter((item) => 'anyOf' in item ? canAny(...(item.anyOf || [])) : can(item.permission));
 
     return (
         <div className="min-h-screen bg-default-50">
@@ -210,23 +135,21 @@ const AdminLayout: React.FC = () => {
                         <Dropdown>
                             <DropdownTrigger>
                                 <User
-                                    name="管理员"
-                                    description="系统管理员"
+                                    name={principal?.display_name || principal?.username || '管理员'}
+                                    description={principal?.is_superadmin ? '超级管理员' : principal?.roles.map((role) => role.name).join('、') || '管理员'}
                                     avatarProps={{
                                         src: "",
-                                        fallback: "Admin",
+                                        fallback: (principal?.display_name || principal?.username || 'A').slice(0, 2),
                                         color: "primary",
                                     }}
                                     className="cursor-pointer"
                                 />
                             </DropdownTrigger>
                             <DropdownMenu aria-label="用户菜单">
-                                <DropdownItem
-                                    key="logout"
-                                    color="danger"
-                                    startContent={<LogOut className="w-4 h-4" />}
-                                    onPress={handleLogout}
-                                >
+                                <DropdownItem key="security" startContent={<KeyRound className="w-4 h-4" />} onPress={() => navigate('/star-admin/security')}>
+                                    账号安全
+                                </DropdownItem>
+                                <DropdownItem key="logout" color="danger" startContent={<LogOut className="w-4 h-4" />} onPress={() => void handleLogout()}>
                                     退出登录
                                 </DropdownItem>
                             </DropdownMenu>

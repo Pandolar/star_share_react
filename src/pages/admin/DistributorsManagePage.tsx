@@ -60,6 +60,7 @@ import {
 import dayjs from 'dayjs';
 import adminApiService from '../../services/adminApi';
 import { showToast } from '../../components/Toast';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
 type PermissionKey = 'can_login' | 'can_generate_cdk' | 'can_edit_notice';
 
@@ -188,6 +189,12 @@ const domainsOverlap = (left: string, right: string) => (
 const toOptionalRate = (value: number) => (Number.isNaN(value) ? undefined : value);
 
 const DistributorsManagePage: React.FC = () => {
+    const { can } = useAdminAuth();
+    const canCreate = can('distributor.create');
+    const canUpdate = can('distributor.update');
+    const canDelete = can('distributor.delete');
+    const canAdjustBalance = can('distributor.balance.adjust');
+    const canUpdateDiscount = can('distributor.discount.update');
     const [distributors, setDistributors] = useState<Distributor[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchInput, setSearchInput] = useState('');
@@ -662,6 +669,7 @@ const DistributorsManagePage: React.FC = () => {
                 step={0.01}
                 placeholder="留空表示不设置"
                 description="例如 0.8 表示按原价的 80% 结算。"
+                isDisabled={!canUpdateDiscount}
             />
             <Table aria-label={`${saveLabel}套餐折扣`} classNames={{ wrapper: 'max-h-80' }}>
                 <TableHeader>
@@ -684,13 +692,14 @@ const DistributorsManagePage: React.FC = () => {
                                     maxValue={1}
                                     step={0.01}
                                     placeholder="继承整体/上级"
+                                    isDisabled={!canUpdateDiscount}
                                 />
                             </TableCell>
                         </TableRow>
                     ))}
                 </TableBody>
             </Table>
-            <Button color={color} onPress={onSave} isLoading={discountSaving}>{saveLabel}</Button>
+            {canUpdateDiscount && <Button color={color} onPress={onSave} isLoading={discountSaving}>{saveLabel}</Button>}
         </div>
     );
 
@@ -824,7 +833,7 @@ const DistributorsManagePage: React.FC = () => {
                     </div>
                     <p className="mt-1 text-sm text-default-500">管理白牌域名归属、账号权限、余额、折扣和卡密生成规则。</p>
                 </div>
-                <Button color="primary" startContent={<Plus className="h-4 w-4" />} onPress={openCreateModal}>创建分销商</Button>
+                {canCreate && <Button color="primary" startContent={<Plus className="h-4 w-4" />} onPress={openCreateModal}>创建分销商</Button>}
             </header>
 
             <Accordion variant="splitted" defaultExpandedKeys={['guide']}>
@@ -912,7 +921,7 @@ const DistributorsManagePage: React.FC = () => {
                                         <TableCell>
                                             <Dropdown placement="bottom-end">
                                                 <DropdownTrigger><Button isIconOnly size="sm" variant="light" aria-label={`操作 ${distributor.username}`}><MoreVertical className="h-4 w-4" /></Button></DropdownTrigger>
-                                                <DropdownMenu aria-label="分销商操作">
+                                                <DropdownMenu aria-label="分销商操作" disabledKeys={[...(!canUpdate ? ['edit', 'status'] : []), ...(!canDelete ? ['delete'] : [])]}>
                                                     <DropdownItem key="view" startContent={<Eye className="h-4 w-4" />} onPress={() => { setSelectedDistributor(distributor); viewModal.onOpen(); }}>查看详情</DropdownItem>
                                                     <DropdownItem key="balance" startContent={<Wallet className="h-4 w-4" />} onPress={() => openBalanceModal(distributor)}>余额与流水</DropdownItem>
                                                     <DropdownItem key="discount" startContent={<Percent className="h-4 w-4" />} onPress={() => openDiscountModal(distributor)}>折扣设置</DropdownItem>
@@ -974,10 +983,10 @@ const DistributorsManagePage: React.FC = () => {
                 <ModalContent>{(onClose) => <><ModalHeader>余额管理：{selectedDistributor?.username}</ModalHeader><ModalBody className="gap-5">
                     <div className="grid gap-4 sm:grid-cols-2"><Card shadow="none"><CardBody><p className="text-sm text-default-500">当前余额</p><p className="mt-1 text-3xl font-semibold">¥{Number(selectedDistributor?.balance || 0).toFixed(2)}</p></CardBody></Card><Card shadow="none"><CardBody><p className="text-sm text-default-500">操作后余额</p><p className={`mt-1 text-3xl font-semibold ${projectedBalance < 0 ? 'text-danger' : ''}`}>¥{projectedBalance.toFixed(2)}</p></CardBody></Card></div>
                     <Form className="grid gap-4 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); handleBalanceChange(); }}>
-                        <Select label="余额操作" selectedKeys={[balanceAction]} onSelectionChange={(keys) => setBalanceAction(String(Array.from(keys)[0] || 'recharge') as 'recharge' | 'deduct')}><SelectItem key="recharge">充值（增加余额）</SelectItem><SelectItem key="deduct">扣减（减少余额）</SelectItem></Select>
-                        <NumberInput label="金额（元）" value={balanceAmount} onValueChange={(value) => setBalanceAmount(toOptionalRate(value))} minValue={0.01} step={0.01} isRequired />
-                        <Input className="sm:col-span-2" label="操作备注" value={balanceRemarks} onValueChange={setBalanceRemarks} placeholder="例如：首次充值、季度返点、退款扣减" />
-                        <Button className="sm:col-span-2" type="submit" color={balanceAction === 'recharge' ? 'success' : 'danger'} isLoading={balanceSubmitting}>{balanceAction === 'recharge' ? '确认充值' : '确认扣减'}</Button>
+                        <Select label="余额操作" selectedKeys={[balanceAction]} onSelectionChange={(keys) => setBalanceAction(String(Array.from(keys)[0] || 'recharge') as 'recharge' | 'deduct')} isDisabled={!canAdjustBalance}><SelectItem key="recharge">充值（增加余额）</SelectItem><SelectItem key="deduct">扣减（减少余额）</SelectItem></Select>
+                        <NumberInput label="金额（元）" value={balanceAmount} onValueChange={(value) => setBalanceAmount(toOptionalRate(value))} minValue={0.01} step={0.01} isRequired isDisabled={!canAdjustBalance} />
+                        <Input className="sm:col-span-2" label="操作备注" value={balanceRemarks} onValueChange={setBalanceRemarks} placeholder="例如：首次充值、季度返点、退款扣减" isDisabled={!canAdjustBalance} />
+                        {canAdjustBalance && <Button className="sm:col-span-2" type="submit" color={balanceAction === 'recharge' ? 'success' : 'danger'} isLoading={balanceSubmitting}>{balanceAction === 'recharge' ? '确认充值' : '确认扣减'}</Button>}
                     </Form>
                     <Divider />
                     <div><div className="mb-3 flex items-center justify-between"><p className="font-medium">最近余额流水</p><Button size="sm" variant="flat" startContent={<RefreshCw className="h-4 w-4" />} onPress={() => selectedDistributor && loadBalanceLogs(selectedDistributor)}>刷新</Button></div>

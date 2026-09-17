@@ -4,6 +4,7 @@ import { MessageSquare, RefreshCw, Search } from 'lucide-react';
 import adminApiService from '../../services/adminApi';
 import type { WorkOrder, WorkOrderMessage } from '../../types/admin';
 import { showToast } from '../../components/Toast';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
 const STATUSES = [
   { key: 'open', label: '待处理' },
@@ -14,6 +15,9 @@ const STATUSES = [
 const statusColors: Record<string, 'warning' | 'primary' | 'success' | 'default'> = { open: 'warning', processing: 'primary', resolved: 'success', closed: 'default' };
 
 const FeedbackManagePage: React.FC = () => {
+  const { can } = useAdminAuth();
+  const canUpdate = can('feedback.update');
+  const canReadAttachments = can('feedback.attachment.read');
   const [rows, setRows] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState('');
@@ -46,6 +50,10 @@ const FeedbackManagePage: React.FC = () => {
       return;
     }
     let cancelled = false;
+    if (!canReadAttachments) {
+      setAttachmentUrls({});
+      return;
+    }
     const attachments = messages.flatMap((message) => message.attachments);
     Promise.all(attachments.map(async (attachment) => {
       const response = await adminApiService.getFeedbackAttachment(attachment.id);
@@ -57,7 +65,7 @@ const FeedbackManagePage: React.FC = () => {
       setAttachmentUrls(next);
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [selected, messages]);
+  }, [canReadAttachments, selected, messages]);
 
   const open = (ticket: WorkOrder) => {
     setSelected(ticket);
@@ -102,7 +110,7 @@ const FeedbackManagePage: React.FC = () => {
               <TableCell>#{ticket.id}</TableCell>
               <TableCell><Chip size="sm" color={statusColors[ticket.status] || 'default'} variant="flat">{STATUSES.find((item) => item.key === ticket.status)?.label || ticket.status}</Chip></TableCell>
               <TableCell>{ticket.category_id || '-'}</TableCell><TableCell>{ticket.title}</TableCell><TableCell>{ticket.user_id}</TableCell><TableCell>{ticket.updated_at || '-'}</TableCell>
-              <TableCell><Button size="sm" variant="flat" onPress={() => open(ticket)}>处理</Button></TableCell>
+              <TableCell><Button size="sm" variant="flat" onPress={() => open(ticket)}>{canUpdate ? '处理' : '查看'}</Button></TableCell>
             </TableRow>}
           </TableBody>
         </Table>
@@ -113,11 +121,11 @@ const FeedbackManagePage: React.FC = () => {
       <ModalBody className="gap-4">{selected && <>
         <div className="rounded-lg bg-default-50 p-3"><div className="font-medium">{selected.title}</div><div className="mt-2 whitespace-pre-wrap text-sm">{selected.content}</div></div>
         <div className="space-y-2">{messages.map((message) => <div key={message.id} className={message.role === 'admin' ? 'rounded bg-primary/5 p-3 text-sm' : 'rounded bg-default-50 p-3 text-sm'}><span className="mr-2 text-xs text-default-500">{message.role === 'admin' ? '管理员' : '用户'}</span>{message.content}{message.attachments.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{message.attachments.map((attachment) => attachmentUrls[attachment.id] ? <img key={attachment.id} src={attachmentUrls[attachment.id]} alt="用户上传截图" className="max-h-40 rounded border border-default-200" /> : <Chip key={attachment.id} size="sm">截图加载中</Chip>)}</div>}</div>)}</div>
-        <Select label="状态" selectedKeys={[nextStatus]} onSelectionChange={(keys) => setNextStatus(String(Array.from(keys)[0] || 'open'))}>{STATUSES.map((item) => <SelectItem key={item.key}>{item.label}</SelectItem>)}</Select>
-        <Textarea label="公开回复（用户可见）" value={reply} onValueChange={setReply} minRows={4} />
-        <Textarea label="内部备注（用户不可见）" value={internalRemark} onValueChange={setInternalRemark} minRows={3} />
+        <Select label="状态" selectedKeys={[nextStatus]} onSelectionChange={(keys) => setNextStatus(String(Array.from(keys)[0] || 'open'))} isDisabled={!canUpdate}>{STATUSES.map((item) => <SelectItem key={item.key}>{item.label}</SelectItem>)}</Select>
+        <Textarea label="公开回复（用户可见）" value={reply} onValueChange={setReply} minRows={4} isReadOnly={!canUpdate} />
+        <Textarea label="内部备注（用户不可见）" value={internalRemark} onValueChange={setInternalRemark} minRows={3} isReadOnly={!canUpdate} />
       </>}</ModalBody>
-      <ModalFooter><Button variant="light" onPress={() => setSelected(null)}>取消</Button><Button color="primary" isLoading={saving} onPress={() => void save()}>保存</Button></ModalFooter>
+      <ModalFooter><Button variant="light" onPress={() => setSelected(null)}>关闭</Button>{canUpdate && <Button color="primary" isLoading={saving} onPress={() => void save()}>保存</Button>}</ModalFooter>
     </ModalContent></Modal>
   </div>;
 };

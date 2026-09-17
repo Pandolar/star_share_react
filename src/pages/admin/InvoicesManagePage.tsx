@@ -8,6 +8,7 @@ import { Copy, Download, FileText, PlayCircle, RefreshCw, Search } from 'lucide-
 import adminApiService from '../../services/adminApi';
 import type { InvoiceQueryParams, InvoiceRecord } from '../../types/admin';
 import { showToast } from '../../components/Toast';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
 const statusLabels: Record<string, string> = {
   awaiting_payment: '待支付',
@@ -72,6 +73,9 @@ const invoiceSummaryFromCsv = (csv: string): string => {
 
 
 const InvoicesManagePage: React.FC = () => {
+  const { can } = useAdminAuth();
+  const canUpdate = can('invoice.update');
+  const canExport = can('invoice.export');
   const [rows, setRows] = useState<InvoiceRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -269,10 +273,10 @@ const InvoicesManagePage: React.FC = () => {
           <div><h1 className="text-2xl font-bold">开票管理</h1><p className="text-sm text-default-500">处理开票申请，并按筛选或选中记录导出财务明细</p></div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button color="primary" variant="flat" startContent={<PlayCircle size={16} />} onPress={batchStartProcessing} isLoading={batchUpdating} isDisabled={!processableSelectedIds.length}>批量开始开票{processableSelectedIds.length ? `（${processableSelectedIds.length}）` : ''}</Button>
-          <Button color="success" variant="flat" onPress={batchMarkIssued} isLoading={batchUpdating} isDisabled={!issuableSelectedIds.length}>批量标记已开票{issuableSelectedIds.length ? `（${issuableSelectedIds.length}）` : ''}</Button>
-          <Button startContent={<Copy size={16} />} onPress={openCopy} isLoading={copying}>复制文本{selectedIds.length ? `（${selectedIds.length}）` : ''}</Button>
-          <Button startContent={<Download size={16} />} onPress={exportCsv} isLoading={exporting}>导出{selectedIds.length ? `选中 ${selectedIds.length} 条` : '当前筛选'}</Button>
+          {canUpdate && <Button color="primary" variant="flat" startContent={<PlayCircle size={16} />} onPress={batchStartProcessing} isLoading={batchUpdating} isDisabled={!processableSelectedIds.length}>批量开始开票{processableSelectedIds.length ? `（${processableSelectedIds.length}）` : ''}</Button>}
+          {canUpdate && <Button color="success" variant="flat" onPress={batchMarkIssued} isLoading={batchUpdating} isDisabled={!issuableSelectedIds.length}>批量标记已开票{issuableSelectedIds.length ? `（${issuableSelectedIds.length}）` : ''}</Button>}
+          {canExport && <Button startContent={<Copy size={16} />} onPress={openCopy} isLoading={copying}>复制文本{selectedIds.length ? `（${selectedIds.length}）` : ''}</Button>}
+          {canExport && <Button startContent={<Download size={16} />} onPress={exportCsv} isLoading={exporting}>导出{selectedIds.length ? `选中 ${selectedIds.length} 条` : '当前筛选'}</Button>}
         </div>
       </div>
 
@@ -307,7 +311,7 @@ const InvoicesManagePage: React.FC = () => {
               <TableCell><div className="space-y-1 text-sm"><p>实付 ¥{record.paid_amount ?? record.payable_amount}</p><p className="text-default-500">{record.pricing_type === 'team' ? '席位原价' : '套餐原价'} ¥{record.original_amount ?? record.base_amount}</p>{Number(record.discount_amount || 0) > 0 && <p className="text-success">{record.pricing_type === 'team' ? '团队折扣' : `优惠码 ${record.promotion_code || ''}`}：-¥{Number(record.discount_amount).toFixed(2)}</p>}{Number(record.cashback_credit_amount || 0) > 0 && <p className="text-success">返现抵扣：-¥{Number(record.cashback_credit_amount).toFixed(2)}</p>}{Number(record.invoice_base_amount || 0) > 0 && <p className="text-default-500">开票计价基数 ¥{Number(record.invoice_base_amount).toFixed(2)}</p>}{Number(record.surcharge_amount || 0) > 0 && <p className="text-warning">开票加价 +¥{Number(record.surcharge_amount).toFixed(2)}</p>}</div></TableCell>
               <TableCell><Chip size="sm" color={record.invoice_status === 'issued' ? 'success' : record.invoice_status === 'processing' ? 'primary' : record.invoice_status === 'pending_issue' ? 'warning' : 'default'} variant="flat">{statusLabels[record.invoice_status]}</Chip></TableCell>
               <TableCell><div className="text-xs"><p>支付：{record.paid_at || '-'}</p><p>开票：{record.invoice_issued_at || '-'}</p>{record.invoice_status_history?.length ? <p className="text-default-500">最近流转：{record.invoice_status_history.at(-1)?.at}</p> : null}</div></TableCell>
-              <TableCell>{record.order_status === 'paid' && record.invoice_status === 'pending_issue' ? <Button size="sm" color="primary" variant="flat" isLoading={updatingId === record.id} onPress={() => updateStatus(record, 'processing')}>开始开票</Button> : record.order_status === 'paid' && record.invoice_status === 'processing' ? <Button size="sm" color="success" isLoading={updatingId === record.id} onPress={() => updateStatus(record, 'issued')}>标记已开票</Button> : '-'}</TableCell>
+              <TableCell>{canUpdate && record.order_status === 'paid' && record.invoice_status === 'pending_issue' ? <Button size="sm" color="primary" variant="flat" isLoading={updatingId === record.id} onPress={() => updateStatus(record, 'processing')}>开始开票</Button> : canUpdate && record.order_status === 'paid' && record.invoice_status === 'processing' ? <Button size="sm" color="success" isLoading={updatingId === record.id} onPress={() => updateStatus(record, 'issued')}>标记已开票</Button> : '-'}</TableCell>
             </TableRow>
           ))}
         </TableBody>

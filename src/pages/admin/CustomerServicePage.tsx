@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Button,
   Card,
+  Checkbox,
   CardBody,
   CardHeader,
   Input,
@@ -15,8 +16,9 @@ import {
   Tab,
   Tabs,
   Tooltip,
+  Textarea,
 } from '@heroui/react';
-import { ArrowLeft, Bell, BellOff, Headphones, RefreshCw, Search, UserRound } from 'lucide-react';
+import { ArrowLeft, Bell, BellOff, Headphones, Plus, RefreshCw, Search, Send, UserRound } from 'lucide-react';
 import adminApiService from '../../services/adminApi';
 import type { AdminCsConversation } from '../../types/admin';
 import type { ChatAttachment, ChatAttachmentConfig, ChatMessage } from '../../components/chat/types';
@@ -26,6 +28,7 @@ import ChatComposer from '../../components/chat/ChatComposer';
 import { formatBytes } from '../../components/chat/attachmentCache';
 import { useCustomerService } from '../../contexts/CustomerServiceContext';
 import { showToast } from '../../components/Toast';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
 const FILTERS = [
   ['all', '全部'],
@@ -57,6 +60,12 @@ const AttachmentSummary: React.FC<{ attachment: ChatAttachment }> = ({ attachmen
 
 const CustomerServicePage: React.FC = () => {
   const { config } = useCustomerService();
+  const { can } = useAdminAuth();
+  const canSend = can('customer_service.message.send');
+  const canBatchSend = can('customer_service.message.batch_send');
+  const canRecall = can('customer_service.message.recall');
+  const canManageQuickReplies = can('customer_service.quick_reply.manage');
+  const canUpload = can('customer_service.attachment.upload');
   const [rows, setRows] = useState<AdminCsConversation[]>([]);
   const [quickReplies, setQuickReplies] = useState<Array<{ id: string; title: string; content: string; attachments?: ChatAttachment[] }>>([]);
   const [selected, setSelected] = useState<AdminCsConversation | null>(null);
@@ -74,11 +83,24 @@ const CustomerServicePage: React.FC = () => {
   const [recalling, setRecalling] = useState(false);
   const [reply, setReply] = useState('');
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
+  const [batchSelection, setBatchSelection] = useState<Set<number>>(new Set());
+  const [batchReplyOpen, setBatchReplyOpen] = useState(false);
+  const [batchReply, setBatchReply] = useState('');
+  const [batchQuickReplyId, setBatchQuickReplyId] = useState<string | undefined>();
+  const [batchSending, setBatchSending] = useState(false);
+  const [quickPhraseOpen, setQuickPhraseOpen] = useState(false);
+  const [quickPhraseTitle, setQuickPhraseTitle] = useState('');
+  const [quickPhraseContent, setQuickPhraseContent] = useState('');
+  const [quickPhraseSaving, setQuickPhraseSaving] = useState(false);
   const [mobileChat, setMobileChat] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>(() => (
     typeof Notification === 'undefined' ? 'unsupported' : Notification.permission
   ));
   const listRequestId = useRef(0);
+  const messageRequestId = useRef(0);
+  const refreshRequestId = useRef(0);
+  const activeConversationId = useRef<number | null>(null);
+  const batchClientMessageId = useRef('');
   const lastListRequest = useRef({ key: '', at: 0 });
   const activeRefreshAt = useRef(0);
   const notifiedMessageAt = useRef(new Map<number, string>());
@@ -86,6 +108,7 @@ const CustomerServicePage: React.FC = () => {
   const openConversationRef = useRef<((conversation: AdminCsConversation) => void) | null>(null);
   const notificationPermissionRef = useRef(notificationPermission);
   notificationPermissionRef.current = notificationPermission;
+  activeConversationId.current = selected?.id ?? null;
   const pageSize = 20;
   const loadList = useCallback(
     async (silent = false) => {
@@ -108,6 +131,8 @@ const CustomerServicePage: React.FC = () => {
         if (requestId !== listRequestId.current) return;
         const nextRows = result.data;
         setRows(nextRows);
+        const visibleIds = new Set(nextRows.map((item) => item.id));
+        setBatchSelection((current) => new Set(Array.from(current).filter((id) => visibleIds.has(id))));
         setTotal(result.total);
         if (notificationBaselineReady.current && notificationPermissionRef.current === 'granted') {
           nextRows.forEach((item) => {
@@ -153,25 +178,33 @@ const CustomerServicePage: React.FC = () => {
   );
   const openConversation = useCallback(
     async (conversation: AdminCsConversation) => {
+      const requestId = ++messageRequestId.current;
+      activeConversationId.current = conversation.id;
+      refreshRequestId.current += 1;
       setSelected(conversation);
       setMessages([]);
       setAttachments([]);
       setReply('');
+      setRecallTarget(null);
       setMobileChat(true);
       setMessageLoading(true);
       try {
         const result = await adminApiService.getCsMessages({ conversation_id: conversation.id, limit: 50 });
+        if (requestId !== messageRequestId.current || activeConversationId.current !== conversation.id) return;
         setMessages(result.messages);
         await adminApiService.markCsRead(conversation.id);
+        if (requestId !== messageRequestId.current || activeConversationId.current !== conversation.id) return;
         const readConversation = { ...result.conversation, admin_unread: 0, unread: 0 } as AdminCsConversation;
         setSelected((current) => (current?.id === conversation.id ? { ...current, ...readConversation } : current));
         setRows((current) => current.map((item) => (
           item.id === conversation.id ? { ...item, ...readConversation } : item
         )));
       } catch (error) {
-        showToast(error instanceof Error ? error.message : '获取消息失败', 'error');
+        if (requestId === messageRequestId.current && activeConversationId.current === conversation.id) {
+          showToast(error instanceof Error ? error.message : '获取消息失败', 'error');
+        }
       } finally {
-        setMessageLoading(false);
+        if (requestId === messageRequestId.current) setMessageLoading(false);
       }
     },
     []
@@ -181,20 +214,26 @@ const CustomerServicePage: React.FC = () => {
   };
   const refreshMessages = useCallback(async () => {
     if (!selected || !mobileChat || document.hidden || !document.hasFocus()) return;
+    const conversationId = selected.id;
+    const requestId = ++refreshRequestId.current;
+    const afterId = messages.length ? messages[messages.length - 1].id : undefined;
     try {
-      const afterId = messages.length ? messages[messages.length - 1].id : undefined;
-      const result = await adminApiService.getCsMessages({ conversation_id: selected.id, after_id: afterId, limit: 50 });
-      setMessages((current) =>
-        afterId && result.messages.length ? [...current, ...result.messages] : afterId ? current : result.messages
-      );
+      const result = await adminApiService.getCsMessages({ conversation_id: conversationId, after_id: afterId, limit: 50 });
+      if (requestId !== refreshRequestId.current || activeConversationId.current !== conversationId) return;
+      setMessages((current) => {
+        if (!afterId) return result.messages;
+        const known = new Set(current.map((message) => message.id));
+        return [...current, ...result.messages.filter((message) => !known.has(message.id))];
+      });
       const hasIncoming = result.messages.some((message) => message.role === 'user');
       if (hasIncoming || result.conversation.admin_unread > 0) {
-        await adminApiService.markCsRead(selected.id);
+        await adminApiService.markCsRead(conversationId);
       }
+      if (requestId !== refreshRequestId.current || activeConversationId.current !== conversationId) return;
       const readConversation = { ...result.conversation, admin_unread: 0, unread: 0 } as AdminCsConversation;
-      setSelected((current) => (current ? { ...current, ...readConversation } : current));
+      setSelected((current) => (current?.id === conversationId ? { ...current, ...readConversation } : current));
       setRows((current) => current.map((item) => (
-        item.id === selected.id ? { ...item, ...readConversation } : item
+        item.id === conversationId ? { ...item, ...readConversation } : item
       )));
     } catch {
       /* 下次轮询重试 */
@@ -242,53 +281,59 @@ const CustomerServicePage: React.FC = () => {
   useEffect(() => {
     const loadAdminConfig = async () => {
       try {
-        const response = await adminApiService.getConfigs();
-        const raw = response.code === 20000 ? response.data.find((item) => item.key === 'CUSTOMER_SERVICE_CONFIG')?.value : null;
-        const parsed = raw ? JSON.parse(raw) : null;
-        if (Array.isArray(parsed?.quick_replies))
-          setQuickReplies(
-            parsed.quick_replies.filter(
-              (item: { id?: unknown; title?: unknown; content?: unknown; enabled?: unknown }) =>
-                item.enabled !== false && typeof item.id === 'string' && typeof item.title === 'string' && typeof item.content === 'string'
-            ) as Array<{ id: string; title: string; content: string; attachments?: ChatAttachment[] }>
-          );
-        const minutes = Number(parsed?.admin?.recall_window_minutes);
+        const runtimeConfig = await adminApiService.getCsRuntimeConfig();
+        if (Array.isArray(runtimeConfig.quick_replies)) {
+          setQuickReplies(runtimeConfig.quick_replies.filter((item) => item.enabled !== false));
+        }
+        const minutes = Number(runtimeConfig.recall_window_minutes);
         if (Number.isFinite(minutes) && minutes >= 1 && minutes <= 1440) setRecallWindowMinutes(Math.trunc(minutes));
       } catch {
-        /* 不影响会话处理 */
+        /* 不影响会话只读处理 */
       }
     };
     void loadAdminConfig();
   }, []);
   const builtinConfig = config?.provider === 'builtin' ? config : null;
   const attachmentConfig: ChatAttachmentConfig | null = builtinConfig?.attachments ?? null;
-  const applySentMessage = (conversation: AdminCsConversation, message: ChatMessage) => {
-    const next: AdminCsConversation = {
-      ...conversation,
-      status: conversation.status === 'open' || conversation.status === 'closed' ? 'processing' : conversation.status,
-      last_message_at: message.created_at,
-      last_message_preview: message.content || '附件消息',
-      last_message_role: 'admin',
-      admin_unread: 0,
-      unread: 0,
-    };
-    setMessages((current) => [...current, message]);
-    setSelected(next);
-    setRows((current) => current.map((item) => item.id === next.id ? next : item));
+  const composerAttachmentConfig: ChatAttachmentConfig | null = attachmentConfig
+    ? (canUpload ? attachmentConfig : { ...attachmentConfig, enabled: false })
+    : null;
+  const conversationPatch = (message: ChatMessage) => ({
+    status: 'processing' as const,
+    closed_at: null,
+    closed_by: null,
+    last_message_at: message.created_at,
+    last_message_preview: message.content || '附件消息',
+    last_message_role: 'admin' as const,
+    admin_unread: 0,
+    unread: 0,
+  });
+  const applySentMessage = (conversationId: number, message: ChatMessage) => {
+    const patch = conversationPatch(message);
+    if (activeConversationId.current === conversationId) {
+      setMessages((current) => current.some((item) => item.id === message.id) ? current : [...current, message]);
+    }
+    setSelected((current) => (current?.id === conversationId ? { ...current, ...patch } : current));
+    setRows((current) => current.map((item) => item.id === conversationId ? { ...item, ...patch } : item));
   };
   const sendMessage = async () => {
     if (!selected || (!reply.trim() && !attachments.length)) return;
+    const conversationId = selected.id;
+    const content = reply.trim();
+    const attachmentIds = attachments.map((item) => item.id);
     setSending(true);
     try {
       const message = await adminApiService.sendCsMessage({
-        conversation_id: selected.id,
-        content: reply.trim(),
-        attachment_ids: attachments.map((item) => item.id),
+        conversation_id: conversationId,
+        content,
+        attachment_ids: attachmentIds,
         client_msg_id: newClientMessageId(),
       });
-      applySentMessage(selected, message);
-      setReply('');
-      setAttachments([]);
+      applySentMessage(conversationId, message);
+      if (activeConversationId.current === conversationId) {
+        setReply('');
+        setAttachments([]);
+      }
       void loadList(true);
     } catch (error) {
       showToast(error instanceof Error ? error.message : '发送消息失败', 'error');
@@ -298,16 +343,17 @@ const CustomerServicePage: React.FC = () => {
   };
   const sendQuickReply = async (quickReplyId: string) => {
     if (!selected || sending) return;
+    const conversationId = selected.id;
     setSending(true);
     try {
       const message = await adminApiService.sendCsMessage({
-        conversation_id: selected.id,
+        conversation_id: conversationId,
         content: '',
         attachment_ids: [],
         quick_reply_id: quickReplyId,
         client_msg_id: newClientMessageId(),
       });
-      applySentMessage(selected, message);
+      applySentMessage(conversationId, message);
       void loadList(true);
     } catch (error) {
       showToast(error instanceof Error ? error.message : '发送快捷回复失败', 'error');
@@ -315,22 +361,89 @@ const CustomerServicePage: React.FC = () => {
       setSending(false);
     }
   };
+  const openBatchReply = () => {
+    if (batchSelection.size < 2) return;
+    batchClientMessageId.current = newClientMessageId();
+    setBatchReply('');
+    setBatchQuickReplyId(undefined);
+    setBatchReplyOpen(true);
+  };
+  const confirmBatchReply = async () => {
+    const conversationIds = Array.from(batchSelection);
+    if (conversationIds.length < 2 || (!batchReply.trim() && !batchQuickReplyId)) return;
+    setBatchSending(true);
+    try {
+      const result = await adminApiService.batchSendCsMessages({
+        conversation_ids: conversationIds,
+        content: batchReply.trim(),
+        quick_reply_id: batchQuickReplyId,
+        client_msg_id: batchClientMessageId.current,
+      });
+      const sentByConversation = new Map(result.messages.map((message) => [message.conversation_id, message]));
+      setRows((current) => current.map((item) => {
+        const message = sentByConversation.get(item.id);
+        return message ? { ...item, ...conversationPatch(message) } : item;
+      }));
+      setSelected((current) => {
+        if (!current) return current;
+        const message = sentByConversation.get(current.id);
+        return message ? { ...current, ...conversationPatch(message) } : current;
+      });
+      const activeMessage = activeConversationId.current ? sentByConversation.get(activeConversationId.current) : undefined;
+      if (activeMessage) {
+        setMessages((current) => current.some((item) => item.id === activeMessage.id) ? current : [...current, activeMessage]);
+      }
+      setBatchSelection(new Set());
+      setBatchReplyOpen(false);
+      showToast(`已向 ${result.sent_count} 个用户发送回复`, 'success');
+      void loadList(true);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '批量回复失败', 'error');
+    } finally {
+      setBatchSending(false);
+    }
+  };
+  const openQuickPhrase = () => {
+    setQuickPhraseTitle('');
+    setQuickPhraseContent(reply.trim());
+    setQuickPhraseOpen(true);
+  };
+  const saveQuickPhrase = async () => {
+    if (!quickPhraseTitle.trim() || !quickPhraseContent.trim()) return;
+    setQuickPhraseSaving(true);
+    try {
+      const created = await adminApiService.createCsQuickReply({
+        title: quickPhraseTitle.trim(),
+        content: quickPhraseContent.trim(),
+      });
+      setQuickReplies((current) => [...current, created]);
+      setQuickPhraseOpen(false);
+      showToast('快捷短语已保存', 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '保存快捷短语失败', 'error');
+    } finally {
+      setQuickPhraseSaving(false);
+    }
+  };
   const confirmRecall = async () => {
-    if (!recallTarget || !selected) return;
+    if (!recallTarget) return;
+    const conversationId = recallTarget.conversation_id;
     setRecalling(true);
     try {
       const result = await adminApiService.recallCsMessage({ message_id: recallTarget.id });
-      setMessages((current) => {
-        const next = current.map((item) => (item.id === result.message.id ? result.message : item));
-        return result.event ? [...next, result.event] : next;
-      });
+      if (activeConversationId.current === conversationId) {
+        setMessages((current) => {
+          const next = current.map((item) => (item.id === result.message.id ? result.message : item));
+          return result.event && !next.some((item) => item.id === result.event?.id) ? [...next, result.event] : next;
+        });
+      }
       const patch = {
         last_message_at: result.conversation.last_message_at,
         last_message_preview: result.conversation.last_message_preview,
         last_message_role: result.conversation.last_message_role,
       };
-      setSelected((current) => (current && current.id === selected.id ? { ...current, ...patch } : current));
-      setRows((current) => current.map((item) => (item.id === selected.id ? { ...item, ...patch } : item)));
+      setSelected((current) => (current?.id === conversationId ? { ...current, ...patch } : current));
+      setRows((current) => current.map((item) => (item.id === conversationId ? { ...item, ...patch } : item)));
       setRecallTarget(null);
       showToast('消息已撤回', 'success');
       void loadList(true);
@@ -377,7 +490,7 @@ const CustomerServicePage: React.FC = () => {
           </div>
         </CardHeader>
       </Card>
-      <div className="grid h-[calc(100dvh-9rem)] min-h-[360px] max-h-[760px] grid-cols-1 gap-4 overflow-hidden lg:h-[min(72vh,760px)] lg:min-h-[520px] lg:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="grid h-[calc(100dvh-13rem)] min-h-[360px] max-h-[760px] grid-cols-1 gap-4 overflow-hidden lg:h-[min(72vh,760px)] lg:min-h-[520px] lg:grid-cols-[320px_minmax(0,1fr)]">
         <Card className={`${mobileChat ? 'hidden lg:block' : 'block'} min-h-0 overflow-hidden`}>
           <CardBody className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-3">
             <Tabs
@@ -392,6 +505,7 @@ const CustomerServicePage: React.FC = () => {
                 setTotal(0);
                 setFilter(nextFilter);
                 setPage(1);
+                setBatchSelection(new Set());
               }}
               aria-label="会话筛选"
               size="sm"
@@ -405,10 +519,31 @@ const CustomerServicePage: React.FC = () => {
               onValueChange={(value) => {
                 setQuery(value);
                 setPage(1);
+                setBatchSelection(new Set());
               }}
               placeholder="搜索用户或消息"
               startContent={<Search className="h-4 w-4" />}
             />
+            {canBatchSend && <div className="flex items-center justify-between gap-2">
+              <Checkbox
+                size="sm"
+                isSelected={rows.length > 0 && batchSelection.size === rows.length}
+                isIndeterminate={batchSelection.size > 0 && batchSelection.size < rows.length}
+                onValueChange={(checked) => setBatchSelection(checked ? new Set(rows.map((item) => item.id)) : new Set())}
+              >
+                全选
+              </Checkbox>
+              <Button
+                size="sm"
+                color="primary"
+                variant="flat"
+                startContent={<Send className="h-4 w-4" />}
+                isDisabled={batchSelection.size < 2}
+                onPress={openBatchReply}
+              >
+                批量回复{batchSelection.size ? `（${batchSelection.size}）` : ''}
+              </Button>
+            </div>}
             <div className="min-h-0 flex-1 overflow-y-auto">
               {listLoading && !rows.length ? (
                 <div className="flex justify-center py-10">
@@ -416,42 +551,54 @@ const CustomerServicePage: React.FC = () => {
                 </div>
               ) : rows.length ? (
                 rows.map((item) => (
-                  <Button
-                    key={item.id}
-                    variant={selected?.id === item.id ? 'flat' : 'light'}
-                    color={selected?.id === item.id ? 'primary' : 'default'}
-                    className="mb-1 h-auto w-full justify-start px-3 py-3 text-left"
-                    onPress={() => void openConversation(item)}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                            ['resolved', 'closed'].includes(item.status)
-                              ? 'bg-success-700'
-                              : item.admin_unread > 0
-                                ? 'bg-danger'
-                                : 'bg-success-300'
-                          }`}
-                          aria-label={['resolved', 'closed'].includes(item.status) ? '已完成' : item.admin_unread > 0 ? '未查看' : '已查看'}
-                        />
-                        <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                          {item.user.profile.username || item.user.profile.email || `用户 ${item.user.id}`}
-                        </span>
-                        <span className="shrink-0 text-xs text-default-500">{relativeTime(item.last_message_at)}</span>
+                  <div key={item.id} className="mb-1 flex items-center gap-1">
+                    {canBatchSend && <Checkbox
+                      size="sm"
+                      aria-label={`选择会话 ${item.user.profile.username || item.user.profile.email || item.user.id}`}
+                      isSelected={batchSelection.has(item.id)}
+                      onValueChange={(checked) => setBatchSelection((current) => {
+                        const next = new Set(current);
+                        if (checked) next.add(item.id);
+                        else next.delete(item.id);
+                        return next;
+                      })}
+                    />}
+                    <Button
+                      variant={selected?.id === item.id ? 'flat' : 'light'}
+                      color={selected?.id === item.id ? 'primary' : 'default'}
+                      className="h-auto min-w-0 flex-1 justify-start px-3 py-3 text-left"
+                      onPress={() => void openConversation(item)}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                              ['resolved', 'closed'].includes(item.status)
+                                ? 'bg-success-700'
+                                : item.admin_unread > 0
+                                  ? 'bg-danger'
+                                  : 'bg-success-300'
+                            }`}
+                            aria-label={['resolved', 'closed'].includes(item.status) ? '已完成' : item.admin_unread > 0 ? '未查看' : '已查看'}
+                          />
+                          <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                            {item.user.profile.username || item.user.profile.email || `用户 ${item.user.id}`}
+                          </span>
+                          <span className="shrink-0 text-xs text-default-500">{relativeTime(item.last_message_at)}</span>
+                        </div>
+                        <div className="mt-1 flex items-center gap-2 text-xs text-default-500">
+                          <span className="shrink-0">{['resolved', 'closed'].includes(item.status) ? '已完成' : item.admin_unread > 0 ? '未查看' : '已查看'}</span>
+                          <span className="truncate">{item.last_message_preview || '暂无消息'}</span>
+                        </div>
                       </div>
-                      <div className="mt-1 flex items-center gap-2 text-xs text-default-500">
-                        <span className="shrink-0">{['resolved', 'closed'].includes(item.status) ? '已完成' : item.admin_unread > 0 ? '未查看' : '已查看'}</span>
-                        <span className="truncate">{item.last_message_preview || '暂无消息'}</span>
-                      </div>
-                    </div>
-                  </Button>
+                    </Button>
+                  </div>
                 ))
               ) : (
                 <div className="py-10 text-center text-sm text-default-500">暂无会话</div>
               )}
             </div>
-            {pages > 1 && <Pagination page={page} total={pages} size="sm" onChange={setPage} className="justify-center" />}
+            {pages > 1 && <Pagination page={page} total={pages} size="sm" onChange={(nextPage) => { setBatchSelection(new Set()); setPage(nextPage); }} className="justify-center" />}
           </CardBody>
         </Card>
         <Card className={`${mobileChat ? 'block' : 'hidden lg:block'} min-h-0 min-w-0 overflow-hidden`}>
@@ -498,21 +645,29 @@ const CustomerServicePage: React.FC = () => {
                     <AttachmentSummary key={attachment.id} attachment={attachment} />
                   ))}
                 <div className="min-h-0 flex-1 overflow-hidden">
-                  <ChatMessageList messages={messages} selfRole="admin" loading={messageLoading} emptyText="暂无消息" scope="admin" recallWindowMinutes={recallWindowMinutes} onRecall={setRecallTarget} />
+                  <ChatMessageList messages={messages} conversationKey={selected.id} selfRole="admin" loading={messageLoading} emptyText="暂无消息" scope="admin" recallWindowMinutes={canRecall ? recallWindowMinutes : undefined} onRecall={canRecall ? setRecallTarget : undefined} />
                 </div>
-                {attachmentConfig ? (
+                {composerAttachmentConfig ? (
                   <ChatComposer
+                    key={selected.id}
                     value={reply}
                     onValueChange={setReply}
                     onSend={() => void sendMessage()}
                     sending={sending}
+                    disabled={!canSend}
+                    disabledHint={!canSend ? '当前账号只有会话查看权限，不能发送消息。' : undefined}
                     maxLength={builtinConfig?.limits.max_content_length ?? 2000}
-                    attachmentConfig={attachmentConfig}
+                    attachmentConfig={composerAttachmentConfig}
                     attachments={attachments}
                     onAttachmentsChange={setAttachments}
                     uploadAttachment={uploadAttachment}
-                    quickReplies={quickReplies}
-                    onPickQuickReply={(id) => void sendQuickReply(id)}
+                    quickReplies={canSend ? quickReplies : []}
+                    onPickQuickReply={canSend ? ((id) => void sendQuickReply(id)) : undefined}
+                    extraActions={canManageQuickReplies ? (
+                      <Button size="sm" variant="flat" startContent={<Plus className="h-4 w-4" />} onPress={openQuickPhrase}>
+                        新建快捷短语
+                      </Button>
+                    ) : null}
                   />
                 ) : (
                   <div className="text-sm text-warning">客服配置尚未加载，暂不能发送消息。</div>
@@ -552,6 +707,99 @@ const CustomerServicePage: React.FC = () => {
             </Button>
             <Button color="danger" isLoading={recalling} onPress={() => void confirmRecall()}>
               确认撤回
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+      <Modal
+        isOpen={batchReplyOpen}
+        onOpenChange={(open) => {
+          if (!open && !batchSending) setBatchReplyOpen(false);
+        }}
+        size="lg"
+      >
+        <ModalContent>
+          <ModalHeader>批量回复</ModalHeader>
+          <ModalBody className="space-y-3">
+            <p className="text-sm text-default-600">将向已选择的 {batchSelection.size} 个用户发送相同回复。发送过程为单个事务，不会只成功一部分。</p>
+            {quickReplies.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {quickReplies.map((item) => (
+                  <Button
+                    key={item.id}
+                    size="sm"
+                    variant={batchQuickReplyId === item.id ? 'solid' : 'flat'}
+                    color={batchQuickReplyId === item.id ? 'primary' : 'default'}
+                    onPress={() => {
+                      setBatchQuickReplyId(item.id);
+                      setBatchReply(item.content);
+                    }}
+                  >
+                    {item.title}
+                  </Button>
+                ))}
+              </div>
+            )}
+            <Textarea
+              label="回复内容"
+              value={batchReply}
+              onValueChange={setBatchReply}
+              minRows={4}
+              maxRows={10}
+              maxLength={builtinConfig?.limits.max_content_length ?? 2000}
+              isDisabled={batchSending}
+            />
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" isDisabled={batchSending} onPress={() => setBatchReplyOpen(false)}>取消</Button>
+            <Button
+              color="primary"
+              startContent={!batchSending && <Send className="h-4 w-4" />}
+              isLoading={batchSending}
+              isDisabled={!batchReply.trim() && !batchQuickReplyId}
+              onPress={() => void confirmBatchReply()}
+            >
+              发送给 {batchSelection.size} 个用户
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+      <Modal
+        isOpen={quickPhraseOpen}
+        onOpenChange={(open) => {
+          if (!open && !quickPhraseSaving) setQuickPhraseOpen(false);
+        }}
+        size="md"
+      >
+        <ModalContent>
+          <ModalHeader>新建快捷短语</ModalHeader>
+          <ModalBody className="space-y-3">
+            <Input
+              label="标题"
+              value={quickPhraseTitle}
+              onValueChange={setQuickPhraseTitle}
+              maxLength={20}
+              isDisabled={quickPhraseSaving}
+            />
+            <Textarea
+              label="内容"
+              value={quickPhraseContent}
+              onValueChange={setQuickPhraseContent}
+              minRows={4}
+              maxRows={10}
+              maxLength={500}
+              isDisabled={quickPhraseSaving}
+            />
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" isDisabled={quickPhraseSaving} onPress={() => setQuickPhraseOpen(false)}>取消</Button>
+            <Button
+              color="primary"
+              isLoading={quickPhraseSaving}
+              isDisabled={!quickPhraseTitle.trim() || !quickPhraseContent.trim()}
+              onPress={() => void saveQuickPhrase()}
+            >
+              保存快捷短语
             </Button>
           </ModalFooter>
         </ModalContent>

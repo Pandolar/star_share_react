@@ -48,12 +48,17 @@ import { showToast } from '../../components/Toast';
 import type { SourceDomainStats } from '../../types/admin';
 import { LongTextPreview, PackageSummary, UserSummary } from '../../components/admin/AdminEntitySummary';
 import ExactSearchPopover from '../../components/admin/ExactSearchPopover';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
 /**
  * 订单管理页面
  * 提供订单的查看、编辑、删除功能
  */
 const OrdersManagePage: React.FC = () => {
+    const { can } = useAdminAuth();
+    const canUpdate = can('order.update');
+    const canDelete = can('order.delete');
+    const canFulfill = can('order.exception.fulfill');
     const [urlSearchParams, setUrlSearchParams] = useSearchParams();
     const urlQuery = (urlSearchParams.get('query') || '').trim();
     // 状态管理
@@ -318,7 +323,7 @@ const OrdersManagePage: React.FC = () => {
                     <MoreVertical className="w-4 h-4" />
                 </Button>
             </DropdownTrigger>
-            <DropdownMenu aria-label="订单操作">
+            <DropdownMenu aria-label="订单操作" disabledKeys={[...(!canUpdate ? ['edit'] : []), ...(!canDelete ? ['delete'] : []), ...(!canFulfill ? ['fulfill'] : [])]}>
                 <DropdownItem
                     key="view"
                     startContent={<Eye className="w-4 h-4" />}
@@ -326,7 +331,7 @@ const OrdersManagePage: React.FC = () => {
                 >
                     查看详情
                 </DropdownItem>
-                {order.manual_fulfillment_allowed ? (
+                {order.manual_fulfillment_allowed && canFulfill ? (
                     <DropdownItem
                         key="fulfill"
                         color="success"
@@ -469,7 +474,7 @@ const OrdersManagePage: React.FC = () => {
                             emptyContent="暂无订单数据"
                         >
                             {orders.map((order) => (
-                                <TableRow key={order.id} onDoubleClick={() => openEditModal(order)}>
+                                <TableRow key={order.id} onDoubleClick={() => { if (canUpdate) openEditModal(order); }}>
                                     <TableCell>
                                         <div className="max-w-72 space-y-1">
                                             <p className="break-all text-sm font-medium" title={order.order_id}>{order.order_id}</p>

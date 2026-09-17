@@ -12,6 +12,115 @@ export interface AdminApiResponse<T = any> {
     total?: number;
 }
 
+export type AdminAccountStatus = 'active' | 'disabled';
+export type AdminPermissionRisk = 'low' | 'medium' | 'high' | 'critical';
+
+export interface AdminRoleSummary {
+    code: string;
+    name: string;
+}
+
+export interface AdminPrincipal {
+    id: number;
+    username: string;
+    display_name: string;
+    email?: string | null;
+    status: AdminAccountStatus;
+    is_superadmin: boolean;
+    mfa_enabled: boolean;
+    must_change_password: boolean;
+    permissions: string[];
+    roles: AdminRoleSummary[];
+    session_id: string;
+}
+
+export interface AdminPermission {
+    permission_key: string;
+    module: string;
+    label: string;
+    description?: string | null;
+    risk_level: AdminPermissionRisk;
+}
+
+export interface AdminRole extends AdminRoleSummary {
+    description?: string | null;
+    sort_order: number;
+    permissions: string[];
+    assigned_accounts: number;
+}
+
+
+export interface AdministratorAccount {
+    id: number;
+    username: string;
+    display_name: string;
+    email?: string | null;
+    status: AdminAccountStatus;
+    is_superadmin: boolean;
+    mfa_enabled: boolean;
+    must_change_password: boolean;
+    authz_version: number;
+    failed_login_count: number;
+    locked_until?: string | null;
+    last_login_at?: string | null;
+    last_login_ip?: string | null;
+    last_seen_at?: string | null;
+    remarks?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
+    role_codes: string[];
+    roles: AdminRoleSummary[];
+    permissions: string[];
+}
+
+export interface AdministratorSession {
+    id: string;
+    admin_id?: number;
+    username?: string;
+    display_name?: string;
+    current?: boolean;
+    ip?: string | null;
+    user_agent?: string | null;
+    created_at?: string | null;
+    last_seen_at?: string | null;
+    idle_expires_at?: string | null;
+    absolute_expires_at?: string | null;
+    mfa_verified: boolean;
+    revoked_at?: string | null;
+    revoke_reason?: string | null;
+    active: boolean;
+}
+
+export interface AdministratorAuditRecord {
+    id: number;
+    admin_id?: number | null;
+    admin_username?: string | null;
+    session_id?: string | null;
+    request_id?: string | null;
+    action: string;
+    permission_key?: string | null;
+    resource_type?: string | null;
+    resource_id?: string | null;
+    result: 'success' | 'denied' | 'failure';
+    reason?: string | null;
+    before_data?: Record<string, unknown> | null;
+    after_data?: Record<string, unknown> | null;
+    ip?: string | null;
+    user_agent?: string | null;
+    method?: string | null;
+    path?: string | null;
+    error_code?: string | null;
+    created_at?: string | null;
+}
+
+export interface AdminLoginResult {
+    mfa_required: boolean;
+    challenge_token?: string;
+    expires_in_seconds?: number;
+    admin_token?: string;
+    principal?: AdminPrincipal;
+}
+
 // 通用查询参数
 export interface CommonQueryParams {
     querystring?: string;
@@ -446,6 +555,8 @@ export interface SystemConfig {
     required: boolean;
     created_at: string;
     updated_at: string;
+    sensitive?: boolean;
+    configured?: boolean | null;
 }
 
 export interface UpdateConfigRequest {

@@ -50,12 +50,17 @@ import dayjs from 'dayjs';
 import adminApiService from '../../services/adminApi';
 import { Package as PackageType, CreatePackageRequest, UpdatePackageRequest, PackageQueryParams } from '../../types/admin';
 import { showToast } from '../../components/Toast';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
 /**
  * 套餐管理页面
  * 提供套餐的增删改查功能
  */
 const PackagesManagePage: React.FC = () => {
+    const { can } = useAdminAuth();
+    const canCreate = can('package.create');
+    const canUpdate = can('package.update');
+    const canDelete = can('package.delete');
     // 状态管理
     const [packages, setPackages] = useState<PackageType[]>([]);
     const [loading, setLoading] = useState(false);
@@ -337,7 +342,7 @@ const PackagesManagePage: React.FC = () => {
                     <MoreVertical className="w-4 h-4" />
                 </Button>
             </DropdownTrigger>
-            <DropdownMenu aria-label="套餐操作">
+            <DropdownMenu aria-label="套餐操作" disabledKeys={[...(!canUpdate ? ['edit'] : []), ...(!canDelete ? ['delete'] : [])]}>
                 <DropdownItem
                     key="view"
                     startContent={<Eye className="w-4 h-4" />}
@@ -443,13 +448,13 @@ const PackagesManagePage: React.FC = () => {
                 <div className="text-sm text-default-600">
                     共 {total} 个套餐
                 </div>
-                <Button
+                {canCreate && <Button
                     color="primary"
                     startContent={<Plus className="w-4 h-4" />}
                     onPress={openCreateModal}
                 >
                     添加套餐
-                </Button>
+                </Button>}
             </div>
 
             {/* 套餐表格 */}
@@ -480,7 +485,7 @@ const PackagesManagePage: React.FC = () => {
                             emptyContent="暂无套餐数据"
                         >
                             {packages.map((pkg) => (
-                                <TableRow key={pkg.id} onDoubleClick={() => openEditModal(pkg)}>
+                                <TableRow key={pkg.id} onDoubleClick={() => { if (canUpdate) openEditModal(pkg); }}>
                                     <TableCell>{pkg.id}</TableCell>
                                     <TableCell>
                                         <div className="space-y-1">
@@ -511,7 +516,7 @@ const PackagesManagePage: React.FC = () => {
                                             size="sm"
                                             color="success"
                                             isSelected={pkg.status === 1}
-                                            isDisabled={statusUpdatingId !== null}
+                                            isDisabled={!canUpdate || statusUpdatingId !== null}
                                             onValueChange={(selected) => void handleStatusChange(pkg, selected ? 1 : 0)}
                                             aria-label={`${pkg.package_name}${pkg.status === 1 ? '下架' : '上架'}`}
                                         >

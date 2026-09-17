@@ -7,6 +7,7 @@ import { buildAttachmentUrl, fetchAttachmentBlob, formatBytes } from './attachme
 
 export interface ChatMessageListProps {
   messages: ChatMessage[];
+  conversationKey?: string | number | null;
   selfRole: 'user' | 'admin';
   loading?: boolean;
   hasMore?: boolean;
@@ -103,6 +104,7 @@ const withinRecallWindow = (createdAt: string, minutes: number): boolean =>
 
 export default function ChatMessageList({
   messages,
+  conversationKey,
   selfRole,
   loading = false,
   hasMore = false,
@@ -115,9 +117,14 @@ export default function ChatMessageList({
 }: ChatMessageListProps): React.ReactElement {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [previewUrl, setPreviewUrl] = useState('');
+  const newestMessageId = messages[messages.length - 1]?.id;
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
-  }, [messages.length]);
+    if (loading) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [conversationKey, loading, newestMessageId]);
   // 撤回事件是独立消息（增量轮询的唯一感知途径）：按 related_message_id 归并到原消息，
   // 事件本身不渲染，这样首屏、after_id、before_id 三条路径都得到同一结果。
   const recallNotices = new Map<number, string>();
