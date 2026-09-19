@@ -754,7 +754,7 @@ class AdminApiService {
         return response.data.data;
     }
 
-    async getCsConversations(params: { current_page?: number; page_size?: number; filter?: string; category_id?: string; querystring?: string; order_column?: string; order?: 'asc' | 'desc' } = {}): Promise<{ data: AdminCsConversation[]; total: number }> {
+    async getCsConversations(params: { current_page?: number; page_size?: number; filter?: string; category_id?: string; querystring?: string } = {}): Promise<{ data: AdminCsConversation[]; total: number }> {
         const queryString = this.buildQueryString(params);
         const active = this.csConversationRequests.get(queryString);
         if (active) return active;
@@ -822,8 +822,11 @@ class AdminApiService {
         return response.data.data;
     }
 
-    async markCsRead(conversation_id?: number): Promise<{ read_at: string }> {
-        const response = await this.api.post('/star/cs_conversation_read', conversation_id === undefined ? {} : { conversation_id });
+    async markCsRead(conversation_id?: number, read_through_message_id?: number): Promise<{ read_at: string; unread: number }> {
+        const response = await this.api.post('/star/cs_conversation_read', {
+            ...(conversation_id === undefined ? {} : { conversation_id }),
+            ...(read_through_message_id === undefined ? {} : { read_through_message_id }),
+        });
         if (response.data.code !== 20000) throw new Error(response.data.msg || '标记客服消息已读失败');
         return response.data.data;
     }

@@ -45,6 +45,15 @@ const relativeTime = (value: string | null) => {
         ? `${Math.floor(seconds / 3600)} 小时前`
         : `${Math.floor(seconds / 86400)} 天前`;
 };
+const conversationActivity = (conversation: AdminCsConversation) => {
+  const timestamp = conversation.last_message_at ? new Date(conversation.last_message_at).getTime() : 0;
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
+const sortConversationsByRecent = (conversations: AdminCsConversation[]) => (
+  [...conversations].sort((left, right) => (
+    conversationActivity(right) - conversationActivity(left) || right.id - left.id
+  ))
+);
 const dataUrlFor = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -70,7 +79,7 @@ const CustomerServicePage: React.FC = () => {
   const [quickReplies, setQuickReplies] = useState<Array<{ id: string; title: string; content: string; attachments?: ChatAttachment[] }>>([]);
   const [selected, setSelected] = useState<AdminCsConversation | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [filter, setFilter] = useState('unread');
+  const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -125,11 +134,9 @@ const CustomerServicePage: React.FC = () => {
           page_size: pageSize,
           filter,
           querystring: query.trim() || undefined,
-          order_column: 'last_message_at',
-          order: 'desc',
         });
         if (requestId !== listRequestId.current) return;
-        const nextRows = result.data;
+        const nextRows = sortConversationsByRecent(result.data);
         setRows(nextRows);
         const visibleIds = new Set(nextRows.map((item) => item.id));
         setBatchSelection((current) => new Set(Array.from(current).filter((id) => visibleIds.has(id))));
@@ -164,7 +171,7 @@ const CustomerServicePage: React.FC = () => {
         setSelected((current) => {
           if (!current) return null;
           const refreshed = nextRows.find((item) => item.id === current.id);
-          return refreshed ? { ...refreshed, admin_unread: 0, unread: 0 } : current;
+          return refreshed ? { ...current, ...refreshed } : current;
         });
       } catch (error) {
         if (requestId === listRequestId.current && !silent) {
@@ -192,13 +199,14 @@ const CustomerServicePage: React.FC = () => {
         const result = await adminApiService.getCsMessages({ conversation_id: conversation.id, limit: 50 });
         if (requestId !== messageRequestId.current || activeConversationId.current !== conversation.id) return;
         setMessages(result.messages);
-        await adminApiService.markCsRead(conversation.id);
+        const latestDelivered = result.messages[result.messages.length - 1];
+        const readResult = await adminApiService.markCsRead(conversation.id, latestDelivered?.id);
         if (requestId !== messageRequestId.current || activeConversationId.current !== conversation.id) return;
-        const readConversation = { ...result.conversation, admin_unread: 0, unread: 0 } as AdminCsConversation;
+        const readConversation = { ...result.conversation, admin_unread: readResult.unread, unread: readResult.unread } as AdminCsConversation;
         setSelected((current) => (current?.id === conversation.id ? { ...current, ...readConversation } : current));
-        setRows((current) => current.map((item) => (
+        setRows((current) => sortConversationsByRecent(current.map((item) => (
           item.id === conversation.id ? { ...item, ...readConversation } : item
-        )));
+        ))));
       } catch (error) {
         if (requestId === messageRequestId.current && activeConversationId.current === conversation.id) {
           showToast(error instanceof Error ? error.message : '获取消息失败', 'error');
@@ -226,15 +234,17 @@ const CustomerServicePage: React.FC = () => {
         return [...current, ...result.messages.filter((message) => !known.has(message.id))];
       });
       const hasIncoming = result.messages.some((message) => message.role === 'user');
-      if (hasIncoming || result.conversation.admin_unread > 0) {
-        await adminApiService.markCsRead(conversationId);
+      const latestDelivered = result.messages[result.messages.length - 1];
+      let remainingUnread = result.conversation.admin_unread;
+      if (latestDelivered && (hasIncoming || remainingUnread > 0)) {
+        remainingUnread = (await adminApiService.markCsRead(conversationId, latestDelivered.id)).unread;
       }
       if (requestId !== refreshRequestId.current || activeConversationId.current !== conversationId) return;
-      const readConversation = { ...result.conversation, admin_unread: 0, unread: 0 } as AdminCsConversation;
+      const readConversation = { ...result.conversation, admin_unread: remainingUnread, unread: remainingUnread } as AdminCsConversation;
       setSelected((current) => (current?.id === conversationId ? { ...current, ...readConversation } : current));
-      setRows((current) => current.map((item) => (
+      setRows((current) => sortConversationsByRecent(current.map((item) => (
         item.id === conversationId ? { ...item, ...readConversation } : item
-      )));
+      ))));
     } catch {
       /* 下次轮询重试 */
     }
@@ -314,7 +324,7 @@ const CustomerServicePage: React.FC = () => {
       setMessages((current) => current.some((item) => item.id === message.id) ? current : [...current, message]);
     }
     setSelected((current) => (current?.id === conversationId ? { ...current, ...patch } : current));
-    setRows((current) => current.map((item) => item.id === conversationId ? { ...item, ...patch } : item));
+    setRows((current) => sortConversationsByRecent(current.map((item) => item.id === conversationId ? { ...item, ...patch } : item)));
   };
   const sendMessage = async () => {
     if (!selected || (!reply.trim() && !attachments.length)) return;
@@ -380,10 +390,10 @@ const CustomerServicePage: React.FC = () => {
         client_msg_id: batchClientMessageId.current,
       });
       const sentByConversation = new Map(result.messages.map((message) => [message.conversation_id, message]));
-      setRows((current) => current.map((item) => {
+      setRows((current) => sortConversationsByRecent(current.map((item) => {
         const message = sentByConversation.get(item.id);
         return message ? { ...item, ...conversationPatch(message) } : item;
-      }));
+      })));
       setSelected((current) => {
         if (!current) return current;
         const message = sentByConversation.get(current.id);
@@ -443,7 +453,7 @@ const CustomerServicePage: React.FC = () => {
         last_message_role: result.conversation.last_message_role,
       };
       setSelected((current) => (current?.id === conversationId ? { ...current, ...patch } : current));
-      setRows((current) => current.map((item) => (item.id === conversationId ? { ...item, ...patch } : item)));
+      setRows((current) => sortConversationsByRecent(current.map((item) => (item.id === conversationId ? { ...item, ...patch } : item))));
       setRecallTarget(null);
       showToast('消息已撤回', 'success');
       void loadList(true);
@@ -573,21 +583,26 @@ const CustomerServicePage: React.FC = () => {
                         <div className="flex items-center gap-2">
                           <span
                             className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                              ['resolved', 'closed'].includes(item.status)
-                                ? 'bg-success-700'
-                                : item.admin_unread > 0
-                                  ? 'bg-danger'
+                              item.admin_unread > 0
+                                ? 'bg-danger'
+                                : ['resolved', 'closed'].includes(item.status)
+                                  ? 'bg-default-300'
                                   : 'bg-success-300'
                             }`}
-                            aria-label={['resolved', 'closed'].includes(item.status) ? '已完成' : item.admin_unread > 0 ? '未查看' : '已查看'}
+                            aria-label={item.admin_unread > 0 ? `有 ${item.admin_unread} 条未读消息` : '已读'}
                           />
                           <span className="min-w-0 flex-1 truncate text-sm font-medium">
                             {item.user.profile.username || item.user.profile.email || `用户 ${item.user.id}`}
                           </span>
+                          {item.admin_unread > 0 && (
+                            <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-danger px-1 text-[11px] font-semibold text-white">
+                              {item.admin_unread > 99 ? '99+' : item.admin_unread}
+                            </span>
+                          )}
                           <span className="shrink-0 text-xs text-default-500">{relativeTime(item.last_message_at)}</span>
                         </div>
                         <div className="mt-1 flex items-center gap-2 text-xs text-default-500">
-                          <span className="shrink-0">{['resolved', 'closed'].includes(item.status) ? '已完成' : item.admin_unread > 0 ? '未查看' : '已查看'}</span>
+                          <span className="shrink-0">{item.admin_unread > 0 ? '未读' : ['resolved', 'closed'].includes(item.status) ? '已完成' : '已读'}</span>
                           <span className="truncate">{item.last_message_preview || '暂无消息'}</span>
                         </div>
                       </div>

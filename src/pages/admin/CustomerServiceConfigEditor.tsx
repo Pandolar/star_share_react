@@ -81,7 +81,7 @@ const DEFAULT_CONFIG: JsonRecord = {
     max_message_page_size: 50,
   },
   badge: { enabled: true, max_display: 99, show_on_floating: true },
-  admin: { notify_enabled: false, notify_bark: false, notify_email: false, notify_email_to: '', default_filter: 'unread', page_size: 20, recall_window_minutes: 10 },
+  admin: { notify_enabled: false, notify_bark: false, notify_email: false, notify_email_to: '', page_size: 20, recall_window_minutes: 10 },
 };
 
 const record = (value: unknown): JsonRecord => (value && typeof value === 'object' && !Array.isArray(value) ? (value as JsonRecord) : {});
@@ -692,20 +692,6 @@ export const CustomerServiceConfigEditor: React.FC<Props> = ({ value, onChange, 
             isDisabled={disabled}
             description="留空则不发邮件"
           />
-          <Select
-            label="默认筛选"
-            selectedKeys={[String(admin.default_filter)]}
-            onSelectionChange={(keys) => patchSection('admin', { default_filter: String(Array.from(keys)[0] || 'unread') })}
-            isDisabled={disabled}
-          >
-            <SelectItem key="all">全部</SelectItem>
-            <SelectItem key="unread">未读</SelectItem>
-            <SelectItem key="awaiting">待回复</SelectItem>
-            <SelectItem key="open">开放</SelectItem>
-            <SelectItem key="processing">处理中</SelectItem>
-            <SelectItem key="resolved">已解决</SelectItem>
-            <SelectItem key="closed">已关闭</SelectItem>
-          </Select>
           {numeric('管理端每页数量', admin.page_size, (page_size) => patchSection('admin', { page_size }), { min: 5, max: 100 })}
           {numeric('撤回时限（分钟）', admin.recall_window_minutes, (recall_window_minutes) => patchSection('admin', { recall_window_minutes }), {
             min: 1,
