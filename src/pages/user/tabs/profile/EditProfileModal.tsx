@@ -30,7 +30,15 @@ interface EditProfileModalProps {
 
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 const PHONE_REGEX = /^1[3-9]\d{9}$/;
+const USCC_CHARSET = '0123456789ABCDEFGHJKLMNPQRTUWXY';
+const USCC_WEIGHTS = [1, 3, 9, 27, 19, 26, 16, 17, 20, 29, 25, 13, 8, 24, 10, 30, 28];
 
+const isStandardTaxNumber = (taxNumber: string) => {
+  if (/^\d{15}$/.test(taxNumber)) return true;
+  if (taxNumber.length !== 18 || taxNumber.split('').some((char) => !USCC_CHARSET.includes(char))) return false;
+  const total = taxNumber.slice(0, 17).split('').reduce((sum, char, index) => sum + USCC_CHARSET.indexOf(char) * USCC_WEIGHTS[index], 0);
+  return taxNumber[17] === USCC_CHARSET[(31 - (total % 31)) % 31];
+};
 const useCountdown = () => {
   const [value, setValue] = useState(0);
   useEffect(() => {
@@ -85,6 +93,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const [billingTitle, setBillingTitle] = useState('');
   const [billingTaxNumber, setBillingTaxNumber] = useState('');
   const [billingConfirmed, setBillingConfirmed] = useState(false);
+  const [specialTaxWarningOpen, setSpecialTaxWarningOpen] = useState(false);
 
   // Modal 打开时，初始化字段
   useEffect(() => {
@@ -108,6 +117,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     setBillingTitle(userInfo?.preferences?.billing_profile?.title || '');
     setBillingTaxNumber(userInfo?.preferences?.billing_profile?.tax_number || '');
     setBillingConfirmed(false);
+    setSpecialTaxWarningOpen(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
@@ -155,7 +165,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (allowSpecialTaxNumber = false) => {
     setEditLoading(true);
     setEditError('');
     try {
@@ -295,8 +305,12 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           return;
         }
         const normalizedTaxNumber = billingTaxNumber.replace(/\s+/g, '').toUpperCase();
-        if (!/^\d{15}$/.test(normalizedTaxNumber) && !/^[0-9A-HJ-NPQRTUWXY]{18}$/.test(normalizedTaxNumber)) {
-          setEditError('请输入 15 位旧税号或 18 位统一社会信用代码');
+        if (!normalizedTaxNumber) {
+          setEditError('请输入税号');
+          return;
+        }
+        if (!allowSpecialTaxNumber && !isStandardTaxNumber(normalizedTaxNumber)) {
+          setSpecialTaxWarningOpen(true);
           return;
         }
         if (!billingConfirmed) {
@@ -346,7 +360,8 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const sendPwdCodeDisabled = pwdCodeSending || pwdCountdown > 0 || !userInfo?.email || userInfo.email.endsWith('@default.com');
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} placement="center" size="2xl" scrollBehavior="inside">
+    <>
+      <Modal isOpen={isOpen} onClose={onClose} placement="center" size="2xl" scrollBehavior="inside">
       <ModalContent>
         <ModalHeader className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
@@ -702,11 +717,32 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           <Button variant="light" onPress={onClose} isDisabled={editLoading}>
             取消
           </Button>
-          <Button color="primary" onPress={handleSubmit} isDisabled={isSubmitDisabled} isLoading={editLoading}>
+          <Button color="primary" onPress={() => void handleSubmit()} isDisabled={isSubmitDisabled} isLoading={editLoading}>
             保存修改
           </Button>
         </ModalFooter>
       </ModalContent>
     </Modal>
-  );
+      <Modal isOpen={specialTaxWarningOpen} onClose={() => setSpecialTaxWarningOpen(false)} placement="center" size="md">
+        <ModalContent>
+          {(onCloseWarning) => (
+            <>
+              <ModalHeader>请确认税号</ModalHeader>
+              <ModalBody>
+                <Alert
+                  color="warning"
+                  variant="flat"
+                  title="您的税号格式非常规税号，请仔细核对确认无误后再保存！"
+                />
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onCloseWarning}>返回修改</Button>
+                <Button color="primary" onPress={() => { onCloseWarning(); void handleSubmit(true); }}>确认保存</Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+    </>
+   );
 };
