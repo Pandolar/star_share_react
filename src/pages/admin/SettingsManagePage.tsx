@@ -45,6 +45,7 @@ import { DistributorLevelDiscountsEditor } from './DistributorLevelDiscountsEdit
 import { HomeInfoConfigEditor } from './HomeInfoConfigEditor';
 import { TeamPlanConfigEditor } from './TeamPlanConfigEditor';
 import { CustomerServiceConfigEditor } from './CustomerServiceConfigEditor';
+import { McpConfigEditor } from './McpConfigEditor';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 const VISUAL_CONFIG_KEYS: Record<string, true> = {
     SPEEDTEST_URL_LIST: true,
@@ -53,6 +54,7 @@ const VISUAL_CONFIG_KEYS: Record<string, true> = {
     DISTRIBUTOR_LEVEL_DISCOUNTS: true,
     WHITE_LABEL_CONFIG: true,
     CUSTOMER_SERVICE_CONFIG: true,
+    MCP_CONFIG: true,
     INVOICE_CONFIG: true,
     INVITE_POLICY: true,
     INVITE_CASHBACK_CONFIG: true,
@@ -69,12 +71,13 @@ const VISUAL_CONFIG_KEYS: Record<string, true> = {
 const SettingsManagePage: React.FC = () => {
     const { can } = useAdminAuth();
     const canUpdate = can('config.update');
+    const canManageMcp = can('mcp.agent.manage');
     const canWriteSecret = can('config.secret.write');
     const canReloadRuntime = can('config.runtime.reload');
     const canReadPackages = can('package.read');
     const canEditConfig = useCallback((config: SystemConfig) => (
-        config.editable && canUpdate && (!config.sensitive || canWriteSecret)
-    ), [canUpdate, canWriteSecret]);
+        config.editable && canUpdate && (!config.sensitive || canWriteSecret) && (config.key !== 'MCP_CONFIG' || canManageMcp)
+    ), [canUpdate, canWriteSecret, canManageMcp]);
     // 状态管理
     const [configs, setConfigs] = useState<SystemConfig[]>([]);
     const [loading, setLoading] = useState(false);
@@ -349,7 +352,7 @@ const SettingsManagePage: React.FC = () => {
                                 刷新限速器
                             </Button>
                         )}
-                        {supportsModeSwitch && (
+                        {supportsModeSwitch && config.key !== 'MCP_CONFIG' && (
                             <Button size="sm" variant="bordered" onPress={() => toggleConfigMode(config.key)}>
                                 {showRawJson ? '切换可视化' : '查看原始 JSON'}
                             </Button>
@@ -439,6 +442,8 @@ const SettingsManagePage: React.FC = () => {
                     <WhiteLabelConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!canEditConfig(config)} />
                 ) : config.key === 'CUSTOMER_SERVICE_CONFIG' ? (
                     <CustomerServiceConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!canEditConfig(config)} />
+                ) : config.key === 'MCP_CONFIG' ? (
+                    <McpConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!canEditConfig(config)} />
                 ) : config.key === 'INVOICE_CONFIG' ? (
                     <InvoiceConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!canEditConfig(config)} />
                 ) : config.key === 'INVITE_POLICY' ? (

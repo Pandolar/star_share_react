@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Chip, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, Progress, Textarea } from '@heroui/react';
-import { Paperclip, Send } from 'lucide-react';
+import { Alert, Button, Chip, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, Progress, Textarea, Tooltip } from '@heroui/react';
+import { Paperclip, Send, Trash2 } from 'lucide-react';
 import type { ChatAttachment, ChatAttachmentConfig, ChatAttachmentKind } from './types';
 import { compressImageFile } from './imageCompression';
 import { toast } from '../../utils/toast';
@@ -20,6 +20,8 @@ export interface ChatComposerProps {
   uploadAttachment: (file: File) => Promise<ChatAttachment>;
   quickReplies?: { id: string; title: string; content: string }[];
   onPickQuickReply?: (id: string, content: string) => void;
+  onDeleteQuickReply?: (id: string) => void;
+  quickReplyPreview?: boolean;
   extraActions?: React.ReactNode;
   footerNote?: React.ReactNode;
 }
@@ -48,6 +50,8 @@ export default function ChatComposer({
   uploadAttachment,
   quickReplies,
   onPickQuickReply,
+  onDeleteQuickReply,
+  quickReplyPreview = false,
   extraActions,
   footerNote,
 }: ChatComposerProps): React.ReactElement {
@@ -65,7 +69,22 @@ export default function ChatComposer({
   };
   useEffect(() => () => {
     if (closeQuickRepliesTimer.current !== null) window.clearTimeout(closeQuickRepliesTimer.current);
+    if (previewTimer.current !== null) window.clearTimeout(previewTimer.current);
   }, []);
+  const [previewReplyId, setPreviewReplyId] = useState<string | null>(null);
+  const previewTimer = useRef<number | null>(null);
+  const cancelQuickReplyPreview = () => {
+    if (previewTimer.current !== null) window.clearTimeout(previewTimer.current);
+    previewTimer.current = null;
+    setPreviewReplyId(null);
+  };
+  const scheduleQuickReplyPreview = (replyId: string) => {
+    cancelQuickReplyPreview();
+    previewTimer.current = window.setTimeout(() => {
+      previewTimer.current = null;
+      setPreviewReplyId(replyId);
+    }, 3000);
+  };
   const [dragging, setDragging] = useState(false);
   const accept = (Object.keys(attachmentConfig.types) as ChatAttachmentKind[])
     .filter((kind) => attachmentConfig.types[kind].enabled)
@@ -202,15 +221,63 @@ export default function ChatComposer({
             <DropdownMenu
               aria-label="快捷回复"
               onMouseEnter={openQuickReplies}
-              onMouseLeave={closeQuickReplies}
+              onMouseLeave={() => {
+                closeQuickReplies();
+                cancelQuickReplyPreview();
+              }}
               onAction={(key) => {
                 const reply = quickReplies.find((item) => item.id === String(key));
+                cancelQuickReplyPreview();
                 setQuickRepliesOpen(false);
                 if (reply) onPickQuickReply?.(reply.id, reply.content);
               }}
             >
               {quickReplies.map((reply) => (
-                <DropdownItem key={reply.id}>{reply.title}</DropdownItem>
+                <DropdownItem
+                  key={reply.id}
+                  onMouseEnter={() => {
+                    if (quickReplyPreview) scheduleQuickReplyPreview(reply.id);
+                  }}
+                  onMouseLeave={() => {
+                    if (quickReplyPreview) cancelQuickReplyPreview();
+                  }}
+                  onFocus={() => {
+                    if (quickReplyPreview) scheduleQuickReplyPreview(reply.id);
+                  }}
+                  onBlur={() => {
+                    if (quickReplyPreview) cancelQuickReplyPreview();
+                  }}
+                  onClick={() => {
+                    if (quickReplyPreview) cancelQuickReplyPreview();
+                  }}
+                  endContent={onDeleteQuickReply ? (
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      variant="light"
+                      color="danger"
+                      aria-label={`删除快捷短语：${reply.title}`}
+                      onClick={(event) => event.stopPropagation()}
+                      onPress={() => {
+                        cancelQuickReplyPreview();
+                        setQuickRepliesOpen(false);
+                        onDeleteQuickReply(reply.id);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  ) : undefined}
+                >
+                  {quickReplyPreview ? (
+                    <Tooltip
+                      content={<span className="block max-w-80 whitespace-pre-wrap break-words">{reply.content}</span>}
+                      isOpen={previewReplyId === reply.id}
+                      placement="right"
+                    >
+                      <span>{reply.title}</span>
+                    </Tooltip>
+                  ) : reply.title}
+                </DropdownItem>
               ))}
             </DropdownMenu>
           </Dropdown>

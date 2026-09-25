@@ -81,7 +81,7 @@ const DEFAULT_CONFIG: JsonRecord = {
     max_message_page_size: 50,
   },
   badge: { enabled: true, max_display: 99, show_on_floating: true },
-  admin: { notify_enabled: false, notify_bark: false, notify_email: false, notify_email_to: '', page_size: 20, recall_window_minutes: 10 },
+  admin: { notify_enabled: false, notify_bark: false, notify_email: false, notify_email_to: '', notify_webhooks: [], page_size: 20, recall_window_minutes: 10 },
 };
 
 const record = (value: unknown): JsonRecord => (value && typeof value === 'object' && !Array.isArray(value) ? (value as JsonRecord) : {});
@@ -140,6 +140,14 @@ export const CustomerServiceConfigEditor: React.FC<Props> = ({ value, onChange, 
     emit({
       quick_replies: (config.quick_replies as JsonRecord[]).map((item, current) => (current === index ? { ...item, ...patch } : item)),
     });
+  const webhooks = Array.isArray(section('admin').notify_webhooks) ? (section('admin').notify_webhooks as JsonRecord[]) : [];
+  const updateWebhook = (index: number, patch: JsonRecord) =>
+    patchSection('admin', { notify_webhooks: webhooks.map((item, current) => (current === index ? { ...item, ...patch } : item)) });
+  const addWebhook = () => {
+    if (webhooks.length >= 8) return;
+    patchSection('admin', { notify_webhooks: [...webhooks, { id: `agent_${Date.now()}`, name: '第三方 Agent', url: '', enabled: true }] });
+  };
+  const removeWebhook = (index: number) => patchSection('admin', { notify_webhooks: webhooks.filter((_, current) => current !== index) });
   const fileData = (file: File) =>
     new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -502,7 +510,11 @@ export const CustomerServiceConfigEditor: React.FC<Props> = ({ value, onChange, 
               <Switch isSelected={reply.enabled === true} onValueChange={(enabled) => updateReply(index, { enabled })} isDisabled={disabled}>
                 启用
               </Switch>
-              <Button isIconOnly color="danger" variant="light" aria-label={`删除快捷回复 ${index + 1}`} onPress={() => emit({ quick_replies: (config.quick_replies as JsonRecord[]).filter((_, current) => current !== index) })} isDisabled={disabled}>
+              <Button isIconOnly color="danger" variant="light" aria-label={`删除快捷回复 ${index + 1}`} onPress={() => {
+                if (window.confirm(`确定删除快捷回复“${String(reply.title || reply.id)}”吗？保存配置后将无法恢复。`)) {
+                  emit({ quick_replies: (config.quick_replies as JsonRecord[]).filter((_, current) => current !== index) });
+                }
+              }} isDisabled={disabled}>
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
@@ -692,6 +704,26 @@ export const CustomerServiceConfigEditor: React.FC<Props> = ({ value, onChange, 
             isDisabled={disabled}
             description="留空则不发邮件"
           />
+          <div className="md:col-span-3 space-y-3 rounded-medium bg-default-50 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="font-medium">第三方 Agent Webhook</p>
+                <p className="text-small text-default-500">仅用户新消息触发；每个端点可独立开关，最多 8 个。</p>
+              </div>
+              <Button size="sm" variant="flat" startContent={<Plus size={16} />} onPress={addWebhook} isDisabled={disabled || webhooks.length >= 8}>添加端点</Button>
+            </div>
+            <Alert color="primary" variant="flat" title="交付格式与安全约束">
+              系统向 HTTPS 公网地址发送 POST JSON（不跟随重定向，单次超时 3 秒）：{'{'}&quot;event&quot;:&quot;customer_service.message.created&quot;,&quot;conversation_id&quot;:123,&quot;message_id&quot;:456,&quot;user_id&quot;:789,&quot;subject&quot;:&quot;…&quot;,&quot;preview&quot;:&quot;前 120 字&quot;,&quot;created_at&quot;:&quot;ISO-8601&quot;{'}'}。不发送完整消息正文、附件、会话令牌或认证密钥；此版本不配置或发送认证密钥，请使用不可猜测的专用 HTTPS 接收地址并在 Agent 端校验事件字段。
+            </Alert>
+            {webhooks.map((webhook, index) => (
+              <div key={String(webhook.id || index)} className="grid gap-3 rounded-medium border border-divider p-3 md:grid-cols-[1fr_1fr_1fr_auto]">
+                <Input label="端点名称" value={String(webhook.name ?? '')} onValueChange={(name) => updateWebhook(index, { name })} isDisabled={disabled} />
+                <Input label="端点 ID" value={String(webhook.id ?? '')} onValueChange={(id) => updateWebhook(index, { id: id.toLowerCase().replace(/[^a-z0-9_-]/g, '') })} isDisabled={disabled} description="小写字母、数字、_ 或 -" />
+                <Input label="HTTPS URL" type="url" value={String(webhook.url ?? '')} onValueChange={(url) => updateWebhook(index, { url })} isDisabled={disabled} description="仅公网 HTTPS；保存时会校验 DNS" />
+                <div className="flex items-center gap-2"><Switch isSelected={webhook.enabled === true} onValueChange={(enabled) => updateWebhook(index, { enabled })} isDisabled={disabled}>启用</Switch><Button isIconOnly aria-label="删除 Webhook" color="danger" variant="light" onPress={() => removeWebhook(index)} isDisabled={disabled}><Trash2 size={16} /></Button></div>
+              </div>
+            ))}
+          </div>
           {numeric('管理端每页数量', admin.page_size, (page_size) => patchSection('admin', { page_size }), { min: 5, max: 100 })}
           {numeric('撤回时限（分钟）', admin.recall_window_minutes, (recall_window_minutes) => patchSection('admin', { recall_window_minutes }), {
             min: 1,

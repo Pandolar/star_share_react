@@ -810,6 +810,12 @@ class AdminApiService {
         return response.data.data;
     }
 
+    async deleteCsQuickReply(id: string): Promise<{ id: string }> {
+        const response = await this.api.delete('/star/cs_quick_replies', { data: { id } });
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '删除快捷短语失败');
+        return response.data.data;
+    }
+
     /**
      * 撤回客服消息：后端软撤回，返回被撤回消息、撤回事件与刷新后的会话。
      * 后台接口的业务失败是 HTTP 200 + code!=20000 + data=[]，这里必须转成异常：

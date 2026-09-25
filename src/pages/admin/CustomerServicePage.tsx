@@ -101,6 +101,8 @@ const CustomerServicePage: React.FC = () => {
   const [quickPhraseTitle, setQuickPhraseTitle] = useState('');
   const [quickPhraseContent, setQuickPhraseContent] = useState('');
   const [quickPhraseSaving, setQuickPhraseSaving] = useState(false);
+  const [quickPhraseDeleteTarget, setQuickPhraseDeleteTarget] = useState<{ id: string; title: string; content: string } | null>(null);
+  const [quickPhraseDeleting, setQuickPhraseDeleting] = useState(false);
   const [mobileChat, setMobileChat] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>(() => (
     typeof Notification === 'undefined' ? 'unsupported' : Notification.permission
@@ -435,6 +437,22 @@ const CustomerServicePage: React.FC = () => {
       setQuickPhraseSaving(false);
     }
   };
+  const confirmQuickPhraseDelete = async () => {
+    if (!quickPhraseDeleteTarget) return;
+    const { id } = quickPhraseDeleteTarget;
+    setQuickPhraseDeleting(true);
+    try {
+      await adminApiService.deleteCsQuickReply(id);
+      setQuickReplies((current) => current.filter((item) => item.id !== id));
+      setBatchQuickReplyId((current) => (current === id ? undefined : current));
+      setQuickPhraseDeleteTarget(null);
+      showToast('快捷短语已删除', 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '删除快捷短语失败', 'error');
+    } finally {
+      setQuickPhraseDeleting(false);
+    }
+  };
   const confirmRecall = async () => {
     if (!recallTarget) return;
     const conversationId = recallTarget.conversation_id;
@@ -678,6 +696,11 @@ const CustomerServicePage: React.FC = () => {
                     uploadAttachment={uploadAttachment}
                     quickReplies={canSend ? quickReplies : []}
                     onPickQuickReply={canSend ? ((id) => void sendQuickReply(id)) : undefined}
+                    onDeleteQuickReply={canManageQuickReplies ? ((id) => {
+                      const target = quickReplies.find((item) => item.id === id);
+                      if (target) setQuickPhraseDeleteTarget(target);
+                    }) : undefined}
+                    quickReplyPreview
                     extraActions={canManageQuickReplies ? (
                       <Button size="sm" variant="flat" startContent={<Plus className="h-4 w-4" />} onPress={openQuickPhrase}>
                         新建快捷短语
@@ -775,6 +798,31 @@ const CustomerServicePage: React.FC = () => {
               onPress={() => void confirmBatchReply()}
             >
               发送给 {batchSelection.size} 个用户
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+      <Modal
+        isOpen={Boolean(quickPhraseDeleteTarget)}
+        onOpenChange={(open) => {
+          if (!open && !quickPhraseDeleting) setQuickPhraseDeleteTarget(null);
+        }}
+        size="md"
+      >
+        <ModalContent>
+          <ModalHeader>删除快捷短语</ModalHeader>
+          <ModalBody>
+            <p className="text-sm text-default-600">确定删除“{quickPhraseDeleteTarget?.title}”吗？删除后无法恢复。</p>
+            {quickPhraseDeleteTarget?.content && (
+              <div className="rounded-medium bg-default-100 p-3 text-sm text-default-700">
+                <p className="whitespace-pre-wrap break-words">{quickPhraseDeleteTarget.content}</p>
+              </div>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" isDisabled={quickPhraseDeleting} onPress={() => setQuickPhraseDeleteTarget(null)}>取消</Button>
+            <Button color="danger" isLoading={quickPhraseDeleting} onPress={() => void confirmQuickPhraseDelete()}>
+              确认删除
             </Button>
           </ModalFooter>
         </ModalContent>
