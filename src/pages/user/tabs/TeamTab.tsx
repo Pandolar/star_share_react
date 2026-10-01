@@ -136,7 +136,9 @@ export const TeamTab: React.FC = () => {
   const [paymentOpen, setPaymentOpen] = useState(false);
   const orderModal = useDisclosure();
   const cancelModal = useDisclosure();
+  const exitModal = useDisclosure();
   const [cancellingTeam, setCancellingTeam] = useState(false);
+  const [exiting, setExiting] = useState(false);
   const [agreementAccepted, setAgreementAccepted] = useState(true);
   const { isRequired: isAgreementRequired } = useUserAgreementRequirement();
 
@@ -355,14 +357,18 @@ export const TeamTab: React.FC = () => {
     }
   };
 
-  const leaveTeam = async () => {
+  const exitTeam = async () => {
+    setExiting(true);
     try {
       const response = await teamUserApi.leave();
-      if (response.code !== 20000) throw new Error(response.msg || '退出失败');
-      toast.success('已退出团队');
+      if (response.code !== 20000) throw new Error(response.msg || '操作失败');
+      toast.success(response.msg || (team?.is_owner ? '团队已解散' : '已退出团队'));
+      exitModal.onClose();
       await loadOverview(true);
     } catch (requestError) {
-      toast.error(requestError instanceof Error ? requestError.message : '退出失败');
+      toast.error(requestError instanceof Error ? requestError.message : '操作失败');
+    } finally {
+      setExiting(false);
     }
   };
 
@@ -390,6 +396,7 @@ export const TeamTab: React.FC = () => {
   const status = TEAM_STATUS[team?.status || ''] || { label: team?.status || '未知', color: 'default' as const };
   const canCreate = !team && overview?.plan_config.enabled && plans.length > 0;
   const pendingCheckout = overview?.pending_checkout;
+  const isOwnerDisband = Boolean(team?.is_owner);
 
   return (
     <div className="space-y-6">
@@ -505,6 +512,30 @@ export const TeamTab: React.FC = () => {
             />
           )}
 
+          {team.status === 'expired' && (
+            <Alert
+              color="danger"
+              variant="flat"
+              title="团队订阅已到期"
+              description={team.is_owner
+                ? '团队权益已停止。续费可立即恢复团队服务；若不再需要，可解散团队并释放全部席位。'
+                : '团队权益已停止。退出后即可购买个人套餐或接受其他团队邀请。'}
+              startContent={<Clock3 className="h-5 w-5" />}
+              endContent={(
+                <div className="flex flex-wrap justify-end gap-2">
+                  {team.is_owner ? (
+                    <>
+                      <Button size="sm" variant="flat" color="danger" onPress={exitModal.onOpen}>解散团队</Button>
+                      <Button size="sm" color="primary" onPress={() => openOrder('renewal')}>续费团队</Button>
+                    </>
+                  ) : (
+                    <Button size="sm" color="danger" onPress={exitModal.onOpen}>退出团队</Button>
+                  )}
+                </div>
+              )}
+            />
+          )}
+
           <Card>
             <CardBody className="gap-5 p-5 sm:p-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -515,24 +546,31 @@ export const TeamTab: React.FC = () => {
                   </div>
                   <p className="mt-1 text-sm text-default-500">团队编号 #{team.id}</p>
                 </div>
-                {team.is_owner ? (
-                  <div className="flex flex-wrap gap-2">
-                    {team.status === 'active' && !team.pending_package_id && (
-                      <Button size="sm" variant="flat" startContent={<Settings2 className="h-4 w-4" />} onPress={() => openOrder('change')}>
-                        调整订阅
-                      </Button>
-                    )}
-                    {(team.status === 'active' || team.status === 'expired') && (
-                      <Button size="sm" color="primary" startContent={<CalendarDays className="h-4 w-4" />} onPress={() => openOrder('renewal')}>
-                        续费团队
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <Button size="sm" color="danger" variant="flat" startContent={<UserMinus className="h-4 w-4" />} onPress={() => void leaveTeam()}>
-                    退出团队
-                  </Button>
-                )}
+                <div className="flex flex-wrap gap-2">
+                  {team.is_owner ? (
+                    <>
+                      {team.status === 'active' && !team.pending_package_id && (
+                        <Button size="sm" variant="flat" startContent={<Settings2 className="h-4 w-4" />} onPress={() => openOrder('change')}>
+                          调整订阅
+                        </Button>
+                      )}
+                      {(team.status === 'active' || team.status === 'expired') && (
+                        <Button size="sm" color="primary" startContent={<CalendarDays className="h-4 w-4" />} onPress={() => openOrder('renewal')}>
+                          续费团队
+                        </Button>
+                      )}
+                      {team.status === 'expired' && (
+                        <Button size="sm" color="danger" variant="flat" startContent={<UserMinus className="h-4 w-4" />} onPress={exitModal.onOpen}>
+                          解散团队
+                        </Button>
+                      )}
+                    </>
+                  ) : (
+                    <Button size="sm" color="danger" variant="flat" startContent={<UserMinus className="h-4 w-4" />} onPress={exitModal.onOpen}>
+                      退出团队
+                    </Button>
+                  )}
+                </div>
               </div>
 
               <Divider />
@@ -565,9 +603,9 @@ export const TeamTab: React.FC = () => {
             </CardBody>
           </Card>
 
-          {team.status === 'active' && (
+          {(team.status === 'active' || team.status === 'expired') && (
             <>
-              {team.is_owner && (
+              {team.is_owner && team.status === 'active' && (
                 <Card>
                   <CardBody className="gap-4 p-5 sm:p-6">
                     <div>
@@ -622,7 +660,7 @@ export const TeamTab: React.FC = () => {
                         </div>
                         <p className="mt-1 text-xs text-default-400">加入时间 {formatDate(member.joined_at)}</p>
                       </div>
-                      {team.is_owner && member.role !== 'owner' && (
+                      {team.is_owner && team.status === 'active' && member.role !== 'owner' && (
                         <div className="flex flex-wrap gap-2">
                           <Button
                             size="sm"
@@ -749,6 +787,29 @@ export const TeamTab: React.FC = () => {
           <ModalFooter>
             <Button variant="light" onPress={cancelModal.onClose}>返回</Button>
             <Button color="danger" isLoading={cancellingTeam} onPress={() => void cancelPendingTeam()}>确认取消</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <Modal isOpen={exitModal.isOpen} onClose={exitModal.onClose} size="sm" placement="center">
+        <ModalContent>
+          <ModalHeader>{isOwnerDisband ? '解散团队' : '退出团队'}</ModalHeader>
+          <ModalBody>
+            {isOwnerDisband ? (
+              <p className="text-sm leading-6 text-default-600">
+                解散后「{team?.team_name}」将立即关闭，所有成员（含你）的团队席位都会被释放且无法恢复，成员可随后购买个人套餐或加入其他团队。确定解散吗？
+              </p>
+            ) : (
+              <p className="text-sm leading-6 text-default-600">
+                退出后你将失去「{team?.team_name}」的团队权益，可随后购买个人套餐或接受其他团队邀请。确定退出吗？
+              </p>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" onPress={exitModal.onClose}>取消</Button>
+            <Button color="danger" isLoading={exiting} onPress={() => void exitTeam()}>
+              {isOwnerDisband ? '确认解散' : '确认退出'}
+            </Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
