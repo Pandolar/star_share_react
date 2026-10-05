@@ -65,11 +65,13 @@ const invoiceSummaryFromCsv = (csv: string): string => {
   const titleIndex = headers.indexOf('发票抬头');
   const taxNumberIndex = headers.indexOf('税号');
   const amountIndex = headers.indexOf('实付金额');
-  if ([titleIndex, taxNumberIndex, amountIndex].some((index) => index < 0)) return '';
+  const emailIndex = headers.indexOf('邮箱');
+  if ([titleIndex, taxNumberIndex, amountIndex, emailIndex].some((index) => index < 0)) return '';
   return records.map((record) => (
-    `抬头：${record[titleIndex] || '-'}，税号：${record[taxNumberIndex] || '-'}，金额：${record[amountIndex] || '-'}`
+    `抬头：${record[titleIndex] || '-'}，税号：${record[taxNumberIndex] || '-'}，金额：${record[amountIndex] || '-'}，邮箱：${record[emailIndex] || '-'}`
   )).join('\n');
 };
+
 
 
 const InvoicesManagePage: React.FC = () => {
@@ -89,7 +91,6 @@ const InvoicesManagePage: React.FC = () => {
   const [pageSize, setPageSize] = useState(20);
   const [total, setTotal] = useState(0);
   const [selectedRows, setSelectedRows] = useState<Map<number, InvoiceRecord>>(new Map());
-  const [csvPreview, setCsvPreview] = useState('');
   const [invoiceSummaryPreview, setInvoiceSummaryPreview] = useState('');
   const copyModal = useDisclosure();
 
@@ -246,7 +247,6 @@ const InvoicesManagePage: React.FC = () => {
       });
       if (!blob.size) { showToast('没有可复制的开票记录', 'warning'); return; }
       const csvText = await blob.text();
-      setCsvPreview(csvText);
       setInvoiceSummaryPreview(invoiceSummaryFromCsv(csvText));
       copyModal.onOpen();
     } catch {
@@ -323,7 +323,7 @@ const InvoicesManagePage: React.FC = () => {
       </div>
 
       <Modal isOpen={copyModal.isOpen} onClose={copyModal.onClose} size="4xl" scrollBehavior="inside">
-        <ModalContent><ModalHeader>开票记录 CSV 文本</ModalHeader><ModalBody className="space-y-4"><div className="space-y-2"><p className="text-sm text-default-500">内容与导出 CSV 的列顺序一致，可手动选择复制，也可点击底部按钮复制。</p><Textarea aria-label="开票记录 CSV 文本内容" value={csvPreview} onValueChange={setCsvPreview} minRows={12} className="font-mono" /></div><div className="space-y-2"><p className="text-sm text-default-500">开票信息简版，每条记录一行。</p><Textarea aria-label="开票信息简版文本" value={invoiceSummaryPreview} onValueChange={setInvoiceSummaryPreview} minRows={8} /></div></ModalBody><ModalFooter><Button variant="light" onPress={copyModal.onClose}>关闭</Button><Button variant="flat" startContent={<Copy size={16} />} onPress={() => copyText(csvPreview, 'CSV文本已复制')}>复制 CSV</Button><Button color="primary" startContent={<Copy size={16} />} onPress={() => copyText(invoiceSummaryPreview, '开票信息简版已复制')}>复制开票信息</Button></ModalFooter></ModalContent>
+        <ModalContent><ModalHeader>开票信息简版</ModalHeader><ModalBody><div className="space-y-2"><p className="text-sm text-default-500">开票信息简版，每条记录一行。</p><Textarea aria-label="开票信息简版文本" value={invoiceSummaryPreview} onValueChange={setInvoiceSummaryPreview} minRows={12} /></div></ModalBody><ModalFooter><Button variant="light" onPress={copyModal.onClose}>关闭</Button><Button color="primary" startContent={<Copy size={16} />} onPress={() => copyText(invoiceSummaryPreview, '开票信息简版已复制')}>复制开票信息</Button></ModalFooter></ModalContent>
       </Modal>
     </div>
   );

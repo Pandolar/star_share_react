@@ -77,6 +77,12 @@ export interface ChatWelcomeConfig {
   title: string;
   message: string;
   working_hours_enabled: boolean;
+  working_hours: {
+    start: string;
+    end: string;
+    days: number[];
+    use_china_holidays: boolean;
+  };
   offline_message: string;
   auto_reply_enabled: boolean;
   auto_reply_message: string;

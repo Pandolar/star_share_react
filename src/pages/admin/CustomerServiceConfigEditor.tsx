@@ -42,7 +42,7 @@ const DEFAULT_CONFIG: JsonRecord = {
     title: '在线客服',
     message: '您好，请描述您遇到的问题，我们会尽快回复。',
     working_hours_enabled: false,
-    working_hours: { start: '09:00', end: '22:00', days: [1, 2, 3, 4, 5, 6, 7] },
+    working_hours: { start: '09:00', end: '22:00', days: [1, 2, 3, 4, 5, 6, 7], use_china_holidays: false },
     offline_message: '当前为非工作时间，我们会在工作时间内回复。',
     auto_reply_enabled: false,
     auto_reply_message: '已收到您的消息，客服会尽快回复。',
@@ -459,14 +459,7 @@ export const CustomerServiceConfigEditor: React.FC<Props> = ({ value, onChange, 
                 key={day}
                 size="sm"
                 isSelected={days.includes(dayNumber)}
-                onValueChange={(selected) =>
-                  patchSection('welcome', {
-                    working_hours: {
-                      ...workingHours,
-                      days: selected ? [...days, dayNumber].sort((a, b) => a - b) : days.filter((item) => item !== dayNumber),
-                    },
-                  })
-                }
+                onValueChange={(selected) => patchSection('welcome', { working_hours: { ...workingHours, days: selected ? [...days, dayNumber].sort((a, b) => a - b) : days.filter((item) => item !== dayNumber) } })}
                 isDisabled={disabled}
               >
                 {label}
@@ -474,6 +467,13 @@ export const CustomerServiceConfigEditor: React.FC<Props> = ({ value, onChange, 
             );
           })}
         </div>
+        <Switch
+          isSelected={workingHours.use_china_holidays === true}
+          onValueChange={(use_china_holidays) => patchSection('welcome', { working_hours: { ...workingHours, use_china_holidays } })}
+          isDisabled={disabled}
+        >
+          按中国法定节假日及调休安排（开启时以法定工作日为准，不使用上方星期选择；已收录 2024–2026 年，其他年份按周一至周五）
+        </Switch>
       </div>
       <section className="space-y-3">
         <div className="flex items-center justify-between">

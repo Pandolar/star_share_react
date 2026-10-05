@@ -46,6 +46,7 @@ import { HomeInfoConfigEditor } from './HomeInfoConfigEditor';
 import { TeamPlanConfigEditor } from './TeamPlanConfigEditor';
 import { CustomerServiceConfigEditor } from './CustomerServiceConfigEditor';
 import { McpConfigEditor } from './McpConfigEditor';
+import { UserCenterTabBadgesConfigEditor } from './UserCenterTabBadgesConfigEditor';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 const VISUAL_CONFIG_KEYS: Record<string, true> = {
     SPEEDTEST_URL_LIST: true,
@@ -55,6 +56,7 @@ const VISUAL_CONFIG_KEYS: Record<string, true> = {
     WHITE_LABEL_CONFIG: true,
     CUSTOMER_SERVICE_CONFIG: true,
     MCP_CONFIG: true,
+    USER_CENTER_TAB_BADGES: true,
     INVOICE_CONFIG: true,
     INVITE_POLICY: true,
     INVITE_CASHBACK_CONFIG: true,
@@ -352,7 +354,7 @@ const SettingsManagePage: React.FC = () => {
                                 刷新限速器
                             </Button>
                         )}
-                        {supportsModeSwitch && config.key !== 'MCP_CONFIG' && (
+                        {supportsModeSwitch && (
                             <Button size="sm" variant="bordered" onPress={() => toggleConfigMode(config.key)}>
                                 {showRawJson ? '切换可视化' : '查看原始 JSON'}
                             </Button>
@@ -444,6 +446,8 @@ const SettingsManagePage: React.FC = () => {
                     <CustomerServiceConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!canEditConfig(config)} />
                 ) : config.key === 'MCP_CONFIG' ? (
                     <McpConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!canEditConfig(config)} />
+                ) : config.key === 'USER_CENTER_TAB_BADGES' ? (
+                    <UserCenterTabBadgesConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!canEditConfig(config)} />
                 ) : config.key === 'INVOICE_CONFIG' ? (
                     <InvoiceConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!canEditConfig(config)} />
                 ) : config.key === 'INVITE_POLICY' ? (
