@@ -174,6 +174,15 @@ export const TeamTab: React.FC = () => {
     void loadOverview();
   }, [loadOverview]);
 
+  // 从其他页返回时更新状态；到期由服务端结算，不依赖浏览器时钟或定时任务。
+  useEffect(() => {
+    const refreshOnReturn = () => {
+      if (!document.hidden) void loadOverview(true);
+    };
+    document.addEventListener('visibilitychange', refreshOnReturn);
+    return () => document.removeEventListener('visibilitychange', refreshOnReturn);
+  }, [loadOverview]);
+
   const team = overview?.team || null;
   const plans = useMemo(() => overview?.plan_config.plans || [], [overview]);
   const incoming = overview?.invitations.incoming || [];
@@ -521,18 +530,9 @@ export const TeamTab: React.FC = () => {
                 ? '团队权益已停止。续费可立即恢复团队服务；若不再需要，可解散团队并释放全部席位。'
                 : '团队权益已停止。退出后即可购买个人套餐或接受其他团队邀请。'}
               startContent={<Clock3 className="h-5 w-5" />}
-              endContent={(
-                <div className="flex flex-wrap justify-end gap-2">
-                  {team.is_owner ? (
-                    <>
-                      <Button size="sm" variant="flat" color="danger" onPress={exitModal.onOpen}>解散团队</Button>
-                      <Button size="sm" color="primary" onPress={() => openOrder('renewal')}>续费团队</Button>
-                    </>
-                  ) : (
-                    <Button size="sm" color="danger" onPress={exitModal.onOpen}>退出团队</Button>
-                  )}
-                </div>
-              )}
+              endContent={team.is_owner
+                ? <Button size="sm" color="danger" variant="flat" onPress={exitModal.onOpen}>解散团队</Button>
+                : <Button size="sm" color="danger" variant="flat" onPress={exitModal.onOpen}>退出团队</Button>}
             />
           )}
 
@@ -559,17 +559,12 @@ export const TeamTab: React.FC = () => {
                           续费团队
                         </Button>
                       )}
-                      {team.status === 'expired' && (
-                        <Button size="sm" color="danger" variant="flat" startContent={<UserMinus className="h-4 w-4" />} onPress={exitModal.onOpen}>
-                          解散团队
-                        </Button>
-                      )}
                     </>
-                  ) : (
+                  ) : team.status === 'active' ? (
                     <Button size="sm" color="danger" variant="flat" startContent={<UserMinus className="h-4 w-4" />} onPress={exitModal.onOpen}>
                       退出团队
                     </Button>
-                  )}
+                  ) : null}
                 </div>
               </div>
 
