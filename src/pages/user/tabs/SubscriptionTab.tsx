@@ -2,11 +2,11 @@
  * 订阅套餐Tab页面
  * 显示用户当前订阅和可用套餐
  */
-import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Card, CardBody, Button, Chip, Input, Spinner, Tab, Tabs } from '@heroui/react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, Card, CardBody, Button, Chip, Input, Spinner, Tab, Tabs, Tooltip } from '@heroui/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Package, Star, Crown, AlertCircle, Calendar, Timer, ChevronDown, Info } from 'lucide-react';
-import { packageUserApi, orderUserApi, teamUserApi } from '../../../services/userApi';
+import { packageUserApi, orderUserApi, teamUserApi, userInfoApi } from '../../../services/userApi';
 import { toast } from '../../../utils/toast';
 import { useIsMobile } from '../../../hooks/useIsMobile';
 import { useWhiteLabel } from '../../../contexts/WhiteLabelContext';
@@ -43,6 +43,9 @@ export const SubscriptionTab: React.FC = () => {
   const [teamMembershipBlocked, setTeamMembershipBlocked] = useState(false);
   const [teamMembershipLoading, setTeamMembershipLoading] = useState(true);
   const [teamMembershipName, setTeamMembershipName] = useState('');
+  const [activeSubscription, setActiveSubscription] = useState<{ level: string; priority: number } | null>(null);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(true);
+  const [subscriptionError, setSubscriptionError] = useState('');
 
   const isMobileDevice = useIsMobile();
   const { isWhiteLabel, loading: whiteLabelLoading, subscriptionNotice } = useWhiteLabel();
@@ -141,6 +144,46 @@ export const SubscriptionTab: React.FC = () => {
     return () => { cancelled = true; };
   }, [isWhiteLabel, whiteLabelLoading]);
 
+  const fetchActiveSubscription = useCallback(async () => {
+    if (whiteLabelLoading) return;
+    if (isWhiteLabel) {
+      setActiveSubscription(null);
+      setSubscriptionError('');
+      setSubscriptionLoading(false);
+      return;
+    }
+    setSubscriptionLoading(true);
+    try {
+      const response = await userInfoApi.getUserInfo();
+      if (response.code !== 20000) throw new Error(response.msg || '获取当前套餐失败');
+      const active = response.data?.user_active_packages;
+      if (active?.package_id && active.status !== 'frozen') {
+        const priority = Number(active.priority);
+        if (!Number.isFinite(priority) || !active.level) throw new Error('当前套餐等级数据无效');
+        setActiveSubscription({ level: active.level, priority });
+      } else {
+        setActiveSubscription(null);
+      }
+      setSubscriptionError('');
+    } catch (err) {
+      setActiveSubscription(null);
+      setSubscriptionError(err instanceof Error ? err.message : '获取当前套餐失败');
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  }, [isWhiteLabel, whiteLabelLoading]);
+
+  useEffect(() => { void fetchActiveSubscription(); }, [fetchActiveSubscription]);
+
+  useEffect(() => {
+    if (isWhiteLabel || whiteLabelLoading) return;
+    const refreshOnReturn = () => {
+      if (!document.hidden) void fetchActiveSubscription();
+    };
+    document.addEventListener('visibilitychange', refreshOnReturn);
+    return () => document.removeEventListener('visibilitychange', refreshOnReturn);
+  }, [fetchActiveSubscription, isWhiteLabel, whiteLabelLoading]);
+
   // 创建订单
   const createOrder = async (pkg: PackageInfo) => {
     if (teamMembershipLoading) {
@@ -151,6 +194,11 @@ export const SubscriptionTab: React.FC = () => {
       toast.warning('您当前正在组织团队内，请先退出组织团队后再购买个人套餐');
       return;
     }
+    if (subscriptionLoading || subscriptionError) {
+      toast.warning(subscriptionError || '正在确认当前套餐等级，请稍后');
+      return;
+    }
+    if (activeSubscription && pkg.category === 'GPT' && pkg.priority < activeSubscription.priority) return;
     setAgreementAccepted(true);
     try {
       setOrderLoading(true);
@@ -260,6 +308,48 @@ export const SubscriptionTab: React.FC = () => {
     if (categoryPackages.length <= 1) return null;
     const sortedByPrice = [...categoryPackages].sort((a, b) => a.price - b.price);
     return sortedByPrice[Math.floor(sortedByPrice.length / 2)];
+  };
+
+  const purchaseAction = (pkg: PackageInfo) => {
+    if (!activeSubscription || pkg.category !== 'GPT') return { label: '立即订阅', hint: '' };
+    if (pkg.priority < activeSubscription.priority) return {
+      label: '无法订阅',
+      hint: `您已是 ${activeSubscription.level} 等级套餐，无法订阅该更低等级的套餐，请选择同等级或者更高等级的套餐`,
+    };
+    if (pkg.priority === activeSubscription.priority) return {
+      label: '套餐续费',
+      hint: '续费后该等级的套餐时长将延长',
+    };
+    return {
+      label: '升级套餐',
+      hint: '订阅后将冻结当前低等级套餐时长，优先消耗高等级套餐的时长，等高等级套餐到期后将自动解冻低等级套餐，',
+    };
+  };
+
+  const subscriptionButton = (pkg: PackageInfo, className: string, style?: React.CSSProperties) => {
+    const action = purchaseAction(pkg);
+    const disabled = pkg.status !== 1 || teamMembershipLoading || teamMembershipBlocked || subscriptionLoading || Boolean(subscriptionError)
+      || (activeSubscription !== null && pkg.category === 'GPT' && pkg.priority < activeSubscription.priority)
+      || (orderLoading && selectedPackage?.id === pkg.id);
+    const label = pkg.status !== 1 ? '暂不可用'
+      : teamMembershipLoading ? '检查团队状态...'
+      : teamMembershipBlocked ? '需先退出团队'
+      : subscriptionLoading ? '检查套餐等级...'
+      : subscriptionError ? '当前等级加载失败'
+      : action.label;
+    const button = <button
+      className={`hero-button ${className}`}
+      disabled={disabled}
+      onClick={() => void createOrder(pkg)}
+      style={style}
+    >
+      {orderLoading && selectedPackage?.id === pkg.id ? <><div className="loading-spinner" />处理中...</> : label}
+    </button>;
+    return action.hint && !teamMembershipLoading && !teamMembershipBlocked && !subscriptionLoading && !subscriptionError && pkg.status === 1 ? (
+      <Tooltip content={action.hint} placement="top" className="max-w-xs">
+        <span className="block w-full" tabIndex={0}>{button}</span>
+      </Tooltip>
+    ) : button;
   };
 
   if (whiteLabelLoading) {
@@ -381,8 +471,10 @@ export const SubscriptionTab: React.FC = () => {
         .subscription-tab-wrapper .hero-button.secondary:hover {
           background: #f9fafb; border-color: #9ca3af;
         }
-        .subscription-tab-wrapper .hero-button:disabled {
-          opacity: 0.5; cursor: not-allowed; transform: none !important;
+        .subscription-tab-wrapper .hero-button:disabled,
+        .subscription-tab-wrapper .hero-button:disabled:hover {
+          opacity: 0.7; cursor: not-allowed; transform: none !important;
+          box-shadow: none; background: #e5e7eb; color: #6b7280; border-color: #e5e7eb;
         }
         .subscription-tab-wrapper .loading-spinner {
           width: 16px; height: 16px;
@@ -526,6 +618,15 @@ export const SubscriptionTab: React.FC = () => {
           endContent={<Button size="sm" color="warning" variant="flat" onPress={() => navigate('/user-center?tab=team')}>前往组织团队</Button>}
         />
       )}
+      {subscriptionError && !isWhiteLabel && !teamMembershipBlocked && (
+        <Alert
+          className="mb-6"
+          color="warning"
+          title="无法确认当前套餐等级"
+          description={subscriptionError}
+          endContent={<Button size="sm" color="warning" variant="flat" onPress={() => void fetchActiveSubscription()}>重试</Button>}
+        />
+      )}
 
       {loading && (
         <div className="flex flex-col items-center justify-center py-16">
@@ -659,20 +760,7 @@ export const SubscriptionTab: React.FC = () => {
                             {pkg.status === 1 ? '使用兑换码激活' : '暂不可用'}
                           </button>
                         ) : (
-                          <button
-                            className={`hero-button ${isPopular ? 'primary' : 'secondary'}`}
-                            disabled={pkg.status !== 1 || teamMembershipLoading || teamMembershipBlocked || (orderLoading && selectedPackage?.id === pkg.id)}
-                            onClick={() => createOrder(pkg)}
-                          >
-                            {orderLoading && selectedPackage?.id === pkg.id ? (
-                              <>
-                                <div className="loading-spinner" />
-                                处理中...
-                              </>
-                            ) : (
-                              pkg.status === 1 ? (teamMembershipLoading ? '检查团队状态...' : teamMembershipBlocked ? '需先退出团队' : '立即订阅') : '暂不可用'
-                            )}
-                          </button>
+                          subscriptionButton(pkg, isPopular ? 'primary' : 'secondary')
                         )}
                       </div>
                     </div>
@@ -752,21 +840,7 @@ export const SubscriptionTab: React.FC = () => {
                           {pkg.status === 1 ? '兑换激活码' : '暂不可用'}
                         </button>
                       ) : (
-                        <button
-                          className="hero-button primary"
-                          disabled={pkg.status !== 1 || teamMembershipLoading || teamMembershipBlocked || (orderLoading && selectedPackage?.id === pkg.id)}
-                          onClick={() => createOrder(pkg)}
-                          style={{ height: '40px', fontSize: '14px' }}
-                        >
-                          {orderLoading && selectedPackage?.id === pkg.id ? (
-                            <>
-                              <div className="loading-spinner" />
-                              处理中...
-                            </>
-                          ) : (
-                            pkg.status === 1 ? (teamMembershipLoading ? '检查团队状态...' : teamMembershipBlocked ? '需先退出团队' : '立即订阅') : '暂不可用'
-                          )}
-                        </button>
+                        subscriptionButton(pkg, 'primary', { height: '40px', fontSize: '14px' })
                       )}
                     </div>
                   </div>
