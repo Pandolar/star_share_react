@@ -415,9 +415,9 @@ const invoiceStatusChip = (order: OrderInfo) => {
                                 <span>{order.created_at}</span>
                               </div>
                               <div className="font-medium text-default-900">{order.package_name}</div>
-                              {!order.is_cdk && (
+                              {!order.is_cdk && order.paid_amount != null && (
                                 <div className="font-medium text-success">
-                                  实付金额：{order.paid_amount != null ? `¥${Number(order.paid_amount).toFixed(2)}` : '尚未支付'}
+                                  实付金额：¥{Number(order.paid_amount).toFixed(2)}
                                 </div>
                               )}
                             </div>

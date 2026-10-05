@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__ide__getDiagnostics",
+      "Bash(node *)",
+      "Bash(python3 *)",
+      "Bash(npx tailwindcss *)",
+      "Bash(npx craco *)",
+      "Bash(awk -F\"'\" '{print $2}')",
+      "Bash(sed -i \"s/import { showMessage } from '\\\\.\\\\.\\\\/\\\\.\\\\.\\\\/utils\\\\/toast';/import { toast } from '..\\\\/..\\\\/utils\\\\/toast';/; s/showMessage\\\\./toast./g\" src/pages/features/GoPlusPage.tsx)",
+      "Bash(sed -i \"s/import { showMessage } from '\\\\.\\\\.\\\\/utils\\\\/toast';/import { toast } from '..\\\\/utils\\\\/toast';/; s/showMessage\\\\./toast./g\" src/hooks/useAuthCheck.ts)",
+      "Bash(awk '{print $1}')",
+      "Bash(git mv *)",
+      "Bash(sed -n '5,204p' src/contexts/HomeInfoContext.tsx)",
+      "Read(//tmp/**)",
+      "Bash(pnpm build *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(identify public/img/logo.png)",
+      "Bash(npx tsc *)"
+    ]
+  }
+}
