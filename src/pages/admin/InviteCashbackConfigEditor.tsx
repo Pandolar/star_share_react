@@ -42,7 +42,8 @@ const InviteCashbackConfigEditor: React.FC<Props> = ({ config, isLoading, isSavi
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Switch isSelected={config.enabled} onValueChange={enabled => onChange({ ...config, enabled })}>启用返现活动</Switch>
           <Switch isSelected={config.withdrawal.enabled} onValueChange={enabled => onChange({ ...config, withdrawal: { ...config.withdrawal, enabled } })}>开放提现</Switch>
-          <Switch isSelected={config.purchase_credit.enabled} onValueChange={enabled => onChange({ ...config, purchase_credit: { enabled } })}>允许返现余额抵扣个人套餐</Switch>
+          <Switch isSelected={config.purchase_credit.enabled} onValueChange={enabled => onChange({ ...config, purchase_credit: { ...config.purchase_credit, enabled } })}>允许返现余额抵扣个人套餐</Switch>
+          <NumberInput label="返现抵扣最低实付" value={config.purchase_credit.min_payable_amount} onValueChange={min_payable_amount => onChange({ ...config, purchase_credit: { ...config.purchase_credit, min_payable_amount: Number.isNaN(min_payable_amount) ? 0 : min_payable_amount } })} minValue={0} step={0.01} description="0 表示可全额抵扣；设置 1、10 等金额时保留对应现金实付" />
           <NumberInput label="最低提现金额" value={config.withdrawal.min_amount} onValueChange={min_amount => onChange({ ...config, withdrawal: { ...config.withdrawal, min_amount: Number.isNaN(min_amount) ? 0 : min_amount } })} minValue={0} step={0.01} />
           <Textarea className="md:col-span-2" label="提现提示" value={config.withdrawal.notice} onValueChange={notice => onChange({ ...config, withdrawal: { ...config.withdrawal, notice } })} minRows={2} />
         </div>

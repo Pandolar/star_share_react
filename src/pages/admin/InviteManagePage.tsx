@@ -56,7 +56,7 @@ const createDefaultPolicyForm = (): InvitePolicyFormState => ({
 const createDefaultCashbackConfig = (): InviteCashbackConfig => ({
   enabled: false,
   withdrawal: { enabled: false, min_amount: 100, notice: '提现暂未开放' },
-  purchase_credit: { enabled: false },
+  purchase_credit: { enabled: false, min_payable_amount: 10 },
   campaigns: [],
 });
 
@@ -191,11 +191,15 @@ const InviteManagePage: React.FC = () => {
       const response = await adminApiService.getInviteCashback();
       if (response.code !== 20000) throw new Error(response.msg || '获取返现活动配置失败');
       const data = response.data;
-      setCashbackConfig(data?.config || {
+      const config = data?.config || {
         enabled: data?.enabled ?? false,
         withdrawal: data?.withdrawal || createDefaultCashbackConfig().withdrawal,
         purchase_credit: data?.purchase_credit || createDefaultCashbackConfig().purchase_credit,
         campaigns: data?.campaigns || [],
+      };
+      setCashbackConfig({
+        ...config,
+        purchase_credit: { ...createDefaultCashbackConfig().purchase_credit, ...(config.purchase_credit || {}) },
       });
     } catch (error) {
       showToast(error instanceof Error ? error.message : '获取返现活动配置失败', 'error');

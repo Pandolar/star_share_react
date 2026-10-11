@@ -52,7 +52,6 @@ export interface ChatConversation {
   closed_at: string | null;
   closed_by: string | null;
   reopen_count: number;
-  internal_remark: string;
   messages?: ChatMessage[];
 }
 

@@ -37,6 +37,7 @@ import {
     FileSearch,
     FileText,
     MessageSquare,
+    Headphones,
     UserCog,
     KeyRound,
 } from 'lucide-react';
@@ -88,6 +89,7 @@ const AdminLayout: React.FC = () => {
         { key: 'settings', label: '系统配置', icon: <Settings className="w-5 h-5" />, path: '/star-admin/settings', permission: 'config.read' },
         { key: 'invites', label: '邀请管理', icon: <Gift className="w-5 h-5" />, path: '/star-admin/invites', permission: null, anyOf: ['invite.policy.read', 'invite.cashback.read', 'invite.analytics.read', 'invite.reward.read', 'invite.withdrawal.read'] },
         { key: 'feedback', label: '工单管理', icon: <MessageSquare className="w-5 h-5" />, path: '/star-admin/feedback', permission: 'feedback.read' },
+        { key: 'customer-service', label: '在线客服', icon: <Headphones className="w-5 h-5" />, path: '/star-admin/customer-service', permission: 'customer_service.conversation.read' },
         { key: 'administrators', label: '管理员与角色', icon: <UserCog className="w-5 h-5" />, path: '/star-admin/administrators', permission: 'administrator.account.read' },
         { key: 'security', label: '账号安全', icon: <KeyRound className="w-5 h-5" />, path: '/star-admin/security', permission: null },
     ].filter((item) => 'anyOf' in item ? canAny(...(item.anyOf || [])) : can(item.permission));
@@ -182,9 +184,9 @@ const AdminLayout: React.FC = () => {
 
             {/* 主要内容区域：左侧导航 + 右侧页面内容 */}
             <div className="mx-auto px-4 py-6 w-full max-w-[1600px]">
-                <div className="hidden sm:flex gap-6">
+                <div className="flex gap-6">
                     {/* 左侧导航 */}
-                    <Card shadow="sm" className="w-72 shrink-0 h-fit">
+                    <Card shadow="sm" className={`hidden sm:flex w-72 shrink-0 h-fit ${getCurrentTab() === 'customer-service' ? 'max-h-[calc(100dvh-7rem)] overflow-y-auto' : ''}`}>
                         <CardBody className="p-3">
                             <Listbox
                                 aria-label="管理后台导航"
@@ -216,10 +218,6 @@ const AdminLayout: React.FC = () => {
                     </div>
                 </div>
 
-                {/* 移动端：保留顶部菜单 + 内容 */}
-                <div className="sm:hidden">
-                    <Outlet />
-                </div>
             </div>
         </div>
     );

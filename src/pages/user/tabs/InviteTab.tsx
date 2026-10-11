@@ -107,6 +107,7 @@ export const InviteTab: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [historyPage, setHistoryPage] = useState(0);
   const { features, loading: whiteLabelLoading } = useWhiteLabel();
   const navigate = useNavigate();
   const fetchInviteData = async (isRefresh = false) => {
@@ -221,6 +222,10 @@ export const InviteTab: React.FC = () => {
   const cashbackOptedOut = cashbackOverview?.enrollment?.status === 'opted_out';
   const cashbackActiveForUser = Boolean(activeCashbackCampaign && cashbackOverview?.enrollment?.status === 'active');
   const cashbackReward = cashbackOverview?.campaign_reward_summary;
+  const historicalCampaigns = cashbackOverview?.historical_campaigns || [];
+  const historicalCampaignPageSize = 5;
+  const historicalCampaignPageCount = Math.ceil(historicalCampaigns.length / historicalCampaignPageSize);
+  const visibleHistoricalCampaigns = historicalCampaigns.slice(historyPage * historicalCampaignPageSize, (historyPage + 1) * historicalCampaignPageSize);
 
   if (loading) {
 
@@ -285,7 +290,7 @@ export const InviteTab: React.FC = () => {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="flex items-center gap-2 text-success font-semibold"><Wallet className="w-4 h-4" />邀请返现活动</div>
-                <h2 className="mt-2 text-xl font-bold text-default-900">{activeCashbackCampaign?.copywriting.headline || cashbackOverview.ended_campaign?.name || '邀请返现'}</h2>
+                <h2 className="mt-2 text-xl font-bold text-default-900">{activeCashbackCampaign?.copywriting.headline || '邀请返利账户'}</h2>
               </div>
             </div>
             {activeCashbackCampaign ? <>
@@ -303,10 +308,37 @@ export const InviteTab: React.FC = () => {
                   {cashbackReward.has_package_specific_rules && <div className="text-xs text-default-400">部分套餐另有专属返现比例，以实际订单结算为准。</div>}
                 </div>
               )}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3"><div className="rounded-xl bg-default-50 p-4"><div className="text-sm text-default-500">可用返现余额</div><div className="mt-1 text-xl font-bold">¥{cashbackAvailable.toFixed(2)}</div><div className="mt-1 text-xs text-default-400">可提现{cashbackOverview.purchase_credit?.enabled ? '，也可在个人套餐支付时抵扣' : ''}</div></div><div className="rounded-xl bg-default-50 p-4"><div className="text-sm text-default-500">提现处理中</div><div className="mt-1 text-xl font-bold">¥{(cashbackSummary?.withdraw_pending_amount ?? 0).toFixed(2)}</div></div><div className="rounded-xl bg-default-50 p-4"><div className="text-sm text-default-500">已提现</div><div className="mt-1 text-xl font-bold">¥{(cashbackSummary?.withdraw_done_amount ?? 0).toFixed(2)}</div></div></div>
               {cashbackActiveForUser && <div className="flex flex-wrap gap-2"><Button variant="flat" color="primary" startContent={<Copy className="w-4 h-4" />} onPress={() => copyText(cashbackOverview.share_copy, '活动分享文案已复制')}>复制活动分享文案</Button><Button variant="light" color="warning" onPress={() => setOptOutConfirmOpen(true)}>关闭本期返现，改为返时长</Button></div>}
-              <div className="flex flex-col gap-3 rounded-xl border border-default-200 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="text-sm text-default-600"><div className="font-medium text-default-900">返现提现</div><div className="mt-1">{cashbackWithdrawal?.notice || '请先在个人中心填写支付宝收款信息。'} 最低提现 ¥{(cashbackWithdrawal?.min_amount ?? 0).toFixed(2)}。</div></div><div className="flex gap-2 shrink-0"><Button variant="flat" onPress={() => navigate('/user-center?tab=profile', { state: { openEdit: 'payment_info' } })}>设置收款信息</Button><Button color="success" isDisabled={!canWithdraw} onPress={withdrawCashback}>申请提现</Button></div></div>
-            </> : cashbackOverview.ended_campaign ? <div className="rounded-xl bg-default-100 p-4 text-sm text-default-600">{cashbackOverview.ended_campaign.ended_message}</div> : <div className="rounded-xl bg-default-100 p-4 text-sm text-default-600">当前暂无进行中的返现活动。</div>}
+            </> : <div className="rounded-xl bg-default-100 p-4 text-sm text-default-600">当前暂无进行中的返现活动，已获得的返利保留在账户中。</div>}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+              <div className="rounded-xl bg-default-50 p-4"><div className="text-sm text-default-500">累计返利</div><div className="mt-1 text-xl font-bold">¥{((cashbackSummary?.available_amount ?? 0) + (cashbackSummary?.reserved_amount ?? 0) + (cashbackSummary?.purchase_consumed_amount ?? 0) + (cashbackSummary?.withdraw_done_amount ?? 0)).toFixed(2)}</div></div>
+              <div className="rounded-xl bg-default-50 p-4"><div className="text-sm text-default-500">可用返利</div><div className="mt-1 text-xl font-bold">¥{cashbackAvailable.toFixed(2)}</div><div className="mt-1 text-xs text-default-400">{cashbackOverview.purchase_credit?.enabled ? '可用于个人套餐抵扣' : cashbackWithdrawal?.enabled ? '可申请提现' : '余额保留，抵扣及提现暂未开放'}</div></div>
+              <div className="rounded-xl bg-default-50 p-4"><div className="text-sm text-default-500">冻结中</div><div className="mt-1 text-xl font-bold">¥{(cashbackSummary?.reserved_amount ?? 0).toFixed(2)}</div><div className="mt-1 text-xs text-default-400">提现处理中 ¥{(cashbackSummary?.withdraw_pending_amount ?? 0).toFixed(2)}</div></div>
+              <div className="rounded-xl bg-default-50 p-4"><div className="text-sm text-default-500">已使用</div><div className="mt-1 text-xl font-bold">¥{((cashbackSummary?.purchase_consumed_amount ?? 0) + (cashbackSummary?.withdraw_done_amount ?? 0)).toFixed(2)}</div></div>
+            </div>
+            <div className="flex flex-col gap-3 rounded-xl border border-default-200 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="text-sm text-default-600"><div className="font-medium text-default-900">返现提现</div><div className="mt-1">{cashbackWithdrawal?.notice || '请先在个人中心填写支付宝收款信息。'} 最低提现 ¥{(cashbackWithdrawal?.min_amount ?? 0).toFixed(2)}。</div></div><div className="flex gap-2 shrink-0"><Button variant="flat" onPress={() => navigate('/user-center?tab=profile', { state: { openEdit: 'payment_info' } })}>设置收款信息</Button><Button color="success" isDisabled={!canWithdraw} onPress={withdrawCashback}>申请提现</Button></div></div>
+            {historicalCampaigns.length > 0 && (
+              <details className="rounded-xl border border-default-200 p-4">
+                <summary className="cursor-pointer font-medium text-default-900">历史活动（已结束 {historicalCampaigns.length} 场）</summary>
+                <div className="mt-4 space-y-3">
+                  {visibleHistoricalCampaigns.map(campaign => (
+                    <div key={campaign.id} className="rounded-lg bg-default-50 p-3 text-sm text-default-600">
+                      <div className="font-medium text-default-900">{campaign.name}</div>
+                      <div className="mt-1">活动期间：{new Date(campaign.starts_at).toLocaleDateString('zh-CN')} 至 {new Date(campaign.ends_at).toLocaleDateString('zh-CN')}</div>
+                      <div className="mt-1">默认返利 {campaign.rule_summary.cashback_rate_percent}%{campaign.rule_summary.min_order_basis_amount > 0 ? `，订单满 ¥${campaign.rule_summary.min_order_basis_amount.toFixed(2)}` : ''}{campaign.rule_summary.max_reward_orders_per_invitee > 0 ? `，每位好友最多 ${campaign.rule_summary.max_reward_orders_per_invitee} 单` : '，不限奖励笔数'}。</div>
+                      <div className="mt-1">{campaign.rule_summary.invitee_reward_enabled ? `新用户加赠套餐时长 ${campaign.rule_summary.invitee_duration_ratio_percent}%` : '本期未开启新用户时长奖励'}。{campaign.ended_message}</div>
+                    </div>
+                  ))}
+                </div>
+                {historicalCampaignPageCount > 1 && (
+                  <div className="mt-3 flex items-center justify-end gap-2">
+                    <Button size="sm" variant="flat" isDisabled={historyPage === 0} onPress={() => setHistoryPage(current => current - 1)}>上一页</Button>
+                    <span className="text-xs text-default-500">{historyPage + 1} / {historicalCampaignPageCount}</span>
+                    <Button size="sm" variant="flat" isDisabled={historyPage >= historicalCampaignPageCount - 1} onPress={() => setHistoryPage(current => current + 1)}>下一页</Button>
+                  </div>
+                )}
+              </details>
+            )}
           </CardBody>
         </Card>
       )}

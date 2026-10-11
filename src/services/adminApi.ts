@@ -748,13 +748,13 @@ class AdminApiService {
 
     // ==================== 在线客服 ====================
 
-    async getCsRuntimeConfig(): Promise<{ quick_replies: Array<{ id: string; title: string; content: string; attachments?: ChatAttachment[]; enabled: boolean }>; recall_window_minutes: number }> {
+    async getCsRuntimeConfig(): Promise<{ quick_replies: Array<{ id: string; title: string; content: string; attachments?: ChatAttachment[]; enabled: boolean }>; recall_window_minutes: number; conversation_groups: Array<{ id: string; name: string }> }> {
         const response = await this.api.get('/star/cs_runtime_config');
         if (response.data.code !== 20000) throw new Error(response.data.msg || '获取客服运行配置失败');
         return response.data.data;
     }
 
-    async getCsConversations(params: { current_page?: number; page_size?: number; filter?: string; category_id?: string; querystring?: string } = {}): Promise<{ data: AdminCsConversation[]; total: number }> {
+    async getCsConversations(params: { current_page?: number; page_size?: number; filter?: string; category_id?: string; group_id?: string; querystring?: string } = {}): Promise<{ data: AdminCsConversation[]; total: number }> {
         const queryString = this.buildQueryString(params);
         const active = this.csConversationRequests.get(queryString);
         if (active) return active;
@@ -780,10 +780,20 @@ class AdminApiService {
         return response.data.data;
     }
 
-    async updateCsConversation(data: { id: number; status?: string; internal_remark?: string; priority?: string }): Promise<AdminCsConversation> {
+    async updateCsConversation(data: { id: number; status?: string; internal_remark?: string; priority?: string; is_pinned?: boolean; group_id?: string; user_remark?: string }): Promise<AdminCsConversation> {
         const response = await this.api.put('/star/cs_conversations', data);
         if (response.data.code !== 20000) throw new Error(response.data.msg || '更新客服会话失败');
         return response.data.data;
+    }
+
+    async unbanCsUser(userId: number): Promise<void> {
+        const response = await this.api.post(`/star/cs_users/${userId}/unban`);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '解封失败');
+    }
+
+    async clearCsUserLimit(userId: number): Promise<void> {
+        const response = await this.api.post(`/star/cs_users/${userId}/clear_limit`);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '解除限速失败');
     }
 
     async getCsMessages(params: { conversation_id: number; after_id?: number; before_id?: number; limit?: number }): Promise<{ conversation: ChatConversation; messages: ChatMessage[]; has_more: boolean }> {

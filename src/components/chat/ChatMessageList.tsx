@@ -18,6 +18,7 @@ export interface ChatMessageListProps {
   /** 撤回时限（分钟）；提供后管理端可对窗口内的自己消息发起撤回。 */
   recallWindowMinutes?: number;
   onRecall?: (message: ChatMessage) => void;
+  userLastReadMessageId?: number | null;
 }
 
 const relativeTime = (value: string): string => {
@@ -114,6 +115,7 @@ export default function ChatMessageList({
   scope,
   recallWindowMinutes,
   onRecall,
+  userLastReadMessageId,
 }: ChatMessageListProps): React.ReactElement {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [previewUrl, setPreviewUrl] = useState('');
@@ -197,6 +199,11 @@ export default function ChatMessageList({
                   <Tooltip content={new Date(message.created_at).toLocaleString()}>
                     <span className="text-xs text-default-400">{relativeTime(message.created_at)}</span>
                   </Tooltip>
+                  {scope === 'admin' && message.role === 'admin' && !recalled && (
+                    <span className={`text-xs ${message.id <= (userLastReadMessageId ?? 0) ? 'text-success' : 'text-default-500'}`}>
+                      {message.id <= (userLastReadMessageId ?? 0) ? '客户已读' : '客户未读'}
+                    </span>
+                  )}
                   {canRecall && (
                     <Tooltip content={`撤回这条消息（${recallWindowMinutes} 分钟内可撤回）`}>
                       <Button isIconOnly size="sm" variant="light" aria-label="撤回消息" onPress={() => onRecall?.(message)}>

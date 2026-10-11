@@ -40,12 +40,13 @@ export interface OrderInfo {
   promotion_code?: string | null;
   promotion_snapshot?: PromotionSnapshot | null;
   cashback_credit_amount?: string;
-  cashback_credit_snapshot?: { non_refundable: boolean; pricing_before_credit: string } | null;
+  cashback_credit_snapshot?: { non_refundable: boolean; pricing_before_credit: string; min_payable_amount?: string } | null;
   cashback_credit?: {
     enabled: boolean;
     available_amount: string;
     selected: boolean;
     applied_amount: string;
+    min_payable_amount?: string;
   };
   settled?: boolean;
   expires_at?: string | null;

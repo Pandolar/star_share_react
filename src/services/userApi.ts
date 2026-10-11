@@ -386,12 +386,13 @@ export const orderUserApi = {
         promotion_code?: string | null;
         promotion_snapshot?: PromotionOrderSnapshot | null;
         cashback_credit_amount?: string;
-        cashback_credit_snapshot?: { non_refundable: boolean; pricing_before_credit: string } | null;
+        cashback_credit_snapshot?: { non_refundable: boolean; pricing_before_credit: string; min_payable_amount?: string } | null;
         cashback_credit?: {
             enabled: boolean;
             available_amount: string;
             selected: boolean;
             applied_amount: string;
+            min_payable_amount?: string;
         };
         settled?: boolean;
         expires_at?: string | null;
@@ -552,15 +553,26 @@ export interface InviteCashbackRewardSummary {
     invitee_duration_ratio_percent: number;
 }
 
+export interface InviteCashbackHistoricalCampaign {
+    id: string;
+    name: string;
+    starts_at: string;
+    ends_at: string;
+    ended_message: string;
+    rule_summary: {
+        cashback_rate_percent: number;
+        min_order_basis_amount: number;
+        max_reward_orders_per_invitee: number;
+        invitee_reward_enabled: boolean;
+        invitee_duration_ratio_percent: number;
+    };
+}
+
 export interface InviteCashbackOverview {
     config_enabled: boolean;
     active_campaign: InviteCashbackCampaign | null;
     campaign_reward_summary: InviteCashbackRewardSummary | null;
-    ended_campaign: {
-        id: string;
-        name: string;
-        ended_message: string;
-    } | null;
+    historical_campaigns: InviteCashbackHistoricalCampaign[];
     enrollment: {
         id: number;
         campaign_id: string;
@@ -576,7 +588,7 @@ export interface InviteCashbackOverview {
         min_amount: number;
         notice: string;
     };
-    purchase_credit?: { enabled: boolean };
+    purchase_credit?: { enabled: boolean; min_payable_amount: number };
     invite_code: string;
     invite_link: string;
     share_copy: string;

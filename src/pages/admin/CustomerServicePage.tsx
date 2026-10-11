@@ -18,7 +18,7 @@ import {
   Tooltip,
   Textarea,
 } from '@heroui/react';
-import { ArrowLeft, Bell, BellOff, Headphones, Plus, RefreshCw, Search, Send, UserRound } from 'lucide-react';
+import { ArrowLeft, Bell, BellOff, Gauge, Headphones, Pin, Plus, RefreshCw, Search, Send, ShieldCheck, UserRound } from 'lucide-react';
 import adminApiService from '../../services/adminApi';
 import type { AdminCsConversation } from '../../types/admin';
 import type { ChatAttachment, ChatAttachmentConfig, ChatMessage } from '../../components/chat/types';
@@ -33,7 +33,13 @@ import { useAdminAuth } from '../../contexts/AdminAuthContext';
 const FILTERS = [
   ['all', '全部'],
   ['unread', '未读'],
+  ['pinned', '置顶'],
 ];
+const GROUPS = [
+  { id: 'general', name: '普通跟进' },
+  { id: 'supervisor', name: '主管待处理' },
+];
+const groupName = (groupId: string | null | undefined) => GROUPS.find((group) => group.id === groupId)?.name || '普通跟进';
 const relativeTime = (value: string | null) => {
   if (!value) return '-';
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
@@ -51,7 +57,9 @@ const conversationActivity = (conversation: AdminCsConversation) => {
 };
 const sortConversationsByRecent = (conversations: AdminCsConversation[]) => (
   [...conversations].sort((left, right) => (
-    conversationActivity(right) - conversationActivity(left) || right.id - left.id
+    Number(right.is_pinned) - Number(left.is_pinned)
+    || conversationActivity(right) - conversationActivity(left)
+    || right.id - left.id
   ))
 );
 const dataUrlFor = (file: File): Promise<string> =>
@@ -75,11 +83,18 @@ const CustomerServicePage: React.FC = () => {
   const canRecall = can('customer_service.message.recall');
   const canManageQuickReplies = can('customer_service.quick_reply.manage');
   const canUpload = can('customer_service.attachment.upload');
+  const canManageConversation = can('customer_service.conversation.manage');
   const [rows, setRows] = useState<AdminCsConversation[]>([]);
   const [quickReplies, setQuickReplies] = useState<Array<{ id: string; title: string; content: string; attachments?: ChatAttachment[] }>>([]);
   const [selected, setSelected] = useState<AdminCsConversation | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [filter, setFilter] = useState('all');
+  const [groupId, setGroupId] = useState('all');
+  const [remarkDraft, setRemarkDraft] = useState('');
+  const [userActionLoading, setUserActionLoading] = useState(false);
+  const [conversationSaving, setConversationSaving] = useState(false);
+  const conversationSavingRef = useRef(false);
+  const userActionRef = useRef(false);
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -90,6 +105,8 @@ const CustomerServicePage: React.FC = () => {
   const [recallWindowMinutes, setRecallWindowMinutes] = useState(10);
   const [recallTarget, setRecallTarget] = useState<ChatMessage | null>(null);
   const [recalling, setRecalling] = useState(false);
+  const canUnbanUser = can('user.status.update');
+  const canClearUserLimit = can('user.limit.reset');
   const [reply, setReply] = useState('');
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [batchSelection, setBatchSelection] = useState<Set<number>>(new Set());
@@ -124,9 +141,9 @@ const CustomerServicePage: React.FC = () => {
   const loadList = useCallback(
     async (silent = false) => {
       if (silent && (document.hidden || !document.hasFocus())) return;
-      const requestKey = `${page}:${filter}:${query.trim()}`;
+      const requestKey = `${page}:${filter}:${groupId}:${query.trim()}`;
       const now = Date.now();
-      if (lastListRequest.current.key === requestKey && now - lastListRequest.current.at < 250) return;
+      if (silent && lastListRequest.current.key === requestKey && now - lastListRequest.current.at < 250) return;
       lastListRequest.current = { key: requestKey, at: now };
       const requestId = ++listRequestId.current;
       if (!silent) setListLoading(true);
@@ -135,6 +152,7 @@ const CustomerServicePage: React.FC = () => {
           current_page: page,
           page_size: pageSize,
           filter,
+          group_id: groupId === 'all' ? undefined : groupId,
           querystring: query.trim() || undefined,
         });
         if (requestId !== listRequestId.current) return;
@@ -183,8 +201,10 @@ const CustomerServicePage: React.FC = () => {
         if (requestId === listRequestId.current && !silent) setListLoading(false);
       }
     },
-    [filter, page, query]
+    [filter, groupId, page, query]
   );
+  const loadListRef = useRef(loadList);
+  loadListRef.current = loadList;
   const openConversation = useCallback(
     async (conversation: AdminCsConversation) => {
       const requestId = ++messageRequestId.current;
@@ -251,6 +271,46 @@ const CustomerServicePage: React.FC = () => {
       /* 下次轮询重试 */
     }
   }, [messages, mobileChat, selected]);
+  useEffect(() => {
+    setRemarkDraft(selected?.user.profile.remarks || '');
+  }, [selected?.id, selected?.user.profile.remarks]);
+  const updateConversation = async (patch: { is_pinned?: boolean; group_id?: string; user_remark?: string }) => {
+    if (!selected || !canManageConversation || conversationSavingRef.current) return;
+    const conversationId = selected.id;
+    conversationSavingRef.current = true;
+    setConversationSaving(true);
+    try {
+      const updated = await adminApiService.updateCsConversation({ id: conversationId, ...patch });
+      setSelected((current) => current?.id === conversationId ? updated : current);
+      setRows((current) => sortConversationsByRecent(current.map((item) => item.id === updated.id ? updated : item)));
+      showToast(patch.user_remark !== undefined ? '用户备注已保存' : patch.group_id ? `已移至${groupName(patch.group_id)}` : updated.is_pinned ? '对话已置顶' : '已取消置顶', 'success');
+      void loadListRef.current();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '更新会话失败', 'error');
+    } finally {
+      conversationSavingRef.current = false;
+      setConversationSaving(false);
+    }
+  };
+  const runUserAction = async (action: 'unban' | 'clear_limit') => {
+    if (!selected || userActionRef.current) return;
+    const userId = selected.user.id;
+    userActionRef.current = true;
+    setUserActionLoading(true);
+    try {
+      if (action === 'unban') {
+        await adminApiService.unbanCsUser(userId);
+        setSelected((current) => current?.user.id === userId ? { ...current, user: { ...current.user, profile: { ...current.user.profile, status: 1 } } } : current);
+      } else await adminApiService.clearCsUserLimit(userId);
+      showToast(action === 'unban' ? '用户已解封' : '当前限速已清除', 'success');
+      void loadListRef.current();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '用户操作失败', 'error');
+    } finally {
+      userActionRef.current = false;
+      setUserActionLoading(false);
+    }
+  };
   const requestBrowserNotificationPermission = async () => {
     if (typeof Notification === 'undefined') {
       showToast('当前浏览器不支持系统通知', 'warning');
@@ -490,10 +550,18 @@ const CustomerServicePage: React.FC = () => {
       conversation_id: selected.id,
     });
   };
+  let latestAdminMessageId: number | null = null;
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index].role === 'admin' && !messages[index].is_recalled && messages[index].content_type !== 'recall') {
+      latestAdminMessageId = messages[index].id;
+      break;
+    }
+  }
+  const customerReadLatestReply = latestAdminMessageId !== null && latestAdminMessageId <= (selected?.user_last_read_message_id ?? 0);
   const pages = Math.max(1, Math.ceil(total / pageSize));
   return (
-    <div className="space-y-4">
-      <Card>
+    <div className="flex h-[calc(100dvh-7rem)] min-h-[480px] flex-col gap-3">
+      <Card className="shrink-0">
         <CardHeader className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 font-semibold"><Headphones className="h-5 w-5 text-primary" />在线客服</div>
           <div className="flex flex-wrap gap-2">
@@ -518,7 +586,7 @@ const CustomerServicePage: React.FC = () => {
           </div>
         </CardHeader>
       </Card>
-      <div className="grid h-[calc(100dvh-13rem)] min-h-[360px] max-h-[760px] grid-cols-1 gap-4 overflow-hidden lg:h-[min(72vh,760px)] lg:min-h-[520px] lg:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden lg:grid-cols-[320px_minmax(0,1fr)]">
         <Card className={`${mobileChat ? 'hidden lg:block' : 'block'} min-h-0 overflow-hidden`}>
           <CardBody className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-3">
             <Tabs
@@ -541,6 +609,20 @@ const CustomerServicePage: React.FC = () => {
               {FILTERS.map(([key, label]) => (
                 <Tab key={key} title={label} />
               ))}
+            </Tabs>
+            <Tabs
+              selectedKey={groupId}
+              onSelectionChange={(key) => {
+                setGroupId(String(key));
+                setRows([]);
+                setTotal(0);
+                setPage(1);
+              }}
+              aria-label="客服分组"
+              size="sm"
+            >
+              <Tab key="all" title="全部分组" />
+              {GROUPS.map((group) => <Tab key={group.id} title={group.name} />)}
             </Tabs>
             <Input
               value={query}
@@ -617,11 +699,17 @@ const CustomerServicePage: React.FC = () => {
                               {item.admin_unread > 99 ? '99+' : item.admin_unread}
                             </span>
                           )}
+                          {item.is_pinned && <Pin className="h-3.5 w-3.5 shrink-0 text-warning" aria-label="已置顶" />}
+                          {item.user.billing.has_entitlement && <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-success" aria-label="有有效权益" />}
                           <span className="shrink-0 text-xs text-default-500">{relativeTime(item.last_message_at)}</span>
                         </div>
                         <div className="mt-1 flex items-center gap-2 text-xs text-default-500">
+                          <span className="shrink-0 rounded bg-default-100 px-1.5 py-0.5 text-[11px] text-default-500">{groupName(item.group_id)}</span>
                           <span className="shrink-0">{item.admin_unread > 0 ? '未读' : ['resolved', 'closed'].includes(item.status) ? '已完成' : '已读'}</span>
                           <span className="truncate">{item.last_message_preview || '暂无消息'}</span>
+                        </div>
+                        <div className={`mt-1 truncate text-xs ${item.user.billing.has_entitlement ? 'text-success' : 'text-default-400'}`}>
+                          {item.user.billing.has_entitlement ? item.user.billing.entitlements.map((entitlement) => `${entitlement.name}${entitlement.source === 'team' ? '（团队）' : ''}`).join(' · ') : '暂无有效权益'}
                         </div>
                       </div>
                     </Button>
@@ -671,6 +759,22 @@ const CustomerServicePage: React.FC = () => {
                     </Button>
                   </Tooltip>
                 </div>
+                <div className="flex flex-wrap items-center gap-2 border-b border-divider pb-3">
+                  <Button size="sm" isDisabled={!canManageConversation || conversationSaving} variant={selected.is_pinned ? 'solid' : 'flat'} color={selected.is_pinned ? 'warning' : 'default'} startContent={<Pin className="h-4 w-4" />} onPress={() => void updateConversation({ is_pinned: !selected.is_pinned })}>
+                    {selected.is_pinned ? '取消置顶' : '置顶对话'}
+                  </Button>
+                  {GROUPS.map((group) => <Button key={group.id} size="sm" isDisabled={!canManageConversation || conversationSaving || (selected.group_id || 'general') === group.id} variant={(selected.group_id || 'general') === group.id ? 'solid' : 'flat'} color={group.id === 'supervisor' ? 'secondary' : 'default'} onPress={() => void updateConversation({ group_id: group.id })}>{group.name}</Button>)}
+                  {canUnbanUser && <Button size="sm" variant="flat" color="success" isDisabled={userActionLoading || selected.user.profile.status === 1} startContent={<ShieldCheck className="h-4 w-4" />} onPress={() => void runUserAction('unban')}>{selected.user.profile.status === 1 ? '账号正常' : '解封账号'}</Button>}
+                  {canClearUserLimit && <Button size="sm" variant="flat" color="warning" isLoading={userActionLoading} startContent={!userActionLoading && <Gauge className="h-4 w-4" />} onPress={() => void runUserAction('clear_limit')}>解除限速</Button>}
+                </div>
+                <div className="grid gap-2 rounded-medium bg-default-50 p-3 text-sm sm:grid-cols-2">
+                  <div className="flex items-center gap-2"><span className="text-default-500">客户已读状态</span><span>{latestAdminMessageId === null ? '暂无客服消息' : customerReadLatestReply ? '已读' : '未读'}</span></div>
+                  <div className="flex items-center gap-2"><span className="text-default-500">有效权益</span><span>{selected.user.billing.has_entitlement ? selected.user.billing.entitlements.map((item) => item.name).join('、') : '暂无有效套餐'}</span></div>
+                </div>
+                <div className="flex items-end gap-2">
+                  <Textarea size="sm" label="用户备注（内部可见）" isDisabled={!canManageConversation || conversationSaving} value={remarkDraft} onValueChange={setRemarkDraft} maxLength={255} minRows={1} maxRows={2} />
+                  <Button size="sm" color="primary" variant="flat" isLoading={conversationSaving} isDisabled={!canManageConversation || remarkDraft === (selected.user.profile.remarks || '')} onPress={() => void updateConversation({ user_remark: remarkDraft })}>保存备注</Button>
+                </div>
                 {messages
                   .flatMap((message) => message.attachments)
                   .slice(-1)
@@ -678,7 +782,7 @@ const CustomerServicePage: React.FC = () => {
                     <AttachmentSummary key={attachment.id} attachment={attachment} />
                   ))}
                 <div className="min-h-0 flex-1 overflow-hidden">
-                  <ChatMessageList messages={messages} conversationKey={selected.id} selfRole="admin" loading={messageLoading} emptyText="暂无消息" scope="admin" recallWindowMinutes={canRecall ? recallWindowMinutes : undefined} onRecall={canRecall ? setRecallTarget : undefined} />
+                  <ChatMessageList messages={messages} conversationKey={selected.id} selfRole="admin" loading={messageLoading} emptyText="暂无消息" scope="admin" userLastReadMessageId={selected.user_last_read_message_id} recallWindowMinutes={canRecall ? recallWindowMinutes : undefined} onRecall={canRecall ? setRecallTarget : undefined} />
                 </div>
                 {composerAttachmentConfig ? (
                   <ChatComposer

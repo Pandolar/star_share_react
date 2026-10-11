@@ -279,6 +279,7 @@ export interface InviteCashbackConfig {
     };
     purchase_credit: {
         enabled: boolean;
+        min_payable_amount: number;
     };
     campaigns: InviteCashbackCampaign[];
 }
@@ -958,6 +959,7 @@ export interface AdminCsUserProfile {
     tel: string | null;
     status: number;
     created_at: string | null;
+    remarks: string;
 }
 
 export interface AdminCsBillingSummary {
@@ -966,6 +968,8 @@ export interface AdminCsBillingSummary {
     paid_orders: number;
     paid_amount: number;
     last_paid_at: string | null;
+    entitlements: (NonNullable<AdminCsBillingSummary['current_package']> & { source: 'personal' | 'team'; expires_at: string | null })[];
+    has_entitlement: boolean;
 }
 
 export interface AdminCsUserSummary {
@@ -978,6 +982,11 @@ export interface AdminCsConversation extends ChatConversation {
     user: AdminCsUserSummary;
     waiting_seconds: number | null;
     assigned_admin: string | null;
+    internal_remark: string;
+    is_pinned: boolean;
+    group_id: string | null;
+    user_last_read_message_id: number | null;
+    user_last_read_at: string | null;
 }
 
 export interface AdminCsStats {
