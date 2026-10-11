@@ -1,10 +1,32 @@
 import config from '../config';
 import { getCookie } from '../utils/cookies';
 import type { ChatAttachment, ChatConfig, ChatConversation, ChatMessage } from '../components/chat/types';
+import type { HomeInfo } from '../types/homeInfo';
 
+export type SiteFeatureName = 'register' | 'wechat_login' | 'invite' | 'invite_rewards' | 'activity' | 'about' | 'customer_service' | 'team' | 'promotion_code' | 'invoice' | 'cashback_credit' | 'reset_quota' | 'speedtest' | 'online_purchase' | 'cdk_exchange';
 
-// 请求响应类型定义
-interface ApiResponse<T = any> {
+export interface SiteModePayload {
+    mode: 'normal' | 'agent' | 'whitelabel';
+    is_white_label: boolean;
+    site_id: number | null;
+    distributor_id: number | null;
+    site_name: string;
+    branding: 'white_label' | 'branded' | 'self';
+    sales_mode: 'cdk' | 'online' | 'hybrid';
+    status: 'active' | 'paused';
+    logo_url: string;
+    customer_service_url: string;
+    features: Partial<Record<SiteFeatureName, boolean>>;
+    notice: string;
+    notice_id: string;
+    enable_register: boolean;
+    enable_wechat_login: boolean;
+    enable_promotion_code: boolean;
+    user_agreement_url: string;
+    subscription_notice: string;
+}
+
+export interface ApiResponse<T = unknown> {
     code: number;
     msg: string;
     data: T;
@@ -41,22 +63,20 @@ const getUserAuthHeaders = (): { [key: string]: string } => {
 };
 
 // 创建用户端请求函数
-async function createUserRequest(
+async function createUserRequest<T = unknown>(
     url: string,
     options: RequestConfig = {}
-): Promise<ApiResponse> {
+): Promise<ApiResponse<T>> {
     const {
         timeout = config.api.timeout,
         ...fetchOptions
     } = options;
 
-    // 准备请求头
-    const headers: { [key: string]: string } = {
+    const headers = new Headers({
         'Content-Type': 'application/json',
-        'X-Site-Domain': window.location.hostname, // 白牌模式判定：携带客户实际访问域名
-        ...getUserAuthHeaders(), // 添加用户认证头
-        ...(fetchOptions.headers as any || {}),
-    };
+        ...getUserAuthHeaders(),
+    });
+    new Headers(fetchOptions.headers).forEach((value, key) => headers.set(key, value));
 
     // 创建超时控制
     const controller = new AbortController();
@@ -84,7 +104,7 @@ async function createUserRequest(
         }
 
         // 解析响应数据
-        const data: ApiResponse = await response.json();
+        const data: ApiResponse<T> = await response.json();
 
         // 检查业务错误码
         if (data.code !== undefined && data.code !== 20000) {
@@ -118,11 +138,10 @@ async function createUserRequest(
     }
 }
 
-// 获取用户端API URL
+// Public user APIs are always relative so the request Host remains authoritative.
 const getUserApiUrl = (path: string): string => {
-    const baseUrl = config.api.baseURL.endsWith('/') ? config.api.baseURL.slice(0, -1) : config.api.baseURL;
     const cleanPath = path.startsWith('/') ? path : `/${path}`;
-    return `${baseUrl}${cleanPath}`;
+    return cleanPath;
 };
 
 // 用户认证管理
@@ -148,7 +167,7 @@ export const announcementApi = {
     // 获取公告信息和Home页面配置信息
     getPublicAndHomeInfo: async (): Promise<ApiResponse<{
         notice: string;
-        home_info: import('../types/homeInfo').HomeInfo;
+        home_info: HomeInfo;
     }>> => {
         return createUserRequest(getUserApiUrl('/u/get_public_info'), {
             method: 'GET',
@@ -156,21 +175,10 @@ export const announcementApi = {
     },
 };
 
-// 站点模式API（自营/白牌）
+// Public site configuration is resolved from the request Host by the backend.
 export const siteModeApi = {
-    // 获取当前站点模式，依据访问域名由后端判定
-    getSiteMode: async (): Promise<ApiResponse<{
-        mode: 'normal' | 'whitelabel';
-        is_white_label: boolean;
-        enable_register?: boolean;
-        enable_wechat_login?: boolean;
-        enable_promotion_code?: boolean;
-        notice?: string;
-        notice_id?: string;
-        subscription_notice?: string;
-        user_agreement_url?: string;
-    }>> => {
-        return createUserRequest(getUserApiUrl('/u/get_site_mode'), {
+    getSiteMode: async (): Promise<ApiResponse<SiteModePayload>> => {
+        return createUserRequest<SiteModePayload>(getUserApiUrl('/u/get_site_mode'), {
             method: 'GET',
         });
     },
@@ -288,13 +296,15 @@ export interface PackageInfoResponse {
     id: number;
     package_name: string;
     category: string;
-    price: number;
+    price: number | null;
     duration: number;
     introduce: string;
     level: string;
     priority: number;
     remarks: string;
     status: number;
+    purchasable: boolean;
+    price_source: 'main' | 'custom';
 }
 
 export interface InvoiceEligibility {

@@ -39,7 +39,6 @@ import { InvoiceConfigEditor } from './InvoiceConfigEditor';
 import { InvitePolicyConfigEditor } from './InvitePolicyConfigEditor';
 import { InviteCashbackSettingsEditor } from './InviteCashbackSettingsEditor';
 import { SpeedTestNodesEditor } from './SpeedTestNodesEditor';
-import { WhiteLabelConfigEditor } from './WhiteLabelConfigEditor';
 import { BarkConfigEditor } from './BarkConfigEditor';
 import { DistributorLevelDiscountsEditor } from './DistributorLevelDiscountsEditor';
 import { HomeInfoConfigEditor } from './HomeInfoConfigEditor';
@@ -53,7 +52,6 @@ const VISUAL_CONFIG_KEYS: Record<string, true> = {
     HOME_INFO: true,
     SEND_BARK_CONFIG: true,
     DISTRIBUTOR_LEVEL_DISCOUNTS: true,
-    WHITE_LABEL_CONFIG: true,
     CUSTOMER_SERVICE_CONFIG: true,
     MCP_CONFIG: true,
     USER_CENTER_TAB_BADGES: true,
@@ -440,8 +438,6 @@ const SettingsManagePage: React.FC = () => {
                         disabled={!canEditConfig(config)}
                         levelOptions={packageLevels}
                     />
-                ) : config.key === 'WHITE_LABEL_CONFIG' ? (
-                    <WhiteLabelConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!canEditConfig(config)} />
                 ) : config.key === 'CUSTOMER_SERVICE_CONFIG' ? (
                     <CustomerServiceConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!canEditConfig(config)} />
                 ) : config.key === 'MCP_CONFIG' ? (

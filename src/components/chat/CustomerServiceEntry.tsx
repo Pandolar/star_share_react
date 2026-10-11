@@ -4,9 +4,11 @@ import { MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCustomerService } from '../../contexts/CustomerServiceContext';
 import { ChatwootFloatingButton } from './ChatwootFloatingButton';
+import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
 
 export default function CustomerServiceEntry({ mode }: { mode: 'user' | 'guest' }): React.ReactElement | null {
   const { config, provider, unread } = useCustomerService();
+  const { customer_service_url: customerServiceUrl, features } = useWhiteLabel();
   const navigate = useNavigate();
   const [guestHintOpen, setGuestHintOpen] = useState(false);
 
@@ -14,7 +16,8 @@ export default function CustomerServiceEntry({ mode }: { mode: 'user' | 'guest' 
   const builtin = config?.provider === 'builtin' ? config : null;
 
 
-  // Chatwoot 是独立入口，不随内置客服开关消失；配置缺失时同样安全返回。
+  if (!features.customer_service) return null;
+  if (customerServiceUrl) return <Button isIconOnly aria-label="联系客服" title="联系客服" onPress={() => window.open(customerServiceUrl, '_blank', 'noopener,noreferrer')} className="fixed bottom-5 right-5 z-50 h-12 w-12 min-w-12 rounded-xl bg-primary text-white shadow-md"><MessageCircle size={22} strokeWidth={2.25} /></Button>;
   if (provider === 'chatwoot') return <ChatwootFloatingButton mode={mode} />;
   if (!builtin || !builtin.entry.floating_enabled) return null;
   if (mode === 'guest' && !builtin.entry.guest_enabled) return null;

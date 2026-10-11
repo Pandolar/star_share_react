@@ -7,6 +7,7 @@ import { WhiteLabelProvider, useWhiteLabel } from './contexts/WhiteLabelContext'
 import { CustomerServiceProvider } from './contexts/CustomerServiceContext';
 import { AdminAuthProvider, useAdminAuth } from './contexts/AdminAuthContext';
 import AdminPermissionRoute from './components/admin/AdminPermissionRoute';
+import type { SiteFeatureName } from './services/userApi';
 
 const HomePage = lazyWithRetry(() => import('./pages/HomePage'), 'HomePage');
 const UserCenter = lazyWithRetry(() => import('./pages/user/UserCenter'), 'UserCenter');
@@ -42,6 +43,9 @@ const AdministratorManagePage = lazyWithRetry(() => import('./pages/admin/Admini
 const AdminSecurityPage = lazyWithRetry(() => import('./pages/admin/AdminSecurityPage'), 'AdminSecurityPage');
 const DistributorDashboardPage = lazyWithRetry(() => import('./pages/distributor/DistributorDashboardPage'), 'DistributorDashboardPage');
 const DistributorProtectedRoute = lazyWithRetry(() => import('./components/distributor/DistributorProtectedRoute'), 'DistributorProtectedRoute');
+const SitesManagePage = lazyWithRetry(() => import('./pages/admin/SitesManagePage'), 'SitesManagePage');
+const CommissionsManagePage = lazyWithRetry(() => import('./pages/admin/CommissionsManagePage'), 'CommissionsManagePage');
+const DistributorSitesPage = lazyWithRetry(() => import('./pages/distributor/DistributorSitesPage'), 'DistributorSitesPage');
 
 const RouteLoadingFallback: React.FC = () => (
   <div className="flex min-h-screen items-center justify-center bg-white px-4 text-sm text-default-500">
@@ -49,10 +53,11 @@ const RouteLoadingFallback: React.FC = () => (
   </div>
 );
 
-const SelfSiteOnly: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isWhiteLabel, loading } = useWhiteLabel();
+const SiteFeatureRoute: React.FC<{ feature: SiteFeatureName; children: React.ReactNode }> = ({ feature, children }) => {
+  const { features, loading, error } = useWhiteLabel();
   if (loading) return <RouteLoadingFallback />;
-  if (isWhiteLabel) return <Navigate to="/user-center" replace />;
+  if (error) return <div className="p-8 text-center" role="alert">{error}，请刷新后重试。</div>;
+  if (!features[feature]) return <Navigate to="/user-center" replace />;
   return <>{children}</>;
 };
 
@@ -68,6 +73,7 @@ const AdminIndexRedirect: React.FC = () => {
     ['dashboard.read', 'overview'], ['user.read', 'users'], ['package.read', 'packages'],
     ['order.read', 'orders'], ['customer_service.conversation.read', 'customer-service'],
     ['administrator.account.read', 'administrators'], ['config.read', 'settings'],
+    ['site.read', 'sites'], ['commission.read', 'commissions'],
   ].find(([permission]) => can(permission));
   return <Navigate to={`/star-admin/${first?.[1] || 'security'}`} replace />;
 };
@@ -113,11 +119,11 @@ const App: React.FC = () => {
                     <Route path="/user-center" element={<UserCenter />} />
 
                     {/* 其他功能路由 */}
-                    <Route path="/handle_callback" element={<SelfSiteOnly><RedirectPage /></SelfSiteOnly>} />
-                    <Route path="/sharespeedtest" element={<SelfSiteOnly><ShareSpeedTestPage /></SelfSiteOnly>} />
-                    <Route path="/jumpns" element={<SelfSiteOnly><JumpNsPage /></SelfSiteOnly>} />
+                    <Route path="/handle_callback" element={<RedirectPage />} />
+                    <Route path="/sharespeedtest" element={<SiteFeatureRoute feature="speedtest"><ShareSpeedTestPage /></SiteFeatureRoute>} />
+                    <Route path="/jumpns" element={<JumpNsPage />} />
                     <Route path="/ios" element={<IOSInstallPage />} />
-                    <Route path="/customer-service" element={<SelfSiteOnly><CustomerServicePage /></SelfSiteOnly>} />
+                    <Route path="/customer-service" element={<SiteFeatureRoute feature="customer_service"><CustomerServicePage /></SiteFeatureRoute>} />
 
                     {/* 分销商路由（结构对齐 /star-admin/：登录页独立，其余在 /distributor 受保护壳下） */}
                     <Route path="/distributor/login" element={<DistributorLoginPage />} />
@@ -125,6 +131,7 @@ const App: React.FC = () => {
                       {/* 默认重定向到控制面板 */}
                       <Route index element={<Navigate to="/distributor/dashboard" replace />} />
                       <Route path="dashboard" element={<DistributorDashboardPage />} />
+                      <Route path="sites" element={<DistributorSitesPage />} />
                     </Route>
 
                     {/* Admin管理后台路由 */}
@@ -140,6 +147,8 @@ const App: React.FC = () => {
                       <Route path="invoices" element={<RequireAdminPermission permission="invoice.read"><InvoicesManagePage /></RequireAdminPermission>} />
                       <Route path="cdk" element={<RequireAdminPermission permission="cdk.read"><CDKManagePage /></RequireAdminPermission>} />
                       <Route path="distributors" element={<RequireAdminPermission permission="distributor.read"><DistributorsManagePage /></RequireAdminPermission>} />
+                      <Route path="sites" element={<RequireAdminPermission permission="site.read"><SitesManagePage /></RequireAdminPermission>} />
+                      <Route path="commissions" element={<RequireAdminPermission permission="commission.read"><CommissionsManagePage /></RequireAdminPermission>} />
                       <Route path="audit-logs" element={<RequireAdminPermission permission="audit.read"><AuditLogsPage /></RequireAdminPermission>} />
                       <Route path="runtime-logs" element={<RequireAdminPermission permission="runtime_log.read"><RuntimeLogsPage /></RequireAdminPermission>} />
                       <Route path="articles" element={<RequireAdminPermission permission="article.read"><ArticlesManagePage /></RequireAdminPermission>} />

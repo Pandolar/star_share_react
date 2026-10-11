@@ -31,7 +31,7 @@ const getPackageLevelStyle = (level?: string) => {
 };
 
 export const ProfileTab: React.FC = () => {
-  const { isWhiteLabel, loading: whiteLabelLoading } = useWhiteLabel();
+  const { features, loading: whiteLabelLoading } = useWhiteLabel();
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -102,7 +102,7 @@ export const ProfileTab: React.FC = () => {
     const publicEditTabs: EditTabKey[] = ['email', 'username', 'password'];
     const selfSiteEditTabs: EditTabKey[] = ['payment_info', 'billing_profile'];
     const canOpen = publicEditTabs.includes(openEdit as EditTabKey)
-      || (!isWhiteLabel && selfSiteEditTabs.includes(openEdit as EditTabKey));
+      || ((features.invoice || features.cashback_credit) && selfSiteEditTabs.includes(openEdit as EditTabKey));
 
     if (openEdit && canOpen) {
       setEditModal({ open: true, tab: openEdit as EditTabKey });
@@ -118,7 +118,7 @@ export const ProfileTab: React.FC = () => {
         search: nextParams.toString() ? `?${nextParams.toString()}` : '',
       }, { replace: true, state: null });
     }
-  }, [location.pathname, location.state, navigate, searchParams, isWhiteLabel, whiteLabelLoading]);
+  }, [location.pathname, location.state, navigate, searchParams, features.invoice, features.cashback_credit, whiteLabelLoading]);
 
   const fetchUserInfo = async () => {
     try {
@@ -140,9 +140,9 @@ export const ProfileTab: React.FC = () => {
   useEffect(() => {
     if (whiteLabelLoading) return;
     fetchUserInfo();
-    if (isWhiteLabel) setCompensations([]);
+    if (!features.activity) setCompensations([]);
     else void fetchCompensations();
-  }, [isWhiteLabel, whiteLabelLoading]);
+  }, [features.activity, whiteLabelLoading]);
 
   const openEditModal = (tab: EditTabKey = 'username') => setEditModal({ open: true, tab });
   const closeEditModal = () => setEditModal((s) => ({ ...s, open: false }));
@@ -277,17 +277,11 @@ export const ProfileTab: React.FC = () => {
                       <Calendar size={16} />
                       <span>注册时间：{userInfo.created_at}</span>
                     </div>
-                    {!isWhiteLabel && (
-                      <div className="flex items-center gap-2 text-default-600">
-                        <User size={16} />
-                        <span>邀请人：{userInfo.inviter_user}</span>
-                      </div>
+                    {features.invite && (
+                      <div className="flex items-center gap-2 text-default-600"><User size={16} /><span>邀请人：{userInfo.inviter_user}</span></div>
                     )}
-                    {!isWhiteLabel && userInfo.wechat_openid && (
-                      <div className="flex items-center gap-2 text-default-600">
-                        <MessageCircle size={16} />
-                        <span>微信：<span className="text-success">已绑定微信</span></span>
-                      </div>
+                    {features.wechat_login && userInfo.wechat_openid && (
+                      <div className="flex items-center gap-2 text-default-600"><MessageCircle size={16} /><span>微信：<span className="text-success">已绑定微信</span></span></div>
                     )}
                   </div>
 
@@ -443,7 +437,7 @@ export const ProfileTab: React.FC = () => {
         isOpen={editModal.open}
         initialTab={editModal.tab}
         userInfo={userInfo}
-        showFinancialTabs={!whiteLabelLoading && !isWhiteLabel}
+        showFinancialTabs={!whiteLabelLoading && (features.invoice || features.cashback_credit)}
         onClose={closeEditModal}
         onUserInfoChange={(next) => setUserInfo((prev) => (prev ? { ...prev, ...next } : prev))}
       />

@@ -8,7 +8,7 @@ module.exports = function (app) {
     '/star',
     createProxyMiddleware({
       target,
-      changeOrigin: true,
+      changeOrigin: false,
       logLevel: 'debug',
     })
   );
@@ -18,7 +18,7 @@ module.exports = function (app) {
     '/u',
     createProxyMiddleware({
       target,
-      changeOrigin: true,
+      changeOrigin: false,
       logLevel: 'debug',
     })
   );

@@ -37,7 +37,6 @@ export interface DistributorInfo {
 export interface DistributorPermissions {
     can_login: boolean;
     can_generate_cdk: boolean;
-    can_edit_notice: boolean;
 }
 
 /**
@@ -62,12 +61,6 @@ export interface DistributorLoginResponse {
     discount_active?: boolean;
 }
 
-/**
- * 配置请求
- */
-export interface DistributorSettingsRequest {
-    notice?: string;
-}
 
 /**
  * 修改密码请求
@@ -246,13 +239,6 @@ class DistributorApiService {
         return response.data;
     }
 
-    /**
-     * 更新分销商配置
-     */
-    async updateSettings(data: DistributorSettingsRequest): Promise<DistributorApiResponse> {
-        const response = await this.api.put('/settings', data);
-        return response.data;
-    }
 
     /**
      * 修改密码

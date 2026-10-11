@@ -48,7 +48,10 @@ export const SubscriptionTab: React.FC = () => {
   const [subscriptionError, setSubscriptionError] = useState('');
 
   const isMobileDevice = useIsMobile();
-  const { isWhiteLabel, loading: whiteLabelLoading, subscriptionNotice } = useWhiteLabel();
+  const { loading: siteLoading, subscription_notice: subscriptionNotice, features } = useWhiteLabel();
+  const canPurchaseOnline = features.online_purchase;
+  const canExchangeCdk = features.cdk_exchange;
+  const canUseTeam = features.team;
   const { isRequired: isAgreementRequired } = useUserAgreementRequirement();
   const navigate = useNavigate();
 
@@ -90,7 +93,7 @@ export const SubscriptionTab: React.FC = () => {
   );
 
   const fetchPackages = React.useCallback(async () => {
-    if (whiteLabelLoading) return;
+    if (siteLoading) return;
     try {
       setLoading(true);
       setError('');
@@ -110,15 +113,15 @@ export const SubscriptionTab: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [subscriptionCategories, whiteLabelLoading]);
+  }, [subscriptionCategories, siteLoading]);
 
   useEffect(() => {
     fetchPackages();
   }, [fetchPackages]);
 
   useEffect(() => {
-    if (whiteLabelLoading) return;
-    if (isWhiteLabel) {
+    if (siteLoading) return;
+    if (!canUseTeam) {
       setTeamMembershipBlocked(false);
       setTeamMembershipLoading(false);
       return;
@@ -142,11 +145,11 @@ export const SubscriptionTab: React.FC = () => {
         if (!cancelled) setTeamMembershipLoading(false);
       });
     return () => { cancelled = true; };
-  }, [isWhiteLabel, whiteLabelLoading]);
+  }, [canUseTeam, siteLoading]);
 
   const fetchActiveSubscription = useCallback(async () => {
-    if (whiteLabelLoading) return;
-    if (isWhiteLabel) {
+    if (siteLoading) return;
+    if (!canPurchaseOnline) {
       setActiveSubscription(null);
       setSubscriptionError('');
       setSubscriptionLoading(false);
@@ -171,18 +174,18 @@ export const SubscriptionTab: React.FC = () => {
     } finally {
       setSubscriptionLoading(false);
     }
-  }, [isWhiteLabel, whiteLabelLoading]);
+  }, [canPurchaseOnline, siteLoading]);
 
   useEffect(() => { void fetchActiveSubscription(); }, [fetchActiveSubscription]);
 
   useEffect(() => {
-    if (isWhiteLabel || whiteLabelLoading) return;
+    if (!canPurchaseOnline || siteLoading) return;
     const refreshOnReturn = () => {
       if (!document.hidden) void fetchActiveSubscription();
     };
     document.addEventListener('visibilitychange', refreshOnReturn);
     return () => document.removeEventListener('visibilitychange', refreshOnReturn);
-  }, [fetchActiveSubscription, isWhiteLabel, whiteLabelLoading]);
+  }, [fetchActiveSubscription, canPurchaseOnline, siteLoading]);
 
   // 创建订单
   const createOrder = async (pkg: PackageInfo) => {
@@ -306,7 +309,7 @@ export const SubscriptionTab: React.FC = () => {
 
   const getMostPopularPackage = (categoryPackages: PackageInfo[]) => {
     if (categoryPackages.length <= 1) return null;
-    const sortedByPrice = [...categoryPackages].sort((a, b) => a.price - b.price);
+    const sortedByPrice = [...categoryPackages].sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity));
     return sortedByPrice[Math.floor(sortedByPrice.length / 2)];
   };
 
@@ -352,8 +355,8 @@ export const SubscriptionTab: React.FC = () => {
     ) : button;
   };
 
-  if (whiteLabelLoading) {
-    return <div className="flex min-h-64 items-center justify-center"><Spinner label="正在确认站点模式..." /></div>;
+  if (siteLoading) {
+    return <div className="flex min-h-64 items-center justify-center"><Spinner label="正在确认站点配置..." /></div>;
   }
 
   return (
@@ -509,7 +512,7 @@ export const SubscriptionTab: React.FC = () => {
           <h1 className="text-3xl font-bold text-foreground mb-2">订阅套餐</h1>
           <p className="text-default-500 max-w-md">选择适合您的订阅方案，享受优质服务</p>
         </div>
-        {!isWhiteLabel && (
+        {canExchangeCdk && (
           <div className="flex items-center gap-3">
             <Button color="primary" variant="flat" onPress={() => setRedeemModalOpen(true)}>
               兑换激活码
@@ -518,8 +521,7 @@ export const SubscriptionTab: React.FC = () => {
         )}
       </div>
 
-      {/* 白牌模式：兑换卡片 */}
-      {isWhiteLabel && (
+      {canExchangeCdk && !canPurchaseOnline && (
         <Card className="mb-6">
           <CardBody className="p-5 sm:p-6">
             <div className="flex items-start gap-4 mb-4">
@@ -532,93 +534,40 @@ export const SubscriptionTab: React.FC = () => {
               </div>
             </div>
             <div className="flex gap-3 items-start">
-              <Input
-                value={cdkCode}
-                onChange={(e) => setCdkCode(e.target.value.toUpperCase())}
-                placeholder="请输入激活码（如：ABCD-1234-EFGH）"
-                className="flex-1"
-              />
-              <Button
-                color="primary"
-                isDisabled={!cdkCode.trim()}
-                onPress={() => {
-                  setRedeemModalOpen(true);
-                }}
-                className="px-6"
-              >
-                兑换
-              </Button>
+              <Input value={cdkCode} onChange={(e) => setCdkCode(e.target.value.toUpperCase())} placeholder="请输入激活码（如：ABCD-1234-EFGH）" className="flex-1" />
+              <Button color="primary" isDisabled={!cdkCode.trim()} onPress={() => setRedeemModalOpen(true)} className="px-6">兑换</Button>
             </div>
           </CardBody>
         </Card>
       )}
 
-      {/* 订阅说明：白牌模式下隐藏（白牌无自营订阅规则，统一走兑换激活码） */}
-      {!isWhiteLabel && (
+      {canPurchaseOnline && (
       <Card className="mb-6 border border-primary/10 bg-primary/5 shadow-sm">
         <CardBody className="p-4 sm:p-5">
-          <button
-            type="button"
-            onClick={() => setShowSubscriptionGuide((p) => !p)}
-            className="w-full flex items-center justify-between gap-4 text-left"
-          >
+          <button type="button" onClick={() => setShowSubscriptionGuide((p) => !p)} className="w-full flex items-center justify-between gap-4 text-left">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Info className="w-4 h-4 text-primary" />
-              </div>
-              <div>
-                <div className="font-semibold text-default-900">订阅说明</div>
-                <div className="text-sm text-default-500">购买前展开查看套餐购买相关规则(必读)</div>
-              </div>
+              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center"><Info className="w-4 h-4 text-primary" /></div>
+              <div><div className="font-semibold text-default-900">订阅说明</div><div className="text-sm text-default-500">购买前展开查看套餐购买相关规则(必读)</div></div>
             </div>
             <ChevronDown className={`w-4 h-4 text-default-500 transition-transform ${showSubscriptionGuide ? 'rotate-180' : ''}`} />
           </button>
-          {showSubscriptionGuide && (
-            <div className="mt-4 rounded-xl bg-white/80 border border-default-100 px-4 py-3 text-sm leading-7">
-              {subscriptionNotice ? (
-                // 使用配置的订阅说明（React Markdown 渲染，与公告一致）
-                <div className="prose prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_strong]:text-default-900 [&_strong]:font-semibold">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {subscriptionNotice}
-                  </ReactMarkdown>
-                </div>
-              ) : (
-                // 降级：配置为空时显示默认说明
-                <div className="text-default-700">
-                  {isWhiteLabel ? (
-                    <>
-                      <div>1. 若您已有订阅套餐，不可再次兑换<strong className="font-semibold text-default-900">更低</strong>等级套餐。</div>
-                      <div>2. 兑换同等级套餐将直接<strong className="font-semibold text-default-900">叠加延期</strong>。</div>
-                      <div>3. 兑换更高等级套餐后将<strong className="font-semibold text-default-900">自动冻结低等级套餐</strong>，待高等级套餐过期后将自动解冻。</div>
-                      <div>4. 请通过右上角【兑换激活码】使用您获得的激活码开通对应套餐。</div>
-                    </>
-                  ) : (
-                    <>
-                      <div>1. 若您已有订阅套餐，不可再次订阅<strong className="font-semibold text-default-900">更低</strong>等级套餐。</div>
-                      <div>2. 订阅同等级套餐将直接<strong className="font-semibold text-default-900">叠加延期</strong>。</div>
-                      <div>3. 订阅更高等级套餐后将<strong className="font-semibold text-default-900">自动冻结低等级套餐</strong>，待高等级套餐过期后将自动解冻。</div>
-                      <div>4. 如果您有激活码/CDK/兑换码，可直接在右上角【兑换激活码】直接兑换。</div>
-                      <div>5. 单笔订单金额<strong className="font-semibold text-default-900">超100元且30天内</strong>可联系客服进行开票，支持高校或企业抬头。</div>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+          {showSubscriptionGuide && <div className="mt-4 rounded-xl bg-white/80 border border-default-100 px-4 py-3 text-sm leading-7">
+            {subscriptionNotice ? <div className="prose prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_strong]:text-default-900 [&_strong]:font-semibold"><ReactMarkdown remarkPlugins={[remarkGfm]}>{subscriptionNotice}</ReactMarkdown></div> : <div className="text-default-700">请在购买前确认套餐等级、时长与适用规则。</div>}
+          </div>}
         </CardBody>
       </Card>
       )}
-      {teamMembershipBlocked && !isWhiteLabel && (
+      {teamMembershipBlocked && canPurchaseOnline && (
         <Alert
           className="mb-6"
           color="warning"
           variant="flat"
           title="组织团队成员无法购买个人套餐"
           description={`您当前属于“${teamMembershipName}”。无论团队订阅是否生效，都需要先退出组织团队后才能购买个人套餐。`}
-          endContent={<Button size="sm" color="warning" variant="flat" onPress={() => navigate('/user-center?tab=team')}>前往组织团队</Button>}
+          endContent={canUseTeam ? <Button size="sm" color="warning" variant="flat" onPress={() => navigate('/user-center?tab=team')}>前往组织团队</Button> : undefined}
         />
       )}
-      {subscriptionError && !isWhiteLabel && !teamMembershipBlocked && (
+      {subscriptionError && canPurchaseOnline && !teamMembershipBlocked && (
         <Alert
           className="mb-6"
           color="warning"
@@ -703,7 +652,7 @@ export const SubscriptionTab: React.FC = () => {
             {groupedPackages[selectedCategory].map((pkg, index) => {
               const mostPopular = getMostPopularPackage(groupedPackages[selectedCategory]);
               const isPopular = mostPopular?.id === pkg.id;
-              const monthlyPrice = calculateMonthlyPrice(pkg.price, pkg.duration);
+              const monthlyPrice = calculateMonthlyPrice(Number(pkg.price), pkg.duration);
               const showMonthlyPrice = shouldShowMonthlyPrice(pkg.duration);
 
               return (
@@ -727,41 +676,19 @@ export const SubscriptionTab: React.FC = () => {
                         </div>
                       </div>
                       <div className="divider" />
-                      {!isWhiteLabel && (
+                      {canPurchaseOnline && (
                       <div className="package-price">
                         {showMonthlyPrice ? (
                           <>
-                            <div className="price-main">
-                              <span className="price-amount">≈¥{monthlyPrice}</span>
-                              <span className="price-unit">/ 月</span>
-                            </div>
+                            <div className="price-main"><span className="price-amount">≈¥{monthlyPrice}</span><span className="price-unit">/ 月</span></div>
                             <p className="price-daily">共 ¥{pkg.price} / {getDurationText(pkg.duration)}</p>
                           </>
-                        ) : (
-                          <div className="price-main">
-                            <span className="price-amount">¥{pkg.price}</span>
-                            <span className="price-unit">/ {getDurationText(pkg.duration)}</span>
-                          </div>
-                        )}
+                        ) : <div className="price-main"><span className="price-amount">¥{pkg.price}</span><span className="price-unit">/ {getDurationText(pkg.duration)}</span></div>}
                       </div>
                       )}
-                      <div className="package-description">
-                        <div className="description-box">
-                          <p className="description-text">{pkg.introduce || '暂无详细描述'}</p>
-                        </div>
-                      </div>
+                      <div className="package-description"><div className="description-box"><p className="description-text">{pkg.introduce || '暂无详细描述'}</p></div></div>
                       <div className="subscribe-button">
-                        {isWhiteLabel ? (
-                          <button
-                            className={`hero-button ${isPopular ? 'primary' : 'secondary'}`}
-                            disabled={pkg.status !== 1}
-                            onClick={() => setRedeemModalOpen(true)}
-                          >
-                            {pkg.status === 1 ? '使用兑换码激活' : '暂不可用'}
-                          </button>
-                        ) : (
-                          subscriptionButton(pkg, isPopular ? 'primary' : 'secondary')
-                        )}
+                        {canPurchaseOnline ? subscriptionButton(pkg, isPopular ? 'primary' : 'secondary') : canExchangeCdk ? <button className={`hero-button ${isPopular ? 'primary' : 'secondary'}`} disabled={pkg.status !== 1} onClick={() => setRedeemModalOpen(true)}>{pkg.status === 1 ? '使用兑换码激活' : '暂不可用'}</button> : null}
                       </div>
                     </div>
                   </div>
@@ -781,7 +708,7 @@ export const SubscriptionTab: React.FC = () => {
           className="grid gap-4 grid-cols-1 max-w-2xl mx-auto"
         >
           {allPackages.map((pkg, index) => {
-            const monthlyPrice = calculateMonthlyPrice(pkg.price, pkg.duration);
+            const monthlyPrice = calculateMonthlyPrice(Number(pkg.price), pkg.duration);
             const showMonthlyPrice = shouldShowMonthlyPrice(pkg.duration);
             return (
               <motion.div
@@ -804,44 +731,14 @@ export const SubscriptionTab: React.FC = () => {
                         </Chip>
                       </div>
                     </div>
-                    {!isWhiteLabel && (
+                    {canPurchaseOnline && (
                       <div className="package-price" style={{ margin: '16px 0' }}>
-                        {showMonthlyPrice ? (
-                          <>
-                            <div className="price-main">
-                              <span className="price-amount" style={{ fontSize: '28px' }}>≈¥{monthlyPrice}</span>
-                              <span className="price-unit">/ 月</span>
-                            </div>
-                            <p className="price-daily">共 ¥{pkg.price} / {getDurationText(pkg.duration)}</p>
-                          </>
-                        ) : (
-                          <div className="price-main">
-                            <span className="price-amount" style={{ fontSize: '28px' }}>¥{pkg.price}</span>
-                            <span className="price-unit">/ {getDurationText(pkg.duration)}</span>
-                          </div>
-                        )}
+                        {showMonthlyPrice ? <><div className="price-main"><span className="price-amount" style={{ fontSize: '28px' }}>≈¥{monthlyPrice}</span><span className="price-unit">/ 月</span></div><p className="price-daily">共 ¥{pkg.price} / {getDurationText(pkg.duration)}</p></> : <div className="price-main"><span className="price-amount" style={{ fontSize: '28px' }}>¥{pkg.price}</span><span className="price-unit">/ {getDurationText(pkg.duration)}</span></div>}
                       </div>
                     )}
-                    <div className="package-description" style={{ margin: '12px 0 20px 0' }}>
-                      <div className="description-box" style={{ minHeight: '60px', padding: '12px' }}>
-                        <p className="description-text" style={{ fontSize: '13px' }}>
-                          {pkg.introduce || '暂无详细描述'}
-                        </p>
-                      </div>
-                    </div>
+                    <div className="package-description" style={{ margin: '12px 0 20px 0' }}><div className="description-box" style={{ minHeight: '60px', padding: '12px' }}><p className="description-text" style={{ fontSize: '13px' }}>{pkg.introduce || '暂无详细描述'}</p></div></div>
                     <div className="subscribe-button">
-                      {isWhiteLabel ? (
-                        <button
-                          className="hero-button primary"
-                          disabled={pkg.status !== 1}
-                          onClick={() => setRedeemModalOpen(true)}
-                          style={{ height: '40px', fontSize: '14px' }}
-                        >
-                          {pkg.status === 1 ? '兑换激活码' : '暂不可用'}
-                        </button>
-                      ) : (
-                        subscriptionButton(pkg, 'primary', { height: '40px', fontSize: '14px' })
-                      )}
+                      {canPurchaseOnline ? subscriptionButton(pkg, 'primary', { height: '40px', fontSize: '14px' }) : canExchangeCdk ? <button className="hero-button primary" disabled={pkg.status !== 1} onClick={() => setRedeemModalOpen(true)} style={{ height: '40px', fontSize: '14px' }}>{pkg.status === 1 ? '兑换激活码' : '暂不可用'}</button> : null}
                     </div>
                   </div>
                 </div>

@@ -144,28 +144,22 @@ export const UsageSection: React.FC<UsageSectionProps> = (props) => {
   const [remainings, setRemainings] = useState<Record<number, number | null>>({});
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // 付费重置配额：入口信息与弹窗状态
-  const { isWhiteLabel } = useWhiteLabel();
+  // Paid quota reset is independently controlled per site.
+  const { features } = useWhiteLabel();
   const [resetInfo, setResetInfo] = useState<{ enabled: boolean; eligible: boolean; price: number } | null>(null);
   const [resetModalOpen, setResetModalOpen] = useState(false);
   useEffect(() => {
-    // 白牌模式下该功能无论如何关闭：不拉取信息、不显示入口
-    if (isWhiteLabel) {
+    if (!features.reset_quota) {
       setResetInfo(null);
       return;
     }
     let cancelled = false;
-    resetQuotaApi
-      .getInfo()
-      .then((res) => {
-        if (!cancelled && res.code === 20000 && res.data) setResetInfo(res.data);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [isWhiteLabel]);
-  const showReset = Boolean(!isWhiteLabel && resetInfo?.enabled && resetInfo?.eligible);
+    resetQuotaApi.getInfo().then((res) => {
+      if (!cancelled && res.code === 20000 && res.data) setResetInfo(res.data);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [features.reset_quota]);
+  const showReset = Boolean(features.reset_quota && resetInfo?.enabled && resetInfo?.eligible);
 
   // 深链：限速提醒等场景通过 ?action=reset_quota 直达，自动打开重置弹窗
   const [searchParams, setSearchParams] = useSearchParams();

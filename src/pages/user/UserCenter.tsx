@@ -141,16 +141,16 @@ const UserCenter: React.FC = () => {
   const navigate = useNavigate();
   const { config: customerServiceConfig, loading: customerServiceLoading, unread: supportUnreadCount } = useCustomerService();
 
-  // White-label mode hides self-site business tabs.
-  const { isWhiteLabel, loading: wlLoading } = useWhiteLabel();
+  const { loading: siteLoading, features } = useWhiteLabel();
   const tabConfigs = React.useMemo(() => ALL_TAB_CONFIGS.filter((tab) => {
-    if (isWhiteLabel && (tab.key === 'invite' || tab.key === 'orders' || tab.key === 'activity' || tab.key === 'about' || tab.key === 'team')) return false;
-    if (tab.key === 'team' && !teamTabVisible) return false;
-    if (tab.key === 'activity' && !activityVisible) return false;
-    if (tab.key === 'about' && !aboutVisible) return false;
-    if (tab.key === 'support' && (customerServiceConfig === null || customerServiceConfig.provider !== 'builtin' || !customerServiceConfig.entry?.tab_enabled)) return false;
+    if (tab.key === 'invite' && !features.invite) return false;
+    if (tab.key === 'orders' && !features.online_purchase) return false;
+    if (tab.key === 'team' && (!features.team || !teamTabVisible)) return false;
+    if (tab.key === 'activity' && (!features.activity || !activityVisible)) return false;
+    if (tab.key === 'about' && (!features.about || !aboutVisible)) return false;
+    if (tab.key === 'support' && (!features.customer_service || customerServiceConfig === null || customerServiceConfig.provider !== 'builtin' || !customerServiceConfig.entry?.tab_enabled)) return false;
     return true;
-  }).map((tab) => tab.key === 'activity' ? { ...tab, label: activityTitle } : tab), [aboutVisible, activityTitle, activityVisible, customerServiceConfig, isWhiteLabel, teamTabVisible]);
+  }).map((tab) => tab.key === 'activity' ? { ...tab, label: activityTitle } : tab), [aboutVisible, activityTitle, activityVisible, customerServiceConfig, features, teamTabVisible]);
 
   // 使用认证检查Hook
   const { isAuthenticated, isChecking, countdown, handleAuthFailure } = useAuthCheck({
@@ -191,8 +191,8 @@ const UserCenter: React.FC = () => {
   // 关闭新增团队时，仅对无团队且无待处理邀请的用户隐藏团队页签。
   useEffect(() => {
     let cancelled = false;
-    if (!isAuthenticated || wlLoading) return;
-    if (isWhiteLabel) {
+    if (!isAuthenticated || siteLoading) return;
+    if (!features.team) {
       setTeamTabVisible(false);
       return;
     }
@@ -209,17 +209,17 @@ const UserCenter: React.FC = () => {
       }
     })();
     return () => { cancelled = true; };
-  }, [isAuthenticated, isWhiteLabel, wlLoading]);
+  }, [features.team, isAuthenticated, siteLoading]);
 
   useEffect(() => {
     let cancelled = false;
-    if (!isAuthenticated || wlLoading) {
+    if (!isAuthenticated || siteLoading) {
       setAboutVisible(false);
       setActivityVisible(false);
       setAboutVisibilityResolved(false);
       return;
     }
-    if (isWhiteLabel) {
+    if (!features.about && !features.activity) {
       setAboutVisible(false);
       setActivityVisible(false);
       setAboutVisibilityResolved(true);
@@ -243,11 +243,11 @@ const UserCenter: React.FC = () => {
         if (!cancelled) setAboutVisibilityResolved(true);
       });
     return () => { cancelled = true; };
-  }, [isAuthenticated, isWhiteLabel, wlLoading]);
+  }, [features.about, features.activity, isAuthenticated, siteLoading]);
 
   useEffect(() => {
     let cancelled = false;
-    if (!isAuthenticated || wlLoading || isWhiteLabel) return;
+    if (!isAuthenticated || siteLoading || !features.invite) return;
     feedbackApi.getBadges().then((response) => {
       if (cancelled || response.code !== 20000) return;
       setInviteUnreadCount(Number(response.data?.tabs?.invite?.unread_count || 0));
@@ -259,7 +259,7 @@ const UserCenter: React.FC = () => {
       setTabBadges(next);
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [isAuthenticated, isWhiteLabel, wlLoading, activeTab]);
+  }, [features.invite, isAuthenticated, siteLoading, activeTab]);
 
   useEffect(() => {
     const clearInviteBadge = () => setInviteUnreadCount(0);

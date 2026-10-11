@@ -1,5 +1,4 @@
 import React, { Suspense } from 'react';
-import { Navigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Hero from '../components/Hero';
 import LatestModels from '../components/LatestModels';
@@ -11,6 +10,10 @@ import { homeSEOConfig } from '../config/seo';
 import { HomeInfoProvider } from '../contexts/HomeInfoContext';
 import { useWeChatDetection } from '../hooks/useWeChatDetection';
 import { useWhiteLabel } from '../contexts/WhiteLabelContext';
+import { Link } from 'react-router-dom';
+import { Button, Card, CardBody } from '@heroui/react';
+import { UserMarkdown } from '../components/UserMarkdown';
+import CustomerServiceEntry from '../components/chat/CustomerServiceEntry';
 
 // 骨架屏组件
 const HomePageSkeleton: React.FC = () => (
@@ -37,21 +40,35 @@ const HomePageSkeleton: React.FC = () => (
 );
 
 const HomePage: React.FC = () => {
-  // 白牌模式：不展示自营营销首页（含品牌/外链），直接进入登录
-  const { isWhiteLabel, loading: wlLoading } = useWhiteLabel();
+  const site = useWhiteLabel();
+  const { loading: siteLoading } = site;
+  const { forceBlockWeChat, showBrowserTip, hideTip } = useWeChatDetection({ forceMode: true });
 
-  // 微信检测功能 - 启用强制模式
-  const { isWeChat, showBrowserTip, forceBlockWeChat, hideTip } = useWeChatDetection({
-    forceMode: true, // 启用强制模式，不允许在微信中访问
-    showTipByDefault: false // 强制模式下不使用普通提示
-  });
-
-  // 白牌模式判定中：先空白等待，避免闪现自营首页
-  if (wlLoading) {
+  // Wait for site configuration so branded content cannot flash on managed hosts.
+  if (siteLoading) {
     return <div className="min-h-screen bg-white" />;
   }
-  if (isWhiteLabel) {
-    return <Navigate to="/login" replace />;
+  if (site.error) return <main className="mx-auto max-w-xl p-8" role="alert"><h1 className="text-xl font-semibold">站点配置暂时不可用</h1><p className="my-4 text-default-600">{site.error}</p><Button onPress={() => window.location.reload()}>重新加载</Button></main>;
+  if (site.site_id !== null) {
+    return (
+      <main className="min-h-screen bg-default-50 px-5 py-12">
+        <div className="mx-auto max-w-3xl space-y-6">
+          <header className="flex items-center gap-4">
+            {site.logo_url && <img src={site.logo_url} alt="" className="h-12 w-12 rounded-xl object-contain" />}
+            <div><p className="text-sm text-default-500">会员服务</p><h1 className="text-3xl font-semibold text-default-900">{site.site_name || '会员中心'}</h1></div>
+          </header>
+          <Card shadow="sm"><CardBody className="gap-5 p-7">
+            <h2 className="text-xl font-medium">在本站管理您的服务</h2>
+            <p className="text-default-600">{site.features.online_purchase ? '查看套餐、购买或续费，订单均可在会员中心查看。' : '使用激活码开通服务，已开通的套餐可继续使用。'}</p>
+            {site.status === 'paused' && <p className="text-warning-700">本站暂停售卖新套餐，已有账号和服务不受影响。</p>}
+            <div className="flex flex-wrap gap-3"><Button as={Link} to="/user-center" color="primary">进入会员中心</Button><Button as={Link} to="/jumpns" variant="flat">开始使用</Button>{site.features.register && <Button as={Link} to="/register" variant="light">注册账号</Button>}</div>
+          </CardBody></Card>
+          {site.notice && <Card shadow="sm"><CardBody className="gap-4 p-7"><h2 className="text-lg font-semibold">站点公告</h2><UserMarkdown>{site.notice}</UserMarkdown></CardBody></Card>}
+          <p className="text-center text-sm text-default-400">{site.site_name}</p>
+        </div>
+        <CustomerServiceEntry mode="guest" />
+      </main>
+    );
   }
 
   // 如果在微信中且启用强制模式，显示强制浏览器打开页面

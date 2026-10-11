@@ -33,7 +33,7 @@ const RegisterPage: React.FC = () => {
   const redirect = useRedirect();
   const location = useLocation();
   const navigate = useNavigate();
-  const { isWhiteLabel, enableRegister, loading: wlLoading } = useWhiteLabel();
+  const { enableRegister, loading: wlLoading, features } = useWhiteLabel();
   const { isRequired: isAgreementRequired } = useUserAgreementRequirement();
 
   // 注册功能关闭时，直接跳回登录页（防止直接访问 /register）
@@ -212,7 +212,7 @@ const RegisterPage: React.FC = () => {
             />
           </div>
 
-          {!isWhiteLabel && (
+          {features.invite && (
           <div className="rounded-xl border border-default-200 bg-default-50/70 p-4 space-y-3">
             <button
               type="button"

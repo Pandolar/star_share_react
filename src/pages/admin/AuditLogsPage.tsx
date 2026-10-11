@@ -336,7 +336,7 @@ const AuditLogsPage: React.FC = () => {
                 <Card key={item.type} shadow="none" className="border border-divider">
                   <CardBody className="grid items-center gap-3 md:grid-cols-[minmax(12rem,1fr)_12rem_13rem]">
                     <div><div className="flex items-center gap-2"><p className="font-medium">{item.label}</p><Chip size="sm" variant="flat">当前 {item.count.toLocaleString('zh-CN')} 条</Chip></div><p className="mt-1 text-xs text-default-500">{item.description}</p></div>
-                    <Select aria-label={`${item.label}保留方式`} selectedKeys={[mode]} onSelectionChange={(keys) => setRetentionMode(item.type, String(Array.from(keys)[0] || 'forever') as AuditLogRetentionMode)}>
+                    <Select aria-label={`${item.label}保留方式`} isDisabled={item.type === 'site_management'} selectedKeys={[mode]} onSelectionChange={(keys) => setRetentionMode(item.type, String(Array.from(keys)[0] || 'forever') as AuditLogRetentionMode)}>
                       {RETENTION_OPTIONS.map((option) => <SelectItem key={option.key}>{option.label}</SelectItem>)}
                     </Select>
                     {mode === 'forever' ? <p className="text-sm text-default-500">不自动删除</p> : <Input type="number" min={1} max={mode === 'days' ? 3650 : 10000000} value={String(rule?.value || '')} onValueChange={(value) => setRetentionValue(item.type, value)} endContent={<span className="whitespace-nowrap text-xs text-default-400">{mode === 'days' ? '天' : '条'}</span>} aria-label={`${item.label}保留${mode === 'days' ? '天数' : '条数'}`} />}

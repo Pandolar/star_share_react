@@ -1,99 +1,50 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { siteModeApi } from '../services/userApi';
+import type { SiteFeatureName, SiteModePayload } from '../services/userApi';
 
-/**
- * 白牌（分销商反代）模式全局状态
- *
- * 启动时调用 /u/get_site_mode，依据当前访问域名判断站点模式：
- * - normal     自营模式（默认）：完整功能
- * - whitelabel 白牌模式：隐藏品牌名/客服/邀请/微信登录/支付，套餐不显示价格，仅可兑换码激活
- *
- * 所有需要按模式裁剪的组件通过 useWhiteLabel() 读取 isWhiteLabel。
- */
-interface WhiteLabelState {
-    isWhiteLabel: boolean;
-    loading: boolean;
-    notice: string;
-    noticeId: string;
-    enableRegister: boolean;
-    enableWechatLogin: boolean;
-    enablePromotionCode: boolean;
-    subscriptionNotice: string;
-    userAgreementUrl: string;
+export interface SiteState extends SiteModePayload {
+  isWhiteLabel: boolean;
+  loading: boolean;
+  error: string | null;
+  features: Record<SiteFeatureName, boolean>;
+  enableRegister: boolean;
+  enableWechatLogin: boolean;
+  userAgreementUrl: string;
 }
 
-const defaultState: WhiteLabelState = {
-    isWhiteLabel: false,
-    loading: true,
-    notice: '',
-    noticeId: '',
-    enableRegister: true,
-    enableWechatLogin: false,
-    enablePromotionCode: false,
-    subscriptionNotice: '',
-    userAgreementUrl: '',
+const featureNames: SiteFeatureName[] = ['register', 'wechat_login', 'invite', 'invite_rewards', 'activity', 'about', 'customer_service', 'team', 'promotion_code', 'invoice', 'cashback_credit', 'reset_quota', 'speedtest', 'online_purchase', 'cdk_exchange'];
+const disabledFeatures = (): Record<SiteFeatureName, boolean> => featureNames.reduce<Record<SiteFeatureName, boolean>>((features, feature) => ({ ...features, [feature]: false }), {} as Record<SiteFeatureName, boolean>);
+
+const defaultState: SiteState = {
+  is_white_label: false,
+  mode: 'normal', isWhiteLabel: false, site_id: null, distributor_id: null, site_name: '', branding: 'branded', sales_mode: 'online', status: 'active', logo_url: '', customer_service_url: '', loading: true, error: null,
+  features: disabledFeatures(), notice: '', notice_id: '', enable_register: false, enable_wechat_login: false, enable_promotion_code: false, subscription_notice: '', user_agreement_url: '',
+  enableRegister: false, enableWechatLogin: false, userAgreementUrl: '',
 };
 
-const WhiteLabelContext = createContext<WhiteLabelState>(defaultState);
+const WhiteLabelContext = createContext<SiteState>(defaultState);
+export const useWhiteLabel = (): SiteState => useContext(WhiteLabelContext);
+export const useSiteFeature = (feature: SiteFeatureName): boolean => useWhiteLabel().features[feature];
 
-export const useWhiteLabel = (): WhiteLabelState => useContext(WhiteLabelContext);
 
-// 同步读取的快照：供 React 树之外（如 axios 拦截器、SDK 初始化）判断使用
-let whiteLabelSnapshot = false;
-export const getWhiteLabelSnapshot = (): boolean => whiteLabelSnapshot;
-
-interface WhiteLabelProviderProps {
-    children: ReactNode;
-}
-
-export const WhiteLabelProvider: React.FC<WhiteLabelProviderProps> = ({ children }) => {
-    const [state, setState] = useState<WhiteLabelState>(defaultState);
-
-    useEffect(() => {
-        let mounted = true;
-        (async () => {
-            try {
-                const res = await siteModeApi.getSiteMode();
-                if (!mounted) return;
-                if (res.code === 20000 && res.data) {
-                    const isWL = res.data.mode === 'whitelabel' || !!res.data.is_white_label;
-                    whiteLabelSnapshot = isWL;
-                    // 白牌模式：中性化浏览器标签标题，避免暴露自营品牌
-                    if (isWL) {
-                        try {
-                            document.title = '会员中心';
-                        } catch {
-                            /* noop */
-                        }
-                    }
-                    setState({
-                        isWhiteLabel: isWL,
-                        loading: false,
-                        notice: res.data.notice || '',
-                        noticeId: res.data.notice_id || '',
-                        enableRegister: res.data.enable_register !== false,
-                        enableWechatLogin: res.data.enable_wechat_login === true,
-                        enablePromotionCode: res.data.enable_promotion_code === true,
-                        subscriptionNotice: res.data.subscription_notice || '',
-                        userAgreementUrl: isWL ? '' : (res.data.user_agreement_url || ''),
-                    });
-                    return;
-                }
-                // 站点模式未知时按白牌处理，避免短暂暴露支付、开票等自营能力。
-                whiteLabelSnapshot = true;
-                setState({ ...defaultState, isWhiteLabel: true, loading: false });
-            } catch {
-                // 网络异常同样 fail closed；恢复连接后刷新即可重新判定。
-                if (mounted) {
-                    whiteLabelSnapshot = true;
-                    setState({ ...defaultState, isWhiteLabel: true, loading: false });
-                }
-            }
-        })();
-        return () => {
-            mounted = false;
-        };
-    }, []);
-
-    return <WhiteLabelContext.Provider value={state}>{children}</WhiteLabelContext.Provider>;
+export const WhiteLabelProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [state, setState] = useState<SiteState>(defaultState);
+  useEffect(() => {
+    let mounted = true;
+    void siteModeApi.getSiteMode().then((res) => {
+      if (!mounted) return;
+      if (res.code !== 20000 || !res.data) throw new Error(res.msg || '无法确认当前站点配置');
+      const payload = res.data;
+      const isWhiteLabel = payload.mode === 'whitelabel' || Boolean(payload.is_white_label);
+      const features = { ...disabledFeatures(), ...payload.features };
+      setState({ ...defaultState, ...payload, isWhiteLabel, loading: false, error: null, features, enableRegister: features.register, enableWechatLogin: features.wechat_login, userAgreementUrl: payload.user_agreement_url });
+      if (isWhiteLabel) document.title = payload.site_name || '用户中心';
+    }).catch((error: unknown) => {
+      if (!mounted) return;
+      setState({ ...defaultState, loading: false, error: error instanceof Error ? error.message : '无法确认当前站点配置' });
+    });
+    return () => { mounted = false; };
+  }, []);
+  return <WhiteLabelContext.Provider value={state}>{children}</WhiteLabelContext.Provider>;
 };

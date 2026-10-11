@@ -57,11 +57,9 @@ const LoginPage: React.FC = () => {
 
   // 登录方式切换
   const [loginMethod, setLoginMethod] = useState<'wechat' | 'email'>('email');
-  // 白牌或全局开关关闭时隐藏微信登录，仅保留邮箱登录
-  const { isWhiteLabel, enableRegister, enableWechatLogin } = useWhiteLabel();
+  const { enableRegister, enableWechatLogin } = useWhiteLabel();
   const { isRequired: isAgreementRequired } = useUserAgreementRequirement();
-  const showWechatLogin = !isWhiteLabel && enableWechatLogin;
-  // 切到微信 Tab 后是否已确认继续使用（用于在显示二维码前先弹推荐邮箱登录的提示）
+  const showWechatLogin = enableWechatLogin;
   const [wechatConfirmed, setWechatConfirmed] = useState(false);
 
   // 获取微信二维码

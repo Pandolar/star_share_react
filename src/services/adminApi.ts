@@ -905,14 +905,12 @@ class AdminApiService {
     async createDistributor(data: {
         username: string;
         password: string;
-        domains: string[];
         remarks?: string;
         level?: number;
         default_cdk_expire_days?: number;
         expires_at?: string | null;
         can_login?: boolean;
         can_generate_cdk?: boolean;
-        can_edit_notice?: boolean;
     }): Promise<AdminApiResponse> {
         const response = await this.api.post('/star/distributors', data);
         return response.data;
@@ -926,14 +924,12 @@ class AdminApiService {
         username?: string;
         password?: string;
         status?: number;
-        domains?: string[];
         remarks?: string;
         level?: number;
         default_cdk_expire_days?: number;
         expires_at?: string | null;
         can_login?: boolean;
         can_generate_cdk?: boolean;
-        can_edit_notice?: boolean;
     }): Promise<AdminApiResponse> {
         const response = await this.api.put('/star/distributors', data);
         return response.data;

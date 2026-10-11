@@ -4,7 +4,7 @@ export interface PackageInfo {
   id: number;
   package_name: string;
   category: string;
-  price: number;
+  price: number | null;
   duration: number;
   introduce: string;
   level: string;

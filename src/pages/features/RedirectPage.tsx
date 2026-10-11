@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getQueryParam } from '../../utils/urlParams';
 import { setAuthCookies, clearAuthCookies } from '../../utils/cookies';
-import { getUserInfo, redirectToLogin, redirectByDomain } from '../../services/auth';
 
 interface RedirectPageProps { }
 
@@ -17,13 +16,6 @@ const RedirectPage: React.FC<RedirectPageProps> = () => {
         const xToken = getQueryParam('xtoken');
         const xyUuidToken = getQueryParam('xy_uuid_token');
         const casAccessToken = getQueryParam('access_token');
-        const domain = getQueryParam('domain');
-
-        // 特殊情况：如果是登录页面且有 xyUuidToken
-        if (xyUuidToken && window.location.pathname === '/login') {
-          window.location.href = `/client-api/login?code=${xyUuidToken}&redirect=true`;
-          return;
-        }
 
         // 如果有用户ID和token，进行验证
         if (xUserId && xToken) {
@@ -39,33 +31,33 @@ const RedirectPage: React.FC<RedirectPageProps> = () => {
 
           try {
             // 验证用户信息
-            const userInfo = await getUserInfo(xUserId, xToken);
+            const userInfo = await fetch('/u/get_user_info', { headers: { xuserid: xUserId, xtoken: xToken }, credentials: 'include' }).then((response) => response.json());
 
             if (userInfo.code !== 20000) {
               // 用户信息无效，清除 cookies 并跳转到登录页面
               setMessage('用户信息无效，正在跳转到登录页面...');
               clearAuthCookies();
-              await redirectToLogin();
+              window.location.replace('/login');
             } else {
-              // 用户信息有效，根据 domain 参数跳转
+              // 已验证账号仍回到当前站点，不接受跨域跳转选择器。
               setMessage('验证成功，正在跳转...');
               setStatus('redirecting');
 
               // 延迟一点时间让用户看到成功消息
               setTimeout(() => {
-                redirectByDomain(domain || '');
+                window.location.replace('/user-center');
               }, 1000);
             }
           } catch (error) {
             // 请求失败，清除 cookies 并跳转到登录页面
             setMessage('验证失败，正在跳转到登录页面...');
             clearAuthCookies();
-            await redirectToLogin();
+            window.location.replace('/login');
           }
         } else {
           // 没有必要的参数，跳转到登录页面
           setMessage('缺少必要参数，正在跳转到登录页面...');
-          await redirectToLogin();
+          window.location.replace('/login');
         }
       } catch (error) {
         setStatus('error');

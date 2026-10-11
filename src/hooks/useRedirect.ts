@@ -1,62 +1,41 @@
-
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useCallback } from 'react';
-import { getCookie } from '../utils/cookies';
+import { useWhiteLabel } from '../contexts/WhiteLabelContext';
 
 export const useRedirect = () => {
-    const navigate = useNavigate();
-    const location = useLocation();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { site_id: siteId } = useWhiteLabel();
 
-    const redirect = useCallback(() => {
-        const params = new URLSearchParams(location.search);
-        const rawFromUrl = params.get('fromurl');
+  return useCallback(() => {
+    const params = new URLSearchParams(location.search);
+    const rawFromUrl = params.get('fromurl');
+    params.delete('fromurl');
+    if (!rawFromUrl) {
+      navigate('/user-center', { replace: true });
+      return;
+    }
 
-        // Remove internal-only param so it doesn't get duplicated
-        params.delete('fromurl');
-
-        if (!rawFromUrl) {
-            navigate('/sharespeedtest', { replace: true });
-            return;
-        }
-
-        // fromurl may be URL-encoded by the caller; decode safely
-        let decodedFromUrl = rawFromUrl;
-        try {
-            decodedFromUrl = decodeURIComponent(rawFromUrl);
-        } catch (_) {
-            // keep original if decode fails
-        }
-
-        // Build final URL robustly and merge params
-        let url: URL;
-        try {
-            url = new URL(decodedFromUrl);
-        } catch (_) {
-            // If relative URL, resolve against current origin
-            url = new URL(decodedFromUrl, window.location.origin);
-        }
-
-        // Preserve any remaining query params from current page
-        // (e.g., domain, flags). Avoid overwriting existing keys.
-        params.forEach((value, key) => {
-            if (!url.searchParams.has(key)) {
-                url.searchParams.set(key, value);
-            }
-        });
-
-        // For compatibility with new third-party login JS:
-        // append auth credentials as URL params if available.
-        const xuserid = getCookie('xuserid');
-        const xtoken = getCookie('xtoken');
-        const xy_uuid_token = getCookie('xy_uuid_token');
-
-        if (xuserid) url.searchParams.set('xuserid', xuserid);
-        if (xtoken) url.searchParams.set('xtoken', xtoken);
-        if (xy_uuid_token) url.searchParams.set('xy_uuid_token', xy_uuid_token);
-
-        // Avoid adding to history stack
-        window.location.replace(url.toString());
-    }, [location.search, navigate]);
-
-    return redirect;
+    let destination: URL;
+    try {
+      destination = new URL(decodeURIComponent(rawFromUrl), window.location.origin);
+    } catch {
+      navigate('/user-center', { replace: true });
+      return;
+    }
+    if (destination.origin !== window.location.origin) {
+      // Managed storefronts must not forward account credentials or redirects off-site.
+      navigate('/user-center', { replace: true });
+      return;
+    }
+    params.forEach((value, key) => {
+      if (!destination.searchParams.has(key)) destination.searchParams.set(key, value);
+    });
+    const target = `${destination.pathname}${destination.search}${destination.hash}`;
+    if (siteId !== null || target.startsWith('/')) {
+      navigate(target, { replace: true });
+      return;
+    }
+    navigate('/user-center', { replace: true });
+  }, [location.search, navigate, siteId]);
 };

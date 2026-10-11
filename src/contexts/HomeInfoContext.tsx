@@ -25,9 +25,9 @@ interface HomeInfoProviderProps {
 }
 
 // 添加缓存机制
-let cachedData: HomeInfo | null = null;
+let cachedData: { host: string; value: HomeInfo } | null = null;
 let cacheTimestamp = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5分钟缓存
+const CACHE_DURATION = 5 * 60 * 1000;
 
 export const HomeInfoProvider: React.FC<HomeInfoProviderProps> = ({ children }) => {
     const [homeInfo, setHomeInfo] = useState<HomeInfo>(defaultHomeInfo);
@@ -38,8 +38,8 @@ export const HomeInfoProvider: React.FC<HomeInfoProviderProps> = ({ children }) 
         try {
             // 检查缓存
             const now = Date.now();
-            if (cachedData && (now - cacheTimestamp) < CACHE_DURATION) {
-                setHomeInfo(cachedData);
+            if (cachedData?.host === window.location.host && (now - cacheTimestamp) < CACHE_DURATION) {
+                setHomeInfo(cachedData.value);
                 setLoading(false);
                 return;
             }
@@ -52,7 +52,7 @@ export const HomeInfoProvider: React.FC<HomeInfoProviderProps> = ({ children }) 
             if (response.code === 20000) {
                 const data = response.data.home_info || defaultHomeInfo;
                 setHomeInfo(data);
-                cachedData = data;
+                cachedData = { host: window.location.host, value: data };
                 cacheTimestamp = now;
             } else {
                 throw new Error(response.msg || '获取首页信息失败');
@@ -60,8 +60,8 @@ export const HomeInfoProvider: React.FC<HomeInfoProviderProps> = ({ children }) 
         } catch (err) {
             setError(err instanceof Error ? err.message : '网络错误');
             // 优先使用缓存数据，其次使用默认数据
-            if (cachedData) {
-                setHomeInfo(cachedData);
+            if (cachedData?.host === window.location.host) {
+                setHomeInfo(cachedData.value);
             } else {
                 setHomeInfo(defaultHomeInfo);
             }

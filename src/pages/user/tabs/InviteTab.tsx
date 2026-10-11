@@ -23,6 +23,7 @@ interface InviteOverviewData {
   inviter_code: string;
   invite_link: string;
   invite_eligible: boolean;
+  rewards_enabled?: boolean;
   history_package_value: number;
   min_history_package_value: number;
   invite_ineligible_reason: string;
@@ -106,7 +107,7 @@ export const InviteTab: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const { isWhiteLabel, loading: whiteLabelLoading } = useWhiteLabel();
+  const { features, loading: whiteLabelLoading } = useWhiteLabel();
   const navigate = useNavigate();
   const fetchInviteData = async (isRefresh = false) => {
     try {
@@ -119,7 +120,7 @@ export const InviteTab: React.FC = () => {
       const requests = [
         inviteUserApi.getOverview(),
         inviteUserApi.getRecords(),
-        !whiteLabelLoading && !isWhiteLabel ? inviteCashbackApi.getOverview() : Promise.resolve(null),
+        !whiteLabelLoading && features.invite_rewards ? inviteCashbackApi.getOverview() : Promise.resolve(null),
       ] as const;
       const [overviewResponse, recordsResponse, cashbackResponse] = await Promise.all(requests);
 
@@ -132,13 +133,10 @@ export const InviteTab: React.FC = () => {
 
       setOverview(overviewResponse.data || null);
       setInvitees(Array.isArray(recordsResponse.data?.invitees) ? recordsResponse.data.invitees : []);
-      // Cashback is self-site-only. Do not retain a prior response after the site mode changes.
-      if (isWhiteLabel || whiteLabelLoading) {
+      if (!features.invite_rewards || whiteLabelLoading) {
         setCashbackOverview(null);
       } else if (cashbackResponse?.code === 20000) {
         setCashbackOverview(cashbackResponse.data || null);
-      } else {
-        setCashbackOverview(null);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '获取邀请信息失败');
@@ -152,7 +150,7 @@ export const InviteTab: React.FC = () => {
     void fetchInviteData();
     // Site-mode changes must discard any prior self-site cashback response.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isWhiteLabel, whiteLabelLoading]);
+  }, [features.invite_rewards, whiteLabelLoading]);
 
   const filteredInvitees = useMemo(() => {
     if (!searchTerm.trim()) {
@@ -166,7 +164,7 @@ export const InviteTab: React.FC = () => {
   }, [invitees, searchTerm]);
 
   const refreshCashback = async () => {
-    if (isWhiteLabel) return;
+    if (!features.invite_rewards) return;
     const response = await inviteCashbackApi.getOverview();
     if (response.code === 20000) {
       setCashbackOverview(response.data || null);
@@ -256,6 +254,7 @@ export const InviteTab: React.FC = () => {
   const inviteEligible = Boolean(overview?.invite_eligible);
   const historyPackageValue = overview?.history_package_value ?? 0;
   const minHistoryPackageValue = overview?.min_history_package_value ?? 45;
+  const rewardsEnabled = features.invite_rewards && overview?.rewards_enabled !== false;
 
   return (
     <motion.div initial={false} animate={{ opacity: 1 }} className="space-y-6">
@@ -266,7 +265,7 @@ export const InviteTab: React.FC = () => {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-default-900">邀请好友</h1>
-            <p className="text-sm text-default-500 mt-1">复制您的邀请链接或邀请码，好友注册并成功支付后，您将获得平台奖励。</p>
+            <p className="text-sm text-default-500 mt-1">{rewardsEnabled ? '复制本站邀请链接，符合条件的订单将按已公布规则产生奖励。' : '可分享本站邀请链接；本站当前不发放邀请奖励。'}</p>
           </div>
         </div>
         <Button
@@ -280,7 +279,7 @@ export const InviteTab: React.FC = () => {
         </Button>
       </div>
 
-      {!isWhiteLabel && cashbackOverview?.config_enabled && (
+      {rewardsEnabled && cashbackOverview?.config_enabled && (
         <Card className="border border-success/20">
           <CardBody className="p-6 space-y-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -381,14 +380,14 @@ export const InviteTab: React.FC = () => {
             </>
           )}
 
-          {!cashbackActiveForUser && <>
+          {rewardsEnabled && !cashbackActiveForUser && <>
             <Divider />
             <div className="rounded-xl bg-primary/5 border border-primary/10 p-4 text-sm text-default-700 leading-7 space-y-2">
               <div className="flex items-center gap-2 font-semibold text-default-900 mb-2"><Info className="w-4 h-4 text-primary" />邀请说明</div>
               <div>1. 历史套餐价值满 <span className="font-medium text-default-900">{minHistoryPackageValue} 元</span> 后，可通过专属链接或邀请码邀请好友。</div>
               <div>2. 当前默认邀请奖励类型：<span className="font-medium text-default-900">{rewardModeText}</span>，邀请人奖励比例约为 <span className="font-medium text-default-900">{rewardRatioPercent}%</span>，被邀请人默认加赠 <span className="font-medium text-default-900">{inviteeRewardRatioPercent}%</span> 时长。</div>
               <div>3. 返时长奖励按您当前可享受的最高套餐等级计算，且不会超过被邀请人本次实际订阅等级。</div>
-              <div>4. 好友支付或使用 CDK 激活成功后，系统会按实际订单结算。</div>
+              <div>4. 好友支付后，系统按订单所属站点及下单时冻结的规则结算；代理站 CDK 兑换不产生现金佣金。</div>
               {hasPackageSpecificRules && <div className="text-xs text-primary-700 bg-primary/8 rounded-lg px-3 py-2">您当前存在套餐级单独邀请规则，不同套餐的实际奖励比例可能不同。</div>}
             </div>
           </>}

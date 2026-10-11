@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
 import { useHomeInfo } from '../contexts/HomeInfoContext';
 import { NavAction as NavActionType } from '../types/homeInfo';
+import { useWhiteLabel } from '../contexts/WhiteLabelContext';
 
 // 按钮渲染函数
 const renderNavAction = (
@@ -60,6 +61,7 @@ const renderNavAction = (
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { homeInfo, loading } = useHomeInfo();
+  const { site_name: siteName, logo_url: logoUrl } = useWhiteLabel();
 
   // 如果还在加载中，显示默认的导航
   if (loading || !homeInfo?.siteInfo || !homeInfo?.navigation) {
@@ -79,6 +81,8 @@ const Header: React.FC = () => {
   }
 
   const { siteInfo, navigation } = homeInfo;
+  const displaySiteName = siteName || siteInfo.siteName;
+  const displayLogoUrl = logoUrl || siteInfo.logoUrl;
   const navActions = navigation?.navActions || [];
 
   // 拆分导航项和右侧按钮
@@ -96,12 +100,12 @@ const Header: React.FC = () => {
             whileTap={{ scale: 0.95 }}
           >
             <img
-              src={siteInfo.logoUrl}
-              alt="Logo"
+              src={displayLogoUrl}
+              alt={`${displaySiteName} Logo`}
               className="w-8 h-8"
             />
             <div className="text-2xl font-bold text-default-900">
-              {siteInfo.siteName}
+              {displaySiteName}
             </div>
           </motion.div>
 

@@ -85,7 +85,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   onAgreementValueChange,
   onClose,
 }) => {
-  const { enablePromotionCode } = useWhiteLabel();
+  const { features } = useWhiteLabel();
+  const enablePromotionCode = features.promotion_code;
   const { isRequired: isAgreementRequired } = useUserAgreementRequirement();
   const navigate = useNavigate();
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('pending');
@@ -98,6 +99,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [invoiceFeatureAvailable, setInvoiceFeatureAvailable] = useState(false);
   const [promotionPanelOpen, setPromotionPanelOpen] = useState(false);
   const [promotionCodeInput, setPromotionCodeInput] = useState('');
+  const [acceptedBaseAmount, setAcceptedBaseAmount] = useState('');
 
   const checkIntervalRef = useRef<number | undefined>(undefined);
   const qrTimerRef = useRef<number | undefined>(undefined);
@@ -130,10 +132,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setInvoiceCreationFailed(false);
     setEligibility(null);
     setInvoiceFeatureAvailable(false);
+    setAcceptedBaseAmount('');
     setPromotionPanelOpen(false);
     setPromotionCodeInput(ordinaryOrder?.promotion_code || '');
     void (async () => {
-      if (!selectedPackage) return;
+      if (!selectedPackage || !features.invoice) return;
       try {
         const response = await orderUserApi.getInvoiceEligibility(
           selectedPackage.id,
@@ -182,7 +185,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     }, 1500);
 
     return cleanup;
-  }, [isOpen, checkoutId, selectedPackage, ordinaryOrder?.expires_at, ordinaryOrder?.expires_in_seconds, ordinaryOrder?.promotion_code]);
+  }, [isOpen, checkoutId, selectedPackage, ordinaryOrder?.expires_at, ordinaryOrder?.expires_in_seconds, ordinaryOrder?.promotion_code, features.invoice]);
 
   useEffect(() => {
     if (!invoiceSelected) return;
@@ -193,7 +196,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   }, [invoiceSelected, eligibilityLoading, eligibility?.reason, invoiceOrder?.order_id]);
 
   const loadEligibility = async (): Promise<InvoiceEligibility | null> => {
-    if (!selectedPackage) return null;
+    if (!selectedPackage || !features.invoice) return null;
     setEligibilityLoading(true);
     try {
       const response = await orderUserApi.getInvoiceEligibility(
@@ -340,7 +343,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const qrCodeValue = activeOrder?.qr_code || activeOrder?.payment_url || '';
   const invoiceProfileAction = getInvoiceProfileAction(eligibility?.reason);
   const agreementReady = !isAgreementRequired || agreementAccepted;
-  const paymentReady = agreementReady && (!invoiceSelected || (eligibility?.eligible === true && Boolean(invoiceOrder)));
+  const baseAmount = String(ordinaryOrder?.base_amount ?? selectedPackage?.price ?? '');
+  const priceChanged = selectedPackage?.price !== null && selectedPackage?.price !== undefined && Number(baseAmount) !== Number(selectedPackage.price);
+  const priceReady = !priceChanged || acceptedBaseAmount === baseAmount;
+  const paymentReady = agreementReady && priceReady && (!invoiceSelected || (eligibility?.eligible === true && Boolean(invoiceOrder)));
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} size="lg" scrollBehavior="inside" hideCloseButton={paymentStatus === 'success'} classNames={{ base: 'max-h-[92vh] mx-2 sm:mx-0', body: 'py-4 sm:py-6 overflow-y-auto', footer: 'border-t border-divider bg-background sticky bottom-0' }}>
@@ -364,6 +370,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           )}
         </ModalHeader>
         <ModalBody>
+          {!priceReady && <Card shadow="none" className="border border-warning-200 bg-warning-50"><CardBody className="gap-3"><p className="font-medium">套餐售价已更新</p><p className="text-sm">页面展示 ¥{selectedPackage?.price}，当前订单套餐价 ¥{baseAmount}。请确认新价格后再支付。</p><Button color="warning" onPress={() => setAcceptedBaseAmount(baseAmount)}>确认当前价格</Button></CardBody></Card>}
           {promotionPanelOpen && enablePromotionCode && paymentStatus === 'pending' && !qrCodeExpired && (
             <Card shadow="none" className="w-full min-w-0 shrink-0 border border-secondary-200 bg-secondary-50/40">
               <CardBody className="w-full min-w-0 gap-3 p-3">
@@ -397,7 +404,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             </Card>
           )}
 
-          {cashbackCredit?.enabled && Number(cashbackCredit.available_amount || 0) > 0 && paymentStatus === 'pending' && !qrCodeExpired && (
+          {features.cashback_credit && cashbackCredit?.enabled && Number(cashbackCredit.available_amount || 0) > 0 && paymentStatus === 'pending' && !qrCodeExpired && (
             <Card shadow="none" className="border border-success-200 bg-success-50/40">
               <CardBody className="gap-3 p-4">
                 <div className="flex items-center justify-between gap-3">

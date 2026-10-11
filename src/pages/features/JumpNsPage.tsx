@@ -17,11 +17,11 @@ const JumpNsPage: React.FC = () => {
     };
 
     const currentUrl = window.location.href;
-    const currentDomain = window.location.hostname;
+    const currentOrigin = window.location.origin;
 
     // 重定向到登录页
     const redirectToLogin = () => {
-      window.location.href = `https://${currentDomain}/login?fromurl=${encodeURIComponent(currentUrl)}`;
+      window.location.href = `${currentOrigin}/login?fromurl=${encodeURIComponent(currentUrl)}`;
     };
 
     // 主逻辑：优先使用 URL 参数，其次使用 Cookie，并进行校验
@@ -55,7 +55,7 @@ const JumpNsPage: React.FC = () => {
 
       try {
         // 5. 调用后端接口校验用户身份
-        const resp = await fetch(`https://${currentDomain}/u/get_user_info`, {
+        const resp = await fetch('/u/get_user_info', {
           method: 'GET',
           headers: {
             'xuserid': xUserId,
@@ -77,7 +77,7 @@ const JumpNsPage: React.FC = () => {
           setCookie('lastCheckTime', String(Date.now()), { days: 1 });
 
           // 构造目标跳转地址
-          const targetUrl = `https://${currentDomain}/service-api/chat/select-car/callback?ticket=${encodeURIComponent(xyUuidToken)}&isPlus=1`;
+          const targetUrl = `${currentOrigin}/service-api/chat/select-car/callback?ticket=${encodeURIComponent(xyUuidToken)}&isPlus=1`;
           window.location.href = targetUrl;
         } else {
           // 7. 校验失败：清除 Cookie 并跳转登录

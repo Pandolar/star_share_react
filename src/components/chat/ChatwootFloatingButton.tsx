@@ -17,7 +17,7 @@ interface ChatwootFloatingButtonProps {
 export const ChatwootFloatingButton: React.FC<ChatwootFloatingButtonProps> = ({
   mode = 'auto',
 }) => {
-  const { isWhiteLabel } = useWhiteLabel();
+  const { features } = useWhiteLabel();
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -35,8 +35,7 @@ export const ChatwootFloatingButton: React.FC<ChatwootFloatingButtonProps> = ({
       window.removeEventListener('chatwoot:close', handleChatwootClose);
     };
   }, []);
-
-  if (isWhiteLabel) return null;
+  if (!features.customer_service) return null;
 
   return (
     <>

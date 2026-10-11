@@ -45,7 +45,6 @@ import {
     CheckCircle2,
     Edit,
     Eye,
-    Globe,
     MoreVertical,
     Percent,
     Plus,
@@ -62,7 +61,7 @@ import adminApiService from '../../services/adminApi';
 import { showToast } from '../../components/Toast';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
-type PermissionKey = 'can_login' | 'can_generate_cdk' | 'can_edit_notice';
+type PermissionKey = 'can_login' | 'can_generate_cdk';
 
 interface DiscountConfig {
     overall?: number;
@@ -73,10 +72,6 @@ interface Distributor {
     id: number;
     username: string;
     status: number;
-    domains: string | string[];
-    domains_parsed?: string[];
-    notice?: string;
-    notice_id?: string;
     remarks?: string;
     balance?: number;
     level?: number;
@@ -85,7 +80,6 @@ interface Distributor {
     discount_active?: boolean;
     can_login?: boolean;
     can_generate_cdk?: boolean;
-    can_edit_notice?: boolean;
     discount_config?: DiscountConfig;
     created_at?: string;
     updated_at?: string;
@@ -95,7 +89,6 @@ interface DistributorFormState {
     username: string;
     password: string;
     status: number;
-    domainsText: string;
     remarks: string;
     resetPassword: boolean;
     level: number;
@@ -103,7 +96,6 @@ interface DistributorFormState {
     expiresAt: string;
     can_login: boolean;
     can_generate_cdk: boolean;
-    can_edit_notice: boolean;
 }
 
 interface BalanceLog {
@@ -126,7 +118,6 @@ const DEFAULT_FORM: DistributorFormState = {
     username: '',
     password: '',
     status: 1,
-    domainsText: '',
     resetPassword: false,
     remarks: '',
     level: 1,
@@ -134,57 +125,12 @@ const DEFAULT_FORM: DistributorFormState = {
     expiresAt: dayjs().add(365, 'day').format('YYYY-MM-DD'),
     can_login: true,
     can_generate_cdk: true,
-    can_edit_notice: true,
 };
 const PERMISSIONS: Array<{ key: PermissionKey; label: string; description: string }> = [
     { key: 'can_login', label: '登录分销商后台', description: '关闭后立即终止所有设备会话，并阻止后续登录。' },
     { key: 'can_generate_cdk', label: '余额生成卡密', description: '允许按最终折后价扣减余额并生成当前账号名下的卡密。' },
-    { key: 'can_edit_notice', label: '修改站点公告', description: '允许分销商在后台修改其绑定域名显示的公告。' },
 ];
 
-const normalizeDomain = (value: string) => {
-    let domain = value.trim().toLowerCase();
-    if (!domain) return '';
-    try {
-        if (domain.includes('://')) domain = new URL(domain).hostname;
-    } catch {
-        return '';
-    }
-    domain = domain.split('/')[0].split(':')[0].replace(/^\.+|\.+$/g, '');
-    return domain;
-};
-
-const parseDomainText = (value: string): { domains: string[]; invalid: string[] } => {
-    const rawValues = value.split(/[\n,，]+/).map((item) => item.trim()).filter(Boolean);
-    const invalid: string[] = [];
-    const domains = rawValues.map((item) => {
-        const normalized = normalizeDomain(item);
-        const labels = normalized.split('.');
-        const isValid = normalized.length <= 253
-            && labels.length >= 2
-            && labels.every((label) => label.length > 0
-                && label.length <= 63
-                && /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label));
-        if (!isValid) invalid.push(item);
-        return normalized;
-    }).filter(Boolean);
-    return { domains: Array.from(new Set(domains)), invalid };
-};
-
-const parseStoredDomains = (distributor: Distributor): string[] => {
-    if (Array.isArray(distributor.domains_parsed)) return distributor.domains_parsed.map(String).filter(Boolean);
-    if (Array.isArray(distributor.domains)) return distributor.domains.map(String).filter(Boolean);
-    try {
-        const parsed = JSON.parse(distributor.domains || '[]');
-        return Array.isArray(parsed) ? parsed.map(String).filter(Boolean) : [];
-    } catch {
-        return distributor.domains ? distributor.domains.split(',').map((item) => item.trim()).filter(Boolean) : [];
-    }
-};
-
-const domainsOverlap = (left: string, right: string) => (
-    left === right || left.endsWith(`.${right}`) || right.endsWith(`.${left}`)
-);
 
 const toOptionalRate = (value: number) => (Number.isNaN(value) ? undefined : value);
 
@@ -297,90 +243,58 @@ const DistributorsManagePage: React.FC = () => {
             password: '',
             status: distributor.status,
             resetPassword: false,
-            domainsText: parseStoredDomains(distributor).join('\n'),
             remarks: distributor.remarks || '',
             level: distributor.level || 1,
             defaultCdkExpireDays: distributor.default_cdk_expire_days ?? 90,
             expiresAt: distributor.expires_at ? dayjs(distributor.expires_at).format('YYYY-MM-DD') : '',
             can_login: distributor.can_login !== false,
             can_generate_cdk: distributor.can_generate_cdk !== false,
-            can_edit_notice: distributor.can_edit_notice !== false,
         });
         editModal.onOpen();
     };
 
-    const validateDomainOwnership = async (domains: string[], excludeId?: number) => {
-        if (domains.length === 0) return true;
-        const response = await adminApiService.getDistributors({ current_page: 1, page_size: 10000 });
-        if (response.code !== 20000 || !Array.isArray(response.data)) {
-            showToast('无法完成域名归属校验，请稍后重试', 'error');
-            return false;
-        }
-        for (const row of response.data as Distributor[]) {
-            if (row.id === excludeId) continue;
-            const existingDomains = parseStoredDomains(row).map(normalizeDomain).filter(Boolean);
-            for (const domain of domains) {
-                const conflict = existingDomains.find((existing) => domainsOverlap(domain, existing));
-                if (conflict) {
-                    showToast(`域名 ${domain} 与分销商 ${row.username} 的 ${conflict} 存在根域/子域重叠`, 'error');
-                    return false;
-                }
-            }
-        }
-        return true;
-    };
 
-    const validateForm = async (isCreate: boolean) => {
+    const validateForm = (isCreate: boolean): boolean => {
         if (!formData.username.trim()) {
             showToast('请输入分销商账号', 'warning');
-            return null;
+            return false;
         }
         if (isCreate && formData.password.length < 8) {
             showToast('初始密码至少 8 位', 'warning');
-            return null;
+            return false;
         }
         if (!isCreate && formData.resetPassword && formData.password.length < 8) {
             showToast('新密码至少 8 位', 'warning');
-            return null;
+            return false;
         }
         if (!Number.isInteger(formData.level) || formData.level < 1) {
             showToast('分销商等级必须是大于等于 1 的整数', 'warning');
-            return null;
+            return false;
         }
         if (!Number.isInteger(formData.defaultCdkExpireDays) || formData.defaultCdkExpireDays < 0) {
             showToast('默认卡密有效期必须是大于等于 0 的整数', 'warning');
-            return null;
+            return false;
         }
         if (formData.expiresAt && !dayjs(formData.expiresAt).isValid()) {
             showToast('请选择有效的分销商有效期', 'warning');
-            return null;
+            return false;
         }
-
-        const parsed = parseDomainText(formData.domainsText);
-        if (parsed.invalid.length > 0) {
-            showToast(`域名格式不正确：${parsed.invalid.join('、')}`, 'warning');
-            return null;
-        }
-        if (!(await validateDomainOwnership(parsed.domains, selectedDistributor?.id))) return null;
-        return parsed.domains;
+        return true;
     };
 
     const handleCreate = async () => {
         setFormSubmitting(true);
         try {
-            const domains = await validateForm(true);
-            if (!domains) return;
+            if (!validateForm(true)) return;
             const response = await adminApiService.createDistributor({
                 username: formData.username.trim(),
                 password: formData.password,
-                domains,
                 remarks: formData.remarks.trim(),
                 level: formData.level,
                 default_cdk_expire_days: formData.defaultCdkExpireDays,
                 expires_at: formData.expiresAt || null,
                 can_login: formData.can_login,
                 can_generate_cdk: formData.can_generate_cdk,
-                can_edit_notice: formData.can_edit_notice,
             });
             if (response.code === 20000) {
                 createModal.onClose();
@@ -401,20 +315,17 @@ const DistributorsManagePage: React.FC = () => {
         if (!selectedDistributor) return;
         setFormSubmitting(true);
         try {
-            const domains = await validateForm(false);
-            if (!domains) return;
+            if (!validateForm(false)) return;
             const response = await adminApiService.updateDistributor({
                 id: selectedDistributor.id,
                 password: formData.resetPassword ? formData.password : undefined,
                 status: formData.status,
-                domains,
                 remarks: formData.remarks.trim(),
                 level: formData.level,
                 default_cdk_expire_days: formData.defaultCdkExpireDays,
                 expires_at: formData.expiresAt || null,
                 can_login: formData.can_login,
                 can_generate_cdk: formData.can_generate_cdk,
-                can_edit_notice: formData.can_edit_notice,
             });
             if (response.code === 20000) {
                 editModal.onClose();
@@ -790,14 +701,6 @@ const DistributorsManagePage: React.FC = () => {
                 />
             </div>
             <Textarea
-                label="域名列表"
-                value={formData.domainsText}
-                onValueChange={(value) => setFormData((current) => ({ ...current, domainsText: value }))}
-                minRows={4}
-                placeholder={'每行一个域名，例如：\nexample.com\nshop.example.com'}
-                description="会自动去协议、端口并转小写。根域会匹配其所有子域，因此根域和子域不能分配给不同分销商。留空表示没有专属白牌站点映射。"
-            />
-            <Textarea
                 label="管理员备注"
                 value={formData.remarks}
                 onValueChange={(value) => setFormData((current) => ({ ...current, remarks: value }))}
@@ -831,26 +734,19 @@ const DistributorsManagePage: React.FC = () => {
                         <Users className="h-6 w-6 text-primary" />
                         <h1 className="text-2xl font-semibold text-foreground">分销商管理</h1>
                     </div>
-                    <p className="mt-1 text-sm text-default-500">管理白牌域名归属、账号权限、余额、折扣和卡密生成规则。</p>
+                    <p className="mt-1 text-sm text-default-500">管理账号权限、余额、折扣和卡密生成规则；站点域名、公告与销售配置请在“代理站点”管理。</p>
                 </div>
                 {canCreate && <Button color="primary" startContent={<Plus className="h-4 w-4" />} onPress={openCreateModal}>创建分销商</Button>}
             </header>
 
             <Accordion variant="splitted" defaultExpandedKeys={['guide']}>
-                <AccordionItem key="guide" aria-label="分销商使用说明" startContent={<BookOpen className="h-5 w-5 text-primary" />} title="常用用法与规则" subtitle="首次配置或排查白牌站点时先看这里">
+                <AccordionItem key="guide" aria-label="分销商使用说明" startContent={<BookOpen className="h-5 w-5 text-primary" />} title="常用用法与规则" subtitle="账号、采购和站点职责分离">
                     <div className="grid gap-4 pb-3 md:grid-cols-2">
-                        <Alert isVisible color="primary" title="1. 账号与域名" description="创建账号后绑定访问域名。启用状态下，配置的根域及其子域会映射到该分销商；没有域名时仍可登录和做卡密业务，但没有专属站点内容。" />
+                        <Alert isVisible color="primary" title="1. 账号与站点分离" description="分销商账号用于登录、余额和卡密采购；域名、品牌、公告、价格与佣金请到“代理站点”单独配置。" />
                         <Alert isVisible color="secondary" title="2. 余额与折扣" description="管理员先充值余额，再配置等级或专属折扣。实际单价优先级：分销商套餐 > 分销商整体 > 等级套餐 > 等级整体 > 原价。" />
-                        <Alert isVisible color="success" title="3. 卡密交付" description="分销商登录后台选择已上架套餐生成卡密，成功后自动扣款。卡密只归属于该分销商，客户在白牌站通过兑换码激活。" />
-                        <Alert isVisible color="warning" title="4. 下线与删除" description="日常下线请停用账号，可立即停止域名映射和鉴权。删除不会自动回收已生成卡密或历史流水，只有确认不再需要账号记录时才使用。" />
-                        <Card className="md:col-span-2" shadow="none">
-                            <CardBody className="gap-2">
-                                <Alert isVisible color="warning" variant="flat" title="部署必查：全局白牌范围" description="分销商绑定域名（或其父域）还必须由“系统配置 → 白牌设置 → WHITE_LABEL_CONFIG.domains”覆盖并启用。否则页面可能按白牌展示，但邀请、支付等后端接口未按白牌策略拦截。" />
-                                <p className="text-sm font-medium">分销商后台地址</p>
-                                <Snippet hideSymbol codeString={loginUrl} onCopy={() => showToast('登录地址已复制', 'success')}>{loginUrl}</Snippet>
-                                <p className="text-xs text-default-500">白牌访问端会隐藏自营品牌、邀请、微信登录和在线支付，套餐通过卡密兑换激活；购买与客服入口由分销商配置。</p>
-                            </CardBody>
-                        </Card>
+                        <Alert isVisible color="success" title="3. 卡密交付" description="分销商可用余额生成卡密，成功后自动扣款；已有卡密和历史流水不受站点上架变更影响。" />
+                        <Alert isVisible color="warning" title="4. 下线与删除" description="日常下线请停用账号；站点暂停仅停止新销售。删除不会自动回收已生成卡密或历史流水。" />
+                        <Card className="md:col-span-2" shadow="none"><CardBody className="gap-2"><p className="text-sm font-medium">分销商后台地址</p><Snippet hideSymbol codeString={loginUrl} onCopy={() => showToast('登录地址已复制', 'success')}>{loginUrl}</Snippet></CardBody></Card>
                     </div>
                 </AccordionItem>
             </Accordion>
@@ -869,7 +765,7 @@ const DistributorsManagePage: React.FC = () => {
                             value={searchInput}
                             onValueChange={setSearchInput}
                             onKeyDown={(event) => event.key === 'Enter' && applySearch()}
-                            placeholder="搜索账号、域名、备注或 ID"
+                            placeholder="搜索账号、备注或 ID"
                             startContent={<Search className="h-4 w-4 text-default-400" />}
                             isClearable
                             onClear={resetSearch}
@@ -890,7 +786,7 @@ const DistributorsManagePage: React.FC = () => {
                     <Table aria-label="分销商列表" classNames={{ table: 'min-w-[1120px]' }}>
                         <TableHeader>
                             <TableColumn>账号</TableColumn>
-                            <TableColumn>站点状态</TableColumn>
+                            <TableColumn>账号状态</TableColumn>
                             <TableColumn>等级与余额</TableColumn>
                             <TableColumn>权限</TableColumn>
                             <TableColumn>管理员备注</TableColumn>
@@ -898,42 +794,17 @@ const DistributorsManagePage: React.FC = () => {
                             <TableColumn>操作</TableColumn>
                         </TableHeader>
                         <TableBody isLoading={loading} loadingContent={<Spinner label="加载分销商中..." />} emptyContent="没有符合条件的分销商">
-                            {distributors.map((distributor) => {
-                                const domains = parseStoredDomains(distributor);
-                                return (
-                                    <TableRow key={distributor.id}>
-                                        <TableCell><div><p className="font-medium">{distributor.username}</p><p className="text-xs text-default-500">ID {distributor.id}</p></div></TableCell>
-                                        <TableCell>
-                                            <div className="space-y-2">
-                                                <Chip color={distributor.status === 1 ? 'success' : 'danger'} variant="flat" size="sm" startContent={distributor.status === 1 ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}>
-                                                    {distributor.status === 1 ? '启用' : '停用'}
-                                                </Chip>
-                                                <div className="flex max-w-80 flex-wrap gap-1">
-                                                    {domains.length === 0 ? <Chip size="sm" variant="flat">未绑定域名</Chip> : domains.slice(0, 3).map((domain) => <Chip key={domain} size="sm" color="primary" variant="flat">{domain}</Chip>)}
-                                                    {domains.length > 3 && <Chip size="sm" variant="flat">+{domains.length - 3}</Chip>}
-                                                </div>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell><div className="space-y-1"><Chip size="sm" color="secondary" variant="flat">L{distributor.level || 1}</Chip><p className="font-medium">¥{Number(distributor.balance || 0).toFixed(2)}</p><Chip size="sm" color={distributor.discount_active === false ? 'warning' : 'success'} variant="flat">{distributor.discount_active === false ? '折扣已到期' : `折扣至 ${distributor.expires_at ? dayjs(distributor.expires_at).format('YYYY-MM-DD') : '永久'}`}</Chip><p className="text-xs text-default-500">卡密默认 {distributor.default_cdk_expire_days ?? 90} 天</p></div></TableCell>
-                                        <TableCell><Chip size="sm" variant="flat" color={permissionsEnabled(distributor) === 4 ? 'success' : 'warning'}>{permissionsEnabled(distributor)}/4 已开通</Chip></TableCell>
-                                        <TableCell><span className="block max-w-56 truncate text-sm text-default-500" title={distributor.remarks || ''}>{distributor.remarks || '-'}</span></TableCell>
-                                        <TableCell>{distributor.updated_at ? dayjs(distributor.updated_at).format('YYYY-MM-DD HH:mm') : '-'}</TableCell>
-                                        <TableCell>
-                                            <Dropdown placement="bottom-end">
-                                                <DropdownTrigger><Button isIconOnly size="sm" variant="light" aria-label={`操作 ${distributor.username}`}><MoreVertical className="h-4 w-4" /></Button></DropdownTrigger>
-                                                <DropdownMenu aria-label="分销商操作" disabledKeys={[...(!canUpdate ? ['edit', 'status'] : []), ...(!canDelete ? ['delete'] : [])]}>
-                                                    <DropdownItem key="view" startContent={<Eye className="h-4 w-4" />} onPress={() => { setSelectedDistributor(distributor); viewModal.onOpen(); }}>查看详情</DropdownItem>
-                                                    <DropdownItem key="balance" startContent={<Wallet className="h-4 w-4" />} onPress={() => openBalanceModal(distributor)}>余额与流水</DropdownItem>
-                                                    <DropdownItem key="discount" startContent={<Percent className="h-4 w-4" />} onPress={() => openDiscountModal(distributor)}>折扣设置</DropdownItem>
-                                                    <DropdownItem key="edit" startContent={<Edit className="h-4 w-4" />} onPress={() => openEditModal(distributor)}>编辑配置</DropdownItem>
-                                                    <DropdownItem key="status" color={distributor.status === 1 ? 'warning' : 'success'} startContent={<ShieldCheck className="h-4 w-4" />} onPress={() => { setSelectedDistributor(distributor); statusModal.onOpen(); }}>{distributor.status === 1 ? '停用账号' : '启用账号'}</DropdownItem>
-                                                    <DropdownItem key="delete" color="danger" className="text-danger" startContent={<Trash2 className="h-4 w-4" />} onPress={() => { setSelectedDistributor(distributor); deleteModal.onOpen(); }}>删除账号记录</DropdownItem>
-                                                </DropdownMenu>
-                                            </Dropdown>
-                                        </TableCell>
-                                    </TableRow>
-                                );
-                            })}
+                            {distributors.map((distributor) => (
+                                <TableRow key={distributor.id}>
+                                    <TableCell><div><p className="font-medium">{distributor.username}</p><p className="text-xs text-default-500">ID {distributor.id}</p></div></TableCell>
+                                    <TableCell><Chip color={distributor.status === 1 ? 'success' : 'danger'} variant="flat" size="sm" startContent={distributor.status === 1 ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}>{distributor.status === 1 ? '启用' : '停用'}</Chip></TableCell>
+                                    <TableCell><div className="space-y-1"><Chip size="sm" color="secondary" variant="flat">L{distributor.level || 1}</Chip><p className="font-medium">¥{Number(distributor.balance || 0).toFixed(2)}</p><Chip size="sm" color={distributor.discount_active === false ? 'warning' : 'success'} variant="flat">{distributor.discount_active === false ? '折扣已到期' : `折扣至 ${distributor.expires_at ? dayjs(distributor.expires_at).format('YYYY-MM-DD') : '永久'}`}</Chip></div></TableCell>
+                                    <TableCell><Chip size="sm" variant="flat" color={permissionsEnabled(distributor) === 2 ? 'success' : 'warning'}>{permissionsEnabled(distributor)}/2 已开通</Chip></TableCell>
+                                    <TableCell><span className="block max-w-56 truncate text-sm text-default-500" title={distributor.remarks || ''}>{distributor.remarks || '-'}</span></TableCell>
+                                    <TableCell>{distributor.updated_at ? dayjs(distributor.updated_at).format('YYYY-MM-DD HH:mm') : '-'}</TableCell>
+                                    <TableCell><Dropdown placement="bottom-end"><DropdownTrigger><Button isIconOnly size="sm" variant="light" aria-label={`操作 ${distributor.username}`}><MoreVertical className="h-4 w-4" /></Button></DropdownTrigger><DropdownMenu aria-label="分销商操作" disabledKeys={[...(!canUpdate ? ['edit', 'status'] : []), ...(!canDelete ? ['delete'] : [])]}><DropdownItem key="view" startContent={<Eye className="h-4 w-4" />} onPress={() => { setSelectedDistributor(distributor); viewModal.onOpen(); }}>查看详情</DropdownItem><DropdownItem key="balance" startContent={<Wallet className="h-4 w-4" />} onPress={() => openBalanceModal(distributor)}>余额与流水</DropdownItem><DropdownItem key="discount" startContent={<Percent className="h-4 w-4" />} onPress={() => openDiscountModal(distributor)}>折扣设置</DropdownItem><DropdownItem key="edit" startContent={<Edit className="h-4 w-4" />} onPress={() => openEditModal(distributor)}>编辑配置</DropdownItem><DropdownItem key="status" color={distributor.status === 1 ? 'warning' : 'success'} startContent={<ShieldCheck className="h-4 w-4" />} onPress={() => { setSelectedDistributor(distributor); statusModal.onOpen(); }}>{distributor.status === 1 ? '停用账号' : '启用账号'}</DropdownItem><DropdownItem key="delete" color="danger" className="text-danger" startContent={<Trash2 className="h-4 w-4" />} onPress={() => { setSelectedDistributor(distributor); deleteModal.onOpen(); }}>删除账号记录</DropdownItem></DropdownMenu></Dropdown></TableCell>
+                                </TableRow>
+                            ))}
                         </TableBody>
                     </Table>
                 </CardBody>
@@ -967,10 +838,6 @@ const DistributorsManagePage: React.FC = () => {
                                 <Card shadow="none"><CardBody><p className="text-sm text-default-500">创建时间</p><p className="mt-2">{selectedDistributor.created_at ? dayjs(selectedDistributor.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}</p></CardBody></Card>
                                 <Card shadow="none"><CardBody><p className="text-sm text-default-500">折扣有效期</p><p className="mt-2 font-medium">{selectedDistributor.expires_at ? dayjs(selectedDistributor.expires_at).format('YYYY-MM-DD HH:mm') : '永久有效'}</p><Chip className="mt-2" size="sm" color={selectedDistributor.discount_active === false ? 'warning' : 'success'} variant="flat">{selectedDistributor.discount_active === false ? '已到期，生成卡密按原价' : '折扣有效'}</Chip></CardBody></Card>
                                 <Card shadow="none"><CardBody><p className="text-sm text-default-500">更新时间</p><p className="mt-2">{selectedDistributor.updated_at ? dayjs(selectedDistributor.updated_at).format('YYYY-MM-DD HH:mm:ss') : '-'}</p></CardBody></Card>
-                            </div></Tab>
-                            <Tab key="site" title="域名与内容"><div className="space-y-4 py-3">
-                                <div><p className="mb-2 text-sm text-default-500">绑定域名</p><div className="flex flex-wrap gap-2">{parseStoredDomains(selectedDistributor).length === 0 ? <Chip variant="flat">未绑定</Chip> : parseStoredDomains(selectedDistributor).map((domain) => <Chip key={domain} color="primary" variant="flat" startContent={<Globe className="h-3 w-3" />}>{domain}</Chip>)}</div></div>
-                                <Card shadow="none"><CardBody><p className="text-sm text-default-500">公告</p><p className="mt-2 whitespace-pre-wrap">{selectedDistributor.notice || '-'}</p></CardBody></Card>
                             </div></Tab>
                             <Tab key="permissions" title="权限"><div className="space-y-3 py-3">{PERMISSIONS.map(({ key, label, description }) => <Alert key={key} isVisible color={selectedDistributor[key] !== false ? 'success' : 'default'} title={`${label}：${selectedDistributor[key] !== false ? '已开通' : '未开通'}`} description={description} />)}</div></Tab>
                             <Tab key="notes" title="备注"><Card className="my-3" shadow="none"><CardBody><p className="whitespace-pre-wrap">{selectedDistributor.remarks || '无管理员备注'}</p></CardBody></Card></Tab>

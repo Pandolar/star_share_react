@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Accordion,
@@ -49,17 +49,13 @@ import {
     User,
 } from '@heroui/react';
 import {
-    Bell,
     ChevronDown,
     CircleHelp,
     Copy,
-    ExternalLink,
-    Globe,
     KeyRound,
     Lock,
     LogOut,
     RefreshCw,
-    Save,
     Search,
     Settings,
     ShieldCheck,
@@ -87,17 +83,6 @@ const isExpired = (cdk: DistributorCdk) => (
     && dayjs(cdk.expires_at).isBefore(dayjs())
 );
 
-const normalizeDomains = (domains: DistributorInfo['domains'] | undefined): string[] => {
-    if (Array.isArray(domains)) return domains.map(String).filter(Boolean);
-    if (!domains) return [];
-    try {
-        const parsed = JSON.parse(domains);
-        if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean);
-    } catch {
-        // Historical cache values may be comma separated.
-    }
-    return domains.split(',').map((item) => item.trim()).filter(Boolean);
-};
 
 
 const formatDateTime = (value?: string | null) => (
@@ -111,8 +96,6 @@ const DistributorDashboardPage: React.FC = () => {
     const [pageError, setPageError] = useState('');
     const [activeTab, setActiveTab] = useState('cdk');
 
-    const [notice, setNotice] = useState('');
-    const [savingSettings, setSavingSettings] = useState(false);
 
     const [oldPassword, setOldPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
@@ -143,9 +126,6 @@ const DistributorDashboardPage: React.FC = () => {
 
     const permissions = distributor?.permissions;
     const canGenerate = permissions?.can_generate_cdk === true;
-    const canEditNotice = permissions?.can_edit_notice === true;
-    const discountActive = distributor?.discount_active !== false;
-    const domains = useMemo(() => normalizeDomains(distributor?.domains), [distributor?.domains]);
     const selectedPackage = packages.find((item) => String(item.package_id) === genPackageId);
     const estimatedCost = Number(((selectedPackage?.unit_price || 0) * (genCount || 0)).toFixed(2));
     const deliverableUnused = Math.max(stats.unused - stats.expired, 0);
@@ -154,6 +134,7 @@ const DistributorDashboardPage: React.FC = () => {
     const balanceCoverage = estimatedCost > 0
         ? Math.min(100, Math.round((balance / estimatedCost) * 100))
         : 100;
+    const discountActive = distributor?.discount_active !== false;
 
     const fetchSettings = useCallback(async () => {
         const response = await distributorApiService.getSettings();
@@ -162,7 +143,6 @@ const DistributorDashboardPage: React.FC = () => {
         }
         const info = response.data;
         setDistributor(info);
-        setNotice(info.notice || '');
         setBalance(Number(info.balance || 0));
         localStorage.setItem('distributor', JSON.stringify(info));
         return info;
@@ -307,26 +287,6 @@ const DistributorDashboardPage: React.FC = () => {
         }
     };
 
-    const handleSaveSettings = async (event: React.FormEvent) => {
-        event.preventDefault();
-        const payload: { notice?: string } = {};
-        if (canEditNotice) payload.notice = notice.trim();
-
-        setSavingSettings(true);
-        try {
-            const response = await distributorApiService.updateSettings(payload);
-            if (response.code === 20000) {
-                showToast('站点配置已保存', 'success');
-                await fetchSettings();
-            } else {
-                showToast(response.msg || '保存失败', 'error');
-            }
-        } catch (error: any) {
-            showToast(error.response?.data?.msg || '保存失败', 'error');
-        } finally {
-            setSavingSettings(false);
-        }
-    };
 
     const handleChangePassword = async (event: React.FormEvent) => {
         event.preventDefault();
@@ -480,6 +440,7 @@ const DistributorDashboardPage: React.FC = () => {
                         <Chip color="secondary" variant="flat">等级 L{distributor.level ?? 1}</Chip>
                         {canGenerate && <Chip color="success" variant="flat">余额 ¥{balance.toFixed(2)}</Chip>}
                         {canGenerate && <Chip color={discountActive ? 'success' : 'warning'} variant="flat">{discountActive ? `折扣至 ${distributor.expires_at ? formatDateTime(distributor.expires_at) : '永久'}` : '折扣已到期 · 按原价'}</Chip>}
+                        <Button variant="flat" color="primary" onPress={() => navigate('/distributor/sites')}>我的站点与佣金</Button>
                     </div>
                 </section>
 
@@ -496,27 +457,10 @@ const DistributorDashboardPage: React.FC = () => {
                             {canGenerate && (
                                 <Alert isVisible color="secondary" variant="flat" title="生成卡密" description="余额和折扣由管理员维护；生成区显示最终折后单价，费用在生成成功时一次性扣除。" />
                             )}
-                            {canEditNotice && (
-                                <Alert
-                                    isVisible
-                                    color="warning"
-                                    variant="flat"
-                                    title="配置站点公告"
-                                    description="可维护绑定域名展示的基础公告，保存后请用绑定域名实际访问确认。"
-                                />
-                            )}
                         </div>
                     </AccordionItem>
                 </Accordion>
 
-                {canEditNotice && domains.length === 0 && (
-                    <Alert
-                        isVisible
-                        color="warning"
-                        title="当前账号没有绑定域名"
-                        description="系统暂时无法把访问域名映射到你的站点配置，请联系管理员绑定域名并完成 DNS/反向代理配置。"
-                    />
-                )}
 
 
                 <Tabs
@@ -737,66 +681,6 @@ const DistributorDashboardPage: React.FC = () => {
                         </div>
                     </Tab>
 
-                    {canEditNotice && (
-                        <Tab key="site" title={<span className="flex items-center gap-2"><Globe className="h-4 w-4" />站点配置</span>}>
-                            <div className="grid gap-6 pt-4 lg:grid-cols-3">
-                                <Card shadow="sm">
-                                    <CardHeader className="flex items-center gap-2 font-semibold"><Globe className="h-5 w-5 text-primary" />站点归属</CardHeader>
-                                    <Divider />
-                                    <CardBody className="gap-4">
-                                        {domains.length === 0 ? (
-                                            <Alert isVisible color="warning" title="未绑定域名" description="站点配置暂时不会匹配到访问端，请联系管理员处理域名归属。" />
-                                        ) : (
-                                            <Listbox
-                                                aria-label="绑定域名"
-                                                selectionMode="none"
-                                                variant="flat"
-                                                onAction={(key) => window.open(`https://${String(key)}`, '_blank', 'noopener,noreferrer')}
-                                            >
-                                                {domains.map((domain, index) => (
-                                                    <ListboxItem
-                                                        key={domain}
-                                                        textValue={domain}
-                                                        showDivider={index < domains.length - 1}
-                                                        startContent={<Globe className="h-4 w-4 text-primary" />}
-                                                        endContent={<ExternalLink className="h-4 w-4 text-default-400" />}
-                                                    >
-                                                        {domain}
-                                                    </ListboxItem>
-                                                ))}
-                                            </Listbox>
-                                        )}
-                                    </CardBody>
-                                </Card>
-
-                                <Card className="lg:col-span-2" shadow="sm">
-                                    <CardHeader className="flex-col items-start gap-1">
-                                        <div className="flex items-center gap-2 font-semibold"><Bell className="h-5 w-5 text-primary" />访问端公告配置</div>
-                                        <p className="text-sm text-default-500">保存后由访问端按绑定域名读取，仅用于展示基础公告。</p>
-                                    </CardHeader>
-                                    <Divider />
-                                    <CardBody>
-                                        <Form className="gap-4" onSubmit={handleSaveSettings}>
-                                            {canEditNotice && (
-                                                <Textarea
-                                                    label="公告"
-                                                    value={notice}
-                                                    onValueChange={setNotice}
-                                                    minRows={4}
-                                                    maxRows={8}
-                                                    description="公告修改后会生成新的公告 ID，访问端可据此重新展示。"
-                                                    placeholder="例如：购买方式、服务时间或重要通知"
-                                                />
-                                            )}
-                                            <Button type="submit" color="primary" size="lg" isLoading={savingSettings} startContent={!savingSettings && <Save className="h-5 w-5" />}>
-                                                保存站点配置
-                                            </Button>
-                                        </Form>
-                                    </CardBody>
-                                </Card>
-                            </div>
-                        </Tab>
-                    )}
 
                     <Tab key="security" title={<span className="flex items-center gap-2"><Lock className="h-4 w-4" />安全设置</span>}>
                         <div className="mx-auto max-w-2xl pt-4">

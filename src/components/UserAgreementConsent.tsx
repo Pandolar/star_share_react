@@ -9,8 +9,8 @@ interface UserAgreementConsentProps {
 }
 
 export const useUserAgreementRequirement = () => {
-  const { isWhiteLabel, loading, userAgreementUrl } = useWhiteLabel();
-  const isVisible = !loading && !isWhiteLabel && Boolean(userAgreementUrl);
+  const { loading, userAgreementUrl } = useWhiteLabel();
+  const isVisible = !loading && Boolean(userAgreementUrl);
   return {
     isVisible,
     isRequired: loading || isVisible,
