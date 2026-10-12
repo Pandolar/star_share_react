@@ -49,6 +49,7 @@ import type {
     AdminTeamQueryParams,
     AdminTeamRecord,
     AdminCsConversation,
+    AdminCsConversationDetail,
     AdminCsStats,
     AdminLoginResult,
     AdminPermission,
@@ -774,8 +775,9 @@ class AdminApiService {
         return response.data.data;
     }
 
-    async getCsConversation(id: number): Promise<AdminCsConversation> {
-        const response = await this.api.get(`/star/cs_conversations/${id}`);
+    async getCsConversation(id: number, params: { orders_page?: number; orders_page_size?: number } = {}): Promise<AdminCsConversationDetail> {
+        const queryString = this.buildQueryString(params);
+        const response = await this.api.get(`/star/cs_conversations/${id}${queryString ? `?${queryString}` : ''}`);
         if (response.data.code !== 20000) throw new Error(response.data.msg || '获取客服会话失败');
         return response.data.data;
     }

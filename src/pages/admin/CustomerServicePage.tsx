@@ -4,7 +4,10 @@ import {
   Card,
   Checkbox,
   CardBody,
-  CardHeader,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
   Input,
   Modal,
   ModalBody,
@@ -18,7 +21,7 @@ import {
   Tooltip,
   Textarea,
 } from '@heroui/react';
-import { ArrowLeft, Bell, BellOff, Gauge, Headphones, Pin, Plus, RefreshCw, Search, Send, ShieldCheck, UserRound } from 'lucide-react';
+import { ArrowLeft, Bell, BellOff, Flag, Gauge, Headphones, MoreHorizontal, Pin, Plus, RefreshCw, Search, Send, ShieldCheck, StickyNote, UserRound } from 'lucide-react';
 import adminApiService from '../../services/adminApi';
 import type { AdminCsConversation } from '../../types/admin';
 import type { ChatAttachment, ChatAttachmentConfig, ChatMessage } from '../../components/chat/types';
@@ -29,6 +32,7 @@ import { formatBytes } from '../../components/chat/attachmentCache';
 import { useCustomerService } from '../../contexts/CustomerServiceContext';
 import { showToast } from '../../components/Toast';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
+import CustomerServiceUserInfo from './CustomerServiceUserInfo';
 
 const FILTERS = [
   ['all', '全部'],
@@ -91,6 +95,8 @@ const CustomerServicePage: React.FC = () => {
   const [filter, setFilter] = useState('all');
   const [groupId, setGroupId] = useState('all');
   const [remarkDraft, setRemarkDraft] = useState('');
+  const [remarkOpen, setRemarkOpen] = useState(false);
+  const [userInfoConversationId, setUserInfoConversationId] = useState<number | null>(null);
   const [userActionLoading, setUserActionLoading] = useState(false);
   const [conversationSaving, setConversationSaving] = useState(false);
   const conversationSavingRef = useRef(false);
@@ -272,8 +278,9 @@ const CustomerServicePage: React.FC = () => {
     }
   }, [messages, mobileChat, selected]);
   useEffect(() => {
-    setRemarkDraft(selected?.user.profile.remarks || '');
-  }, [selected?.id, selected?.user.profile.remarks]);
+    setRemarkOpen(false);
+    setUserInfoConversationId(null);
+  }, [selected?.id]);
   const updateConversation = async (patch: { is_pinned?: boolean; group_id?: string; user_remark?: string }) => {
     if (!selected || !canManageConversation || conversationSavingRef.current) return;
     const conversationId = selected.id;
@@ -284,6 +291,7 @@ const CustomerServicePage: React.FC = () => {
       setSelected((current) => current?.id === conversationId ? updated : current);
       setRows((current) => sortConversationsByRecent(current.map((item) => item.id === updated.id ? updated : item)));
       showToast(patch.user_remark !== undefined ? '用户备注已保存' : patch.group_id ? `已移至${groupName(patch.group_id)}` : updated.is_pinned ? '对话已置顶' : '已取消置顶', 'success');
+      if (patch.user_remark !== undefined) setRemarkOpen(false);
       void loadListRef.current();
     } catch (error) {
       showToast(error instanceof Error ? error.message : '更新会话失败', 'error');
@@ -558,37 +566,19 @@ const CustomerServicePage: React.FC = () => {
     }
   }
   const customerReadLatestReply = latestAdminMessageId !== null && latestAdminMessageId <= (selected?.user_last_read_message_id ?? 0);
+  const notificationLabel = notificationPermission === 'granted' ? '浏览器通知已开启' : notificationPermission === 'denied' ? '浏览器通知被禁用，点击查看开启方式' : '开启浏览器通知';
+  const openRemark = () => {
+    if (!selected) return;
+    setRemarkDraft(selected.user.profile.remarks || '');
+    setRemarkOpen(true);
+  };
   const pages = Math.max(1, Math.ceil(total / pageSize));
   return (
     <div className="flex h-[calc(100dvh-7rem)] min-h-[480px] flex-col gap-3">
-      <Card className="shrink-0">
-        <CardHeader className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 font-semibold"><Headphones className="h-5 w-5 text-primary" />在线客服</div>
-          <div className="flex flex-wrap gap-2">
-            {notificationPermission !== 'granted' && notificationPermission !== 'unsupported' && (
-              <Button
-                color={notificationPermission === 'denied' ? 'warning' : 'primary'}
-                variant="flat"
-                startContent={notificationPermission === 'denied' ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
-                onPress={() => void requestBrowserNotificationPermission()}
-              >
-                {notificationPermission === 'denied' ? '通知权限已拒绝' : '开启浏览器通知'}
-              </Button>
-            )}
-            {notificationPermission === 'granted' && (
-              <Button variant="flat" color="success" startContent={<Bell className="h-4 w-4" />} isDisabled>
-                浏览器通知已开启
-              </Button>
-            )}
-            <Button variant="flat" isLoading={listLoading} startContent={!listLoading && <RefreshCw className="h-4 w-4" />} onPress={() => void loadList()}>
-              刷新
-            </Button>
-          </div>
-        </CardHeader>
-      </Card>
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden lg:grid-cols-[320px_minmax(0,1fr)]">
         <Card className={`${mobileChat ? 'hidden lg:block' : 'block'} min-h-0 overflow-hidden`}>
           <CardBody className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-3">
+            <div className="flex shrink-0 items-center justify-between gap-1">
             <Tabs
               selectedKey={filter}
               onSelectionChange={(key) => {
@@ -610,6 +600,19 @@ const CustomerServicePage: React.FC = () => {
                 <Tab key={key} title={label} />
               ))}
             </Tabs>
+              <div className="flex items-center gap-0.5">
+                {notificationPermission !== 'unsupported' && (
+                  <Tooltip content={notificationLabel}>
+                    <Button isIconOnly size="sm" variant="light" aria-label={notificationLabel} color={notificationPermission === 'granted' ? 'success' : 'default'} isDisabled={notificationPermission === 'granted'} onPress={() => void requestBrowserNotificationPermission()}>
+                      {notificationPermission === 'denied' ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
+                    </Button>
+                  </Tooltip>
+                )}
+                <Tooltip content="刷新会话">
+                  <Button isIconOnly size="sm" variant="light" aria-label="刷新会话" isLoading={listLoading} onPress={() => void loadList()}><RefreshCw className="h-4 w-4" /></Button>
+                </Tooltip>
+              </div>
+            </div>
             <Tabs
               selectedKey={groupId}
               onSelectionChange={(key) => {
@@ -700,11 +703,11 @@ const CustomerServicePage: React.FC = () => {
                             </span>
                           )}
                           {item.is_pinned && <Pin className="h-3.5 w-3.5 shrink-0 text-warning" aria-label="已置顶" />}
+                          {item.group_id === 'supervisor' && <Tooltip content="主管待处理"><span className="shrink-0 text-secondary" aria-label="主管待处理"><Flag className="h-3.5 w-3.5" /></span></Tooltip>}
                           {item.user.billing.has_entitlement && <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-success" aria-label="有有效权益" />}
                           <span className="shrink-0 text-xs text-default-500">{relativeTime(item.last_message_at)}</span>
                         </div>
                         <div className="mt-1 flex items-center gap-2 text-xs text-default-500">
-                          <span className="shrink-0 rounded bg-default-100 px-1.5 py-0.5 text-[11px] text-default-500">{groupName(item.group_id)}</span>
                           <span className="shrink-0">{item.admin_unread > 0 ? '未读' : ['resolved', 'closed'].includes(item.status) ? '已完成' : '已读'}</span>
                           <span className="truncate">{item.last_message_preview || '暂无消息'}</span>
                         </div>
@@ -723,57 +726,37 @@ const CustomerServicePage: React.FC = () => {
           </CardBody>
         </Card>
         <Card className={`${mobileChat ? 'block' : 'hidden lg:block'} min-h-0 min-w-0 overflow-hidden`}>
-          <CardBody className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-3 sm:p-4">
+          <CardBody className="flex h-full min-h-0 flex-col gap-2 overflow-hidden p-3">
             {selected ? (
               <>
-                <div className="flex items-center justify-between gap-3 border-b border-divider pb-3">
-                  <Button isIconOnly className="lg:hidden" size="sm" variant="light" aria-label="返回会话列表" onPress={() => setMobileChat(false)}>
-                    <ArrowLeft className="h-4 w-4" />
-                  </Button>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 font-semibold">
+                <div className="flex shrink-0 items-center gap-2 border-b border-divider pb-2">
+                  <Button isIconOnly className="lg:hidden" size="sm" variant="light" aria-label="返回会话列表" onPress={() => setMobileChat(false)}><ArrowLeft className="h-4 w-4" /></Button>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 text-sm font-semibold">
                       <span className="truncate">{selected.user.profile.username || selected.user.profile.email || '用户'}</span>
-                      {selected.admin_unread > 0 && <span className="h-2 w-2 rounded-full bg-danger" aria-label="有未读消息" />}
+                      {selected.is_pinned && <Pin className="h-3 w-3 shrink-0 text-warning" aria-label="已置顶" />}
+                      {selected.group_id === 'supervisor' && <Tooltip content="主管待处理"><span className="shrink-0 text-secondary" aria-label="主管待处理"><Flag className="h-3 w-3" /></span></Tooltip>}
                     </div>
-                    <div className="mt-1 text-sm text-default-500">与 Nice 的对话</div>
+                    <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-default-400">
+                      {latestAdminMessageId !== null && <span className="shrink-0">{customerReadLatestReply ? '客户已读' : '客户未读'}</span>}
+                      <span className="truncate">{selected.user.billing.has_entitlement ? selected.user.billing.entitlements.map((item) => item.name).join(' · ') : '暂无有效权益'}</span>
+                    </div>
                   </div>
-                  <Tooltip
-                    placement="bottom-end"
-                    content={
-                      <div className="min-w-60 space-y-2 p-1 text-sm">
-                        <div className="font-medium">用户信息</div>
-                        <div className="grid gap-1 text-default-600">
-                          <span>用户名：{selected.user.profile.username || '-'}</span>
-                          <span>邮箱：{selected.user.profile.email || '-'}</span>
-                          <span>注册：{selected.user.profile.created_at ? new Date(selected.user.profile.created_at).toLocaleString() : '-'}</span>
-                          <span>当前套餐：{selected.user.billing.current_package?.name || '-'}</span>
-                          <span>套餐状态：{selected.user.billing.current_package?.status || '-'}</span>
-                          <span>现金订单：{selected.user.billing.paid_orders} 笔 / ¥{selected.user.billing.paid_amount.toFixed(2)}</span>
-                          <span>最近支付：{selected.user.billing.last_paid_at ? new Date(selected.user.billing.last_paid_at).toLocaleString() : '-'}</span>
-                        </div>
-                      </div>
-                    }
-                  >
-                    <Button size="sm" variant="flat" startContent={<UserRound className="h-4 w-4" />}>
-                      用户信息
-                    </Button>
+                  <Tooltip content={selected.user.profile.remarks ? `用户备注：${selected.user.profile.remarks}` : '添加用户备注'}>
+                    <Button isIconOnly size="sm" variant="light" aria-label="用户备注" color={selected.user.profile.remarks ? 'primary' : 'default'} onPress={openRemark}><StickyNote className="h-4 w-4" /></Button>
                   </Tooltip>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 border-b border-divider pb-3">
-                  <Button size="sm" isDisabled={!canManageConversation || conversationSaving} variant={selected.is_pinned ? 'solid' : 'flat'} color={selected.is_pinned ? 'warning' : 'default'} startContent={<Pin className="h-4 w-4" />} onPress={() => void updateConversation({ is_pinned: !selected.is_pinned })}>
-                    {selected.is_pinned ? '取消置顶' : '置顶对话'}
-                  </Button>
-                  {GROUPS.map((group) => <Button key={group.id} size="sm" isDisabled={!canManageConversation || conversationSaving || (selected.group_id || 'general') === group.id} variant={(selected.group_id || 'general') === group.id ? 'solid' : 'flat'} color={group.id === 'supervisor' ? 'secondary' : 'default'} onPress={() => void updateConversation({ group_id: group.id })}>{group.name}</Button>)}
-                  {canUnbanUser && <Button size="sm" variant="flat" color="success" isDisabled={userActionLoading || selected.user.profile.status === 1} startContent={<ShieldCheck className="h-4 w-4" />} onPress={() => void runUserAction('unban')}>{selected.user.profile.status === 1 ? '账号正常' : '解封账号'}</Button>}
-                  {canClearUserLimit && <Button size="sm" variant="flat" color="warning" isLoading={userActionLoading} startContent={!userActionLoading && <Gauge className="h-4 w-4" />} onPress={() => void runUserAction('clear_limit')}>解除限速</Button>}
-                </div>
-                <div className="grid gap-2 rounded-medium bg-default-50 p-3 text-sm sm:grid-cols-2">
-                  <div className="flex items-center gap-2"><span className="text-default-500">客户已读状态</span><span>{latestAdminMessageId === null ? '暂无客服消息' : customerReadLatestReply ? '已读' : '未读'}</span></div>
-                  <div className="flex items-center gap-2"><span className="text-default-500">有效权益</span><span>{selected.user.billing.has_entitlement ? selected.user.billing.entitlements.map((item) => item.name).join('、') : '暂无有效套餐'}</span></div>
-                </div>
-                <div className="flex items-end gap-2">
-                  <Textarea size="sm" label="用户备注（内部可见）" isDisabled={!canManageConversation || conversationSaving} value={remarkDraft} onValueChange={setRemarkDraft} maxLength={255} minRows={1} maxRows={2} />
-                  <Button size="sm" color="primary" variant="flat" isLoading={conversationSaving} isDisabled={!canManageConversation || remarkDraft === (selected.user.profile.remarks || '')} onPress={() => void updateConversation({ user_remark: remarkDraft })}>保存备注</Button>
+                  <Button size="sm" variant="light" className="shrink-0 min-w-0 px-2" startContent={<UserRound className="h-4 w-4" />} onPress={() => setUserInfoConversationId(selected.id)}>用户信息</Button>
+                  <Dropdown placement="bottom-end">
+                    <DropdownTrigger><Button isIconOnly size="sm" variant="light" aria-label="更多会话操作"><MoreHorizontal className="h-5 w-5" /></Button></DropdownTrigger>
+                    <DropdownMenu aria-label="会话操作">
+                      <DropdownItem key="pin" isDisabled={!canManageConversation || conversationSaving} startContent={<Pin className="h-4 w-4" />} onPress={() => void updateConversation({ is_pinned: !selected.is_pinned })}>{selected.is_pinned ? '取消置顶' : '置顶对话'}</DropdownItem>
+                      <DropdownItem key="group" isDisabled={!canManageConversation || conversationSaving} onPress={() => void updateConversation({ group_id: selected.group_id === 'supervisor' ? 'general' : 'supervisor' })}>{selected.group_id === 'supervisor' ? '移至普通跟进' : '转交主管待处理'}</DropdownItem>
+                      <DropdownItem key="unban" isDisabled={!canUnbanUser || userActionLoading || selected.user.profile.status === 1} startContent={<ShieldCheck className="h-4 w-4" />} onPress={() => void runUserAction('unban')}>{selected.user.profile.status === 1 ? '账号正常' : '解封账号'}</DropdownItem>
+                      <DropdownItem key="limit" isDisabled={!canClearUserLimit || userActionLoading} startContent={<Gauge className="h-4 w-4" />} onPress={() => void runUserAction('clear_limit')}>解除当前限速</DropdownItem>
+                      <DropdownItem key="refresh" startContent={<RefreshCw className="h-4 w-4" />} onPress={() => { void loadList(); void refreshMessages(); }}>刷新会话</DropdownItem>
+                      <DropdownItem key="notifications" isDisabled={notificationPermission === 'unsupported' || notificationPermission === 'granted'} startContent={<Bell className="h-4 w-4" />} onPress={() => void requestBrowserNotificationPermission()}>{notificationLabel}</DropdownItem>
+                    </DropdownMenu>
+                  </Dropdown>
                 </div>
                 {messages
                   .flatMap((message) => message.attachments)
@@ -824,6 +807,20 @@ const CustomerServicePage: React.FC = () => {
           </CardBody>
         </Card>
       </div>
+      <CustomerServiceUserInfo conversationId={userInfoConversationId} onClose={() => setUserInfoConversationId(null)} />
+      <Modal isOpen={remarkOpen} onOpenChange={(open) => { if (!conversationSaving) setRemarkOpen(open); }} isDismissable={!conversationSaving} isKeyboardDismissDisabled={conversationSaving} size="md">
+        <ModalContent>
+          <ModalHeader>用户备注</ModalHeader>
+          <ModalBody>
+            <p className="text-xs text-default-500">仅内部可见，同一用户的所有会话共用。</p>
+            <Textarea label="备注内容" autoFocus isReadOnly={!canManageConversation} isDisabled={conversationSaving} value={remarkDraft} onValueChange={setRemarkDraft} maxLength={255} minRows={3} maxRows={6} />
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" isDisabled={conversationSaving} onPress={() => setRemarkOpen(false)}>关闭</Button>
+            {canManageConversation && <Button color="primary" isLoading={conversationSaving} isDisabled={remarkDraft === (selected?.user.profile.remarks || '')} onPress={() => void updateConversation({ user_remark: remarkDraft })}>保存备注</Button>}
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
       <Modal
         isOpen={Boolean(recallTarget)}
         onOpenChange={(open) => {

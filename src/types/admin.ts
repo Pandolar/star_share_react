@@ -989,6 +989,27 @@ export interface AdminCsConversation extends ChatConversation {
     user_last_read_at: string | null;
 }
 
+export interface AdminCsPurchaseOrder {
+    id: number;
+    order_id: string;
+    package_name: string | null;
+    order_type: string;
+    status: 'paid';
+    paid_amount: string | null;
+    cashback_credit_amount: string;
+    created_at: string | null;
+    paid_at: string | null;
+}
+
+export interface AdminCsConversationDetail extends AdminCsConversation {
+    purchase_history: {
+        orders: AdminCsPurchaseOrder[];
+        total: number;
+        current_page: number;
+        page_size: number;
+    };
+}
+
 export interface AdminCsStats {
     total: number;
     open: number;
