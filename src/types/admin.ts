@@ -119,6 +119,7 @@ export interface AdminLoginResult {
     expires_in_seconds?: number;
     admin_token?: string;
     principal?: AdminPrincipal;
+    expires_at?: string;
 }
 
 // 通用查询参数

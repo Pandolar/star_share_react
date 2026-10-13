@@ -148,8 +148,8 @@ class AdminApiService {
     /**
      * 保存管理员token
      */
-    private setAdminToken(token: string): void {
-        // 优先写入 localStorage，失败则写入 cookie
+    private setAdminToken(token: string, expiresAt?: string): void {
+        // Prefer localStorage, with a persistent cookie fallback for browsers where it is unavailable.
         let written = false;
         try {
             const testKey = `__ls_test___${Date.now()}`;
@@ -157,27 +157,23 @@ class AdminApiService {
             localStorage.removeItem(testKey);
             localStorage.setItem(this.tokenKey, token);
             written = true;
-        } catch (_) {
+        } catch {
             written = false;
         }
 
-        // 同步写入 cookie 作为兜底（即便 localStorage 成功也写入，增强稳健性）
         try {
-            const days = 7; // 有效期 7 天
-            const d = new Date();
-            d.setTime(d.getTime() + days * 24 * 60 * 60 * 1000);
-            const expires = `expires=${d.toUTCString()}`;
-            // SameSite=Lax 兼容大多数场景；开发环境不强制 Secure
-            document.cookie = `${this.tokenKey}=${encodeURIComponent(token)}; ${expires}; path=/; SameSite=Lax`;
-        } catch (_) {
+            const expiry = expiresAt ? new Date(expiresAt) : null;
+            if (expiry && !Number.isNaN(expiry.getTime()) && expiry.getTime() > Date.now()) {
+                document.cookie = `${this.tokenKey}=${encodeURIComponent(token)}; expires=${expiry.toUTCString()}; path=/; SameSite=Lax`;
+            }
+        } catch {
             // ignore
         }
 
         if (!written) {
-            // 作为最后手段再尝试 sessionStorage（某些浏览器隐私模式允许）
             try {
                 sessionStorage.setItem(this.tokenKey, token);
-            } catch (_) {
+            } catch {
                 // ignore
             }
         }
@@ -187,12 +183,12 @@ class AdminApiService {
      * 清除管理员token
      */
     private clearAdminToken(): void {
-        try { localStorage.removeItem(this.tokenKey); } catch (_) {}
-        try { sessionStorage.removeItem(this.tokenKey); } catch (_) {}
+        try { localStorage.removeItem(this.tokenKey); } catch {}
+        try { sessionStorage.removeItem(this.tokenKey); } catch {}
         try {
             // 通过设置过期时间清除 cookie
             document.cookie = `${this.tokenKey}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax`;
-        } catch (_) {
+        } catch {
             // ignore
         }
     }
@@ -218,7 +214,7 @@ class AdminApiService {
     async login(username: string, password: string): Promise<AdminApiResponse<AdminLoginResult>> {
         const response = await this.api.post('/star/auth/login', { username, password });
         if (response.data.code === 20000 && response.data.data?.admin_token) {
-            this.setAdminToken(response.data.data.admin_token);
+            this.setAdminToken(response.data.data.admin_token, response.data.data.expires_at);
         }
         return response.data;
     }
@@ -226,7 +222,7 @@ class AdminApiService {
     async verifyMfa(challenge_token: string, code: string): Promise<AdminApiResponse<AdminLoginResult>> {
         const response = await this.api.post('/star/auth/mfa/verify', { challenge_token, code });
         if (response.data.code === 20000 && response.data.data?.admin_token) {
-            this.setAdminToken(response.data.data.admin_token);
+            this.setAdminToken(response.data.data.admin_token, response.data.data.expires_at);
         }
         return response.data;
     }
