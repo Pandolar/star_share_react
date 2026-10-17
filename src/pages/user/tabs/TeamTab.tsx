@@ -43,8 +43,10 @@ import {
   teamUserApi,
 } from '../../../services/userApi';
 import { toast } from '../../../utils/toast';
+import { useIsMobile } from '../../../hooks/useIsMobile';
 import { TeamPaymentModal } from './team/TeamPaymentModal';
 import { UserAgreementConsent, useUserAgreementRequirement } from '../../../components/UserAgreementConsent';
+import { useWhiteLabel } from '../../../contexts/WhiteLabelContext';
 
 const formatDate = (value?: string | null) => value
   ? new Date(value).toLocaleString('zh-CN', { hour12: false })
@@ -134,6 +136,8 @@ export const TeamTab: React.FC = () => {
   const [creatingOrder, setCreatingOrder] = useState(false);
   const [checkout, setCheckout] = useState<TeamCheckout | null>(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const paymentCheckoutRef = React.useRef({ id: checkout?.checkout_id, open: paymentOpen });
+  paymentCheckoutRef.current = { id: checkout?.checkout_id, open: paymentOpen };
   const orderModal = useDisclosure();
   const cancelModal = useDisclosure();
   const exitModal = useDisclosure();
@@ -141,6 +145,8 @@ export const TeamTab: React.FC = () => {
   const [exiting, setExiting] = useState(false);
   const [agreementAccepted, setAgreementAccepted] = useState(true);
   const { isRequired: isAgreementRequired } = useUserAgreementRequirement();
+  const { payment_methods: paymentMethods } = useWhiteLabel();
+  const isMobileDevice = useIsMobile();
 
   const loadOverview = useCallback(async (background = false): Promise<TeamOverview | null> => {
     if (background) setRefreshing(true);
@@ -243,6 +249,10 @@ export const TeamTab: React.FC = () => {
   };
 
   const createOrder = async () => {
+    if (!paymentMethods[0]) {
+      toast.warning('当前暂未开放在线支付');
+      return;
+    }
     if (!selectedPlan) {
       toast.error('请选择团队套餐');
       return;
@@ -263,6 +273,8 @@ export const TeamTab: React.FC = () => {
         seat_count: seats,
         team_name: orderAction === 'initial' ? teamName.trim() : undefined,
         replace_pending: Boolean(overview?.pending_checkout),
+        payment_method: paymentMethods[0],
+        device: isMobileDevice ? 'mobile' : 'pc',
       });
       if (response.code !== 20000 || !response.data?.order_id) {
         throw new Error(response.msg || '创建支付订单失败');
@@ -292,6 +304,7 @@ export const TeamTab: React.FC = () => {
   };
   const createInvoiceOrder = async (): Promise<TeamCheckout | null> => {
     if (!checkout?.checkout_id) return null;
+    const checkoutId = checkout.checkout_id;
     try {
       const response = await teamUserApi.createOrder({
         action: checkout.action || (team?.status === 'pending' ? 'initial' : 'renewal'),
@@ -299,11 +312,15 @@ export const TeamTab: React.FC = () => {
         seat_count: checkout.seat_count,
         checkout_id: checkout.checkout_id,
         invoice_requested: true,
+        payment_method: checkout.pay_type || paymentMethods[0],
+        device: isMobileDevice ? 'mobile' : 'pc',
       });
+      if (!paymentCheckoutRef.current.open || paymentCheckoutRef.current.id !== checkoutId) return null;
       if (response.code !== 20000 || !response.data?.order_id) throw new Error(response.msg || '创建开票订单失败');
       setCheckout(response.data);
       return response.data;
     } catch (requestError) {
+      if (!paymentCheckoutRef.current.open || paymentCheckoutRef.current.id !== checkoutId) return null;
       toast.error(requestError instanceof Error ? requestError.message : '创建开票订单失败');
       return null;
     }
@@ -404,6 +421,7 @@ export const TeamTab: React.FC = () => {
 
   const status = TEAM_STATUS[team?.status || ''] || { label: team?.status || '未知', color: 'default' as const };
   const canCreate = !team && overview?.plan_config.enabled && plans.length > 0;
+  const paymentsOpen = paymentMethods.length > 0;
   const pendingCheckout = overview?.pending_checkout;
   const isOwnerDisband = Boolean(team?.is_owner);
 
@@ -433,6 +451,7 @@ export const TeamTab: React.FC = () => {
         >
           {!refreshing && <RefreshCw className="h-4 w-4" />}
         </Button>
+      {!paymentsOpen && <Alert color="warning" variant="flat" title="在线支付暂未开放" description="当前仍可查看和管理团队、成员及邀请，但不能创建、调整或续费团队订阅。" />}
       </div>
 
       <Card className="border border-primary-100 bg-primary-50/40 shadow-sm">
@@ -481,7 +500,7 @@ export const TeamTab: React.FC = () => {
               创建后由你担任所有者。购买团队套餐并完成付款后，即可邀请已注册成员加入。
             </p>
             {canCreate ? (
-              <Button className="mt-6" color="primary" startContent={<Crown className="h-4 w-4" />} onPress={() => openOrder('initial')}>
+              <Button className="mt-6" color="primary" startContent={<Crown className="h-4 w-4" />} isDisabled={!paymentsOpen} onPress={() => openOrder('initial')}>
                 创建团队
               </Button>
             ) : (
@@ -503,7 +522,7 @@ export const TeamTab: React.FC = () => {
               endContent={team.is_owner && (
                 <div className="flex flex-wrap justify-end gap-2">
                   <Button size="sm" variant="light" onPress={cancelModal.onOpen}>取消创建</Button>
-                  <Button size="sm" variant="flat" color="warning" onPress={replacePendingOrder}>更换订单</Button>
+                  <Button size="sm" variant="flat" color="warning" isDisabled={!paymentsOpen} onPress={replacePendingOrder}>更换订单</Button>
                   {pendingCheckout?.recoverable && <Button size="sm" color="warning" onPress={continuePayment}>继续支付</Button>}
                 </div>
               )}
@@ -517,7 +536,7 @@ export const TeamTab: React.FC = () => {
               title={`有一笔待支付的${pendingCheckout.action === 'change' ? '套餐调整' : '续费'}订单`}
               description={`${pendingCheckout.package_name || `套餐 #${pendingCheckout.package_id}`} · ${pendingCheckout.seat_count} 席 · ¥${pendingCheckout.payable_amount || '--'}`}
               startContent={<CircleDollarSign className="h-5 w-5" />}
-              endContent={<Button size="sm" color="warning" onPress={continuePayment}>{pendingCheckout.recoverable ? '继续支付' : '重新生成'}</Button>}
+              endContent={<Button size="sm" color="warning" isDisabled={!paymentsOpen && !pendingCheckout.recoverable} onPress={continuePayment}>{pendingCheckout.recoverable ? '继续支付' : '重新生成'}</Button>}
             />
           )}
 
@@ -550,12 +569,12 @@ export const TeamTab: React.FC = () => {
                   {team.is_owner ? (
                     <>
                       {team.status === 'active' && !team.pending_package_id && (
-                        <Button size="sm" variant="flat" startContent={<Settings2 className="h-4 w-4" />} onPress={() => openOrder('change')}>
+                        <Button size="sm" variant="flat" startContent={<Settings2 className="h-4 w-4" />} isDisabled={!paymentsOpen} onPress={() => openOrder('change')}>
                           调整订阅
                         </Button>
                       )}
                       {(team.status === 'active' || team.status === 'expired') && (
-                        <Button size="sm" color="primary" startContent={<CalendarDays className="h-4 w-4" />} onPress={() => openOrder('renewal')}>
+                        <Button size="sm" color="primary" startContent={<CalendarDays className="h-4 w-4" />} isDisabled={!paymentsOpen} onPress={() => openOrder('renewal')}>
                           续费团队
                         </Button>
                       )}
@@ -810,6 +829,7 @@ export const TeamTab: React.FC = () => {
       </Modal>
 
       <TeamPaymentModal
+        methods={paymentMethods}
         isOpen={paymentOpen}
         checkout={checkout}
         onClose={() => {
@@ -819,6 +839,7 @@ export const TeamTab: React.FC = () => {
         onSuccess={async () => { await loadOverview(true); }}
         onExpired={async () => { await loadOverview(true); }}
         onCreateInvoiceOrder={createInvoiceOrder}
+        onCheckoutChange={setCheckout}
       />
     </div>
   );

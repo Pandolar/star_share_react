@@ -1,4 +1,6 @@
 /** Subscription Tab 共享类型与工具 */
+import type { PaymentMethod } from '../../../../services/userApi';
+
 
 export interface PackageInfo {
   id: number;
@@ -32,7 +34,7 @@ export interface OrderInfo {
   payment_url: string | null;
   qr_code: string;
   channel: string;
-  pay_type: string;
+  pay_type: PaymentMethod;
   base_amount?: string;
   payable_amount?: string;
   invoice_requested?: boolean;

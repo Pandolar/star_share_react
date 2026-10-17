@@ -15,28 +15,33 @@ import {
   Tooltip,
 } from '@heroui/react';
 import { motion } from 'framer-motion';
-import { CheckCircle, AlertCircle, QrCode, ExternalLink, ReceiptText, UserRoundCog, TicketPercent, WalletCards } from 'lucide-react';
-import { orderUserApi, type InvoiceEligibility } from '../../../../services/userApi';
+import { CheckCircle, AlertCircle, ExternalLink, ReceiptText, UserRoundCog, TicketPercent, WalletCards } from 'lucide-react';
+import { orderUserApi, type InvoiceEligibility, type PaymentMethod } from '../../../../services/userApi';
+import { PaymentMethodSelector, paymentMethodLabel } from '../../../../components/PaymentMethodSelector';
 import { toast } from '../../../../utils/toast';
 import { celebrateSuccess } from '../../../../utils/confetti';
 import { generateQRCodeDataUrl } from './qrCode';
 import { getCheckoutRemainingMs } from './checkoutExpiry';
 import { getDurationText, PackageInfo, OrderInfo } from './types';
+
 import { useWhiteLabel } from '../../../../contexts/WhiteLabelContext';
 import { useNavigate } from 'react-router-dom';
 import { UserAgreementConsent, useUserAgreementRequirement } from '../../../../components/UserAgreementConsent';
 
 interface PaymentModalProps {
   isOpen: boolean;
+  methods: readonly PaymentMethod[];
   selectedPackage: PackageInfo | null;
   ordinaryOrder: OrderInfo | null;
   invoiceOrder: OrderInfo | null;
   creatingInvoiceOrder: boolean;
-  onCreateInvoiceOrder: () => Promise<OrderInfo | null>;
+  onCreateInvoiceOrder: (checkoutId?: string) => Promise<OrderInfo | null>;
   promotionActionLoading: boolean;
   onApplyPromotionCode: (promotionCode: string) => Promise<OrderInfo | null>;
   cashbackActionLoading: boolean;
   onApplyCashbackCredit: (useCashback: boolean) => Promise<OrderInfo | null>;
+  onPaymentMethodChange: (paymentMethod: PaymentMethod, invoiceRequested: boolean) => Promise<OrderInfo | null>;
+  paymentMethod: PaymentMethod;
   agreementAccepted: boolean;
   onAgreementValueChange: (selected: boolean) => void;
   onClose: () => void;
@@ -81,6 +86,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   onApplyPromotionCode,
   cashbackActionLoading,
   onApplyCashbackCredit,
+  onPaymentMethodChange,
+  paymentMethod,
+  methods,
   agreementAccepted,
   onAgreementValueChange,
   onClose,
@@ -100,10 +108,16 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [promotionPanelOpen, setPromotionPanelOpen] = useState(false);
   const [promotionCodeInput, setPromotionCodeInput] = useState('');
   const [acceptedBaseAmount, setAcceptedBaseAmount] = useState('');
+  const [switchingPaymentMethod, setSwitchingPaymentMethod] = useState(false);
 
   const checkIntervalRef = useRef<number | undefined>(undefined);
   const qrTimerRef = useRef<number | undefined>(undefined);
   const checkoutIdRef = useRef<string | undefined>(undefined);
+  const checkoutDeadlineRef = useRef<{ checkoutId: string; deadline: number } | null>(null);
+  const modalInitializedRef = useRef(false);
+  const paymentSwitchRequestRef = useRef(0);
+  const isOpenRef = useRef(isOpen);
+  const paymentStatusRef = useRef(paymentStatus);
   const invoicePanelRef = useRef<HTMLDivElement | null>(null);
   const activeOrder = invoiceSelected && invoiceOrder ? invoiceOrder : ordinaryOrder;
   const checkoutId = ordinaryOrder?.checkout_id;
@@ -121,20 +135,27 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   useEffect(() => {
     if (paymentStatus === 'success') celebrateSuccess();
   }, [paymentStatus]);
-
   checkoutIdRef.current = checkoutId;
+  isOpenRef.current = isOpen;
+  paymentStatusRef.current = paymentStatus;
 
   useEffect(() => {
-    if (!isOpen || !checkoutId) return;
-    setPaymentStatus('pending');
-    setQrCodeExpired(false);
-    setInvoiceSelected(false);
-    setInvoiceCreationFailed(false);
+    if (!isOpen || !checkoutId) {
+      modalInitializedRef.current = false;
+      return;
+    }
+    if (!modalInitializedRef.current) {
+      modalInitializedRef.current = true;
+      setPaymentStatus('pending');
+      setQrCodeExpired(false);
+      setInvoiceSelected(false);
+      setInvoiceCreationFailed(false);
+      setAcceptedBaseAmount('');
+      setPromotionPanelOpen(false);
+      setPromotionCodeInput(ordinaryOrder?.promotion_code || '');
+    }
     setEligibility(null);
     setInvoiceFeatureAvailable(false);
-    setAcceptedBaseAmount('');
-    setPromotionPanelOpen(false);
-    setPromotionCodeInput(ordinaryOrder?.promotion_code || '');
     void (async () => {
       if (!selectedPackage || !features.invoice) return;
       try {
@@ -143,6 +164,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           ordinaryOrder?.promotion_code || undefined,
           checkoutId,
         );
+        if (checkoutIdRef.current !== checkoutId || !isOpenRef.current) return;
         if (response.code === 20000 && response.data) {
           setEligibility(response.data);
           setInvoiceFeatureAvailable(response.data.reason !== 'invoice_disabled' && response.data.reason !== 'non_self_site');
@@ -152,10 +174,16 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       }
     })();
 
-    const remainingMs = getCheckoutRemainingMs({
-      expires_at: ordinaryOrder?.expires_at,
-      expires_in_seconds: ordinaryOrder?.expires_in_seconds,
-    });
+    if (checkoutDeadlineRef.current?.checkoutId !== checkoutId) {
+      checkoutDeadlineRef.current = {
+        checkoutId,
+        deadline: Date.now() + getCheckoutRemainingMs({
+          expires_at: ordinaryOrder?.expires_at,
+          expires_in_seconds: ordinaryOrder?.expires_in_seconds,
+        }),
+      };
+    }
+    const remainingMs = checkoutDeadlineRef.current.deadline - Date.now();
     if (remainingMs <= 0) {
       setQrCodeExpired(true);
       return cleanup;
@@ -170,7 +198,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       const polledCheckoutId = checkoutId;
       try {
         const response = await orderUserApi.getCheckoutStatus(polledCheckoutId);
-        if (checkoutIdRef.current !== polledCheckoutId) return;
+        if (checkoutIdRef.current !== polledCheckoutId || !isOpenRef.current || paymentStatusRef.current !== 'pending') return;
         if (response.code === 20000 && response.data?.paid) {
           setPaymentStatus('success');
           cleanup();
@@ -237,22 +265,52 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     return true;
   };
   const handleInvoiceSwitch = async (selected: boolean) => {
-    if (!selected) {
-      setInvoiceSelected(false);
-      setInvoiceCreationFailed(false);
+    if (selected && !ensureAgreementAccepted()) return;
+    const previousSelected = invoiceSelected;
+    setInvoiceSelected(selected);
+    setInvoiceCreationFailed(false);
+    const targetOrder = selected ? invoiceOrder : ordinaryOrder;
+    if (targetOrder) {
+      if (targetOrder.pay_type === paymentMethod) return;
+      const requestId = ++paymentSwitchRequestRef.current;
+      const requestedCheckoutId = checkoutId;
+      setSwitchingPaymentMethod(true);
+      try {
+        const switched = await onPaymentMethodChange(paymentMethod, selected);
+        if (!switched && isOpenRef.current && checkoutIdRef.current === requestedCheckoutId) {
+          setInvoiceSelected(previousSelected);
+        }
+      } finally {
+        if (requestId === paymentSwitchRequestRef.current && isOpenRef.current) setSwitchingPaymentMethod(false);
+      }
       return;
     }
-    if (!ensureAgreementAccepted()) return;
-
-    setInvoiceSelected(true);
-    setInvoiceCreationFailed(false);
-    if (invoiceOrder) return;
-
+    if (!selected) return;
     const currentEligibility = eligibility || await loadEligibility();
     if (!currentEligibility?.eligible) return;
-
-    const createdOrder = await onCreateInvoiceOrder();
+    const createdOrder = await onCreateInvoiceOrder(checkoutId);
     if (!createdOrder) setInvoiceCreationFailed(true);
+  };
+
+  const handlePaymentMethodChange = async (method: PaymentMethod) => {
+    if (method === paymentMethod || !checkoutId || !activeOrder || activeOrder.settled) return;
+    const requestId = ++paymentSwitchRequestRef.current;
+    const requestedCheckoutId = checkoutId;
+    setSwitchingPaymentMethod(true);
+    try {
+      await onPaymentMethodChange(method, invoiceSelected);
+    } finally {
+      if (requestId === paymentSwitchRequestRef.current && isOpenRef.current && checkoutIdRef.current === requestedCheckoutId && paymentStatusRef.current === 'pending') {
+        setSwitchingPaymentMethod(false);
+      }
+    }
+  };
+
+  const restoreInvoiceOrder = async (order: OrderInfo | null) => {
+    if (invoiceSelected && order && !order.settled) {
+      const invoice = await onCreateInvoiceOrder(order.checkout_id);
+      if (!invoice) setInvoiceCreationFailed(true);
+    }
   };
 
   const handleApplyPromotion = async () => {
@@ -264,6 +322,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     }
     const nextOrder = await onApplyPromotionCode(code);
     if (nextOrder) {
+      await restoreInvoiceOrder(nextOrder);
       setPromotionCodeInput(nextOrder.promotion_code || code);
       setPromotionPanelOpen(false);
     }
@@ -273,6 +332,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     if (!ensureAgreementAccepted()) return;
     const nextOrder = await onApplyPromotionCode('');
     if (nextOrder) {
+      await restoreInvoiceOrder(nextOrder);
       setPromotionCodeInput('');
       setPromotionPanelOpen(false);
     }
@@ -285,19 +345,26 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       setPaymentStatus('success');
       cleanup();
       setTimeout(() => window.location.reload(), 2000);
+    } else {
+      await restoreInvoiceOrder(nextOrder);
     }
   };
 
   const handleManualCheck = async () => {
     if (!ensureAgreementAccepted()) return;
     if (!checkoutId) return;
+    const requestedCheckoutId = checkoutId;
     setManualCheckLoading(true);
     setPaymentStatus('checking');
     try {
-      for (const order of [ordinaryOrder, invoiceOrder]) {
-        if (order?.order_id) await orderUserApi.forceGetPayStatus(order.order_id);
+      const candidates = await orderUserApi.getCheckoutStatus(requestedCheckoutId);
+      if (candidates.code === 20000 && candidates.data?.orders) {
+        await Promise.all(candidates.data.orders
+          .filter((order) => order.status === 'pending')
+          .map((order) => orderUserApi.forceGetPayStatus(order.order_id)));
       }
-      const response = await orderUserApi.getCheckoutStatus(checkoutId);
+      const response = await orderUserApi.getCheckoutStatus(requestedCheckoutId);
+      if (checkoutIdRef.current !== requestedCheckoutId || !isOpenRef.current) return;
       if (response.code === 20000 && response.data?.paid) {
         setPaymentStatus('success');
         cleanup();
@@ -312,10 +379,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         toast.warning('未检测到支付成功，请确认是否已完成付款。');
       }
     } catch {
-      setPaymentStatus('pending');
-      toast.error('查询失败，请稍后重试或联系客服。');
+      if (checkoutIdRef.current === requestedCheckoutId && isOpenRef.current) {
+        setPaymentStatus('pending');
+        toast.error('查询失败，请稍后重试或联系客服。');
+      }
     } finally {
-      setManualCheckLoading(false);
+      if (checkoutIdRef.current === requestedCheckoutId && isOpenRef.current) setManualCheckLoading(false);
     }
   };
 
@@ -341,12 +410,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   };
 
   const qrCodeValue = activeOrder?.qr_code || activeOrder?.payment_url || '';
+  const activeMethodEnabled = Boolean(activeOrder && methods.includes(activeOrder.pay_type));
   const invoiceProfileAction = getInvoiceProfileAction(eligibility?.reason);
   const agreementReady = !isAgreementRequired || agreementAccepted;
   const baseAmount = String(ordinaryOrder?.base_amount ?? selectedPackage?.price ?? '');
   const priceChanged = selectedPackage?.price !== null && selectedPackage?.price !== undefined && Number(baseAmount) !== Number(selectedPackage.price);
   const priceReady = !priceChanged || acceptedBaseAmount === baseAmount;
   const paymentReady = agreementReady && priceReady && (!invoiceSelected || (eligibility?.eligible === true && Boolean(invoiceOrder)));
+  const actionsDisabled = switchingPaymentMethod || creatingInvoiceOrder || promotionActionLoading || cashbackActionLoading;
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} size="lg" scrollBehavior="inside" hideCloseButton={paymentStatus === 'success'} classNames={{ base: 'max-h-[92vh] mx-2 sm:mx-0', body: 'py-4 sm:py-6 overflow-y-auto', footer: 'border-t border-divider bg-background sticky bottom-0' }}>
@@ -363,6 +434,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               variant="flat"
               startContent={<TicketPercent className="h-4 w-4" />}
               onPress={() => setPromotionPanelOpen((current) => !current)}
+              isDisabled={actionsDisabled}
               aria-label="使用优惠码"
             >
               {activePromotion ? `已优惠 ¥${activePromotion.discount_amount}` : '使用优惠码'}
@@ -391,11 +463,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   />
                   <div className="flex shrink-0 gap-2 sm:pt-1">
                     {activePromotion && (
-                      <Button size="sm" variant="light" onPress={handleRemovePromotion} isDisabled={promotionActionLoading}>
+                      <Button size="sm" variant="light" onPress={handleRemovePromotion} isDisabled={actionsDisabled}>
                         不使用优惠
                       </Button>
                     )}
-                    <Button size="sm" color="secondary" onPress={handleApplyPromotion} isLoading={promotionActionLoading}>
+                    <Button size="sm" color="secondary" onPress={handleApplyPromotion} isLoading={promotionActionLoading} isDisabled={switchingPaymentMethod}>
                       使用
                     </Button>
                   </div>
@@ -409,7 +481,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               <CardBody className="gap-3 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-start gap-2"><WalletCards className="mt-0.5 h-4 w-4 text-success" /><div><p className="text-sm font-medium">返现余额抵扣</p><p className="text-xs text-default-500">可用余额 ¥{cashbackCredit.available_amount}，开启后自动最大抵扣{Number(cashbackCredit.min_payable_amount || 0) > 0 ? `，保留现金 ¥${Number(cashbackCredit.min_payable_amount).toFixed(2)}` : ''}</p></div></div>
-                  <Switch aria-label="使用返现余额抵扣" isSelected={cashbackSelected} onValueChange={handleCashbackSwitch} isDisabled={cashbackActionLoading || invoiceSelected} />
+                  <Switch aria-label="使用返现余额抵扣" isSelected={cashbackSelected} onValueChange={handleCashbackSwitch} isDisabled={actionsDisabled || invoiceSelected} />
                 </div>
                 <p className="text-xs text-danger">成功购买后，返现余额抵扣部分不支持退回。</p>
               </CardBody>
@@ -436,12 +508,15 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               )}
 
               <div className="text-center">
-                {paymentStatus === 'pending' && !qrCodeExpired && paymentReady && (
+                {paymentStatus === 'pending' && !qrCodeExpired && !activeOrder.settled && (
                   <div className="space-y-4">
-                    <div className="flex items-center justify-center gap-2"><QrCode className="h-5 w-5 text-primary" /><span className="text-base font-medium">{activeOrder.pay_type === 'wxpay' ? '请使用微信扫码支付' : '请扫码支付'}</span></div>
-                    <p className="text-sm text-default-500">本次结账 5 分钟内有效，请尽快完成支付</p>
-                    {qrCodeValue && <div className="flex justify-center"><Card className="relative p-4 shadow-sm sm:p-6"><motion.img key={activeOrder.order_id} src={generateQRCodeDataUrl(qrCodeValue)} alt="支付二维码" className="h-44 w-44 sm:h-52 sm:w-52" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} /></Card></div>}
-                    {activeOrder.payment_url && <a href={activeOrder.payment_url} target="_blank" rel="noopener noreferrer"><Button variant="flat" color="primary" endContent={<ExternalLink className="h-4 w-4" />}>打开支付页面</Button></a>}
+                    <PaymentMethodSelector methods={methods} value={paymentMethod} onChange={handlePaymentMethodChange} isDisabled={actionsDisabled} isLoading={switchingPaymentMethod} />
+                    {!activeMethodEnabled && <p className="rounded-lg bg-warning-50 px-4 py-3 text-sm text-warning-700">当前支付方式已关闭，请选择其他可用方式。</p>}
+                    {paymentReady && activeMethodEnabled && !switchingPaymentMethod && <>
+                      <p className="text-sm text-default-500">本次结账 5 分钟内有效，请尽快完成支付</p>
+                      {qrCodeValue && <div className="flex justify-center"><Card className="relative p-4 shadow-sm sm:p-6"><motion.img key={activeOrder.order_id} src={generateQRCodeDataUrl(qrCodeValue)} alt={`${paymentMethodLabel(activeOrder.pay_type)}支付二维码`} className="h-44 w-44 sm:h-52 sm:w-52" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} /></Card></div>}
+                      {activeOrder.payment_url && <a href={activeOrder.payment_url} target="_blank" rel="noopener noreferrer"><Button variant="flat" color="primary" endContent={<ExternalLink className="h-4 w-4" />}>打开{activeOrder.pay_type === 'alipay' ? '支付宝' : '微信'}支付页面</Button></a>}
+                    </>}
                   </div>
                 )}
                 {paymentStatus === 'pending' && !qrCodeExpired && (
@@ -536,7 +611,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                       <Switch
                         size="sm"
                         isSelected={invoiceSelected}
-                        isDisabled={!agreementReady || creatingInvoiceOrder || promotionActionLoading || eligibilityLoading || eligibility?.reason === 'below_threshold'}
+                        isDisabled={!agreementReady || actionsDisabled || eligibilityLoading || eligibility?.reason === 'below_threshold'}
                         onValueChange={handleInvoiceSwitch}
                         aria-label="是否开票"
                         classNames={{ label: 'text-xs text-default-500' }}
@@ -549,7 +624,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               </div>
               <div className="ml-auto flex items-center gap-2">
                 <Button variant="light" onPress={handleClose}>取消支付</Button>
-                <Button color="success" onPress={handleManualCheck} isLoading={manualCheckLoading} isDisabled={!paymentReady}>我已完成支付</Button>
+                <Button color="success" onPress={handleManualCheck} isLoading={manualCheckLoading} isDisabled={!paymentReady || actionsDisabled}>我已完成支付</Button>
               </div>
             </div>
           )}

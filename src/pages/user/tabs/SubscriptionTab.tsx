@@ -6,7 +6,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Card, CardBody, Button, Chip, Input, Spinner, Tab, Tabs, Tooltip } from '@heroui/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Package, Star, Crown, AlertCircle, Calendar, Timer, ChevronDown, Info } from 'lucide-react';
-import { packageUserApi, orderUserApi, teamUserApi, userInfoApi } from '../../../services/userApi';
+import { packageUserApi, orderUserApi, teamUserApi, userInfoApi, type PaymentMethod } from '../../../services/userApi';
 import { toast } from '../../../utils/toast';
 import { useIsMobile } from '../../../hooks/useIsMobile';
 import { useWhiteLabel } from '../../../contexts/WhiteLabelContext';
@@ -36,6 +36,8 @@ export const SubscriptionTab: React.FC = () => {
   const [invoiceOrder, setInvoiceOrder] = useState<OrderInfo | null>(null);
   const [orderLoading, setOrderLoading] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('wxpay');
+  const activeCheckoutIdRef = React.useRef<string | undefined>(undefined);
   const [selectedCategory, setSelectedCategory] = useState<SubscriptionType>('yearly');
   const [showSubscriptionGuide, setShowSubscriptionGuide] = useState(false);
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
@@ -46,12 +48,15 @@ export const SubscriptionTab: React.FC = () => {
   const [activeSubscription, setActiveSubscription] = useState<{ level: string; priority: number } | null>(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(true);
   const [subscriptionError, setSubscriptionError] = useState('');
+  activeCheckoutIdRef.current = ordinaryOrder?.checkout_id;
+
 
   const isMobileDevice = useIsMobile();
-  const { loading: siteLoading, subscription_notice: subscriptionNotice, features } = useWhiteLabel();
+  const { loading: siteLoading, subscription_notice: subscriptionNotice, features, payment_methods: paymentMethods } = useWhiteLabel();
   const canPurchaseOnline = features.online_purchase;
   const canExchangeCdk = features.cdk_exchange;
   const canUseTeam = features.team;
+  const firstPaymentMethod = paymentMethods[0];
   const { isRequired: isAgreementRequired } = useUserAgreementRequirement();
   const navigate = useNavigate();
 
@@ -189,6 +194,10 @@ export const SubscriptionTab: React.FC = () => {
 
   // 创建订单
   const createOrder = async (pkg: PackageInfo) => {
+    if (!firstPaymentMethod) {
+      toast.warning('当前暂未开放在线支付');
+      return;
+    }
     if (teamMembershipLoading) {
       toast.info('正在确认组织团队状态，请稍后');
       return;
@@ -206,17 +215,16 @@ export const SubscriptionTab: React.FC = () => {
     try {
       setOrderLoading(true);
       setSelectedPackage(pkg);
-
-      const requestData = isMobileDevice ? { device: 'mobile' as const } : {};
-      const response = await orderUserApi.createOrder(pkg.id, requestData);
-
+      const response = await orderUserApi.createOrder(pkg.id, {
+        ...(isMobileDevice ? { device: 'mobile' as const } : {}),
+        payment_method: firstPaymentMethod,
+      });
       if (response.code === 20000) {
-        setOrdinaryOrder({ ...response.data, invoice_snapshot: response.data.invoice_snapshot || null });
+        const responseMethod = response.data.pay_type as PaymentMethod;
+        setSelectedPaymentMethod(responseMethod);
+        setOrdinaryOrder({ ...response.data, qr_code: response.data.qr_code || '', pay_type: responseMethod, invoice_snapshot: response.data.invoice_snapshot || null });
         setPaymentModalOpen(true);
-
-      } else {
-        toast.error(response.msg || '创建订单失败');
-      }
+      } else toast.error(response.msg || '创建订单失败');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '网络错误');
     } finally {
@@ -224,19 +232,23 @@ export const SubscriptionTab: React.FC = () => {
     }
   };
 
-  const createInvoiceOrder = async () => {
+  const createInvoiceOrder = async (targetCheckoutId?: string) => {
     if (isAgreementRequired && !agreementAccepted) return null;
-    if (!selectedPackage || !ordinaryOrder?.checkout_id || invoiceOrder) return null;
+    const checkoutId = targetCheckoutId || ordinaryOrder?.checkout_id;
+    if (!selectedPackage || !checkoutId || (invoiceOrder && invoiceOrder.checkout_id === checkoutId)) return null;
     setOrderLoading(true);
     try {
       const response = await orderUserApi.createOrder(selectedPackage.id, {
-        ...(isMobileDevice ? { device: 'mobile' } : {}),
+        ...(isMobileDevice ? { device: 'mobile' as const } : {}),
+        payment_method: selectedPaymentMethod,
         invoice_requested: true,
-        checkout_id: ordinaryOrder.checkout_id,
+        checkout_id: checkoutId,
       });
       if (response.code === 20000) {
-        setInvoiceOrder({ ...response.data, invoice_snapshot: response.data.invoice_snapshot || null });
-        return { ...response.data, invoice_snapshot: response.data.invoice_snapshot || null };
+        if (activeCheckoutIdRef.current !== checkoutId) return null;
+        const nextOrder = { ...response.data, qr_code: response.data.qr_code || '', pay_type: response.data.pay_type as PaymentMethod, invoice_snapshot: response.data.invoice_snapshot || null };
+        setInvoiceOrder((current) => current?.checkout_id === checkoutId ? current : nextOrder);
+        return nextOrder;
       } else {
         toast.error(response.msg || '创建开票订单失败');
         return null;
@@ -249,23 +261,62 @@ export const SubscriptionTab: React.FC = () => {
     }
   };
 
+  const switchPaymentMethod = async (paymentMethod: PaymentMethod, invoiceRequested: boolean) => {
+    const checkoutId = ordinaryOrder?.checkout_id;
+    const sourceOrder = invoiceRequested ? invoiceOrder : ordinaryOrder;
+    if (!checkoutId || !sourceOrder || sourceOrder.settled) return null;
+    try {
+      const response = await orderUserApi.getCheckoutPayment(
+        checkoutId,
+        paymentMethod,
+        invoiceRequested,
+        isMobileDevice ? 'mobile' : 'pc',
+      );
+      if (response.code !== 20000 || !response.data) {
+        toast.error(response.msg || '切换支付方式失败');
+        return null;
+      }
+      if (activeCheckoutIdRef.current !== checkoutId) return null;
+      const nextOrder = {
+        ...sourceOrder,
+        ...response.data,
+        qr_code: response.data.qr_code || '',
+        invoice_snapshot: sourceOrder.invoice_snapshot || null,
+      };
+      if (invoiceRequested) {
+        setInvoiceOrder((current) => current?.checkout_id === checkoutId ? nextOrder : current);
+      } else {
+        setOrdinaryOrder((current) => current?.checkout_id === checkoutId ? nextOrder : current);
+      }
+      setSelectedPaymentMethod(paymentMethod);
+      return nextOrder;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '切换支付方式失败');
+      return null;
+    }
+  };
+
   const applyPromotionCode = async (promotionCode: string) => {
     if (isAgreementRequired && !agreementAccepted) return null;
     if (!selectedPackage) return null;
+    const previousCheckoutId = ordinaryOrder?.checkout_id;
     setOrderLoading(true);
     try {
       const response = await orderUserApi.createOrder(selectedPackage.id, {
         ...(isMobileDevice ? { device: 'mobile' as const } : {}),
+        payment_method: selectedPaymentMethod,
         promotion_code: promotionCode,
-        replace_checkout_id: ordinaryOrder?.checkout_id,
+        replace_checkout_id: previousCheckoutId,
       });
       if (response.code !== 20000) {
         toast.error(response.msg || '优惠码使用失败');
         return null;
       }
-      const nextOrder = { ...response.data, invoice_snapshot: response.data.invoice_snapshot || null };
-      setOrdinaryOrder(nextOrder);
-      setInvoiceOrder(null);
+      if (activeCheckoutIdRef.current !== previousCheckoutId) return null;
+      const nextOrder = { ...response.data, qr_code: response.data.qr_code || '', pay_type: response.data.pay_type as PaymentMethod, invoice_snapshot: response.data.invoice_snapshot || null };
+      activeCheckoutIdRef.current = nextOrder.checkout_id;
+      setOrdinaryOrder((current) => current?.checkout_id === previousCheckoutId ? nextOrder : current);
+      setInvoiceOrder((current) => current?.checkout_id === previousCheckoutId ? null : current);
       toast.success(nextOrder.promotion_code
         ? `优惠码 ${nextOrder.promotion_code} 已使用`
         : '已恢复套餐原价');
@@ -281,21 +332,25 @@ export const SubscriptionTab: React.FC = () => {
   const applyCashbackCredit = async (useCashback: boolean) => {
     if (isAgreementRequired && !agreementAccepted) return null;
     if (!selectedPackage || !ordinaryOrder?.checkout_id) return null;
+    const previousCheckoutId = ordinaryOrder.checkout_id;
     setOrderLoading(true);
     try {
       const response = await orderUserApi.createOrder(selectedPackage.id, {
         ...(isMobileDevice ? { device: 'mobile' as const } : {}),
+        payment_method: selectedPaymentMethod,
         promotion_code: ordinaryOrder.promotion_code || undefined,
         use_cashback_credit: useCashback,
-        replace_checkout_id: ordinaryOrder.checkout_id,
+        replace_checkout_id: previousCheckoutId,
       });
       if (response.code !== 20000) {
         toast.error(response.msg || '返现余额抵扣失败');
         return null;
       }
-      const nextOrder = { ...response.data, invoice_snapshot: response.data.invoice_snapshot || null };
-      setOrdinaryOrder(nextOrder);
-      setInvoiceOrder(null);
+      if (activeCheckoutIdRef.current !== previousCheckoutId) return null;
+      const nextOrder = { ...response.data, qr_code: response.data.qr_code || '', pay_type: response.data.pay_type as PaymentMethod, invoice_snapshot: response.data.invoice_snapshot || null };
+      activeCheckoutIdRef.current = nextOrder.checkout_id;
+      setOrdinaryOrder((current) => current?.checkout_id === previousCheckoutId ? nextOrder : current);
+      setInvoiceOrder((current) => current?.checkout_id === previousCheckoutId ? null : current);
       if (nextOrder.settled) toast.success('返现余额支付成功');
       else toast.success(useCashback ? `已抵扣 ¥${nextOrder.cashback_credit_amount}` : '已取消返现抵扣');
       return nextOrder;
@@ -759,6 +814,7 @@ export const SubscriptionTab: React.FC = () => {
 
       <PaymentModal
         isOpen={paymentModalOpen}
+        methods={paymentMethods}
         selectedPackage={selectedPackage}
         ordinaryOrder={ordinaryOrder}
         invoiceOrder={invoiceOrder}
@@ -768,9 +824,12 @@ export const SubscriptionTab: React.FC = () => {
         onApplyPromotionCode={applyPromotionCode}
         cashbackActionLoading={orderLoading}
         onApplyCashbackCredit={applyCashbackCredit}
+        onPaymentMethodChange={switchPaymentMethod}
+        paymentMethod={selectedPaymentMethod}
         agreementAccepted={agreementAccepted}
         onAgreementValueChange={setAgreementAccepted}
         onClose={() => {
+          activeCheckoutIdRef.current = undefined;
           setPaymentModalOpen(false);
           setOrdinaryOrder(null);
           setInvoiceOrder(null);

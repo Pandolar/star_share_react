@@ -17,6 +17,7 @@ export interface SiteModePayload {
     logo_url: string;
     customer_service_url: string;
     features: Partial<Record<SiteFeatureName, boolean>>;
+    payment_methods: PaymentMethod[];
     notice: string;
     notice_id: string;
     enable_register: boolean;
@@ -333,8 +334,27 @@ export const packageUserApi = {
     },
 };
 
+export type PaymentMethod = 'wxpay' | 'alipay';
+
+export interface CheckoutPayment {
+    success: boolean;
+    trade_no: string;
+    order_id: string;
+    checkout_id: string;
+    package_id: number;
+    payment_url: string | null;
+    qr_code: string | null;
+    channel: string;
+    pay_type: PaymentMethod;
+    payable_amount: string;
+    invoice_requested: boolean;
+    expires_at: string | null;
+    expires_in_seconds: number;
+}
+
 export interface CreateOrderOptions {
     device?: 'mobile' | 'pc';
+    payment_method?: PaymentMethod;
     invoice_requested?: boolean;
     checkout_id?: string;
     promotion_code?: string;
@@ -413,13 +433,25 @@ export const orderUserApi = {
         });
     },
 
+    getCheckoutPayment: async (
+        checkout_id: string,
+        payment_method: PaymentMethod,
+        invoice_requested = false,
+        device: 'mobile' | 'pc' = 'pc',
+    ): Promise<ApiResponse<CheckoutPayment>> => {
+        return createUserRequest(getUserApiUrl('/u/checkout_payment'), {
+            method: 'POST',
+            body: JSON.stringify({ checkout_id, payment_method, invoice_requested, device }),
+        });
+    },
+
     getCheckoutStatus: async (checkout_id: string): Promise<ApiResponse<{
         paid: boolean;
         winning_order_id: string | null;
         invoice_requested: boolean | null;
         expires_at?: string | null;
         expires_in_seconds?: number;
-        orders: Array<{ order_id: string; invoice_requested: boolean; status: string }>;
+        orders: Array<{ order_id: string; invoice_requested: boolean; payment_method: string | null; status: string }>;
     }>> => {
         return createUserRequest(getUserApiUrl(`/u/checkout_status?checkout_id=${encodeURIComponent(checkout_id)}`), {
             method: 'GET',
@@ -492,14 +524,18 @@ export const resetQuotaApi = {
     },
 
     // 创建重置配额订单（支付成功后清空本周期配额）
-    createOrder: async (extraData?: any): Promise<ApiResponse<{
+    createOrder: async (extraData?: { device?: 'mobile' | 'pc'; payment_method?: PaymentMethod }): Promise<ApiResponse<{
         success: boolean;
         trade_no: string;
         order_id: string;
+        checkout_id: string;
+        expires_at?: string | null;
+        expires_in_seconds?: number;
+        payable_amount?: string;
         payment_url: string | null;
         qr_code: string;
         channel: string;
-        pay_type: string;
+        pay_type: PaymentMethod;
     }>> => {
         return createUserRequest(getUserApiUrl('/u/reset_quota_order'), {
             method: 'POST',
@@ -853,6 +889,7 @@ export interface TeamCheckout {
     package_id: number;
     package_name?: string | null;
     seat_count: number;
+    pay_type?: PaymentMethod;
     base_amount?: string;
     payable_amount?: string;
     payment_url?: string | null;
@@ -895,6 +932,8 @@ export const teamUserApi = {
     getTeam: async (): Promise<ApiResponse<TeamOverview>> => createUserRequest(getUserApiUrl('/u/team'), { method: 'GET' }),
     createOrder: async (params: {
         action: 'initial' | 'change' | 'renewal';
+        payment_method?: PaymentMethod;
+        device?: 'mobile' | 'pc';
         package_id: number;
         seat_count: number;
         team_name?: string;

@@ -46,6 +46,7 @@ import { TeamPlanConfigEditor } from './TeamPlanConfigEditor';
 import { CustomerServiceConfigEditor } from './CustomerServiceConfigEditor';
 import { McpConfigEditor } from './McpConfigEditor';
 import { UserCenterTabBadgesConfigEditor } from './UserCenterTabBadgesConfigEditor';
+import { PaymentMethodsConfigEditor } from './PaymentMethodsConfigEditor';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 const VISUAL_CONFIG_KEYS: Record<string, true> = {
     SPEEDTEST_URL_LIST: true,
@@ -62,6 +63,7 @@ const VISUAL_CONFIG_KEYS: Record<string, true> = {
     COMPENSATION_CONFIG: true,
     BILL_RULE: true,
     TEAM_PLAN_CONFIG: true,
+    PAYMENT_METHODS_CONFIG: true,
 };
 
 /**
@@ -452,6 +454,8 @@ const SettingsManagePage: React.FC = () => {
                     <InviteCashbackSettingsEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!canEditConfig(config)} />
                 ) : config.key === 'TEAM_PLAN_CONFIG' ? (
                     <TeamPlanConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!canEditConfig(config)} packages={packageOptions} />
+                ) : config.key === 'PAYMENT_METHODS_CONFIG' ? (
+                    <PaymentMethodsConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!canEditConfig(config)} />
                 ) : config.key === 'BILL_RULE' ? (
                     <BillRuleConfigEditor value={value} onChange={(json) => updateConfigValue(config.key, json)} disabled={!canEditConfig(config)} legacyType={configValues.BILL_RULE_TYPE || 'fixed'} packageLevels={Array.from(new Set(packageLevels.map((item) => item.level)))} />
                 ) : config.key === 'BILL_RULE_TYPE' ? (

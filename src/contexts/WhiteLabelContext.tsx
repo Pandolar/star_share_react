@@ -21,6 +21,7 @@ const defaultState: SiteState = {
   mode: 'normal', isWhiteLabel: false, site_id: null, distributor_id: null, site_name: '', branding: 'branded', sales_mode: 'online', status: 'active', logo_url: '', customer_service_url: '', loading: true, error: null,
   features: disabledFeatures(), notice: '', notice_id: '', enable_register: false, enable_wechat_login: false, enable_promotion_code: false, subscription_notice: '', user_agreement_url: '',
   enableRegister: false, enableWechatLogin: false, userAgreementUrl: '',
+  payment_methods: [],
 };
 
 const WhiteLabelContext = createContext<SiteState>(defaultState);
@@ -32,19 +33,24 @@ export const WhiteLabelProvider: React.FC<{ children: ReactNode }> = ({ children
   const [state, setState] = useState<SiteState>(defaultState);
   useEffect(() => {
     let mounted = true;
-    void siteModeApi.getSiteMode().then((res) => {
-      if (!mounted) return;
-      if (res.code !== 20000 || !res.data) throw new Error(res.msg || '无法确认当前站点配置');
-      const payload = res.data;
-      const isWhiteLabel = payload.mode === 'whitelabel' || Boolean(payload.is_white_label);
-      const features = { ...disabledFeatures(), ...payload.features };
-      setState({ ...defaultState, ...payload, isWhiteLabel, loading: false, error: null, features, enableRegister: features.register, enableWechatLogin: features.wechat_login, userAgreementUrl: payload.user_agreement_url });
-      if (isWhiteLabel) document.title = payload.site_name || '用户中心';
-    }).catch((error: unknown) => {
-      if (!mounted) return;
-      setState({ ...defaultState, loading: false, error: error instanceof Error ? error.message : '无法确认当前站点配置' });
-    });
-    return () => { mounted = false; };
+    const refresh = () => {
+      if (document.hidden) return;
+      void siteModeApi.getSiteMode().then((res) => {
+        if (!mounted) return;
+        if (res.code !== 20000 || !res.data) throw new Error(res.msg || '无法确认当前站点配置');
+        const payload = res.data;
+        const isWhiteLabel = payload.mode === 'whitelabel' || Boolean(payload.is_white_label);
+        const features = { ...disabledFeatures(), ...payload.features };
+        setState({ ...defaultState, ...payload, isWhiteLabel, loading: false, error: null, features, enableRegister: features.register, enableWechatLogin: features.wechat_login, userAgreementUrl: payload.user_agreement_url });
+        if (isWhiteLabel) document.title = payload.site_name || '用户中心';
+      }).catch((error: unknown) => {
+        if (!mounted) return;
+        setState({ ...defaultState, loading: false, error: error instanceof Error ? error.message : '无法确认当前站点配置' });
+      });
+    };
+    refresh();
+    document.addEventListener('visibilitychange', refresh);
+    return () => { mounted = false; document.removeEventListener('visibilitychange', refresh); };
   }, []);
   return <WhiteLabelContext.Provider value={state}>{children}</WhiteLabelContext.Provider>;
 };

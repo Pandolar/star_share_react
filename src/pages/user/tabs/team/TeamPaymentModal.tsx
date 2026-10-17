@@ -3,18 +3,23 @@ import { Button, Card, CardBody, Chip, Modal, ModalBody, ModalContent, ModalFoot
 import { motion } from 'framer-motion';
 import { CheckCircle2, Clock3, ExternalLink, QrCode, ReceiptText, RefreshCw, TriangleAlert, UserRoundCog } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { orderUserApi, teamUserApi, type InvoiceEligibility, type TeamCheckout } from '../../../../services/userApi';
+import { orderUserApi, teamUserApi, type InvoiceEligibility, type TeamCheckout, type PaymentMethod } from '../../../../services/userApi';
+import { PaymentMethodSelector, paymentMethodLabel } from '../../../../components/PaymentMethodSelector';
+import { toast } from '../../../../utils/toast';
 import { celebrateSuccess } from '../../../../utils/confetti';
 import { getCheckoutRemainingMs } from '../subscription/checkoutExpiry';
 import { generateQRCodeDataUrl } from '../subscription/qrCode';
+import { useIsMobile } from '../../../../hooks/useIsMobile';
 
 interface TeamPaymentModalProps {
   isOpen: boolean;
+  methods: readonly PaymentMethod[];
   checkout: TeamCheckout | null;
   onClose: () => void;
   onSuccess: () => void | Promise<void>;
   onExpired: () => void | Promise<void>;
   onCreateInvoiceOrder: () => Promise<TeamCheckout | null>;
+  onCheckoutChange?: (checkout: TeamCheckout) => void;
 }
 
 type PaymentState = 'pending' | 'success' | 'expired' | 'failed';
@@ -40,13 +45,16 @@ const INVOICE_REASON: Record<string, string> = {
 
 export const TeamPaymentModal: React.FC<TeamPaymentModalProps> = ({
   isOpen,
+  methods,
   checkout,
   onClose,
   onSuccess,
   onExpired,
   onCreateInvoiceOrder,
+  onCheckoutChange,
 }) => {
   const navigate = useNavigate();
+  const isMobileDevice = useIsMobile();
   const [paymentState, setPaymentState] = useState<PaymentState>('pending');
   const [remainingMs, setRemainingMs] = useState(0);
   const [manualChecking, setManualChecking] = useState(false);
@@ -54,35 +62,53 @@ export const TeamPaymentModal: React.FC<TeamPaymentModalProps> = ({
   const [invoiceEligibility, setInvoiceEligibility] = useState<InvoiceEligibility | null>(null);
   const [invoiceEligibilityLoading, setInvoiceEligibilityLoading] = useState(false);
   const [invoiceCreationFailed, setInvoiceCreationFailed] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(checkout?.pay_type || 'wxpay');
+  const [switchingMethod, setSwitchingMethod] = useState(false);
   const settledRef = useRef(false);
+  const requestRef = useRef(0);
+  const deadlineRef = useRef<{ checkoutId: string; deadline: number } | null>(null);
+  const activeCheckoutRef = useRef<string | null>(null);
+  const checkoutSnapshotRef = useRef(checkout);
+  checkoutSnapshotRef.current = checkout;
+  const onSuccessRef = useRef(onSuccess);
+  const onExpiredRef = useRef(onExpired);
+  useEffect(() => { onSuccessRef.current = onSuccess; }, [onSuccess]);
+  useEffect(() => { onExpiredRef.current = onExpired; }, [onExpired]);
+
+  useEffect(() => {
+    activeCheckoutRef.current = isOpen ? checkout?.checkout_id || null : null;
+    if (!isOpen) requestRef.current += 1;
+  }, [checkout?.checkout_id, isOpen]);
 
   const finishSuccess = useCallback(async () => {
     if (settledRef.current) return;
     settledRef.current = true;
     setPaymentState('success');
     celebrateSuccess();
-    await onSuccess();
-  }, [onSuccess]);
+    await onSuccessRef.current();
+  }, []);
 
   const finishExpired = useCallback(async () => {
     if (settledRef.current) return;
     settledRef.current = true;
     setPaymentState('expired');
-    await onExpired();
-  }, [onExpired]);
+    await onExpiredRef.current();
+  }, []);
 
   const checkStatus = useCallback(async () => {
-    if (!checkout?.checkout_id || settledRef.current) return;
+    const checkoutId = checkout?.checkout_id;
+    if (!checkoutId || settledRef.current) return;
     try {
-      const response = await orderUserApi.getCheckoutStatus(checkout.checkout_id);
-      if (response.code !== 20000 || !response.data) return;
+      const response = await orderUserApi.getCheckoutStatus(checkoutId);
+      if (activeCheckoutRef.current !== checkoutId || settledRef.current || response.code !== 20000 || !response.data) return;
       if (response.data.paid) {
         await finishSuccess();
         return;
       }
       const order = response.data.orders.find((item) => item.order_id === checkout.order_id);
-      if (order?.status === 'failed' || response.data.expires_in_seconds === 0) {
-        await finishExpired();
+      const allFailed = response.data.orders.length > 0 && response.data.orders.every((item) => item.status === 'failed');
+      if ((order?.status === 'failed' && allFailed) || response.data.expires_in_seconds === 0) {
+        if (activeCheckoutRef.current === checkoutId && !settledRef.current) await finishExpired();
       }
     } catch {
       // A transient polling failure must not replace the recoverable payment state.
@@ -90,13 +116,16 @@ export const TeamPaymentModal: React.FC<TeamPaymentModalProps> = ({
   }, [checkout, finishExpired, finishSuccess]);
 
   useEffect(() => {
-    if (!isOpen || !checkout) return;
+    if (!isOpen || !checkout?.checkout_id) return;
     settledRef.current = false;
     setPaymentState('pending');
     setManualChecking(false);
-    const initialRemaining = getCheckoutRemainingMs(checkout);
-    const deadline = Date.now() + initialRemaining;
-    setRemainingMs(initialRemaining);
+    const initialRemaining = getCheckoutRemainingMs(checkoutSnapshotRef.current || {});
+    if (!deadlineRef.current || deadlineRef.current.checkoutId !== checkout.checkout_id) {
+      deadlineRef.current = { checkoutId: checkout.checkout_id, deadline: Date.now() + initialRemaining };
+    }
+    const deadline = deadlineRef.current.deadline;
+    setRemainingMs(Math.max(0, deadline - Date.now()));
 
     const countdown = window.setInterval(() => {
       const next = Math.max(0, deadline - Date.now());
@@ -104,16 +133,17 @@ export const TeamPaymentModal: React.FC<TeamPaymentModalProps> = ({
       if (next === 0) void finishExpired();
     }, 1000);
     return () => window.clearInterval(countdown);
-  }, [checkout, finishExpired, isOpen]);
+  }, [checkout?.checkout_id, finishExpired, isOpen]);
 
   useEffect(() => {
-    if (!isOpen || !checkout) return;
-    setInvoiceSelected(Boolean(checkout.invoice_requested));
+    const invoiceCheckout = checkoutSnapshotRef.current;
+    if (!isOpen || !invoiceCheckout) return;
+    setInvoiceSelected(Boolean(invoiceCheckout.invoice_requested));
     setInvoiceCreationFailed(false);
     setInvoiceEligibility(null);
     setInvoiceEligibilityLoading(true);
     let cancelled = false;
-    void teamUserApi.getInvoiceEligibility(checkout.package_id, checkout.seat_count)
+    void teamUserApi.getInvoiceEligibility(invoiceCheckout.package_id, invoiceCheckout.seat_count)
       .then((response) => {
         if (!cancelled) setInvoiceEligibility(response.code === 20000 ? response.data || null : null);
       })
@@ -124,7 +154,11 @@ export const TeamPaymentModal: React.FC<TeamPaymentModalProps> = ({
         if (!cancelled) setInvoiceEligibilityLoading(false);
       });
     return () => { cancelled = true; };
-  }, [checkout, isOpen]);
+  }, [checkout?.checkout_id, checkout?.package_id, checkout?.seat_count, checkout?.invoice_requested, isOpen]);
+
+  useEffect(() => {
+    if (isOpen && checkout?.checkout_id) setPaymentMethod(checkout.pay_type || 'wxpay');
+  }, [checkout?.checkout_id, checkout?.pay_type, isOpen]);
 
   useEffect(() => {
     if (!isOpen || !checkout?.checkout_id || paymentState !== 'pending') return;
@@ -145,30 +179,73 @@ export const TeamPaymentModal: React.FC<TeamPaymentModalProps> = ({
     if (!created) setInvoiceCreationFailed(true);
   };
 
+  const handlePaymentMethodChange = async (method: PaymentMethod) => {
+    if (!checkout?.checkout_id || method === paymentMethod || switchingMethod || settledRef.current) return;
+    const checkoutId = checkout.checkout_id;
+    const requestId = ++requestRef.current;
+    setSwitchingMethod(true);
+    try {
+      const response = await orderUserApi.getCheckoutPayment(checkoutId, method, Boolean(checkout.invoice_requested), isMobileDevice ? 'mobile' : 'pc');
+      if (requestRef.current !== requestId || activeCheckoutRef.current !== checkoutId || settledRef.current) return;
+      if (response.code !== 20000 || !response.data) throw new Error(response.msg || '切换支付方式失败');
+      const payment = response.data;
+      const nextCheckout: TeamCheckout = {
+        ...checkout,
+        order_id: payment.order_id,
+        checkout_id: payment.checkout_id,
+        pay_type: payment.pay_type,
+        payment_url: payment.payment_url,
+        qr_code: payment.qr_code || '',
+        payable_amount: payment.payable_amount,
+        invoice_requested: payment.invoice_requested,
+        expires_at: payment.expires_at,
+        expires_in_seconds: payment.expires_in_seconds,
+      };
+      setPaymentMethod(payment.pay_type);
+      onCheckoutChange?.(nextCheckout);
+    } catch (requestError) {
+      if (requestRef.current === requestId) toast.error(requestError instanceof Error ? requestError.message : '切换支付方式失败');
+    } finally {
+      if (requestRef.current === requestId) setSwitchingMethod(false);
+    }
+  };
+
   const goToInvoiceProfile = (openEdit: 'email' | 'billing_profile') => {
     onClose();
     navigate('/user-center?tab=profile', { state: { openEdit } });
   };
 
   const handleManualCheck = async () => {
-    if (!checkout) return;
+    const checkoutId = checkout?.checkout_id;
+    if (!checkoutId) return;
     setManualChecking(true);
     try {
-      await orderUserApi.forceGetPayStatus(checkout.order_id);
+      const response = await orderUserApi.getCheckoutStatus(checkoutId);
+      if (activeCheckoutRef.current !== checkoutId || settledRef.current) return;
+      if (response.code !== 20000 || !response.data) throw new Error(response.msg || '查询支付状态失败');
+      await Promise.all(response.data.orders.filter((order) => order.status === 'pending').map((order) => orderUserApi.forceGetPayStatus(order.order_id)));
+      if (activeCheckoutRef.current !== checkoutId || settledRef.current) return;
       await checkStatus();
-    } catch {
-      setPaymentState('failed');
+    } catch (requestError) {
+      if (activeCheckoutRef.current === checkoutId && !settledRef.current) {
+        setPaymentState('failed');
+        toast.error(requestError instanceof Error ? requestError.message : '查询支付状态失败');
+      }
     } finally {
-      setManualChecking(false);
+      if (activeCheckoutRef.current === checkoutId) setManualChecking(false);
     }
   };
 
   const qrCodeValue = checkout?.qr_code || checkout?.payment_url || '';
+  const activeMethodEnabled = Boolean(checkout?.pay_type && methods.includes(checkout.pay_type));
   const actionLabel = ACTION_LABELS[checkout?.action || 'initial'];
+  const methodLabel = paymentMethodLabel(checkout?.pay_type || paymentMethod);
+  const jumpText = methodLabel === '支付宝' ? '打开支付宝支付页面' : '打开微信支付页面';
   const totalMinutes = 5 * 60 * 1000;
   const progressValue = Math.max(0, Math.min(100, (remainingMs / totalMinutes) * 100));
   const invoicePoints = Number(checkout?.invoice_snapshot?.surcharge_rate || invoiceEligibility?.surcharge_rate || 0) * 100;
   const paymentReady = !invoiceSelected || Boolean(checkout?.invoice_requested);
+  const paymentBusy = switchingMethod || manualChecking;
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="lg" placement="center" scrollBehavior="inside">
       <ModalContent>
@@ -204,6 +281,9 @@ export const TeamPaymentModal: React.FC<TeamPaymentModalProps> = ({
             </div>
           ) : (
             <div className="space-y-4">
+              <PaymentMethodSelector methods={methods} value={checkout?.pay_type || paymentMethod} onChange={(method) => void handlePaymentMethodChange(method)} isDisabled={paymentBusy || !checkout?.checkout_id} isLoading={switchingMethod} />
+              {!activeMethodEnabled && <p className="rounded-lg bg-warning-50 px-4 py-3 text-center text-sm text-warning-700">当前支付方式已关闭，请选择其他可用方式。</p>}
+              {switchingMethod && <div className="flex items-center justify-center gap-2 py-8 text-sm text-default-500"><Spinner size="sm" />正在切换支付方式...</div>}
               <Card shadow="none" className="border border-default-200 bg-default-50">
                 <CardBody className="grid gap-3 p-4 sm:grid-cols-3">
                   <div>
@@ -251,29 +331,16 @@ export const TeamPaymentModal: React.FC<TeamPaymentModalProps> = ({
               )}
 
 
-              {paymentReady && (
+              {!switchingMethod && paymentReady && activeMethodEnabled && (
                 <div className="flex flex-col items-center gap-3 py-1">
                   {qrCodeValue ? (
                     <Card className="p-4 shadow-sm">
-                      <motion.img
-                        key={checkout?.order_id}
-                        src={generateQRCodeDataUrl(qrCodeValue)}
-                        alt="团队订阅支付二维码"
-                        className="h-48 w-48 sm:h-52 sm:w-52"
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                      />
+                      <motion.img key={checkout?.order_id} src={generateQRCodeDataUrl(qrCodeValue)} alt={`${methodLabel}团队订阅支付二维码`} className="h-48 w-48 sm:h-52 sm:w-52" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} />
                     </Card>
-                  ) : (
-                    <div className="flex h-52 w-52 items-center justify-center rounded-lg border border-dashed border-default-300 text-center text-sm text-default-500">支付链接暂不可用<br />请关闭后重新生成</div>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <Clock3 className="h-4 w-4 text-warning-600" />
-                    <span className="text-sm text-default-600">请在 {formatCountdown(remainingMs)} 内完成支付</span>
-                    {paymentState === 'failed' && <Chip size="sm" color="warning" variant="flat">查询失败，可重试</Chip>}
-                  </div>
+                  ) : <div className="flex h-52 w-52 items-center justify-center rounded-lg border border-dashed border-default-300 text-center text-sm text-default-500">支付链接暂不可用<br />请关闭后重新生成</div>}
+                  <div className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-warning-600" /><span className="text-sm text-default-600">请在 {formatCountdown(remainingMs)} 内完成支付</span>{paymentState === 'failed' && <Chip size="sm" color="warning" variant="flat">查询失败，可重试</Chip>}</div>
                   <Progress aria-label="支付订单剩余时间" value={progressValue} color={progressValue < 20 ? 'warning' : 'primary'} size="sm" className="max-w-sm" />
-                  {checkout?.payment_url && <Button as="a" href={checkout.payment_url} target="_blank" rel="noopener noreferrer" variant="flat" color="primary" endContent={<ExternalLink className="h-4 w-4" />}>打开支付页面</Button>}
+                  {checkout?.payment_url && <Button as="a" href={checkout.payment_url} target="_blank" rel="noopener noreferrer" variant="flat" color="primary" endContent={<ExternalLink className="h-4 w-4" />}>{jumpText}</Button>}
                 </div>
               )}
             </div>
@@ -286,7 +353,7 @@ export const TeamPaymentModal: React.FC<TeamPaymentModalProps> = ({
                 <Switch
                   size="sm"
                   isSelected={invoiceSelected}
-                  isDisabled={invoiceEligibilityLoading || Boolean(checkout?.invoice_requested)}
+                  isDisabled={invoiceEligibilityLoading || paymentBusy || Boolean(checkout?.invoice_requested)}
                   onValueChange={(selected) => void handleInvoiceSwitch(selected)}
                   aria-label="是否开票"
                 >
@@ -296,9 +363,9 @@ export const TeamPaymentModal: React.FC<TeamPaymentModalProps> = ({
             </Tooltip>
           )}
           <div className="ml-auto flex items-center gap-2">
-            <Button variant="light" onPress={onClose}>{paymentState === 'success' ? '完成' : '稍后支付'}</Button>
+            <Button variant="light" onPress={onClose} isDisabled={switchingMethod}>{paymentState === 'success' ? '完成' : '稍后支付'}</Button>
             {(paymentState === 'pending' || paymentState === 'failed') && (
-              <Button color="success" onPress={handleManualCheck} isLoading={manualChecking} isDisabled={!paymentReady} startContent={!manualChecking && <RefreshCw className="h-4 w-4" />}>我已完成支付</Button>
+              <Button color="success" onPress={handleManualCheck} isLoading={manualChecking} isDisabled={!paymentReady || switchingMethod} startContent={!manualChecking && <RefreshCw className="h-4 w-4" />}>我已完成支付</Button>
             )}
           </div>
         </ModalFooter>
