@@ -1,6 +1,9 @@
 #!/bin/sh
 set -eu
 
+# Public static files must stay readable even when launched after a private backup.
+umask 022
+
 # Execute a private snapshot so `git pull` may safely replace this script while it runs.
 if [ "${DEPLOY_SCRIPT_STAGED:-0}" != 1 ]; then
     original_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
