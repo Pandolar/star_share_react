@@ -27,11 +27,15 @@ export default function SiteEditor({ site, distributor = false, canManage = true
   useEffect(() => { setDraft(site); setDomainText(site.domains.join('\n')); }, [site]);
   const allowed = (permission: SiteEditPermission) => canManage && (!distributor || site.permissions[permission] === true);
   const patch = (change: Partial<DistributorSite>) => setDraft((current) => ({ ...current, ...change }));
+  // 旧后端不返回 commission_mode：既不渲染选择器，也绝不把它放进保存载荷。
+  const modeSupported = site.commission_mode === 'rate' || site.commission_mode === 'margin';
   const changed: Partial<DistributorSite> = {};
-  const keys: Array<keyof DistributorSite> = ['name', 'status', 'distributor_id', 'branding', 'sales_mode', 'logo_url', 'customer_service_url', 'notice_mode', 'notice', 'features', 'feature_limits', 'permissions', 'commission_enabled', 'commission_mode', 'commission_rate', 'allow_reward_stacking'];
+  const keys: Array<keyof DistributorSite> = ['name', 'status', 'distributor_id', 'branding', 'sales_mode', 'logo_url', 'customer_service_url', 'notice_mode', 'notice', 'features', 'feature_limits', 'permissions', 'commission_enabled', 'commission_rate', 'allow_reward_stacking'];
+  if (modeSupported) keys.push('commission_mode');
   for (const key of keys) {
     if (JSON.stringify(draft[key]) !== JSON.stringify(site[key])) Object.assign(changed, { [key]: draft[key] });
   }
+  if (!modeSupported) delete changed.commission_mode;
   const domains = Array.from(new Set(domainText.split(/[\n,，]+/).map((value) => value.trim().toLowerCase()).filter(Boolean)));
   if (!distributor && JSON.stringify(domains) !== JSON.stringify(site.domains)) changed.domains = domains;
   const hasChanges = Object.keys(changed).length > 0;
@@ -66,10 +70,10 @@ export default function SiteEditor({ site, distributor = false, canManage = true
       </CardBody></Card></Tab>
       <Tab key="commission" title="分佣规则"><Card shadow="none"><CardBody className="gap-5 p-5">
         <Switch isSelected={draft.commission_enabled} isDisabled={distributor || !canFinancial} onValueChange={(commission_enabled) => patch({ commission_enabled })}>在线销售计佣</Switch>
-        <Select label="佣金方式" className="max-w-md" selectedKeys={[draft.commission_mode || 'rate']} isDisabled={distributor || !canFinancial} onChange={(event) => patch({ commission_mode: event.target.value as DistributorSite['commission_mode'] })} description="按站点二选一，仅管理员可改；写入新订单后固定，历史订单不重算。">
+        {modeSupported ? <Select label="佣金方式" className="max-w-md" selectedKeys={[draft.commission_mode || 'rate']} isDisabled={distributor || !canFinancial} onChange={(event) => patch({ commission_mode: event.target.value as DistributorSite['commission_mode'] })} description="按站点二选一，仅管理员可改；写入新订单后固定，历史订单不重算。">
           <SelectItem key="rate">比例分成 · 按实付百分比计提</SelectItem>
           <SelectItem key="margin">差价归代理 · 平台每单只留固定成本</SelectItem>
-        </Select>
+        </Select> : <Alert color="default" title="当前后端仅支持比例分成" description="“差价归代理（平台固定进货价）”需要配套后端版本；后端升级发布后此处会出现佣金方式选择器。" />}
         {(draft.commission_mode || 'rate') === 'rate' ? <>
           <Input label="佣金比例（%）" type="number" min="0" max="100" step="0.01" className="max-w-sm" value={String(Number(draft.commission_rate || 0) * 100)} isReadOnly={distributor || !canFinancial} onValueChange={(value) => patch({ commission_rate: String(Number(value) / 100) })} description="代理佣金 = 实付金额 × 比例。比例随卖价等比分成：代理卖价越高双方收入同比越高。" />
           <Alert color="primary" title="比例分成怎么算" description="例：主站价 ¥100、比例 50%，代理定价 ¥160 → 代理佣金 ¥80，平台净得 ¥80。若代理提价到 ¥200 → 佣金 ¥100，平台 ¥100。想让平台恰好净得固定成本（如 ¥50），比例 = 1 − 成本÷代理定价（50÷160 → 68.75%），但代理改价后平台净额会跟着变。" />
