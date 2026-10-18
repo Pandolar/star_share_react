@@ -1,10 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
-    Accordion,
-    AccordionItem,
     Alert,
-    Avatar,
     Button,
     Card,
     CardBody,
@@ -12,10 +9,6 @@ import {
     CardHeader,
     Chip,
     Divider,
-    Dropdown,
-    DropdownItem,
-    DropdownMenu,
-    DropdownTrigger,
     Form,
     Input,
     Listbox,
@@ -25,10 +18,6 @@ import {
     ModalContent,
     ModalFooter,
     ModalHeader,
-    Navbar,
-    NavbarBrand,
-    NavbarContent,
-    NavbarItem,
     NumberInput,
     Pagination,
     Progress,
@@ -46,19 +35,16 @@ import {
     Tabs,
     Textarea,
     useDisclosure,
-    User,
 } from '@heroui/react';
 import {
-    ChevronDown,
-    CircleHelp,
     Copy,
     KeyRound,
     Lock,
     LogOut,
     RefreshCw,
     Search,
-    Settings,
     ShieldCheck,
+    Store,
     Ticket,
     Wallet,
 } from 'lucide-react';
@@ -390,88 +376,31 @@ const DistributorDashboardPage: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-default-50">
-            <Navbar isBordered maxWidth="xl">
-                <NavbarBrand className="gap-2">
-                    <Avatar color="primary" icon={<Settings className="h-5 w-5" />} size="sm" />
-                    <div>
-                        <p className="font-semibold text-foreground">分销商控制台</p>
-                        <p className="text-xs text-default-500">业务控制台</p>
-                    </div>
-                </NavbarBrand>
-                <NavbarContent justify="end">
-                    <NavbarItem className="hidden sm:flex">
-                        <User
-                            name={distributor.username}
-                            description={`等级 L${distributor.level ?? 1}`}
-                            avatarProps={{ fallback: distributor.username.slice(0, 1).toUpperCase() }}
-                        />
-                    </NavbarItem>
-                    <NavbarItem>
-                        <Dropdown placement="bottom-end">
-                            <DropdownTrigger>
-                                <Button variant="flat" endContent={<ChevronDown className="h-4 w-4" />}>
-                                    账号
-                                </Button>
-                            </DropdownTrigger>
-                            <DropdownMenu aria-label="账号操作">
-                                <DropdownItem key="security" startContent={<KeyRound className="h-4 w-4" />} onPress={() => setActiveTab('security')}>
-                                    修改密码
-                                </DropdownItem>
-                                <DropdownItem key="logout" color="danger" startContent={<LogOut className="h-4 w-4" />} onPress={logoutModal.onOpen}>
-                                    退出登录
-                                </DropdownItem>
-                            </DropdownMenu>
-                        </Dropdown>
-                    </NavbarItem>
-                </NavbarContent>
-            </Navbar>
-
-            <main className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-                <section className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <h1 className="text-2xl font-semibold text-foreground">你好，{distributor.username}</h1>
-                        <p className="mt-1 text-sm text-default-500">查看卡密业务与当前账号可用的管理功能。</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        <Chip color={distributor.status === 1 ? 'success' : 'danger'} variant="flat">
-                            账号{distributor.status === 1 ? '已启用' : '已停用'}
-                        </Chip>
-                        <Chip color="secondary" variant="flat">等级 L{distributor.level ?? 1}</Chip>
-                        {canGenerate && <Chip color="success" variant="flat">余额 ¥{balance.toFixed(2)}</Chip>}
-                        {canGenerate && <Chip color={discountActive ? 'success' : 'warning'} variant="flat">{discountActive ? `折扣至 ${distributor.expires_at ? formatDateTime(distributor.expires_at) : '永久'}` : '折扣已到期 · 按原价'}</Chip>}
-                        <Button variant="flat" color="primary" onPress={() => navigate('/distributor/sites')}>我的站点与佣金</Button>
-                    </div>
-                </section>
-
-                <Accordion variant="splitted" defaultExpandedKeys={['quick-start']}>
-                    <AccordionItem
-                        key="quick-start"
-                        aria-label="基础用法"
-                        startContent={<CircleHelp className="h-5 w-5 text-primary" />}
-                        title="基础用法"
-                        subtitle="查看当前账号可用功能的操作说明"
-                    >
-                        <div className="grid gap-4 pb-3 md:grid-cols-2">
-                            <Alert isVisible color="success" variant="flat" title="查看并交付卡密" description="到“我的卡密”复制未使用且未过期的卡密交付客户。每个卡密默认只能使用一次。" />
-                            {canGenerate && (
-                                <Alert isVisible color="secondary" variant="flat" title="生成卡密" description="余额和折扣由管理员维护；生成区显示最终折后单价，费用在生成成功时一次性扣除。" />
-                            )}
-                        </div>
-                    </AccordionItem>
-                </Accordion>
-
-
-
-                <Tabs
-                    aria-label="分销商控制台功能"
-                    selectedKey={activeTab}
-                    onSelectionChange={(key) => setActiveTab(String(key))}
-                    color="primary"
-                    variant="underlined"
-                    className="w-full"
-                >
-                    <Tab key="cdk" title={<span className="flex items-center gap-2"><Ticket className="h-4 w-4" />卡密业务</span>}>
+        <main className="mx-auto min-h-screen max-w-7xl space-y-6 p-5 sm:p-8">
+            <header className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-semibold">分销商控制台</h1>
+                    <p className="mt-1 text-sm text-default-500">你好，{distributor.username}。卡密采购、站点经营、佣金对账都在这个后台完成。</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                    <Chip color={distributor.status === 1 ? 'success' : 'danger'} variant="flat">账号{distributor.status === 1 ? '已启用' : '已停用'}</Chip>
+                    <Chip color="secondary" variant="flat">等级 L{distributor.level ?? 1}</Chip>
+                    {canGenerate && <Chip color="success" variant="flat">余额 ¥{balance.toFixed(2)}</Chip>}
+                    {canGenerate && <Chip color={discountActive ? 'success' : 'warning'} variant="flat">{discountActive ? `折扣至 ${distributor.expires_at ? formatDateTime(distributor.expires_at) : '永久'}` : '折扣已到期 · 按原价'}</Chip>}
+                    <Button as={Link} to="/distributor/sites" variant="flat" startContent={<Store className="h-4 w-4" />}>站点经营与佣金</Button>
+                    <Button variant="flat" startContent={<KeyRound className="h-4 w-4" />} onPress={() => setActiveTab('security')}>修改密码</Button>
+                    <Button variant="flat" color="danger" startContent={<LogOut className="h-4 w-4" />} onPress={logoutModal.onOpen}>退出登录</Button>
+                </div>
+            </header>
+            <Tabs
+                aria-label="分销商控制台功能"
+                selectedKey={activeTab}
+                onSelectionChange={(key) => setActiveTab(String(key))}
+                color="primary"
+                variant="underlined"
+                className="w-full"
+            >
+                <Tab key="cdk" title={<span className="flex items-center gap-2"><Ticket className="h-4 w-4" />卡密采购</span>}>
                         <div className="space-y-6 pt-4">
                             <div className={`grid gap-4 sm:grid-cols-2 ${canGenerate ? 'lg:grid-cols-6' : 'lg:grid-cols-5'}`}>
                                 {canGenerate && <Card shadow="sm"><CardBody><p className="text-sm text-default-500">账户余额</p><p className="mt-1 text-2xl font-semibold">¥{balance.toFixed(2)}</p></CardBody></Card>}
@@ -596,6 +525,20 @@ const DistributorDashboardPage: React.FC = () => {
                                 </div>
                             )}
 
+                            <Alert
+                                isVisible
+                                color={discountActive ? 'primary' : 'warning'}
+                                variant="flat"
+                                title={discountActive ? '分销商折扣有效期说明' : '分销商折扣已到期'}
+                                description={discountActive
+                                    ? `当前折扣有效期至 ${distributor.expires_at ? formatDateTime(distributor.expires_at) : '永久'}。有效期仅影响生成卡密时的折扣价格。`
+                                    : `折扣已于 ${distributor.expires_at ? formatDateTime(distributor.expires_at) : '-'} 到期。到期后仍可登录控制台、管理站点、查看余额和生成卡密，但新生成卡密按套餐原价扣款；历史卡密、余额及其他功能不受影响。`}
+                            />
+                        </div>
+                    </Tab>
+
+                    <Tab key="list" title={<span className="flex items-center gap-2"><Copy className="h-4 w-4" />我的卡密</span>}>
+                        <div className="space-y-6 pt-4">
                             {canGenerate && lastBatchId && (
                                 <Alert
                                     isVisible
@@ -702,16 +645,6 @@ const DistributorDashboardPage: React.FC = () => {
                         </div>
                     </Tab>
                 </Tabs>
-                <Alert
-                    isVisible
-                    color={discountActive ? 'primary' : 'warning'}
-                    variant="flat"
-                    title={discountActive ? '分销商折扣有效期说明' : '分销商折扣已到期'}
-                    description={discountActive
-                        ? `当前折扣有效期至 ${distributor.expires_at ? formatDateTime(distributor.expires_at) : '永久'}。有效期仅影响生成卡密时的折扣价格。`
-                        : `折扣已于 ${distributor.expires_at ? formatDateTime(distributor.expires_at) : '-'} 到期。到期后仍可登录控制台、管理站点、查看余额和生成卡密，但新生成卡密按套餐原价扣款；历史卡密、余额及其他功能不受影响。`}
-                />
-            </main>
 
             {canGenerate && (
                 <Modal isOpen={generateModal.isOpen} onOpenChange={generateModal.onOpenChange} placement="center">
@@ -754,7 +687,7 @@ const DistributorDashboardPage: React.FC = () => {
                     )}
                 </ModalContent>
             </Modal>
-        </div>
+        </main>
     );
 };
 
