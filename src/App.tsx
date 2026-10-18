@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import ErrorBoundary from './components/ErrorBoundary';
 import { lazyWithRetry } from './utils/lazyWithRetry';
@@ -41,7 +41,11 @@ const AdminCustomerServicePage = lazyWithRetry(() => import('./pages/admin/Custo
 const DistributorLoginPage = lazyWithRetry(() => import('./pages/distributor/DistributorLoginPage'), 'DistributorLoginPage');
 const AdministratorManagePage = lazyWithRetry(() => import('./pages/admin/AdministratorManagePage'), 'AdministratorManagePage');
 const AdminSecurityPage = lazyWithRetry(() => import('./pages/admin/AdminSecurityPage'), 'AdminSecurityPage');
-const DistributorDashboardPage = lazyWithRetry(() => import('./pages/distributor/DistributorDashboardPage'), 'DistributorDashboardPage');
+const DistributorLayout = lazyWithRetry(() => import('./components/distributor/DistributorLayout'), 'DistributorLayout');
+const DistributorPurchasePage = lazyWithRetry(() => import('./pages/distributor/DistributorPurchasePage'), 'DistributorPurchasePage');
+const DistributorCdksPage = lazyWithRetry(() => import('./pages/distributor/DistributorCdksPage'), 'DistributorCdksPage');
+const DistributorSecurityPage = lazyWithRetry(() => import('./pages/distributor/DistributorSecurityPage'), 'DistributorSecurityPage');
+const DistributorCommissionsPage = lazyWithRetry(() => import('./pages/distributor/DistributorCommissionsPage'), 'DistributorCommissionsPage');
 const DistributorProtectedRoute = lazyWithRetry(() => import('./components/distributor/DistributorProtectedRoute'), 'DistributorProtectedRoute');
 const SitesManagePage = lazyWithRetry(() => import('./pages/admin/SitesManagePage'), 'SitesManagePage');
 const CommissionsManagePage = lazyWithRetry(() => import('./pages/admin/CommissionsManagePage'), 'CommissionsManagePage');
@@ -84,7 +88,7 @@ const RequireAdminPermission: React.FC<{ permission?: string; anyOf?: string[]; 
 
 const DistributorRouteShell: React.FC = () => (
   <DistributorProtectedRoute>
-    <Outlet />
+    <DistributorLayout />
   </DistributorProtectedRoute>
 );
 
@@ -128,10 +132,14 @@ const App: React.FC = () => {
                     {/* 分销商路由（结构对齐 /star-admin/：登录页独立，其余在 /distributor 受保护壳下） */}
                     <Route path="/distributor/login" element={<DistributorLoginPage />} />
                     <Route path="/distributor" element={<DistributorRouteShell />}>
-                      {/* 默认重定向到控制面板 */}
-                      <Route index element={<Navigate to="/distributor/dashboard" replace />} />
-                      <Route path="dashboard" element={<DistributorDashboardPage />} />
+                      {/* 默认进入卡密采购；旧控制台地址兼容跳转到采购页 */}
+                      <Route index element={<Navigate to="/distributor/purchase" replace />} />
+                      <Route path="dashboard" element={<Navigate to="/distributor/purchase" replace />} />
+                      <Route path="purchase" element={<DistributorPurchasePage />} />
+                      <Route path="cdks" element={<DistributorCdksPage />} />
                       <Route path="sites" element={<DistributorSitesPage />} />
+                      <Route path="commissions" element={<DistributorCommissionsPage />} />
+                      <Route path="security" element={<DistributorSecurityPage />} />
                     </Route>
 
                     {/* Admin管理后台路由 */}

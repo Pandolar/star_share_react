@@ -25,7 +25,7 @@ const DistributorLoginPage: React.FC = () => {
 
     useEffect(() => {
         if (distributorApiService.isLoggedIn()) {
-            navigate('/distributor/dashboard', { replace: true });
+            navigate('/distributor/purchase', { replace: true });
             return;
         }
         const notice = sessionStorage.getItem('distributorLoginNotice') || '';
@@ -52,7 +52,7 @@ const DistributorLoginPage: React.FC = () => {
                 localStorage.setItem('dtoken', response.data.dtoken);
                 localStorage.setItem('distributor', JSON.stringify(response.data));
                 showToast('登录成功', 'success');
-                navigate('/distributor/dashboard', { replace: true });
+                navigate('/distributor/purchase', { replace: true });
             } else {
                 showToast(response.msg || '登录失败', 'error');
             }
