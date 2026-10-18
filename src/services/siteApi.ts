@@ -5,7 +5,7 @@ import type { CommissionLedger, CommissionSummary, DistributorSite, PageQuery, S
 
 export interface SiteApiResponse<T> { code: number; msg?: string; data?: T; total?: number; }
 export function siteData<T>(response: SiteApiResponse<T>): T { if (response.code !== 20000 || response.data === undefined) throw new Error(response.msg || '操作失败'); return response.data; }
-const adminWritable = ['name', 'status', 'distributor_id', 'branding', 'sales_mode', 'logo_url', 'customer_service_url', 'notice_mode', 'notice', 'features', 'feature_limits', 'permissions', 'commission_enabled', 'commission_rate', 'allow_reward_stacking', 'domains', 'domain_rules'];
+const adminWritable = ['name', 'status', 'distributor_id', 'branding', 'sales_mode', 'logo_url', 'customer_service_url', 'notice_mode', 'notice', 'features', 'feature_limits', 'permissions', 'commission_enabled', 'commission_mode', 'commission_rate', 'allow_reward_stacking', 'domains', 'domain_rules'];
 const distributorWritable = ['name', 'branding', 'logo_url', 'customer_service_url', 'notice_mode', 'notice', 'features'];
 const pickFields = (source: Partial<DistributorSite>, fields: string[]) => Object.fromEntries(Object.entries(source).filter(([key, value]) => fields.includes(key) && value !== undefined));
 class SiteApiService {

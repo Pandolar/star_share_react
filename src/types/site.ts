@@ -2,6 +2,7 @@ export type SiteStatus = 'active' | 'paused';
 export type SiteBranding = 'white_label' | 'branded';
 export type SiteSalesMode = 'cdk' | 'online' | 'hybrid';
 export type SiteEditPermission = 'edit_branding' | 'edit_notice' | 'edit_features' | 'edit_prices' | 'edit_packages';
+export type SiteCommissionMode = 'rate' | 'margin';
 export interface SiteDomainRule { hostname: string; include_subdomains: boolean; }
 export type SitePermissions = Partial<Record<SiteEditPermission, boolean>>;
 export interface DistributorSite {
@@ -24,6 +25,7 @@ export interface DistributorSite {
   effective_features: Record<string, boolean>;
   permissions: SitePermissions;
   commission_enabled: boolean;
+  commission_mode: SiteCommissionMode;
   commission_rate: string;
   allow_reward_stacking: boolean;
   revision: number;
@@ -83,6 +85,7 @@ export interface SiteOrder {
   user_id: number;
   created_at: string;
   paid_at: string | null;
+  commission_mode: SiteCommissionMode | null;
   commission_rate: string | null;
   commission_amount: string;
   commission_base_amount: string;

@@ -17,7 +17,7 @@ const fieldLabels: Record<string, string> = {
   name: '站点名称', distributor_id: '所属代理', status: '经营状态', branding: '品牌展示', sales_mode: '销售方式',
   domains: '域名', logo_url: 'Logo', customer_service_url: '客服链接', notice_mode: '公告来源', notice: '公告内容',
   features: '站点功能', feature_limits: '功能许可', permissions: '编辑权限', commission_enabled: '计佣开关',
-  commission_rate: '佣金比例', allow_reward_stacking: '邀请奖励叠加',
+  commission_mode: '佣金方式', commission_rate: '佣金比例', allow_reward_stacking: '邀请奖励叠加',
 };
 
 export default function SiteEditor({ site, distributor = false, canManage = true, canFinancial = false, busy, onSave }: Props) {
@@ -28,7 +28,7 @@ export default function SiteEditor({ site, distributor = false, canManage = true
   const allowed = (permission: SiteEditPermission) => canManage && (!distributor || site.permissions[permission] === true);
   const patch = (change: Partial<DistributorSite>) => setDraft((current) => ({ ...current, ...change }));
   const changed: Partial<DistributorSite> = {};
-  const keys: Array<keyof DistributorSite> = ['name', 'status', 'distributor_id', 'branding', 'sales_mode', 'logo_url', 'customer_service_url', 'notice_mode', 'notice', 'features', 'feature_limits', 'permissions', 'commission_enabled', 'commission_rate', 'allow_reward_stacking'];
+  const keys: Array<keyof DistributorSite> = ['name', 'status', 'distributor_id', 'branding', 'sales_mode', 'logo_url', 'customer_service_url', 'notice_mode', 'notice', 'features', 'feature_limits', 'permissions', 'commission_enabled', 'commission_mode', 'commission_rate', 'allow_reward_stacking'];
   for (const key of keys) {
     if (JSON.stringify(draft[key]) !== JSON.stringify(site[key])) Object.assign(changed, { [key]: draft[key] });
   }
@@ -66,9 +66,19 @@ export default function SiteEditor({ site, distributor = false, canManage = true
       </CardBody></Card></Tab>
       <Tab key="commission" title="分佣规则"><Card shadow="none"><CardBody className="gap-5 p-5">
         <Switch isSelected={draft.commission_enabled} isDisabled={distributor || !canFinancial} onValueChange={(commission_enabled) => patch({ commission_enabled })}>在线销售计佣</Switch>
-        <Input label="佣金比例（%）" type="number" min="0" max="100" step="0.01" className="max-w-sm" value={String(Number(draft.commission_rate || 0) * 100)} isReadOnly={distributor || !canFinancial} onValueChange={(value) => patch({ commission_rate: String(Number(value) / 100) })} />
+        <Select label="佣金方式" className="max-w-md" selectedKeys={[draft.commission_mode || 'rate']} isDisabled={distributor || !canFinancial} onChange={(event) => patch({ commission_mode: event.target.value as DistributorSite['commission_mode'] })} description="按站点二选一，仅管理员可改；写入新订单后固定，历史订单不重算。">
+          <SelectItem key="rate">比例分成 · 按实付百分比计提</SelectItem>
+          <SelectItem key="margin">差价归代理 · 平台每单只留固定成本</SelectItem>
+        </Select>
+        {(draft.commission_mode || 'rate') === 'rate' ? <>
+          <Input label="佣金比例（%）" type="number" min="0" max="100" step="0.01" className="max-w-sm" value={String(Number(draft.commission_rate || 0) * 100)} isReadOnly={distributor || !canFinancial} onValueChange={(value) => patch({ commission_rate: String(Number(value) / 100) })} description="代理佣金 = 实付金额 × 比例。比例随卖价等比分成：代理卖价越高双方收入同比越高。" />
+          <Alert color="primary" title="比例分成怎么算" description="例：主站价 ¥100、比例 50%，代理定价 ¥160 → 代理佣金 ¥80，平台净得 ¥80。若代理提价到 ¥200 → 佣金 ¥100，平台 ¥100。想让平台恰好净得固定成本（如 ¥50），比例 = 1 − 成本÷代理定价（50÷160 → 68.75%），但代理改价后平台净额会跟着变。" />
+        </> : <>
+          <Alert color="primary" title="差价归代理怎么算" description="平台每单固定留存 = “套餐与价格”页该套餐的“平台固定收入（进货价）”× 份数；代理佣金 = 实付金额 − 邀请奖励现金成本 − 平台固定收入，下限为 0。代理无论卖多少钱平台只收固定数，超出部分全部归代理，佣金比例输入框在此方式下不生效。例：进货价设 ¥50、代理定价 ¥160 → 代理佣金 ¥110，平台只收 ¥50；代理提价到 ¥200 → 佣金 ¥150，平台仍 ¥50。实付不足覆盖进货价时订单直接拒绝。" />
+          <Alert color="warning" title="别忘了设置每个套餐的进货价" description="差价方式下请到“套餐与价格”页为每个已授权套餐填写“平台固定收入（进货价）”，默认为 0 表示平台不保底、全部实付都计为代理佣金。建议同时设置最低/最高售价边界，控制代理定价范围。" />
+        </>}
         <Switch isSelected={draft.allow_reward_stacking} isDisabled={distributor || !canFinancial} onValueChange={(allow_reward_stacking) => patch({ allow_reward_stacking })}>明确允许邀请奖励与代理佣金叠加</Switch>
-        <Alert color="warning" title="只影响新建结账" description="费率和归属写入订单后固定；有效支付才计佣，CDK 兑换不重复计佣。佣金页提供月度对账与退款冲减，打款在群聊线下沟通，不清零累计值；采购余额独立。" />
+        <Alert color="warning" title="只影响新建结账" description="方式和费率写入订单后固定；有效支付才计佣，CDK 兑换不重复计佣。佣金页提供月度对账与退款冲减，打款在群聊线下沟通，不清零累计值；采购余额独立。" />
       </CardBody></Card></Tab>
     </Tabs>
     <Modal isOpen={confirm} onClose={() => !busy && setConfirm(false)} isDismissable={!busy}>
