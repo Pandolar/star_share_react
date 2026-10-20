@@ -195,6 +195,9 @@ export const TeamTab: React.FC = () => {
   const outgoing = overview?.invitations.outgoing || [];
   const activeMembers = overview?.members.filter((member) => member.status === 'active' || member.status === 'suspended') || [];
   const occupiedSeats = activeMembers.length + outgoing.length;
+  // 已付款的下周期降席变更会收紧可用上限，与后端 _effective_seat_limit 保持一致。
+  const seatLimit = team ? Math.min(team.seat_count, team.pending_seat_count || team.seat_count) : 0;
+  const availableSeats = Math.max(0, seatLimit - occupiedSeats);
   const selectedPlan = useMemo(
     () => plans.find((plan) => String(plan.package_id) === planId) || null,
     [planId, plans],
@@ -202,6 +205,11 @@ export const TeamTab: React.FC = () => {
   const estimatedTotal = selectedPlan
     ? Number(selectedPlan.unit_price) * seats * selectedPlan.discount_rate
     : 0;
+  // 调整订阅时新席位不得低于当前已占用及预留席位，与后端校验一致。
+  const seatFloor = Math.max(
+    selectedPlan?.min_seats || overview?.plan_config.min_seats || 2,
+    orderAction === 'change' ? occupiedSeats : 0,
+  );
 
   const openOrder = (
     action: 'initial' | 'change' | 'renewal',
@@ -212,7 +220,8 @@ export const TeamTab: React.FC = () => {
     setOrderAction(action);
     setPlanId(plan ? String(plan.package_id) : '');
     const desiredSeats = sourceCheckout?.seat_count || team?.seat_count || plan?.min_seats || overview?.plan_config.min_seats || 2;
-    setSeats(Math.max(plan?.min_seats || 2, Math.min(plan?.max_seats || 200, desiredSeats)));
+    const floorAtOpen = Math.max(plan?.min_seats || 2, action === 'change' ? occupiedSeats : 0);
+    setSeats(Math.max(floorAtOpen, Math.min(plan?.max_seats || 200, desiredSeats)));
     orderModal.onOpen();
   };
 
@@ -624,7 +633,7 @@ export const TeamTab: React.FC = () => {
                   <CardBody className="gap-4 p-5 sm:p-6">
                     <div>
                       <h2 className="font-semibold">邀请成员</h2>
-                      <p className="mt-1 text-sm text-default-500">填写已注册用户的邮箱；邀请 7 天内有效并预留一个席位</p>
+                      <p className="mt-1 text-sm text-default-500">填写已注册用户的邮箱；邀请 7 天内有效并预留一个席位，对方在「组织团队」页接受后即加入</p>
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row">
                       <Input
@@ -641,13 +650,26 @@ export const TeamTab: React.FC = () => {
                         color="primary"
                         className="h-14 sm:self-start"
                         isLoading={inviting}
-                        isDisabled={occupiedSeats >= team.seat_count}
+                        isDisabled={availableSeats <= 0}
                         onPress={() => void sendInvite()}
                       >
                         发送邀请
                       </Button>
                     </div>
-                    {occupiedSeats >= team.seat_count && <p className="text-sm text-warning-600">当前没有可用席位，请先调整团队订阅。</p>}
+                    {availableSeats <= 0 && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm text-warning-600">
+                          {team.pending_seat_count && team.pending_seat_count < team.seat_count
+                            ? `下周期将生效 ${team.pending_seat_count} 席的变更，当前可用席位已全部占用或预留。`
+                            : '当前没有可用席位，可先增加席位后再邀请。'}
+                        </p>
+                        {!team.pending_package_id && (
+                          <Button size="sm" color="warning" variant="flat" isDisabled={!paymentsOpen} onPress={() => openOrder('change')}>
+                            增加席位
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </CardBody>
                 </Card>
               )}
@@ -657,9 +679,11 @@ export const TeamTab: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <h2 className="font-semibold">团队成员</h2>
-                      <p className="mt-1 text-sm text-default-500">{activeMembers.length} 名成员</p>
+                      <p className="mt-1 text-sm text-default-500">
+                        {activeMembers.length} 名成员{!team.is_owner ? ' · 仅团队所有者可以邀请新成员' : ''}
+                      </p>
                     </div>
-                    <Chip size="sm" variant="flat">剩余 {Math.max(0, team.seat_count - occupiedSeats)} 席</Chip>
+                    <Chip size="sm" variant="flat">剩余 {availableSeats} 席</Chip>
                   </div>
                   <Divider />
                   {activeMembers.map((member) => (
@@ -739,7 +763,10 @@ export const TeamTab: React.FC = () => {
                 const nextId = String(Array.from(keys)[0] || '');
                 setPlanId(nextId);
                 const plan = plans.find((item) => String(item.package_id) === nextId);
-                if (plan) setSeats((current) => Math.max(plan.min_seats, Math.min(plan.max_seats, current)));
+                if (plan) setSeats((current) => Math.max(
+                  Math.max(plan.min_seats, orderAction === 'change' ? occupiedSeats : 0),
+                  Math.min(plan.max_seats, current),
+                ));
               }}
               renderValue={(items) => items.map((item) => {
                 const plan = item.data as TeamPlan | undefined;
@@ -764,12 +791,14 @@ export const TeamTab: React.FC = () => {
             <NumberInput
               label="席位数量"
               value={seats}
-              onValueChange={(value) => setSeats(Math.max(selectedPlan?.min_seats || 2, Math.trunc(value || 0)))}
-              minValue={selectedPlan?.min_seats || overview?.plan_config.min_seats || 2}
+              onValueChange={(value) => setSeats(Math.max(seatFloor, Math.trunc(value || 0)))}
+              minValue={seatFloor}
               maxValue={selectedPlan?.max_seats || overview?.plan_config.max_seats || 200}
               step={1}
               isDisabled={orderAction === 'renewal' && team?.status === 'active'}
-              description={selectedPlan ? `${selectedPlan.min_seats}-${selectedPlan.max_seats} 个席位，包含团队所有者` : '请先选择套餐'}
+              description={selectedPlan
+                ? `${selectedPlan.min_seats}-${selectedPlan.max_seats} 个席位，包含团队所有者${orderAction === 'change' && occupiedSeats > selectedPlan.min_seats ? `；当前已占用/预留 ${occupiedSeats} 席，不能调低到该值以下` : ''}`
+                : '请先选择套餐'}
             />
             {selectedPlan && (
               <div className="grid gap-3 rounded-lg bg-default-50 p-4 sm:grid-cols-3">
