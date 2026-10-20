@@ -15,13 +15,16 @@ import {
   ModalFooter,
   ModalHeader,
   Pagination,
+  Select,
+  SelectItem,
   Spinner,
   Tab,
   Tabs,
   Tooltip,
   Textarea,
 } from '@heroui/react';
-import { ArrowLeft, Bell, BellOff, Flag, Gauge, Headphones, MoreHorizontal, Pin, Plus, RefreshCw, Search, Send, ShieldCheck, StickyNote, UserRound } from 'lucide-react';
+import { ArrowLeft, Bell, BellOff, CircleDollarSign, Flag, Gauge, Headphones, MoreHorizontal, Pin, Plus, RefreshCw, Search, Send, ShieldCheck, StickyNote, UserRound, Volume2, VolumeX } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import adminApiService from '../../services/adminApi';
 import type { AdminCsConversation } from '../../types/admin';
 import type { ChatAttachment, ChatAttachmentConfig, ChatMessage } from '../../components/chat/types';
@@ -30,9 +33,12 @@ import ChatMessageList from '../../components/chat/ChatMessageList';
 import ChatComposer from '../../components/chat/ChatComposer';
 import { formatBytes } from '../../components/chat/attachmentCache';
 import { useCustomerService } from '../../contexts/CustomerServiceContext';
+import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
 import { showToast } from '../../components/Toast';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import CustomerServiceUserInfo from './CustomerServiceUserInfo';
+import CustomerServiceContextPanel, { PaymentCardPrefill } from './CustomerServiceContextPanel';
+import { paymentMethodLabel } from '../../components/PaymentMethodSelector';
 
 const FILTERS = [
   ['all', '全部'],
@@ -79,15 +85,50 @@ const AttachmentSummary: React.FC<{ attachment: ChatAttachment }> = ({ attachmen
   </span>
 );
 
+const SOUND_STORAGE_KEY = 'cs_workstation_sound';
+let sharedAudioContext: AudioContext | null = null;
+
+/** 常规消息提示音：两音下行，WebAudio 合成，无需音频资源文件。 */
+const playCsMessageSound = () => {
+  try {
+    // 旧版 Safari 的 vendor 前缀构造器，lib.dom 未声明；可选成员因此可直接赋值。
+    const legacyWindow: typeof window & { webkitAudioContext?: typeof AudioContext } = window;
+    const ContextClass = window.AudioContext || legacyWindow.webkitAudioContext;
+    if (!ContextClass) return;
+    sharedAudioContext = sharedAudioContext || new ContextClass();
+    const context = sharedAudioContext;
+    if (context.state === 'suspended') void context.resume();
+    const startAt = context.currentTime;
+    [880, 587].forEach((frequency, index) => {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = 'sine';
+      oscillator.frequency.value = frequency;
+      const at = startAt + index * 0.14;
+      gain.gain.setValueAtTime(0.0001, at);
+      gain.gain.exponentialRampToValueAtTime(0.22, at + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.18);
+      oscillator.connect(gain).connect(context.destination);
+      oscillator.start(at);
+      oscillator.stop(at + 0.2);
+    });
+  } catch {
+    /* 音频设备不可用时静默跳过 */
+  }
+};
+
 const CustomerServicePage: React.FC = () => {
   const { config } = useCustomerService();
+  const { payment_methods: paymentMethods } = useWhiteLabel();
   const { can } = useAdminAuth();
+  const navigate = useNavigate();
   const canSend = can('customer_service.message.send');
   const canBatchSend = can('customer_service.message.batch_send');
   const canRecall = can('customer_service.message.recall');
   const canManageQuickReplies = can('customer_service.quick_reply.manage');
   const canUpload = can('customer_service.attachment.upload');
   const canManageConversation = can('customer_service.conversation.manage');
+  const canSendPaymentCard = can('customer_service.payment_card.send');
   const [rows, setRows] = useState<AdminCsConversation[]>([]);
   const [quickReplies, setQuickReplies] = useState<Array<{ id: string; title: string; content: string; attachments?: ChatAttachment[] }>>([]);
   const [selected, setSelected] = useState<AdminCsConversation | null>(null);
@@ -130,6 +171,20 @@ const CustomerServicePage: React.FC = () => {
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>(() => (
     typeof Notification === 'undefined' ? 'unsupported' : Notification.permission
   ));
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    try {
+      return window.localStorage.getItem(SOUND_STORAGE_KEY) !== '0';
+    } catch {
+      return true;
+    }
+  });
+  const [listMenu, setListMenu] = useState<{ x: number; y: number; conversation: AdminCsConversation } | null>(null);
+  const [paymentCardOpen, setPaymentCardOpen] = useState(false);
+  const [paymentCardTitle, setPaymentCardTitle] = useState('补差价');
+  const [paymentCardAmount, setPaymentCardAmount] = useState('');
+  const [paymentCardMethod, setPaymentCardMethod] = useState('alipay');
+  const [paymentCardNote, setPaymentCardNote] = useState('');
+  const [paymentCardSending, setPaymentCardSending] = useState(false);
   const listRequestId = useRef(0);
   const messageRequestId = useRef(0);
   const refreshRequestId = useRef(0);
@@ -142,6 +197,8 @@ const CustomerServicePage: React.FC = () => {
   const openConversationRef = useRef<((conversation: AdminCsConversation) => void) | null>(null);
   const notificationPermissionRef = useRef(notificationPermission);
   notificationPermissionRef.current = notificationPermission;
+  const soundEnabledRef = useRef(soundEnabled);
+  soundEnabledRef.current = soundEnabled;
   activeConversationId.current = selected?.id ?? null;
   const pageSize = 20;
   const loadList = useCallback(
@@ -167,15 +224,19 @@ const CustomerServicePage: React.FC = () => {
         const visibleIds = new Set(nextRows.map((item) => item.id));
         setBatchSelection((current) => new Set(Array.from(current).filter((id) => visibleIds.has(id))));
         setTotal(result.total);
-        if (notificationBaselineReady.current && notificationPermissionRef.current === 'granted') {
+        let hasNewCustomerMessage = false;
+        if (notificationBaselineReady.current) {
           nextRows.forEach((item) => {
             const lastNotifiedAt = notifiedMessageAt.current.get(item.id);
-            if (
+            const isNewCustomerMessage = Boolean(
               item.admin_unread > 0
               && item.last_message_role === 'user'
               && item.last_message_at
               && lastNotifiedAt !== item.last_message_at
-            ) {
+            );
+            if (!isNewCustomerMessage) return;
+            hasNewCustomerMessage = true;
+            if (notificationPermissionRef.current === 'granted') {
               const displayName = item.user.profile.username || item.user.profile.email || `用户 ${item.user.id}`;
               const notification = new Notification(`在线客服新消息 · ${displayName}`, {
                 body: item.last_message_preview || '用户发来了一条新消息',
@@ -190,6 +251,7 @@ const CustomerServicePage: React.FC = () => {
             }
           });
         }
+        if (hasNewCustomerMessage && soundEnabledRef.current) playCsMessageSound();
         nextRows.forEach((item) => {
           if (item.last_message_at) notifiedMessageAt.current.set(item.id, item.last_message_at);
         });
@@ -256,11 +318,20 @@ const CustomerServicePage: React.FC = () => {
     try {
       const result = await adminApiService.getCsMessages({ conversation_id: conversationId, after_id: afterId, limit: 50 });
       if (requestId !== refreshRequestId.current || activeConversationId.current !== conversationId) return;
-      setMessages((current) => {
-        if (!afterId) return result.messages;
-        const known = new Set(current.map((message) => message.id));
-        return [...current, ...result.messages.filter((message) => !known.has(message.id))];
-      });
+      // 系统消息（如卡片到账通知）意味着既有消息状态变化：整页静默重拉刷新卡片。
+      if (afterId && result.messages.some((message) => message.role === 'system')) {
+        const fresh = await adminApiService.getCsMessages({ conversation_id: conversationId, limit: 50 });
+        if (requestId !== refreshRequestId.current || activeConversationId.current !== conversationId) return;
+        setMessages(fresh.messages);
+        result.messages = fresh.messages;
+        result.conversation = fresh.conversation;
+      } else {
+        setMessages((current) => {
+          if (!afterId) return result.messages;
+          const known = new Set(current.map((message) => message.id));
+          return [...current, ...result.messages.filter((message) => !known.has(message.id))];
+        });
+      }
       const hasIncoming = result.messages.some((message) => message.role === 'user');
       const latestDelivered = result.messages[result.messages.length - 1];
       let remainingUnread = result.conversation.admin_unread;
@@ -281,9 +352,9 @@ const CustomerServicePage: React.FC = () => {
     setRemarkOpen(false);
     setUserInfoConversationId(null);
   }, [selected?.id]);
-  const updateConversation = async (patch: { is_pinned?: boolean; group_id?: string; user_remark?: string }) => {
-    if (!selected || !canManageConversation || conversationSavingRef.current) return;
-    const conversationId = selected.id;
+  const updateConversationFor = async (conversation: AdminCsConversation, patch: { is_pinned?: boolean; group_id?: string; user_remark?: string }) => {
+    if (!canManageConversation || conversationSavingRef.current) return;
+    const conversationId = conversation.id;
     conversationSavingRef.current = true;
     setConversationSaving(true);
     try {
@@ -298,6 +369,80 @@ const CustomerServicePage: React.FC = () => {
     } finally {
       conversationSavingRef.current = false;
       setConversationSaving(false);
+    }
+  };
+  const updateConversation = async (patch: { is_pinned?: boolean; group_id?: string; user_remark?: string }) => {
+    if (!selected) return;
+    await updateConversationFor(selected, patch);
+  };
+  const toggleSound = () => {
+    setSoundEnabled((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem(SOUND_STORAGE_KEY, next ? '1' : '0');
+      } catch {
+        /* 隐私模式下不可写时仅本次会话生效 */
+      }
+      if (next) playCsMessageSound();
+      return next;
+    });
+  };
+  const markConversationReadFromMenu = async (conversation: AdminCsConversation) => {
+    try {
+      const result = await adminApiService.markCsRead(conversation.id);
+      setRows((current) => sortConversationsByRecent(current.map((item) => (
+        item.id === conversation.id ? { ...item, admin_unread: result.unread, unread: result.unread } : item
+      ))));
+      setSelected((current) => (current?.id === conversation.id ? { ...current, admin_unread: result.unread } : current));
+      showToast('已标记为已读', 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '标记已读失败', 'error');
+    }
+  };
+  const runListMenuAction = (action: 'open' | 'pin' | 'group' | 'read' | 'refresh') => {
+    const menu = listMenu;
+    setListMenu(null);
+    if (!menu) return;
+    const conversation = menu.conversation;
+    if (action === 'open') void openConversation(conversation);
+    else if (action === 'pin') void updateConversationFor(conversation, { is_pinned: !conversation.is_pinned });
+    else if (action === 'group') void updateConversationFor(conversation, { group_id: conversation.group_id === 'supervisor' ? 'general' : 'supervisor' });
+    else if (action === 'read') void markConversationReadFromMenu(conversation);
+    else if (action === 'refresh') void loadList();
+  };
+  const openPaymentCard = (prefill?: PaymentCardPrefill) => {
+    if (!selected) return;
+    setPaymentCardTitle(prefill?.title || '补差价');
+    setPaymentCardAmount(prefill?.amount || '');
+    setPaymentCardNote(prefill?.note || '');
+    setPaymentCardMethod(paymentMethods.includes('alipay') ? 'alipay' : paymentMethods[0] || 'alipay');
+    setPaymentCardOpen(true);
+  };
+  const sendPaymentCard = async () => {
+    if (!selected || !canSendPaymentCard || paymentCardSending) return;
+    const amount = paymentCardAmount.trim();
+    if (!amount || Number(amount) <= 0) {
+      showToast('请输入正确的收款金额', 'warning');
+      return;
+    }
+    const conversationId = selected.id;
+    setPaymentCardSending(true);
+    try {
+      const message = await adminApiService.sendCsPaymentCard({
+        conversation_id: conversationId,
+        title: paymentCardTitle.trim() || '补差价',
+        amount,
+        payment_method: paymentCardMethod,
+        note: paymentCardNote.trim() || undefined,
+      });
+      applySentMessage(conversationId, message);
+      setPaymentCardOpen(false);
+      showToast('收款卡片已发送', 'success');
+      void loadList(true);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '发送收款卡片失败', 'error');
+    } finally {
+      setPaymentCardSending(false);
     }
   };
   const runUserAction = async (action: 'unban' | 'clear_limit') => {
@@ -337,6 +482,16 @@ const CustomerServicePage: React.FC = () => {
   useEffect(() => {
     void loadList();
   }, [loadList]);
+  // 浏览器自动播放策略：首次交互后解锁 AudioContext，后续提示音才能出声。
+  useEffect(() => {
+    const unlock = () => {
+      if (!soundEnabledRef.current) return;
+      playCsMessageSound();
+      document.removeEventListener('pointerdown', unlock);
+    };
+    document.addEventListener('pointerdown', unlock);
+    return () => document.removeEventListener('pointerdown', unlock);
+  }, []);
   useEffect(() => {
     const refreshActivePage = () => {
       if (typeof Notification !== 'undefined') setNotificationPermission(Notification.permission);
@@ -383,7 +538,9 @@ const CustomerServicePage: React.FC = () => {
     closed_at: null,
     closed_by: null,
     last_message_at: message.created_at,
-    last_message_preview: message.content || '附件消息',
+    last_message_preview: message.card
+      ? `[收款卡片] ${message.card.title} ¥${message.card.amount}`
+      : message.content || '附件消息',
     last_message_role: 'admin' as const,
     admin_unread: 0,
     unread: 0,
@@ -574,8 +731,31 @@ const CustomerServicePage: React.FC = () => {
   };
   const pages = Math.max(1, Math.ceil(total / pageSize));
   return (
-    <div className="flex h-[calc(100dvh-7rem)] min-h-[480px] flex-col gap-3">
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden lg:grid-cols-[320px_minmax(0,1fr)]">
+    <div className="flex h-dvh min-h-[520px] flex-col overflow-hidden bg-background">
+      <header className="flex shrink-0 items-center gap-3 border-b border-divider bg-content1 px-3 py-2 sm:px-4">
+        <Button size="sm" variant="light" startContent={<ArrowLeft className="h-4 w-4" />} onPress={() => navigate('/star-admin')}>
+          返回后台
+        </Button>
+        <div className="flex min-w-0 items-center gap-2">
+          <Headphones className="h-5 w-5 shrink-0 text-primary" />
+          <h1 className="truncate text-base font-bold">客服工作台</h1>
+        </div>
+        <div className="ml-auto flex items-center gap-1">
+          <Tooltip content={soundEnabled ? '新消息提示音已开启，点击关闭' : '新消息提示音已关闭，点击开启'}>
+            <Button isIconOnly size="sm" variant="light" aria-label="切换提示音" color={soundEnabled ? 'success' : 'default'} onPress={toggleSound}>
+              {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+            </Button>
+          </Tooltip>
+          {notificationPermission !== 'unsupported' && (
+            <Tooltip content={notificationLabel}>
+              <Button isIconOnly size="sm" variant="light" aria-label={notificationLabel} color={notificationPermission === 'granted' ? 'success' : 'default'} isDisabled={notificationPermission === 'granted'} onPress={() => void requestBrowserNotificationPermission()}>
+                {notificationPermission === 'denied' ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
+              </Button>
+            </Tooltip>
+          )}
+        </div>
+      </header>
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden p-3 lg:grid-cols-[340px_minmax(0,1fr)] lg:p-4 xl:grid-cols-[340px_minmax(0,1fr)_320px]">
         <Card className={`${mobileChat ? 'hidden lg:block' : 'block'} min-h-0 overflow-hidden`}>
           <CardBody className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-3">
             <div className="flex shrink-0 items-center justify-between gap-1">
@@ -601,13 +781,6 @@ const CustomerServicePage: React.FC = () => {
               ))}
             </Tabs>
               <div className="flex items-center gap-0.5">
-                {notificationPermission !== 'unsupported' && (
-                  <Tooltip content={notificationLabel}>
-                    <Button isIconOnly size="sm" variant="light" aria-label={notificationLabel} color={notificationPermission === 'granted' ? 'success' : 'default'} isDisabled={notificationPermission === 'granted'} onPress={() => void requestBrowserNotificationPermission()}>
-                      {notificationPermission === 'denied' ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
-                    </Button>
-                  </Tooltip>
-                )}
                 <Tooltip content="刷新会话">
                   <Button isIconOnly size="sm" variant="light" aria-label="刷新会话" isLoading={listLoading} onPress={() => void loadList()}><RefreshCw className="h-4 w-4" /></Button>
                 </Tooltip>
@@ -664,7 +837,14 @@ const CustomerServicePage: React.FC = () => {
                 </div>
               ) : rows.length ? (
                 rows.map((item) => (
-                  <div key={item.id} className="mb-1 flex items-center gap-1">
+                  <div
+                    key={item.id}
+                    className="mb-1 flex items-center gap-1"
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      setListMenu({ x: event.clientX, y: event.clientY, conversation: item });
+                    }}
+                  >
                     {canBatchSend && <Checkbox
                       size="sm"
                       aria-label={`选择会话 ${item.user.profile.username || item.user.profile.email || item.user.id}`}
@@ -788,11 +968,20 @@ const CustomerServicePage: React.FC = () => {
                       if (target) setQuickPhraseDeleteTarget(target);
                     }) : undefined}
                     quickReplyPreview
-                    extraActions={canManageQuickReplies ? (
-                      <Button size="sm" variant="flat" startContent={<Plus className="h-4 w-4" />} onPress={openQuickPhrase}>
-                        新建快捷短语
-                      </Button>
-                    ) : null}
+                    extraActions={(
+                      <div className="flex flex-wrap items-center gap-2">
+                        {canSendPaymentCard && (
+                          <Button size="sm" variant="flat" color="warning" startContent={<CircleDollarSign className="h-4 w-4" />} onPress={() => openPaymentCard()}>
+                            收款卡片
+                          </Button>
+                        )}
+                        {canManageQuickReplies && (
+                          <Button size="sm" variant="flat" startContent={<Plus className="h-4 w-4" />} onPress={openQuickPhrase}>
+                            新建快捷短语
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   />
                 ) : (
                   <div className="text-sm text-warning">客服配置尚未加载，暂不能发送消息。</div>
@@ -803,6 +992,15 @@ const CustomerServicePage: React.FC = () => {
                 <Headphones className="h-10 w-10" />
                 <span>请选择左侧会话开始处理</span>
               </div>
+            )}
+          </CardBody>
+        </Card>
+        <Card className="hidden min-h-0 overflow-hidden xl:block">
+          <CardBody className="flex h-full min-h-0 flex-col overflow-hidden p-3">
+            {selected ? (
+              <CustomerServiceContextPanel conversation={selected} onOpenPaymentCard={openPaymentCard} className="h-full" />
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-default-400">选择会话后展示用户上下文</div>
             )}
           </CardBody>
         </Card>
@@ -968,6 +1166,77 @@ const CustomerServicePage: React.FC = () => {
           </ModalFooter>
         </ModalContent>
       </Modal>
+      <Modal isOpen={paymentCardOpen} onOpenChange={(open) => { if (!open && !paymentCardSending) setPaymentCardOpen(false); }} size="md" placement="center">
+        <ModalContent>
+          <ModalHeader>发送收款卡片</ModalHeader>
+          <ModalBody className="gap-3">
+            <p className="text-xs text-default-500">
+              用户在聊天中点击卡片即可按指定方式支付；支付成功后卡片自动标记为已支付，订单记录可见，不触发任何奖励。
+            </p>
+            <Input label="卡片标题" value={paymentCardTitle} onValueChange={setPaymentCardTitle} maxLength={30} isDisabled={paymentCardSending} />
+            <Input label="收款金额（元）" type="number" value={paymentCardAmount} onValueChange={setPaymentCardAmount} min={0.01} step={0.01} isDisabled={paymentCardSending} isRequired />
+            <Select
+              label="指定支付方式"
+              selectedKeys={[paymentCardMethod]}
+              onSelectionChange={(keys) => setPaymentCardMethod(String(Array.from(keys)[0] || paymentCardMethod))}
+              isDisabled={paymentCardSending}
+            >
+              {paymentMethods.map((method) => (
+                <SelectItem key={method}>{paymentMethodLabel(method)}</SelectItem>
+              ))}
+            </Select>
+            <Textarea label="备注说明（可选）" value={paymentCardNote} onValueChange={setPaymentCardNote} maxLength={120} minRows={2} isDisabled={paymentCardSending} />
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" isDisabled={paymentCardSending} onPress={() => setPaymentCardOpen(false)}>取消</Button>
+            <Button color="warning" isLoading={paymentCardSending} isDisabled={!paymentCardAmount.trim()} onPress={() => void sendPaymentCard()}>
+              发送卡片
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+      {listMenu && (
+        <div
+          className="fixed inset-0 z-50"
+          onClick={() => setListMenu(null)}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            setListMenu(null);
+          }}
+        >
+          <div
+            className="absolute min-w-44 overflow-hidden rounded-xl border border-divider bg-content1 py-1 shadow-lg"
+            style={{
+              left: Math.max(8, Math.min(listMenu.x, window.innerWidth - 200)),
+              top: Math.max(8, Math.min(listMenu.y, window.innerHeight - 240)),
+            }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="truncate px-3 py-1.5 text-xs text-default-400">
+              {listMenu.conversation.user.profile.username || listMenu.conversation.user.profile.email || `用户 ${listMenu.conversation.user.id}`}
+            </p>
+            <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-default-100" onClick={() => runListMenuAction('open')}>
+              <Headphones className="h-4 w-4 text-default-500" /> 打开会话
+            </button>
+            {canManageConversation && (
+              <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-default-100" onClick={() => runListMenuAction('pin')}>
+                <Pin className="h-4 w-4 text-default-500" /> {listMenu.conversation.is_pinned ? '取消置顶' : '置顶对话'}
+              </button>
+            )}
+            {canManageConversation && (
+              <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-default-100" onClick={() => runListMenuAction('group')}>
+                <Flag className="h-4 w-4 text-default-500" /> {listMenu.conversation.group_id === 'supervisor' ? '移至普通跟进' : '转交主管待处理'}
+              </button>
+            )}
+            <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-default-100" onClick={() => runListMenuAction('read')}>
+              <Bell className="h-4 w-4 text-default-500" /> 标记为已读
+            </button>
+            <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-default-100" onClick={() => runListMenuAction('refresh')}>
+              <RefreshCw className="h-4 w-4 text-default-500" /> 刷新列表
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

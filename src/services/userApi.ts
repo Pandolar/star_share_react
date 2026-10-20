@@ -1,6 +1,6 @@
 import config from '../config';
 import { getCookie } from '../utils/cookies';
-import type { ChatAttachment, ChatConfig, ChatConversation, ChatMessage } from '../components/chat/types';
+import type { ChatAttachment, ChatCardPayment, ChatConfig, ChatConversation, ChatMessage, ChatMessagesPage } from '../components/chat/types';
 import type { HomeInfo } from '../types/homeInfo';
 
 export type SiteFeatureName = 'register' | 'wechat_login' | 'invite' | 'invite_rewards' | 'activity' | 'about' | 'customer_service' | 'team' | 'promotion_code' | 'invoice' | 'cashback_credit' | 'reset_quota' | 'speedtest' | 'online_purchase' | 'cdk_exchange';
@@ -675,16 +675,21 @@ export const customerServiceApi = {
         if (response.code !== 20000) throw new Error(response.msg || '更新会话失败');
         return response.data as ChatConversation;
     },
-    getMessages: async (params: { conversation_id: number; after_id?: number; before_id?: number; limit?: number }): Promise<{ conversation: ChatConversation; messages: ChatMessage[]; has_more: boolean; unread: number }> => {
+    getMessages: async (params: { conversation_id: number; after_id?: number; before_id?: number; limit?: number }): Promise<ChatMessagesPage> => {
         const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)])).toString();
         const response = await createUserRequest(getUserApiUrl(`/u/cs_messages?${query}`), { method: 'GET' });
         if (response.code !== 20000) throw new Error(response.msg || '获取消息失败');
-        return response.data as { conversation: ChatConversation; messages: ChatMessage[]; has_more: boolean; unread: number };
+        return response.data as ChatMessagesPage;
     },
     sendMessage: async (payload: { conversation_id: number; content: string; attachment_ids: string[]; client_msg_id?: string }): Promise<ChatMessage> => {
         const response = await createUserRequest(getUserApiUrl('/u/cs_messages'), { method: 'POST', body: JSON.stringify(payload) });
         if (response.code !== 20000) throw new Error(response.msg || '发送消息失败');
         return response.data as ChatMessage;
+    },
+    payCard: async (payload: { message_id: number; device?: 'pc' | 'mobile' }): Promise<ChatCardPayment> => {
+        const response = await createUserRequest(getUserApiUrl('/u/cs_card_pay'), { method: 'POST', body: JSON.stringify(payload) });
+        if (response.code !== 20000) throw new Error(response.msg || '创建支付失败');
+        return response.data as ChatCardPayment;
     },
     markRead: async (conversation_id?: number): Promise<{ read_at: string; unread: number }> => {
         const response = await createUserRequest(getUserApiUrl('/u/cs_conversation_read'), { method: 'POST', body: JSON.stringify(conversation_id ? { conversation_id } : {}) });

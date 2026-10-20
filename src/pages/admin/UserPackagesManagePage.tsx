@@ -27,6 +27,8 @@ import {
 import {
     Search,
     Eye,
+    Pencil,
+    Trash2,
     UserCheck,
     Filter,
     RefreshCw,
@@ -35,10 +37,11 @@ import {
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import adminApiService from '../../services/adminApi';
-import { UserPackage, UserPackageQueryParams } from '../../types/admin';
+import { Package, UserPackage, UserPackageQueryParams } from '../../types/admin';
 import { showToast } from '../../components/Toast';
 import { LongTextPreview, PackageSummary, UserSummary } from '../../components/admin/AdminEntitySummary';
 import ExactSearchPopover from '../../components/admin/ExactSearchPopover';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
 const WAY_LABELS: Record<string, string> = {
     purchase: '购买',
@@ -52,6 +55,9 @@ const WAY_LABELS: Record<string, string> = {
  */
 const UserPackagesManagePage: React.FC = () => {
     const navigate = useNavigate();
+    const { can } = useAdminAuth();
+    const canEdit = can('user_package.update');
+    const canDelete = can('user_package.delete');
     // 状态管理
     const [userPackages, setUserPackages] = useState<UserPackage[]>([]);
     const [loading, setLoading] = useState(false);
@@ -64,6 +70,16 @@ const UserPackagesManagePage: React.FC = () => {
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
     const [selectedUserPackage, setSelectedUserPackage] = useState<UserPackage | null>(null);
+    const [packageOptions, setPackageOptions] = useState<Package[]>([]);
+    const [editTarget, setEditTarget] = useState<UserPackage | null>(null);
+    const [editPackageId, setEditPackageId] = useState('');
+    const [editStatus, setEditStatus] = useState<'active' | 'frozen' | 'expired'>('active');
+    const [editCreatedAt, setEditCreatedAt] = useState('');
+    const [editRemainingDuration, setEditRemainingDuration] = useState('');
+    const [editRemarks, setEditRemarks] = useState('');
+    const [editSaving, setEditSaving] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<UserPackage | null>(null);
+    const [deleting, setDeleting] = useState(false);
 
     // Modal控制
     const { isOpen: isViewOpen, onOpen: onViewOpen, onClose: onViewClose } = useDisclosure();
@@ -157,6 +173,66 @@ const UserPackagesManagePage: React.FC = () => {
     const openViewModal = (userPackage: UserPackage) => {
         setSelectedUserPackage(userPackage);
         onViewOpen();
+    };
+
+    // 编辑弹窗需要套餐候选，仅在首次打开时加载
+    const loadPackageOptions = async () => {
+        if (packageOptions.length) return;
+        try {
+            const response = await adminApiService.getPackages({ page_size: 1000 });
+            if (response.code === 20000 && Array.isArray(response.data)) setPackageOptions(response.data);
+        } catch {
+            showToast('获取套餐列表失败', 'error');
+        }
+    };
+
+    const openEditModal = (userPackage: UserPackage) => {
+        setEditTarget(userPackage);
+        setEditPackageId(String(userPackage.package_id));
+        setEditStatus(userPackage.status);
+        setEditCreatedAt(dayjs(userPackage.created_at).format('YYYY-MM-DDTHH:mm'));
+        setEditRemainingDuration(userPackage.remaining_duration != null ? String(userPackage.remaining_duration) : '');
+        setEditRemarks(userPackage.remarks || '');
+        void loadPackageOptions();
+    };
+
+    const submitEdit = async () => {
+        if (!editTarget || editSaving) return;
+        setEditSaving(true);
+        try {
+            const response = await adminApiService.updateUserPackage({
+                id: editTarget.id,
+                package_id: Number(editPackageId),
+                status: editStatus,
+                created_at: editCreatedAt ? editCreatedAt.replace('T', ' ') : undefined,
+                remaining_duration: editRemainingDuration.trim() === '' ? null : Number(editRemainingDuration),
+                remarks: editRemarks,
+            });
+            if (response.code !== 20000) throw new Error(response.msg || '更新失败');
+            showToast('套餐记录已更新', 'success');
+            setEditTarget(null);
+            void fetchUserPackages();
+        } catch (error) {
+            showToast(error instanceof Error ? error.message : '更新套餐记录失败', 'error');
+        } finally {
+            setEditSaving(false);
+        }
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteTarget || deleting) return;
+        setDeleting(true);
+        try {
+            const response = await adminApiService.deleteUserPackage(deleteTarget.id);
+            if (response.code !== 20000) throw new Error(response.msg || '删除失败');
+            showToast('套餐记录已删除', 'success');
+            setDeleteTarget(null);
+            void fetchUserPackages();
+        } catch (error) {
+            showToast(error instanceof Error ? error.message : '删除套餐记录失败', 'error');
+        } finally {
+            setDeleting(false);
+        }
     };
 
     // 状态渲染
@@ -307,7 +383,7 @@ const UserPackagesManagePage: React.FC = () => {
                             <TableColumn width={260}>关联订单 / 交易号</TableColumn>
                             <TableColumn width={150}>权益状态</TableColumn>
                             <TableColumn width={220}>备注</TableColumn>
-                            <TableColumn width={80}>操作</TableColumn>
+                            <TableColumn width={120}>操作</TableColumn>
                         </TableHeader>
                         <TableBody
                             isLoading={loading}
@@ -371,15 +447,41 @@ const UserPackagesManagePage: React.FC = () => {
                                         <LongTextPreview value={userPackage.remarks} className="max-w-52" />
                                     </TableCell>
                                     <TableCell>
-                                        <Button
-                                            isIconOnly
-                                            variant="light"
-                                            size="sm"
-                                            aria-label={`查看用户套餐记录 ${userPackage.id}`}
-                                            onPress={() => openViewModal(userPackage)}
-                                        >
-                                            <Eye className="w-4 h-4" />
-                                        </Button>
+                                        <div className="flex items-center gap-1">
+                                            <Button
+                                                isIconOnly
+                                                variant="light"
+                                                size="sm"
+                                                aria-label={`查看用户套餐记录 ${userPackage.id}`}
+                                                onPress={() => openViewModal(userPackage)}
+                                            >
+                                                <Eye className="w-4 h-4" />
+                                            </Button>
+                                            {canEdit && (
+                                                <Button
+                                                    isIconOnly
+                                                    variant="light"
+                                                    size="sm"
+                                                    color="primary"
+                                                    aria-label={`编辑用户套餐记录 ${userPackage.id}`}
+                                                    onPress={() => openEditModal(userPackage)}
+                                                >
+                                                    <Pencil className="w-4 h-4" />
+                                                </Button>
+                                            )}
+                                            {canDelete && (
+                                                <Button
+                                                    isIconOnly
+                                                    variant="light"
+                                                    size="sm"
+                                                    color="danger"
+                                                    aria-label={`删除用户套餐记录 ${userPackage.id}`}
+                                                    onPress={() => setDeleteTarget(userPackage)}
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                            )}
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -482,6 +584,83 @@ const UserPackagesManagePage: React.FC = () => {
                         <Button color="primary" onPress={onViewClose}>
                             关闭
                         </Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
+
+            {/* 编辑用户套餐记录 */}
+            <Modal isOpen={editTarget !== null} onOpenChange={(open) => { if (!open && !editSaving) setEditTarget(null); }} size="lg">
+                <ModalContent>
+                    <ModalHeader className="flex items-center gap-2">
+                        <Pencil className="w-5 h-5" />
+                        编辑套餐记录 #{editTarget?.id}
+                    </ModalHeader>
+                    <ModalBody className="gap-4">
+                        <Alert color="warning" variant="flat" title="谨慎操作" description="修改套餐或激活时间会立即改变用户的实际权益与到期时间，操作会记录审计日志。" />
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <Select
+                                label="套餐"
+                                selectedKeys={editPackageId ? [editPackageId] : []}
+                                onSelectionChange={(keys) => setEditPackageId(String(Array.from(keys)[0] || ''))}
+                                isDisabled={editSaving}
+                            >
+                                {packageOptions.map((pkg) => (
+                                    <SelectItem key={String(pkg.id)} textValue={`${pkg.package_name}（${pkg.level}）`}>
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span>{pkg.package_name}（{pkg.level}）</span>
+                                            <span className="text-xs text-default-400">#{pkg.id} · {pkg.duration}天</span>
+                                        </div>
+                                    </SelectItem>
+                                ))}
+                            </Select>
+                            <Select
+                                label="权益状态"
+                                selectedKeys={[editStatus]}
+                                onSelectionChange={(keys) => setEditStatus(String(Array.from(keys)[0] || 'active') as 'active' | 'frozen' | 'expired')}
+                                isDisabled={editSaving}
+                            >
+                                <SelectItem key="active">有效</SelectItem>
+                                <SelectItem key="frozen">冻结</SelectItem>
+                                <SelectItem key="expired">过期</SelectItem>
+                            </Select>
+                            <Input
+                                label="激活时间（决定到期时间）"
+                                type="datetime-local"
+                                value={editCreatedAt}
+                                onValueChange={setEditCreatedAt}
+                                isDisabled={editSaving}
+                            />
+                            <Input
+                                label="冻结剩余时长（分钟，仅冻结时有效）"
+                                type="number"
+                                value={editRemainingDuration}
+                                onValueChange={setEditRemainingDuration}
+                                min={0}
+                                isDisabled={editSaving || editStatus !== 'frozen'}
+                            />
+                        </div>
+                        <Input label="备注" value={editRemarks} onValueChange={setEditRemarks} maxLength={255} isDisabled={editSaving} />
+                    </ModalBody>
+                    <ModalFooter>
+                        <Button variant="light" isDisabled={editSaving} onPress={() => setEditTarget(null)}>取消</Button>
+                        <Button color="primary" isLoading={editSaving} isDisabled={!editPackageId} onPress={() => void submitEdit()}>保存修改</Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
+
+            {/* 删除确认 */}
+            <Modal isOpen={deleteTarget !== null} onOpenChange={(open) => { if (!open && !deleting) setDeleteTarget(null); }} size="sm">
+                <ModalContent>
+                    <ModalHeader>删除套餐记录</ModalHeader>
+                    <ModalBody>
+                        <p className="text-sm leading-6 text-default-600">
+                            确定删除用户「{deleteTarget?.user?.email || deleteTarget?.user_id}」的套餐记录 #{deleteTarget?.id}（{deleteTarget?.package?.package_name || `套餐 ${deleteTarget?.package_id}`}）吗？
+                            删除后该权益立即失效，订单记录不受影响，此操作无法撤销。
+                        </p>
+                    </ModalBody>
+                    <ModalFooter>
+                        <Button variant="light" isDisabled={deleting} onPress={() => setDeleteTarget(null)}>取消</Button>
+                        <Button color="danger" isLoading={deleting} onPress={() => void confirmDelete()}>确认删除</Button>
                     </ModalFooter>
                 </ModalContent>
             </Modal>

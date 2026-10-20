@@ -1000,6 +1000,8 @@ export interface AdminCsPurchaseOrder {
     cashback_credit_amount: string;
     created_at: string | null;
     paid_at: string | null;
+    invoice_requested?: boolean;
+    invoice_status?: string | null;
 }
 
 export interface AdminCsConversationDetail extends AdminCsConversation {

@@ -1,13 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Skeleton } from '@heroui/react';
+import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Skeleton } from '@heroui/react';
 import { Headphones } from 'lucide-react';
 import { customerServiceApi } from '../../../services/userApi';
 import { useCustomerService } from '../../../contexts/CustomerServiceContext';
 import ChatComposer from '../../../components/chat/ChatComposer';
 import ChatMessageList from '../../../components/chat/ChatMessageList';
-import type { ChatAttachment, ChatConversation, ChatMessage } from '../../../components/chat/types';
+import type { ChatAttachment, ChatCard, ChatCardPayment, ChatConversation, ChatMessage, ChatMessagesPage } from '../../../components/chat/types';
 import { newClientMessageId } from '../../../components/chat/types';
 import { toast } from '../../../utils/toast';
+import { useIsMobile } from '../../../hooks/useIsMobile';
+import { generateQRCodeDataUrl } from './subscription/qrCode';
+import { paymentMethodLabel } from '../../../components/PaymentMethodSelector';
 
 
 const fileData = (file: File) =>
@@ -28,6 +31,9 @@ export default function CustomerServiceTab(): React.ReactElement {
   const [composerValue, setComposerValue] = useState('');
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [sending, setSending] = useState(false);
+  const [payingCardId, setPayingCardId] = useState<number | null>(null);
+  const [cardPayment, setCardPayment] = useState<ChatCardPayment | null>(null);
+  const isMobileDevice = useIsMobile();
   const lastMessageId = useRef<number | null>(null);
   const selectedId = selected?.id;
 
@@ -43,12 +49,16 @@ export default function CustomerServiceTab(): React.ReactElement {
     }
   }, [unreadByConversation]);
 
-  const loadMessages = useCallback(async (conversationId: number, params: { after_id?: number; before_id?: number; silent?: boolean } = {}) => {
+  const loadMessages = useCallback(async (conversationId: number, params: { after_id?: number; before_id?: number; silent?: boolean } = {}): Promise<ChatMessagesPage> => {
     const initialLoad = !params.after_id && !params.before_id && !params.silent;
     setLoadingMessages(initialLoad);
     if (params.before_id) setLoadingMore(true);
     try {
       const response = await customerServiceApi.getMessages({ conversation_id: conversationId, limit: 30, after_id: params.after_id, before_id: params.before_id });
+      // 系统消息（如卡片到账通知）意味着既有消息状态可能变化：整页静默重拉一次以刷新卡片状态。
+      if (params.after_id && response.messages.some((item) => item.role === 'system')) {
+        return loadMessages(conversationId, { silent: true });
+      }
       const readConversation = { ...response.conversation, unread: 0, user_unread: 0 };
       setSelected((current) => (current?.id === conversationId ? readConversation : current));
       setMessages((previous) =>
@@ -174,6 +184,28 @@ export default function CustomerServiceTab(): React.ReactElement {
     }
   };
 
+  const payCard = async (message: ChatMessage, _card: ChatCard) => {
+    setPayingCardId(message.id);
+    try {
+      const payment = await customerServiceApi.payCard({ message_id: message.id, device: isMobileDevice ? 'mobile' : 'pc' });
+      if (payment.status === 'paid') {
+        toast.success('该卡片已支付，无需重复操作');
+        if (selected) await loadMessages(selected.id, { silent: true }).catch(() => {});
+        return;
+      }
+      // 手机端直接跳转支付页；桌面端展示二维码弹窗。
+      if (isMobileDevice && payment.payment_url) {
+        window.location.href = payment.payment_url;
+        return;
+      }
+      setCardPayment(payment);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '创建支付失败');
+    } finally {
+      setPayingCardId(null);
+    }
+  };
+
   if (loading) return <Skeleton className="h-96 rounded-xl" />;
   if (!config || config.provider !== 'builtin') return <div className="py-12 text-center text-default-500">在线客服暂未开启</div>;
 
@@ -195,6 +227,8 @@ export default function CustomerServiceTab(): React.ReactElement {
               if (messages[0]) void loadMessages(selected.id, { before_id: messages[0].id }).catch(() => {});
             }}
             scope="user"
+            onPayCard={(message, card) => void payCard(message, card)}
+            payingCardId={payingCardId}
           />
         </div>
       ) : (
@@ -218,6 +252,32 @@ export default function CustomerServiceTab(): React.ReactElement {
           uploadAttachment={uploadAttachment}
         />
       </div>
+      <Modal isOpen={Boolean(cardPayment)} onOpenChange={(open) => { if (!open) setCardPayment(null); }} size="sm" placement="center">
+        <ModalContent>
+          <ModalHeader>扫码支付</ModalHeader>
+          <ModalBody className="items-center gap-3">
+            <p className="text-sm text-default-500">
+              请使用{paymentMethodLabel(cardPayment?.pay_type || 'alipay')}支付 ¥{cardPayment?.payable_amount || '--'}
+            </p>
+            {cardPayment && (
+              <img
+                src={generateQRCodeDataUrl(cardPayment.qr_code || cardPayment.payment_url || '')}
+                alt="支付二维码"
+                className="h-52 w-52 rounded-lg border border-default-200"
+              />
+            )}
+            <p className="text-xs text-default-400">支付完成后卡片会自动更新为已支付</p>
+          </ModalBody>
+          <ModalFooter>
+            {cardPayment?.payment_url && (
+              <Button variant="flat" color="primary" onPress={() => window.open(cardPayment.payment_url || '', '_blank')}>
+                打开支付页面
+              </Button>
+            )}
+            <Button variant="light" onPress={() => setCardPayment(null)}>关闭</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </section>
   );
 }

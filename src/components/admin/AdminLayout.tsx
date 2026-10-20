@@ -89,7 +89,7 @@ const AdminLayout: React.FC = () => {
         { key: 'settings', label: '系统配置', icon: <Settings className="w-5 h-5" />, path: '/star-admin/settings', permission: 'config.read' },
         { key: 'invites', label: '邀请管理', icon: <Gift className="w-5 h-5" />, path: '/star-admin/invites', permission: null, anyOf: ['invite.policy.read', 'invite.cashback.read', 'invite.analytics.read', 'invite.reward.read', 'invite.withdrawal.read'] },
         { key: 'feedback', label: '工单管理', icon: <MessageSquare className="w-5 h-5" />, path: '/star-admin/feedback', permission: 'feedback.read' },
-        { key: 'customer-service', label: '在线客服', icon: <Headphones className="w-5 h-5" />, path: '/star-admin/customer-service', permission: 'customer_service.conversation.read' },
+        { key: 'customer-service', label: '在线客服', icon: <Headphones className="w-5 h-5" />, path: '/star-admin/service', permission: 'customer_service.conversation.read' },
         { key: 'administrators', label: '管理员与角色', icon: <UserCog className="w-5 h-5" />, path: '/star-admin/administrators', permission: 'administrator.account.read' },
         { key: 'security', label: '账号安全', icon: <KeyRound className="w-5 h-5" />, path: '/star-admin/security', permission: null },
     ].filter((item) => 'anyOf' in item ? canAny(...(item.anyOf || [])) : can(item.permission));

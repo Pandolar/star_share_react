@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Avatar, Button, Card, Image, Modal, ModalBody, ModalContent, ModalHeader, ScrollShadow, Spinner, Tooltip } from '@heroui/react';
 import { Download, FileText, Undo2 } from 'lucide-react';
-import type { ChatAttachment, ChatMessage } from './types';
+import type { ChatAttachment, ChatCard, ChatMessage } from './types';
 import { CHAT_RECALL_CONTENT_TYPE, CHAT_RECALL_NOTICE } from './types';
 import { buildAttachmentUrl, fetchAttachmentBlob, formatBytes } from './attachmentCache';
+import ChatCardView from './ChatCardView';
 
 export interface ChatMessageListProps {
   messages: ChatMessage[];
@@ -19,6 +20,9 @@ export interface ChatMessageListProps {
   recallWindowMinutes?: number;
   onRecall?: (message: ChatMessage) => void;
   userLastReadMessageId?: number | null;
+  /** 用户侧点击卡片支付。 */
+  onPayCard?: (message: ChatMessage, card: ChatCard) => void;
+  payingCardId?: number | null;
 }
 
 const relativeTime = (value: string): string => {
@@ -116,6 +120,8 @@ export default function ChatMessageList({
   recallWindowMinutes,
   onRecall,
   userLastReadMessageId,
+  onPayCard,
+  payingCardId,
 }: ChatMessageListProps): React.ReactElement {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [previewUrl, setPreviewUrl] = useState('');
@@ -178,23 +184,27 @@ export default function ChatMessageList({
               )}
               <div className={`max-w-[80%] ${mine ? 'items-end' : 'items-start'} flex flex-col`}>
                 {!grouped && <span className="mb-1 text-xs text-default-500">{senderName(message)}</span>}
-                <div
-                  className={`rounded-2xl px-3 py-2 text-sm ${mine ? 'bg-primary text-primary-foreground' : 'bg-default-100 text-default-800'}`}
-                >
-                  {recalled ? (
-                    <p className="whitespace-pre-wrap break-words text-xs italic opacity-70">{recallNotices.get(message.id) ?? CHAT_RECALL_NOTICE}</p>
-                  ) : (
-                    <>
-                      {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
-                      {message.attachments?.map((attachment, attachmentIndex) => (
-                        <div key={attachment.id}>
-                          {attachment.kind === 'image' && <p className="mb-1 text-xs opacity-70">图片{attachmentIndex + 1}</p>}
-                          <AttachmentView attachment={attachment} scope={scope} onPreview={setPreviewUrl} />
-                        </div>
-                      ))}
-                    </>
-                  )}
-                </div>
+                {message.card && !recalled ? (
+                  <ChatCardView message={message} card={message.card} scope={scope} onPayCard={onPayCard} paying={payingCardId === message.id} />
+                ) : (
+                  <div
+                    className={`rounded-2xl px-3 py-2 text-sm ${mine ? 'bg-primary text-primary-foreground' : 'bg-default-100 text-default-800'}`}
+                  >
+                    {recalled ? (
+                      <p className="whitespace-pre-wrap break-words text-xs italic opacity-70">{recallNotices.get(message.id) ?? CHAT_RECALL_NOTICE}</p>
+                    ) : (
+                      <>
+                        {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
+                        {message.attachments?.map((attachment, attachmentIndex) => (
+                          <div key={attachment.id}>
+                            {attachment.kind === 'image' && <p className="mb-1 text-xs opacity-70">图片{attachmentIndex + 1}</p>}
+                            <AttachmentView attachment={attachment} scope={scope} onPreview={setPreviewUrl} />
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                )}
                 <div className="mt-1 flex items-center gap-1">
                   <Tooltip content={new Date(message.created_at).toLocaleString()}>
                     <span className="text-xs text-default-400">{relativeTime(message.created_at)}</span>

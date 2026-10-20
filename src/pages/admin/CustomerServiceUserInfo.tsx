@@ -34,6 +34,7 @@ const ORDER_TYPE_LABELS: Record<string, string> = {
   team_initial: '团队首次购买',
   team_change: '团队套餐调整',
   team_renewal: '团队续费',
+  surcharge: '客服收款',
 };
 
 const formatDateTime = (value: string | null | undefined): string => {

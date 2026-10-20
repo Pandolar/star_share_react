@@ -29,11 +29,54 @@ export interface ChatMessage {
   recalled_by?: string | null;
   /** 撤回事件（content_type='recall'）指向的原消息 ID。 */
   related_message_id?: number | null;
+  /** 组件卡片负载（content_type 为卡片类型时由后端解析下发）。 */
+  card?: ChatCard;
 }
 
 /** 撤回占位文案：前后端共用同一句，避免用户端与后台显示不一致。 */
 export const CHAT_RECALL_NOTICE = '客服撤回了一条消息';
 export const CHAT_RECALL_CONTENT_TYPE = 'recall';
+
+/**
+ * 组件卡片：content_type 标记卡片类型，负载由后端随消息下发为 card 字段。
+ * 新增卡片类型时在 ChatCard 联合类型与 ChatCardView 中各加一支即可。
+ */
+export const CHAT_PAYMENT_CARD_CONTENT_TYPE = 'payment_card';
+
+/** 收款卡片（补差价）：status 由后端按订单实时状态补齐。 */
+export interface ChatSurchargeCard {
+  kind: 'surcharge';
+  title: string;
+  amount: string;
+  payment_method: string;
+  note?: string;
+  order_id?: string;
+  status: 'unpaid' | 'pending' | 'paid' | 'failed';
+  paid_amount?: string;
+  paid_at?: string | null;
+}
+
+export type ChatCard = ChatSurchargeCard;
+
+/** 卡片支付结果（用户点击支付时返回）。 */
+export interface ChatCardPayment {
+  order_id: string;
+  status: string;
+  payable_amount: string;
+  pay_type: string | null;
+  payment_url?: string | null;
+  qr_code?: string | null;
+  expires_at?: string | null;
+  expires_in_seconds?: number | null;
+}
+
+/** 消息分页拉取结果。 */
+export interface ChatMessagesPage {
+  conversation: ChatConversation;
+  messages: ChatMessage[];
+  has_more: boolean;
+  unread: number;
+}
 
 export interface ChatConversation {
   id: number;

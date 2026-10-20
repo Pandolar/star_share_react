@@ -144,6 +144,17 @@ const App: React.FC = () => {
 
                     {/* Admin管理后台路由 */}
                     <Route path="/star-admin/login" element={<AdminLoginPage />} />
+                    {/* 客服工作台：独立于后台布局的全屏大页面 */}
+                    <Route
+                      path="/star-admin/service"
+                      element={
+                        <AdminProtectedRoute>
+                          <RequireAdminPermission permission="customer_service.conversation.read">
+                            <AdminCustomerServicePage />
+                          </RequireAdminPermission>
+                        </AdminProtectedRoute>
+                      }
+                    />
                     <Route path="/star-admin" element={<AdminRouteShell />}>
                       <Route index element={<AdminIndexRedirect />} />
                       <Route path="overview" element={<RequireAdminPermission permission="dashboard.read"><OverviewDashboardPage /></RequireAdminPermission>} />
@@ -163,7 +174,8 @@ const App: React.FC = () => {
                       <Route path="settings" element={<RequireAdminPermission permission="config.read"><SettingsManagePage /></RequireAdminPermission>} />
                       <Route path="invites" element={<RequireAdminPermission anyOf={['invite.policy.read', 'invite.cashback.read', 'invite.analytics.read', 'invite.reward.read', 'invite.withdrawal.read']}><InviteManagePage /></RequireAdminPermission>} />
                       <Route path="feedback" element={<RequireAdminPermission permission="feedback.read"><FeedbackManagePage /></RequireAdminPermission>} />
-                      <Route path="customer-service" element={<RequireAdminPermission permission="customer_service.conversation.read"><AdminCustomerServicePage /></RequireAdminPermission>} />
+                      {/* 旧地址兼容跳转到独立客服工作台 */}
+                      <Route path="customer-service" element={<Navigate to="/star-admin/service" replace />} />
                       <Route path="administrators" element={<RequireAdminPermission permission="administrator.account.read"><AdministratorManagePage /></RequireAdminPermission>} />
                       <Route path="security" element={<AdminSecurityPage />} />
                     </Route>

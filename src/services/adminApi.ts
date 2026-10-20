@@ -432,6 +432,16 @@ class AdminApiService {
         return response.data;
     }
 
+    async updateUserPackage(data: { id: number; package_id?: number; status?: string; created_at?: string; remaining_duration?: number | null; remarks?: string }): Promise<AdminApiResponse<UserPackage>> {
+        const response = await this.api.put('/star/user_packages', data);
+        return response.data;
+    }
+
+    async deleteUserPackage(id: number): Promise<AdminApiResponse> {
+        const response = await this.api.delete('/star/user_packages', { data: { id } });
+        return response.data;
+    }
+
     // ==================== CDK管理 ====================
 
     /**
@@ -833,6 +843,18 @@ class AdminApiService {
     async recallCsMessage(data: { message_id: number }): Promise<{ message: ChatMessage; event: ChatMessage | null; conversation: ChatConversation }> {
         const response = await this.api.post('/star/cs_messages/recall', data);
         if (response.data.code !== 20000) throw new Error(response.data.msg || '撤回消息失败');
+        return response.data.data;
+    }
+
+    async sendCsPaymentCard(data: { conversation_id: number; title: string; amount: string; payment_method: string; note?: string }): Promise<ChatMessage> {
+        const response = await this.api.post('/star/cs_payment_cards', data);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '发送收款卡片失败');
+        return response.data.data;
+    }
+
+    async createInvoice(data: { id: number; title: string; tax_number?: string; email?: string }): Promise<InvoiceRecord & { suggested_surcharge: string }> {
+        const response = await this.api.post('/star/invoices', data);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '补录开票失败');
         return response.data.data;
     }
 
