@@ -156,8 +156,15 @@ start = source.find('.u=')
 end = source.find('.chunk.js"', start)
 if start < 0 or end < 0:
     raise SystemExit('无法解析 webpack 分块文件映射')
+# webpack 为压缩体积会把数字 chunk id 写成 JS 科学计数法字面量（如 4e3 即 4000），
+# 必须先按 JS 数字解析，再与文件名中的十进制 id 比较。
+def _chunk_id(key):
+    if re.fullmatch(r'\d+(?:\.\d+)?[eE][+-]?\d+', key):
+        return str(int(float(key)))
+    return key
+
 chunk_map = dict(re.findall(r'(\d+|[0-9a-f]+):"([0-9a-f]{8})"', source[start:end + 10]))
-expected = {f'{chunk_id}.{digest}.chunk.js' for chunk_id, digest in chunk_map.items()}
+expected = {f'{_chunk_id(chunk_id)}.{digest}.chunk.js' for chunk_id, digest in chunk_map.items()}
 emitted = {path.name for path in (build / 'starstatic/js').glob('*.chunk.js')}
 if expected != emitted:
     raise SystemExit(f'分块文件不一致：缺少={sorted(expected-emitted)}，多余={sorted(emitted-expected)}')
