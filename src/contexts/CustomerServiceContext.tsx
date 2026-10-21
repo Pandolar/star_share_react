@@ -134,12 +134,21 @@ export function CustomerServiceProvider({ children }: { children: React.ReactNod
   };
 
   useEffect(() => {
-    if (cachedConfig !== undefined) return;
-
-    void loadConfig().then((next) => {
-      setResolved(next);
-      setLoading(false);
-    });
+    // 后台可能刚开启或调整客服配置：缓存只用于首帧，挂载与回到前台时始终后台重拉。
+    const refresh = () => {
+      if (document.hidden) return;
+      void loadConfig().then((next) => {
+        setResolved(next);
+        setLoading(false);
+      });
+    };
+    refresh();
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
   }, []);
 
   useEffect(() => {
