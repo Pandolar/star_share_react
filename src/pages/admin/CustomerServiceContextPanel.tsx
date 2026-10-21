@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Button,
+  Checkbox,
   Chip,
   Divider,
   Input,
@@ -12,11 +13,12 @@ import {
   Pagination,
   ScrollShadow,
   Spinner,
+  Textarea,
   Tooltip,
 } from '@heroui/react';
-import { CircleDollarSign, Mail, ReceiptText, RefreshCw, ShieldCheck, UserRound } from 'lucide-react';
+import { CircleDollarSign, Mail, Pencil, ReceiptText, RefreshCw, ShieldCheck, StickyNote, UserRound } from 'lucide-react';
 import adminApiService from '../../services/adminApi';
-import type { AdminCsConversation, AdminCsConversationDetail, AdminCsPurchaseOrder } from '../../types/admin';
+import type { AdminCsConversation, AdminCsConversationDetail } from '../../types/admin';
 import { showToast } from '../../components/Toast';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
@@ -56,25 +58,31 @@ export interface PaymentCardPrefill {
 
 export interface CustomerServiceContextPanelProps {
   conversation: AdminCsConversation;
-  /** 打开收款卡片弹窗（可带预填金额，例如补开票后的建议补收）。 */
+  /** 打开收款卡片弹窗（可带预填金额）。 */
   onOpenPaymentCard: (prefill?: PaymentCardPrefill) => void;
-  /** 面板内部触发用户信息弹层（窄屏回退）。 */
+  /** 保存用户备注（仅内部可见，同一用户所有会话共用）。 */
+  onUpdateUserRemark: (remark: string) => Promise<void>;
   className?: string;
 }
 
 /**
- * 客服工作台右侧上下文面板：用户资料、权益、购买记录、补开票与收款卡片入口。
- * 信息密度面向全职客服设计，所有操作就地完成，不打断聊天。
+ * 客服工作台右侧上下文面板：用户资料与备注、权益、购买记录、补开发票与收款卡片入口。
+ * 信息密度面向全职客服设计，高频操作就地完成，不打断聊天。
  */
-const CustomerServiceContextPanel: React.FC<CustomerServiceContextPanelProps> = ({ conversation, onOpenPaymentCard, className }) => {
+const CustomerServiceContextPanel: React.FC<CustomerServiceContextPanelProps> = ({ conversation, onOpenPaymentCard, onUpdateUserRemark, className }) => {
   const { can } = useAdminAuth();
   const canCreateInvoice = can('invoice.create');
+  const canEditRemark = can('customer_service.conversation.manage');
   const [detail, setDetail] = useState<AdminCsConversationDetail | null>(null);
   const [ordersPage, setOrdersPage] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [invoiceOrder, setInvoiceOrder] = useState<AdminCsPurchaseOrder | null>(null);
+  const [remarkEditing, setRemarkEditing] = useState(false);
+  const [remarkDraft, setRemarkDraft] = useState('');
+  const [remarkSaving, setRemarkSaving] = useState(false);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [invoiceAmount, setInvoiceAmount] = useState('');
   const [invoiceEmail, setInvoiceEmail] = useState('');
+  const [invoiceNotice, setInvoiceNotice] = useState(true);
   const [invoiceSaving, setInvoiceSaving] = useState(false);
   const requestId = useRef(0);
 
@@ -95,6 +103,7 @@ const CustomerServiceContextPanel: React.FC<CustomerServiceContextPanelProps> = 
   useEffect(() => {
     setDetail(null);
     setOrdersPage(1);
+    setRemarkEditing(false);
     void load(1);
   }, [load]);
 
@@ -103,32 +112,41 @@ const CustomerServiceContextPanel: React.FC<CustomerServiceContextPanelProps> = 
   const orders = detail?.purchase_history.orders || [];
   const orderPages = Math.max(1, Math.ceil((detail?.purchase_history.total || 0) / ORDER_PAGE_SIZE));
 
-  const openInvoice = (order: AdminCsPurchaseOrder) => {
-    setInvoiceOrder(order);
-    setInvoiceAmount(order.paid_amount || '');
+  const startRemarkEdit = () => {
+    setRemarkDraft(user.profile.remarks || '');
+    setRemarkEditing(true);
+  };
+
+  const saveRemark = async () => {
+    if (remarkSaving) return;
+    setRemarkSaving(true);
+    try {
+      await onUpdateUserRemark(remarkDraft.trim());
+      setRemarkEditing(false);
+    } finally {
+      setRemarkSaving(false);
+    }
+  };
+
+  const openInvoice = () => {
+    setInvoiceAmount('');
     setInvoiceEmail(user.profile.email || '');
+    setInvoiceNotice(true);
+    setInvoiceOpen(true);
   };
 
   const submitInvoice = async () => {
-    if (!invoiceOrder) return;
+    if (invoiceSaving) return;
     setInvoiceSaving(true);
     try {
-      const created = await adminApiService.createInvoice({
-        id: invoiceOrder.id,
-        amount: invoiceAmount.trim() || undefined,
+      const result = await adminApiService.createManualInvoice({
+        user_id: user.id,
+        amount: invoiceAmount.trim(),
         email: invoiceEmail.trim() || undefined,
+        send_notice: invoiceNotice,
       });
-      showToast('开票信息已补录，进入待开票队列', 'success');
-      setInvoiceOrder(null);
-      void load(ordersPage, true);
-      const surcharge = Number(created.suggested_surcharge);
-      if (surcharge > 0) {
-        onOpenPaymentCard({
-          title: '开票补差价',
-          amount: surcharge.toFixed(2),
-          note: `订单 ${invoiceOrder.order_id} 补录开票加价`,
-        });
-      }
+      showToast(result.notice_sent ? '开票信息已补录，并已提示用户' : '开票信息已补录，进入待开票队列', 'success');
+      setInvoiceOpen(false);
     } catch (error) {
       showToast(error instanceof Error ? error.message : '补录开票失败', 'error');
     } finally {
@@ -152,7 +170,29 @@ const CustomerServiceContextPanel: React.FC<CustomerServiceContextPanelProps> = 
             <p className="truncate">邮箱：{user.profile.email || '-'}</p>
             <p>用户ID：{user.id} · 状态：{user.profile.status === 1 ? '正常' : '已禁用'}</p>
             <p>注册：{formatDateTime(user.profile.created_at)}</p>
-            {user.profile.remarks && <p className="text-warning-600">备注:{user.profile.remarks}</p>}
+          </div>
+          <div className="mt-2 rounded-lg bg-default-50 px-2.5 py-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="flex items-center gap-1 text-xs font-medium text-default-600"><StickyNote className="h-3.5 w-3.5" /> 用户备注（仅内部可见）</p>
+              {canEditRemark && !remarkEditing && (
+                <Button isIconOnly size="sm" variant="light" aria-label="编辑用户备注" className="h-5 w-5 min-w-0" onPress={startRemarkEdit}>
+                  <Pencil className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+            {remarkEditing ? (
+              <div className="mt-1.5 space-y-1.5">
+                <Textarea size="sm" minRows={2} maxRows={5} maxLength={255} value={remarkDraft} onValueChange={setRemarkDraft} isDisabled={remarkSaving} aria-label="用户备注" />
+                <div className="flex justify-end gap-1.5">
+                  <Button size="sm" variant="light" className="h-6 min-w-0 px-2 text-xs" isDisabled={remarkSaving} onPress={() => setRemarkEditing(false)}>取消</Button>
+                  <Button size="sm" color="primary" className="h-6 min-w-0 px-2 text-xs" isLoading={remarkSaving} onPress={() => void saveRemark()}>保存</Button>
+                </div>
+              </div>
+            ) : (
+              <p className={`mt-1 whitespace-pre-wrap break-words text-xs ${user.profile.remarks ? 'text-warning-600' : 'text-default-400'}`}>
+                {user.profile.remarks || '暂无备注'}
+              </p>
+            )}
           </div>
         </div>
         <Divider />
@@ -170,16 +210,36 @@ const CustomerServiceContextPanel: React.FC<CustomerServiceContextPanelProps> = 
             )) : <p className="text-xs text-default-400">暂无有效权益</p>}
             <p className="text-xs text-default-500">累计支付 {billing.paid_orders} 单 · ¥{billing.paid_amount.toFixed(2)}</p>
           </div>
-          <Button
-            size="sm"
-            color="warning"
-            variant="flat"
-            className="mt-3 w-full"
-            startContent={<CircleDollarSign className="h-4 w-4" />}
-            onPress={() => onOpenPaymentCard()}
-          >
-            发送收款卡片（补差价）
-          </Button>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Button
+              size="sm"
+              color="warning"
+              variant="flat"
+              startContent={<CircleDollarSign className="h-4 w-4" />}
+              onPress={() => onOpenPaymentCard()}
+            >
+              收款卡片
+            </Button>
+            {canCreateInvoice && (
+              billing.billing_profile?.title ? (
+                <Button
+                  size="sm"
+                  color="primary"
+                  variant="flat"
+                  startContent={<ReceiptText className="h-4 w-4" />}
+                  onPress={openInvoice}
+                >
+                  补开发票
+                </Button>
+              ) : (
+                <Tooltip content="需用户先在个人中心完善发票抬头">
+                  <Button size="sm" variant="flat" isDisabled startContent={<ReceiptText className="h-4 w-4" />}>
+                    补开发票
+                  </Button>
+                </Tooltip>
+              )
+            )}
+          </div>
         </div>
         <Divider />
         <div>
@@ -198,24 +258,11 @@ const CustomerServiceContextPanel: React.FC<CustomerServiceContextPanelProps> = 
                     <span>{ORDER_TYPE_LABELS[order.order_type] || order.order_type}</span>
                     <span>{formatDateTime(order.paid_at || order.created_at)}</span>
                   </div>
-                  <div className="mt-1 flex items-center justify-between gap-2">
-                    {order.invoice_requested ? (
+                  {order.invoice_requested && (
+                    <div className="mt-1">
                       <Chip size="sm" variant="flat" color="success">{INVOICE_STATUS_LABELS[order.invoice_status || ''] || '已申请开票'}</Chip>
-                    ) : (
-                      <span className="text-default-400">未申请开票</span>
-                    )}
-                    {canCreateInvoice && !order.invoice_requested && (
-                      billing.billing_profile?.title ? (
-                        <Button size="sm" variant="flat" color="primary" className="h-6 min-w-0 px-2 text-xs" onPress={() => openInvoice(order)}>
-                          补开票
-                        </Button>
-                      ) : (
-                        <Tooltip content="需用户先在个人中心完善发票抬头">
-                          <span className="text-xs text-default-400">用户未填开票信息</span>
-                        </Tooltip>
-                      )
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               ))}
               {orderPages > 1 && (
@@ -227,17 +274,14 @@ const CustomerServiceContextPanel: React.FC<CustomerServiceContextPanelProps> = 
           )}
         </div>
       </div>
-      <Modal isOpen={Boolean(invoiceOrder)} onOpenChange={(open) => { if (!open && !invoiceSaving) setInvoiceOrder(null); }} size="md" placement="center">
+      <Modal isOpen={invoiceOpen} onOpenChange={(open) => { if (!open && !invoiceSaving) setInvoiceOpen(false); }} size="md" placement="center">
         <ModalContent>
-          <ModalHeader>补录开票信息</ModalHeader>
+          <ModalHeader>补开发票</ModalHeader>
           <ModalBody className="gap-3">
-            <p className="text-xs text-default-500">
-              订单 {invoiceOrder?.order_id} · 实付 ¥{invoiceOrder?.paid_amount || '--'}；补录后进入「开票管理」待开票队列。
-            </p>
             <div className="rounded-lg bg-default-50 px-3 py-2 text-xs">
               <p className="font-medium">用户开票资料（本人填写，不可代改）</p>
-              <p className="mt-1 text-default-600">抬头：{detail?.user.billing.billing_profile?.title || '-'}</p>
-              <p className="text-default-600">税号：{detail?.user.billing.billing_profile?.tax_number || '（未填写）'}</p>
+              <p className="mt-1 text-default-600">抬头：{billing.billing_profile?.title || '-'}</p>
+              <p className="text-default-600">税号：{billing.billing_profile?.tax_number || '（未填写）'}</p>
             </div>
             <Input
               label="开票金额（元）"
@@ -246,14 +290,18 @@ const CustomerServiceContextPanel: React.FC<CustomerServiceContextPanelProps> = 
               onValueChange={setInvoiceAmount}
               min={0.01}
               step={0.01}
-              description="默认按订单实付金额，可手动调整"
+              placeholder="手动输入开票金额"
+              description="不绑定具体套餐订单，按实际收款情况填写"
               isRequired
+              autoFocus
             />
             <Input label="接收邮箱" type="email" value={invoiceEmail} onValueChange={setInvoiceEmail} startContent={<Mail className="h-4 w-4 text-default-400" />} />
-            <p className="text-xs text-default-400">若需向用户补收开票加价，提交成功后会自动打开收款卡片并预填建议金额。</p>
+            <Checkbox size="sm" isSelected={invoiceNotice} onValueChange={setInvoiceNotice} isDisabled={invoiceSaving}>
+              在会话中提示用户「{invoiceAmount.trim() || 'xxx'}元发票正在补录流程中」
+            </Checkbox>
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" isDisabled={invoiceSaving} onPress={() => setInvoiceOrder(null)}>取消</Button>
+            <Button variant="light" isDisabled={invoiceSaving} onPress={() => setInvoiceOpen(false)}>取消</Button>
             <Button color="primary" isLoading={invoiceSaving} isDisabled={!invoiceAmount.trim() || Number(invoiceAmount) <= 0} onPress={() => void submitInvoice()}>确认补录</Button>
           </ModalFooter>
         </ModalContent>

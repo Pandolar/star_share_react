@@ -998,7 +998,14 @@ const CustomerServicePage: React.FC = () => {
         <Card className="hidden min-h-0 overflow-hidden xl:block">
           <CardBody className="flex h-full min-h-0 flex-col overflow-hidden p-3">
             {selected ? (
-              <CustomerServiceContextPanel conversation={selected} onOpenPaymentCard={openPaymentCard} className="h-full" />
+              <CustomerServiceContextPanel
+                conversation={selected}
+                onOpenPaymentCard={openPaymentCard}
+                onUpdateUserRemark={async (remark) => {
+                  if (selected) await updateConversationFor(selected, { user_remark: remark });
+                }}
+                className="h-full"
+              />
             ) : (
               <div className="flex h-full items-center justify-center text-sm text-default-400">选择会话后展示用户上下文</div>
             )}

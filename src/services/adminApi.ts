@@ -852,9 +852,15 @@ class AdminApiService {
         return response.data.data;
     }
 
-    async createInvoice(data: { id: number; amount?: string; email?: string }): Promise<InvoiceRecord & { suggested_surcharge: string }> {
+    async createManualInvoice(data: { user_id: number; amount: string; email?: string; send_notice?: boolean }): Promise<InvoiceRecord & { notice_sent: boolean }> {
         const response = await this.api.post('/star/invoices', data);
         if (response.data.code !== 20000) throw new Error(response.data.msg || '补录开票失败');
+        return response.data.data;
+    }
+
+    async updateInvoiceAmount(data: { id: number; amount: string }): Promise<InvoiceRecord> {
+        const response = await this.api.post('/star/invoices/amount', data);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '修改开票金额失败');
         return response.data.data;
     }
 

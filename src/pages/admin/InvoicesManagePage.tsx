@@ -93,6 +93,9 @@ const InvoicesManagePage: React.FC = () => {
   const [selectedRows, setSelectedRows] = useState<Map<number, InvoiceRecord>>(new Map());
   const [invoiceSummaryPreview, setInvoiceSummaryPreview] = useState('');
   const copyModal = useDisclosure();
+  const [amountTarget, setAmountTarget] = useState<InvoiceRecord | null>(null);
+  const [amountValue, setAmountValue] = useState('');
+  const [amountSaving, setAmountSaving] = useState(false);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const selectedOnPage = rows.reduce((count, row) => count + Number(selectedRows.has(row.id)), 0);
@@ -152,6 +155,26 @@ const InvoicesManagePage: React.FC = () => {
     if (selected) next.set(row.id, row); else next.delete(row.id);
     return next;
   });
+
+  const openAmountEditor = (record: InvoiceRecord) => {
+    setAmountTarget(record);
+    setAmountValue(String(record.invoice_base_amount ?? record.payable_amount ?? ''));
+  };
+
+  const submitAmount = async () => {
+    if (!amountTarget || amountSaving) return;
+    setAmountSaving(true);
+    try {
+      await adminApiService.updateInvoiceAmount({ id: amountTarget.id, amount: amountValue.trim() });
+      showToast('开票金额已更新', 'success');
+      setAmountTarget(null);
+      await load();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '修改开票金额失败', 'error');
+    } finally {
+      setAmountSaving(false);
+    }
+  };
 
   const updateStatus = async (record: InvoiceRecord, target: 'processing' | 'issued') => {
     setUpdatingId(record.id);
@@ -311,7 +334,7 @@ const InvoicesManagePage: React.FC = () => {
               <TableCell><div className="space-y-1 text-sm"><p>实付 ¥{record.paid_amount ?? record.payable_amount}</p><p className="text-default-500">{record.pricing_type === 'team' ? '席位原价' : '套餐原价'} ¥{record.original_amount ?? record.base_amount}</p>{Number(record.discount_amount || 0) > 0 && <p className="text-success">{record.pricing_type === 'team' ? '团队折扣' : `优惠码 ${record.promotion_code || ''}`}：-¥{Number(record.discount_amount).toFixed(2)}</p>}{Number(record.cashback_credit_amount || 0) > 0 && <p className="text-success">返现抵扣：-¥{Number(record.cashback_credit_amount).toFixed(2)}</p>}{Number(record.invoice_base_amount || 0) > 0 && <p className="text-default-500">开票计价基数 ¥{Number(record.invoice_base_amount).toFixed(2)}</p>}{Number(record.surcharge_amount || 0) > 0 && <p className="text-warning">开票加价 +¥{Number(record.surcharge_amount).toFixed(2)}</p>}</div></TableCell>
               <TableCell><Chip size="sm" color={record.invoice_status === 'issued' ? 'success' : record.invoice_status === 'processing' ? 'primary' : record.invoice_status === 'pending_issue' ? 'warning' : 'default'} variant="flat">{statusLabels[record.invoice_status]}</Chip></TableCell>
               <TableCell><div className="text-xs"><p>支付：{record.paid_at || '-'}</p><p>开票：{record.invoice_issued_at || '-'}</p>{record.invoice_status_history?.length ? <p className="text-default-500">最近流转：{record.invoice_status_history.at(-1)?.at}</p> : null}</div></TableCell>
-              <TableCell>{canUpdate && record.order_status === 'paid' && record.invoice_status === 'pending_issue' ? <Button size="sm" color="primary" variant="flat" isLoading={updatingId === record.id} onPress={() => updateStatus(record, 'processing')}>开始开票</Button> : canUpdate && record.order_status === 'paid' && record.invoice_status === 'processing' ? <Button size="sm" color="success" isLoading={updatingId === record.id} onPress={() => updateStatus(record, 'issued')}>标记已开票</Button> : '-'}</TableCell>
+              <TableCell><div className="flex flex-wrap items-center gap-1.5">{canUpdate && record.order_status === 'paid' && record.invoice_status === 'pending_issue' ? <Button size="sm" color="primary" variant="flat" isLoading={updatingId === record.id} onPress={() => updateStatus(record, 'processing')}>开始开票</Button> : canUpdate && record.order_status === 'paid' && record.invoice_status === 'processing' ? <Button size="sm" color="success" isLoading={updatingId === record.id} onPress={() => updateStatus(record, 'issued')}>标记已开票</Button> : null}{canUpdate && (record.invoice_status === 'pending_issue' || record.invoice_status === 'processing') && <Button size="sm" variant="light" onPress={() => openAmountEditor(record)}>修改金额</Button>}{!(canUpdate && (record.invoice_status === 'pending_issue' || record.invoice_status === 'processing')) && '-'}</div></TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -324,6 +347,31 @@ const InvoicesManagePage: React.FC = () => {
 
       <Modal isOpen={copyModal.isOpen} onClose={copyModal.onClose} size="4xl" scrollBehavior="inside">
         <ModalContent><ModalHeader>开票信息简版</ModalHeader><ModalBody><div className="space-y-2"><p className="text-sm text-default-500">开票信息简版，每条记录一行。</p><Textarea aria-label="开票信息简版文本" value={invoiceSummaryPreview} onValueChange={setInvoiceSummaryPreview} minRows={12} /></div></ModalBody><ModalFooter><Button variant="light" onPress={copyModal.onClose}>关闭</Button><Button color="primary" startContent={<Copy size={16} />} onPress={() => copyText(invoiceSummaryPreview, '开票信息简版已复制')}>复制开票信息</Button></ModalFooter></ModalContent>
+      </Modal>
+
+      <Modal isOpen={amountTarget !== null} onOpenChange={(open) => { if (!open && !amountSaving) setAmountTarget(null); }} size="sm" placement="center">
+        <ModalContent>
+          <ModalHeader>修改开票金额</ModalHeader>
+          <ModalBody className="gap-3">
+            <p className="text-xs text-default-500">
+              订单 {amountTarget?.order_id} · {amountTarget?.title}；仅待开票/开票中可改，修改会记入状态流转历史。
+            </p>
+            <Input
+              label="最终开票金额（元）"
+              type="number"
+              value={amountValue}
+              onValueChange={setAmountValue}
+              min={0.01}
+              step={0.01}
+              isRequired
+              autoFocus
+            />
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" isDisabled={amountSaving} onPress={() => setAmountTarget(null)}>取消</Button>
+            <Button color="primary" isLoading={amountSaving} isDisabled={!amountValue.trim() || Number(amountValue) <= 0} onPress={() => void submitAmount()}>确认修改</Button>
+          </ModalFooter>
+        </ModalContent>
       </Modal>
     </div>
   );
