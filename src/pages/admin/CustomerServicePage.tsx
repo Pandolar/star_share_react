@@ -39,10 +39,16 @@ import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import CustomerServiceUserInfo from './CustomerServiceUserInfo';
 import CustomerServiceContextPanel, { PaymentCardPrefill } from './CustomerServiceContextPanel';
 import { paymentMethodLabel } from '../../components/PaymentMethodSelector';
+import { CsAiManagementPanel } from './CsAiManagementPanel';
+import { CsAiPanel, CsHandlingControls } from './CsAiPanel';
 
 const FILTERS = [
   ['all', '全部'],
   ['unread', '未读'],
+  ['ai', 'AI 跟进'],
+  ['human', '人工跟进'],
+  ['draft_pending', '待审核草稿'],
+  ['overdue', '超时'],
   ['pinned', '置顶'],
 ];
 const GROUPS = [
@@ -123,6 +129,8 @@ const CustomerServicePage: React.FC = () => {
   const { can } = useAdminAuth();
   const navigate = useNavigate();
   const canSend = can('customer_service.message.send');
+  const canManageAi = can('customer_service.ai.manage');
+  const [aiManagementOpen, setAiManagementOpen] = useState(false);
   const canBatchSend = can('customer_service.message.batch_send');
   const canRecall = can('customer_service.message.recall');
   const canManageQuickReplies = can('customer_service.quick_reply.manage');
@@ -135,6 +143,7 @@ const CustomerServicePage: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [filter, setFilter] = useState('all');
   const [groupId, setGroupId] = useState('all');
+  const [groups, setGroups] = useState(GROUPS);
   const [remarkDraft, setRemarkDraft] = useState('');
   const [remarkOpen, setRemarkOpen] = useState(false);
   const [userInfoConversationId, setUserInfoConversationId] = useState<number | null>(null);
@@ -231,6 +240,7 @@ const CustomerServicePage: React.FC = () => {
             const isNewCustomerMessage = Boolean(
               item.admin_unread > 0
               && item.last_message_role === 'user'
+              && (item.handler !== 'ai' || item.ai_state === 'draft_pending')
               && item.last_message_at
               && lastNotifiedAt !== item.last_message_at
             );
@@ -520,6 +530,7 @@ const CustomerServicePage: React.FC = () => {
         if (Array.isArray(runtimeConfig.quick_replies)) {
           setQuickReplies(runtimeConfig.quick_replies.filter((item) => item.enabled !== false));
         }
+        if (Array.isArray(runtimeConfig.conversation_groups)) setGroups(runtimeConfig.conversation_groups);
         const minutes = Number(runtimeConfig.recall_window_minutes);
         if (Number.isFinite(minutes) && minutes >= 1 && minutes <= 1440) setRecallWindowMinutes(Math.trunc(minutes));
       } catch {
@@ -736,6 +747,7 @@ const CustomerServicePage: React.FC = () => {
         <Button size="sm" variant="light" startContent={<ArrowLeft className="h-4 w-4" />} onPress={() => navigate('/star-admin')}>
           返回后台
         </Button>
+        {canManageAi && <Button size="sm" variant="flat" startContent={<ShieldCheck className="h-4 w-4" />} onPress={() => setAiManagementOpen((value) => !value)}>AI 管理</Button>}
         <div className="flex min-w-0 items-center gap-2">
           <Headphones className="h-5 w-5 shrink-0 text-primary" />
           <h1 className="truncate text-base font-bold">客服工作台</h1>
@@ -755,7 +767,8 @@ const CustomerServicePage: React.FC = () => {
           )}
         </div>
       </header>
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden p-3 lg:grid-cols-[340px_minmax(0,1fr)] lg:p-4 xl:grid-cols-[340px_minmax(0,1fr)_320px]">
+      {aiManagementOpen && canManageAi && <div className="min-h-0 flex-1 overflow-y-auto border-b border-divider bg-content1 p-3"><CsAiManagementPanel selectedConversationIds={Array.from(batchSelection)} onClose={() => setAiManagementOpen(false)} /></div>}
+      <div className={`${aiManagementOpen ? 'hidden' : 'grid'} min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden p-3 lg:grid-cols-[340px_minmax(0,1fr)] lg:p-4 xl:grid-cols-[340px_minmax(0,1fr)_320px]`}>
         <Card className={`${mobileChat ? 'hidden lg:block' : 'block'} min-h-0 overflow-hidden`}>
           <CardBody className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-3">
             <div className="flex shrink-0 items-center justify-between gap-1">
@@ -798,7 +811,7 @@ const CustomerServicePage: React.FC = () => {
               size="sm"
             >
               <Tab key="all" title="全部分组" />
-              {GROUPS.map((group) => <Tab key={group.id} title={group.name} />)}
+              {groups.map((group) => <Tab key={group.id} title={group.name} />)}
             </Tabs>
             <Input
               value={query}
@@ -938,14 +951,32 @@ const CustomerServicePage: React.FC = () => {
                     </DropdownMenu>
                   </Dropdown>
                 </div>
+                <CsHandlingControls
+                  conversation={selected}
+                  canManage={canManageConversation}
+                  canManageAi={canManageAi}
+                  onConversation={(updated) => {
+                    setSelected(updated);
+                    setRows((current) => sortConversationsByRecent(current.map((item) => item.id === updated.id ? updated : item)));
+                  }}
+                />
                 {messages
                   .flatMap((message) => message.attachments)
                   .slice(-1)
                   .map((attachment) => (
                     <AttachmentSummary key={attachment.id} attachment={attachment} />
                   ))}
+                <CsAiPanel
+                  conversation={selected}
+                  canManage={canManageConversation}
+                  canSend={canSend}
+                  onConversation={(updated) => {
+                    setSelected(updated);
+                    setRows((current) => sortConversationsByRecent(current.map((item) => item.id === updated.id ? updated : item)));
+                  }}
+                />
                 <div className="min-h-0 flex-1 overflow-hidden">
-                  <ChatMessageList messages={messages} conversationKey={selected.id} selfRole="admin" loading={messageLoading} emptyText="暂无消息" scope="admin" userLastReadMessageId={selected.user_last_read_message_id} recallWindowMinutes={canRecall ? recallWindowMinutes : undefined} onRecall={canRecall ? setRecallTarget : undefined} />
+                  <ChatMessageList messages={messages.filter((message) => message.content_type !== 'ai_draft')} conversationKey={selected.id} selfRole="admin" loading={messageLoading} emptyText="暂无消息" scope="admin" userLastReadMessageId={selected.user_last_read_message_id} recallWindowMinutes={canRecall ? recallWindowMinutes : undefined} onRecall={canRecall ? setRecallTarget : undefined} />
                 </div>
                 {composerAttachmentConfig ? (
                   <ChatComposer

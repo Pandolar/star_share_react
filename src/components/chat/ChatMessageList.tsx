@@ -206,6 +206,7 @@ export default function ChatMessageList({
                   </div>
                 )}
                 <div className="mt-1 flex items-center gap-1">
+                  {scope === 'admin' && message.ai_meta?.source && <span className="text-xs text-secondary">{message.ai_meta.source === 'human_reviewed' ? '人工确认建议' : message.ai_meta.source === 'incident' ? '事故话术' : '自动回复'}</span>}
                   <Tooltip content={new Date(message.created_at).toLocaleString()}>
                     <span className="text-xs text-default-400">{relativeTime(message.created_at)}</span>
                   </Tooltip>

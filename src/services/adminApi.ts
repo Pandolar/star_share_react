@@ -890,6 +890,112 @@ class AdminApiService {
         return `${baseUrl}/star/cs_attachment/${encodeURIComponent(id)}`;
     }
 
+    async getCsAiConfig(): Promise<Record<string, unknown>> {
+        const response = await this.api.get('/star/cs_ai_config');
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '获取 AI 配置失败');
+        return response.data.data;
+    }
+
+    async updateCsAiConfig(data: Record<string, unknown>): Promise<Record<string, unknown>> {
+        const response = await this.api.put('/star/cs_ai_config', data);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '保存 AI 配置失败');
+        return response.data.data;
+    }
+
+    async stopCsAi(): Promise<void> {
+        const response = await this.api.post('/star/cs_ai_stop');
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '停止 AI 失败');
+    }
+
+    async listCsDrafts(params: { conversation_id: number }): Promise<{ data: Array<{ id: number; content?: string; ai_meta?: { reason?: string; revision?: number; kb_hits?: Array<{ document_name?: string; content?: string }>; draft?: { status?: string; reason?: string } } }>; total: number }> {
+        const response = await this.api.get(`/star/cs_drafts?${this.buildQueryString(params)}`);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '获取 AI 草稿失败');
+        return { data: response.data.data || [], total: Number(response.data.total) || 0 };
+    }
+
+    async sendCsDraft(id: number, data: { expected_revision: number; content?: string; client_msg_id?: string }): Promise<{ message: ChatMessage; conversation: AdminCsConversation; draft: unknown }> {
+        const response = await this.api.post(`/star/cs_drafts/${id}/send`, data);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '发送 AI 草稿失败');
+        return response.data.data;
+    }
+
+    async rejectCsDraft(id: number, data: { expected_revision: number; reason?: string }): Promise<{ conversation: AdminCsConversation; draft: unknown }> {
+        const response = await this.api.post(`/star/cs_drafts/${id}/reject`, data);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '拒绝 AI 草稿失败');
+        return response.data.data;
+    }
+
+    async setCsConversationHandling(id: number, data: { handler: 'human' | 'ai'; expected_revision: number; action?: 'claim' | 'release'; follow_up_state?: string | null; follow_up_at?: string | null; assigned_admin?: string | null }): Promise<AdminCsConversation> {
+        const response = await this.api.post(`/star/cs_conversations/${id}/handling`, data);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '更新会话处理失败');
+        return response.data.data;
+    }
+
+    async listCsKbCandidates(params: { status?: string; query?: string; current_page?: number; page_size?: number } = {}): Promise<{ data: Array<Record<string, unknown>>; total: number }> {
+        const response = await this.api.get(`/star/cs_kb_candidates?${this.buildQueryString(params)}`);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '获取知识库候选失败');
+        return { data: response.data.data || [], total: Number(response.data.total) || 0 };
+    }
+
+    async createCsKbCandidate(data: { question: string; answer: string; source?: string }): Promise<Record<string, unknown>> {
+        const response = await this.api.post('/star/cs_kb_candidates', data);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '创建知识库候选失败');
+        return response.data.data;
+    }
+
+    async updateCsKbCandidate(data: { id: number; revision: number; action: 'edit' | 'approve' | 'reject' | 'merge' | 'retry' | 'disable'; question?: string; answer?: string; target_id?: number }): Promise<Record<string, unknown>> {
+        const response = await this.api.put('/star/cs_kb_candidates', data);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '更新知识库候选失败');
+        return response.data.data;
+    }
+
+    async mineCsKb(data: { conversation_ids?: number[]; before_id?: number; limit?: number } = {}): Promise<{ queued: number }> {
+        const response = await this.api.post('/star/cs_kb_mine', data);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '提交知识挖掘失败');
+        return response.data.data;
+    }
+
+    async getCsMineProgress(): Promise<Record<string, unknown>> {
+        const response = await this.api.get('/star/cs_kb_mine');
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '获取知识挖掘进度失败');
+        return response.data.data;
+    }
+
+    async getCsIncident(): Promise<{ active: Record<string, unknown> | null; history: Array<Record<string, unknown>>; revision: number }> {
+        const response = await this.api.get('/star/cs_incident');
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '获取事件公告失败');
+        return response.data.data;
+    }
+
+    async saveCsIncident(data: Record<string, unknown>): Promise<{ active: Record<string, unknown> | null; history: Array<Record<string, unknown>>; revision: number }> {
+        const response = await this.api.post('/star/cs_incident', data);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '保存事件公告失败');
+        return response.data.data;
+    }
+
+    async clearCsIncident(): Promise<{ active: Record<string, unknown> | null; history: Array<Record<string, unknown>>; revision: number }> {
+        const response = await this.api.delete('/star/cs_incident');
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '结束事件公告失败');
+        return response.data.data;
+    }
+
+    async batchCsIncident(data: { conversation_ids: number[]; action: 'reply' | 'resolve'; client_msg_id: string }): Promise<{ count: number }> {
+        const response = await this.api.post('/star/cs_incident/batch', data);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '批量事件操作失败');
+        return response.data.data;
+    }
+
+    async postCsAiAudit(data: { message_id: number; score: 'correct' | 'incorrect' | 'tone'; comment?: string }): Promise<void> {
+        const response = await this.api.post('/star/cs_ai_audit', data);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '提交 AI 审核失败');
+    }
+
+    async getCsAiStats(): Promise<Record<string, unknown>> {
+        const response = await this.api.get('/star/cs_ai_stats');
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '获取 AI 统计失败');
+        return response.data.data;
+    }
+
     // ==================== 仪表盘 ====================
 
     /**

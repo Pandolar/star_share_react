@@ -214,6 +214,7 @@ export default function CustomerServiceTab(): React.ReactElement {
       <div className="border-b border-default-200 p-3">
         <p className="font-semibold">在线客服</p>
       </div>
+      {typeof config.announcement === 'string' && config.announcement.trim() && <div className="border-b border-warning-200 bg-warning-50 px-3 py-2 text-sm text-warning-800">{config.announcement}</div>}
       {selected ? (
         <div className="min-h-0 flex-1 p-3">
           <ChatMessageList

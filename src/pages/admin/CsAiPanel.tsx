@@ -1,0 +1,124 @@
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Button, Card, CardBody, Chip, Input, Select, SelectItem, Textarea } from '@heroui/react';
+import { Bot, RefreshCw, Send, X } from 'lucide-react';
+import adminApiService from '../../services/adminApi';
+import { showToast } from '../../components/Toast';
+import type { AdminCsConversation } from '../../types/admin';
+
+type Draft = {
+  id: number;
+  content?: string;
+  ai_meta?: { reason?: string; revision?: number; kb_hits?: Array<{ document_name?: string; content?: string }>; draft?: { status?: string; reason?: string } };
+};
+
+export const CsAiPanel: React.FC<{ conversation: AdminCsConversation; onConversation: (value: AdminCsConversation) => void; canManage: boolean; canSend: boolean }> = ({ conversation, onConversation, canManage, canSend }) => {
+  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [editor, setEditor] = useState<Record<number, string>>({});
+  const [busy, setBusy] = useState<number | null>(null);
+  const active = useRef(conversation.id);
+  active.current = conversation.id;
+  const requestVersion = useRef(0);
+  const localEditors = useRef(editor);
+  localEditors.current = editor;
+  const load = useCallback(async () => {
+    const id = conversation.id;
+    const version = ++requestVersion.current;
+    try {
+      const result = await adminApiService.listCsDrafts({ conversation_id: id });
+      if (active.current === id && version === requestVersion.current) {
+        const next = result.data as Draft[];
+        setDrafts((previous) => [...next, ...previous.filter((draft) =>
+          !next.some((item) => item.id === draft.id) && localEditors.current[draft.id] !== undefined
+        ).map((draft) => ({ ...draft, ai_meta: { ...draft.ai_meta, draft: { ...draft.ai_meta?.draft, status: 'stale' } } }))]);
+      }
+    } catch (error) {
+      if (active.current === id) showToast(error instanceof Error ? error.message : '读取建议失败', 'error');
+    }
+  }, [conversation.id]);
+  useEffect(() => {
+    setDrafts([]);
+    setEditor({});
+    void load();
+    const timer = window.setInterval(() => void load(), 6000);
+    return () => { window.clearInterval(timer); requestVersion.current += 1; };
+  }, [load]);
+  const act = async (draft: Draft, action: 'send' | 'reject') => {
+    if (busy !== null) return;
+    setBusy(draft.id);
+    requestVersion.current += 1;
+    try {
+      const expected_revision = draft.ai_meta?.revision ?? -1;
+      const result = action === 'send'
+        ? await adminApiService.sendCsDraft(draft.id, { expected_revision, content: editor[draft.id] ?? draft.content })
+        : await adminApiService.rejectCsDraft(draft.id, { expected_revision });
+      if (result.conversation.id === active.current) onConversation(result.conversation);
+      setEditor((previous) => { const next = { ...previous }; delete next[draft.id]; localEditors.current = next; return next; });
+      setDrafts((previous) => previous.filter((item) => item.id !== draft.id));
+      showToast(action === 'send' ? '已发送确认后的回复' : '建议已驳回，转人工处理', 'success');
+      await load();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '操作失败', 'error');
+      await load();
+    } finally { setBusy(null); }
+  };
+  return <div className="space-y-2">
+    <div className="flex justify-between items-center">
+      <span className="text-sm font-semibold flex gap-1 items-center"><Bot size={16} />内部回复建议</span>
+      <Button size="sm" isIconOnly variant="light" aria-label="刷新建议" onPress={() => void load()}><RefreshCw size={14} /></Button>
+    </div>
+    {conversation.handoff_reason && <p className="text-xs text-warning">交接原因：{conversation.handoff_reason}</p>}
+    {drafts.map((draft) => {
+      const stale = draft.ai_meta?.revision !== conversation.ai_revision || draft.ai_meta?.draft?.status === 'stale';
+      return <Card key={draft.id} className="border border-secondary-200"><CardBody className="gap-2 p-3">
+        <Chip size="sm" color={stale ? 'warning' : 'secondary'}>{stale ? '会话已变化，请核对最新内容' : '等待人工确认'}</Chip>
+        <p className="text-xs text-default-500">{draft.ai_meta?.draft?.reason || draft.ai_meta?.reason}</p>
+        {(draft.ai_meta?.kb_hits || []).map((hit, index) => <details key={index} className="text-xs text-default-500"><summary>{hit.document_name || '检索来源'}</summary><p className="whitespace-pre-wrap">{hit.content}</p></details>)}
+        <Textarea label="回复建议（编辑后发送）" value={editor[draft.id] ?? draft.content ?? ''} onValueChange={(content) => setEditor((current) => ({ ...current, [draft.id]: content }))} minRows={3} isReadOnly={!canSend} />
+        <div className="flex gap-2">
+          <Button size="sm" color="primary" startContent={<Send size={14} />} isDisabled={!canSend || stale || busy !== null} onPress={() => void act(draft, 'send')}>确认发送</Button>
+          <Button size="sm" color="danger" variant="flat" startContent={<X size={14} />} isDisabled={!canManage || stale || busy !== null} onPress={() => void act(draft, 'reject')}>驳回</Button>
+          {stale && <Button size="sm" variant="light" onPress={() => { setEditor((current) => { const next = { ...current }; delete next[draft.id]; return next; }); setDrafts((current) => current.filter((item) => item.id !== draft.id)); }}>清除过期建议（先复制需要的内容）</Button>}
+        </div>
+      </CardBody></Card>;
+    })}
+    {!drafts.length && <p className="text-xs text-default-500">暂无待确认建议。建议不对用户显示。</p>}
+    {conversation.sla_overdue && <Alert color="warning" title="跟进或回复已超时" />}
+  </div>;
+};
+
+export const CsHandlingControls: React.FC<{ conversation: AdminCsConversation; onConversation: (value: AdminCsConversation) => void; canManage: boolean; canManageAi: boolean }> = ({ conversation, onConversation, canManage, canManageAi }) => {
+  const [busy, setBusy] = useState(false);
+  const [due, setDue] = useState('');
+  const [assignee, setAssignee] = useState('');
+  const [followup, setFollowup] = useState('waiting_internal');
+  useEffect(() => { setDue(''); setAssignee(conversation.assigned_admin || ''); }, [conversation.id, conversation.assigned_admin]);
+  const apply = async (handler: 'human' | 'ai', action?: 'claim' | 'release', follow = false) => {
+    if (busy || !canManage) return;
+    setBusy(true);
+    try {
+      const value = await adminApiService.setCsConversationHandling(conversation.id, {
+        handler, action, expected_revision: Number(conversation.ai_revision || 0),
+        ...(follow ? { follow_up_state: followup, follow_up_at: due ? new Date(due).toISOString() : null, assigned_admin: assignee || null } : {}),
+      });
+      onConversation(value);
+    } catch (error) { showToast(error instanceof Error ? error.message : '更新失败', 'error'); }
+    finally { setBusy(false); }
+  };
+  return <div className="space-y-2">
+    <div className="flex flex-wrap gap-2 items-center">
+      <Chip size="sm">{conversation.handler === 'ai' ? '自动处理' : '人工处理'} · {conversation.ai_state || 'idle'}</Chip>
+      <Button size="sm" isDisabled={!canManage || busy} onPress={() => void apply('human', 'claim')}>认领 / 接管</Button>
+      <Button size="sm" isDisabled={!canManage || busy} onPress={() => void apply('human', 'release')}>释放认领</Button>
+      <Button size="sm" isDisabled={!canManageAi || busy} onPress={() => void apply('ai', 'release')}>交还自动处理</Button>
+      <Button size="sm" color="danger" variant="flat" isDisabled={!canManageAi || busy} onPress={() => void adminApiService.stopCsAi().then(() => showToast('已停止全部自动处理', 'success')).catch((error: Error) => showToast(error.message, 'error'))}>停止全部 AI</Button>
+    </div>
+    <details className="text-xs"><summary>分配与定时跟进</summary><div className="grid gap-2 mt-2 md:grid-cols-2">
+      <Input size="sm" label="客服账号（留空为未认领）" value={assignee} onValueChange={setAssignee} />
+      <Input size="sm" type="datetime-local" label="跟进时间" value={due} onValueChange={setDue} />
+      <Select size="sm" label="跟进状态" selectedKeys={[followup]} onSelectionChange={(keys) => setFollowup(String(Array.from(keys)[0]))}>
+        <SelectItem key="waiting_user">等待用户</SelectItem><SelectItem key="waiting_internal">内部处理</SelectItem><SelectItem key="escalated">升级主管</SelectItem>
+      </Select>
+      <Button size="sm" isDisabled={!canManage || busy} onPress={() => void apply('human', undefined, true)}>保存跟进</Button>
+    </div></details>
+  </div>;
+};

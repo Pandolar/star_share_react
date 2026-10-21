@@ -988,6 +988,15 @@ export interface AdminCsConversation extends ChatConversation {
     group_id: string | null;
     user_last_read_message_id: number | null;
     user_last_read_at: string | null;
+    handler?: 'human' | 'ai';
+    ai_state?: 'idle' | 'waiting' | 'running' | 'draft_pending';
+    ai_revision?: number;
+    ai_due_at?: string | null;
+    incident_id?: string | null;
+    follow_up_at?: string | null;
+    follow_up_state?: 'waiting_user' | 'waiting_internal' | 'escalated' | null;
+    handoff_reason?: string | null;
+    sla_overdue?: boolean;
 }
 
 export interface AdminCsPurchaseOrder {

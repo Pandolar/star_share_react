@@ -31,6 +31,8 @@ export interface ChatMessage {
   related_message_id?: number | null;
   /** 组件卡片负载（content_type 为卡片类型时由后端解析下发）。 */
   card?: ChatCard;
+  /** Internal-only provenance; never supplied to the customer API. */
+  ai_meta?: { generated?: boolean; source?: string; confidence?: number; review?: string; reason?: string };
 }
 
 /** 撤回占位文案：前后端共用同一句，避免用户端与后台显示不一致。 */
@@ -135,6 +137,7 @@ export type ChatProvider = 'builtin' | 'chatwoot' | 'off';
 export interface ChatConfig {
   enabled: boolean;
   provider: ChatProvider;
+  announcement?: string;
   entry: {
     tab_enabled: boolean;
     tab_label: string;
