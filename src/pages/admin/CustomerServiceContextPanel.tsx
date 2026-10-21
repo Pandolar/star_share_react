@@ -73,8 +73,7 @@ const CustomerServiceContextPanel: React.FC<CustomerServiceContextPanelProps> = 
   const [ordersPage, setOrdersPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [invoiceOrder, setInvoiceOrder] = useState<AdminCsPurchaseOrder | null>(null);
-  const [invoiceTitle, setInvoiceTitle] = useState('');
-  const [invoiceTaxNumber, setInvoiceTaxNumber] = useState('');
+  const [invoiceAmount, setInvoiceAmount] = useState('');
   const [invoiceEmail, setInvoiceEmail] = useState('');
   const [invoiceSaving, setInvoiceSaving] = useState(false);
   const requestId = useRef(0);
@@ -106,19 +105,17 @@ const CustomerServiceContextPanel: React.FC<CustomerServiceContextPanelProps> = 
 
   const openInvoice = (order: AdminCsPurchaseOrder) => {
     setInvoiceOrder(order);
-    setInvoiceTitle(detail?.user.billing.billing_profile?.title || '');
-    setInvoiceTaxNumber('');
+    setInvoiceAmount(order.paid_amount || '');
     setInvoiceEmail(user.profile.email || '');
   };
 
   const submitInvoice = async () => {
-    if (!invoiceOrder || !invoiceTitle.trim()) return;
+    if (!invoiceOrder) return;
     setInvoiceSaving(true);
     try {
       const created = await adminApiService.createInvoice({
         id: invoiceOrder.id,
-        title: invoiceTitle.trim(),
-        tax_number: invoiceTaxNumber.trim() || undefined,
+        amount: invoiceAmount.trim() || undefined,
         email: invoiceEmail.trim() || undefined,
       });
       showToast('开票信息已补录，进入待开票队列', 'success');
@@ -208,9 +205,15 @@ const CustomerServiceContextPanel: React.FC<CustomerServiceContextPanelProps> = 
                       <span className="text-default-400">未申请开票</span>
                     )}
                     {canCreateInvoice && !order.invoice_requested && (
-                      <Button size="sm" variant="flat" color="primary" className="h-6 min-w-0 px-2 text-xs" onPress={() => openInvoice(order)}>
-                        补开票
-                      </Button>
+                      billing.billing_profile?.title ? (
+                        <Button size="sm" variant="flat" color="primary" className="h-6 min-w-0 px-2 text-xs" onPress={() => openInvoice(order)}>
+                          补开票
+                        </Button>
+                      ) : (
+                        <Tooltip content="需用户先在个人中心完善发票抬头">
+                          <span className="text-xs text-default-400">用户未填开票信息</span>
+                        </Tooltip>
+                      )
                     )}
                   </div>
                 </div>
@@ -231,14 +234,27 @@ const CustomerServiceContextPanel: React.FC<CustomerServiceContextPanelProps> = 
             <p className="text-xs text-default-500">
               订单 {invoiceOrder?.order_id} · 实付 ¥{invoiceOrder?.paid_amount || '--'}；补录后进入「开票管理」待开票队列。
             </p>
-            <Input label="发票抬头" value={invoiceTitle} onValueChange={setInvoiceTitle} maxLength={100} isRequired />
-            <Input label="纳税人识别号（企业抬头必填）" value={invoiceTaxNumber} onValueChange={setInvoiceTaxNumber} maxLength={100} />
+            <div className="rounded-lg bg-default-50 px-3 py-2 text-xs">
+              <p className="font-medium">用户开票资料（本人填写，不可代改）</p>
+              <p className="mt-1 text-default-600">抬头：{detail?.user.billing.billing_profile?.title || '-'}</p>
+              <p className="text-default-600">税号：{detail?.user.billing.billing_profile?.tax_number || '（未填写）'}</p>
+            </div>
+            <Input
+              label="开票金额（元）"
+              type="number"
+              value={invoiceAmount}
+              onValueChange={setInvoiceAmount}
+              min={0.01}
+              step={0.01}
+              description="默认按订单实付金额，可手动调整"
+              isRequired
+            />
             <Input label="接收邮箱" type="email" value={invoiceEmail} onValueChange={setInvoiceEmail} startContent={<Mail className="h-4 w-4 text-default-400" />} />
             <p className="text-xs text-default-400">若需向用户补收开票加价，提交成功后会自动打开收款卡片并预填建议金额。</p>
           </ModalBody>
           <ModalFooter>
             <Button variant="light" isDisabled={invoiceSaving} onPress={() => setInvoiceOrder(null)}>取消</Button>
-            <Button color="primary" isLoading={invoiceSaving} isDisabled={!invoiceTitle.trim()} onPress={() => void submitInvoice()}>确认补录</Button>
+            <Button color="primary" isLoading={invoiceSaving} isDisabled={!invoiceAmount.trim() || Number(invoiceAmount) <= 0} onPress={() => void submitInvoice()}>确认补录</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

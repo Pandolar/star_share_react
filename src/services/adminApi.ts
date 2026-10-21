@@ -852,7 +852,7 @@ class AdminApiService {
         return response.data.data;
     }
 
-    async createInvoice(data: { id: number; title: string; tax_number?: string; email?: string }): Promise<InvoiceRecord & { suggested_surcharge: string }> {
+    async createInvoice(data: { id: number; amount?: string; email?: string }): Promise<InvoiceRecord & { suggested_surcharge: string }> {
         const response = await this.api.post('/star/invoices', data);
         if (response.data.code !== 20000) throw new Error(response.data.msg || '补录开票失败');
         return response.data.data;

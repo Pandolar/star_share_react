@@ -964,7 +964,7 @@ export interface AdminCsUserProfile {
 }
 
 export interface AdminCsBillingSummary {
-    billing_profile: { title: string } | null;
+    billing_profile: { title: string; tax_number?: string } | null;
     current_package: { name: string; category: string; level: string; status: string; remaining_duration: number | null; activated_at: string | null } | null;
     paid_orders: number;
     paid_amount: number;
