@@ -45,8 +45,8 @@ import { CsAiPanel, CsHandlingControls } from './CsAiPanel';
 const FILTERS = [
   ['all', '全部'],
   ['unread', '未读'],
-  ['ai', 'AI 跟进'],
-  ['human', '人工跟进'],
+  ['taken_over', '已接管'],
+  ['unclaimed', '未接管'],
   ['draft_pending', '待审核草稿'],
   ['overdue', '超时'],
   ['pinned', '置顶'],
@@ -954,7 +954,6 @@ const CustomerServicePage: React.FC = () => {
                 <CsHandlingControls
                   conversation={selected}
                   canManage={canManageConversation}
-                  canManageAi={canManageAi}
                   onConversation={(updated) => {
                     setSelected(updated);
                     setRows((current) => sortConversationsByRecent(current.map((item) => item.id === updated.id ? updated : item)));

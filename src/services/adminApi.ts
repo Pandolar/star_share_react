@@ -788,7 +788,7 @@ class AdminApiService {
         return response.data.data;
     }
 
-    async updateCsConversation(data: { id: number; status?: string; internal_remark?: string; priority?: string; is_pinned?: boolean; group_id?: string; user_remark?: string }): Promise<AdminCsConversation> {
+    async updateCsConversation(data: { id: number; status?: string; internal_remark?: string; priority?: string; is_pinned?: boolean; group_id?: string; user_remark?: string; follow_up_state?: string | null; follow_up_at?: string | null }): Promise<AdminCsConversation> {
         const response = await this.api.put('/star/cs_conversations', data);
         if (response.data.code !== 20000) throw new Error(response.data.msg || '更新客服会话失败');
         return response.data.data;
@@ -925,7 +925,7 @@ class AdminApiService {
         return response.data.data;
     }
 
-    async setCsConversationHandling(id: number, data: { handler: 'human' | 'ai'; expected_revision: number; action?: 'claim' | 'release'; follow_up_state?: string | null; follow_up_at?: string | null; assigned_admin?: string | null }): Promise<AdminCsConversation> {
+    async setCsConversationHandling(id: number, data: { taken_over: boolean; expected_revision: number }): Promise<AdminCsConversation> {
         const response = await this.api.post(`/star/cs_conversations/${id}/handling`, data);
         if (response.data.code !== 20000) throw new Error(response.data.msg || '更新会话处理失败');
         return response.data.data;
