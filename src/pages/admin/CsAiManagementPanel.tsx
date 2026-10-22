@@ -77,30 +77,58 @@ export const CsAiManagementPanel: React.FC<Props> = ({ selectedConversationIds, 
     else await adminApiService.createCsKbCandidate({ question, answer });
     setEditing(null); setQuestion(''); setAnswer(''); await loadKb();
   });
-  const settingFields: Array<[string, string]> = [['auto_threshold', '自动发送评分门槛（还需检索证据）'], ['draft_threshold', '建议评分门槛'], ['debounce_seconds', '静默合并窗口（秒）'], ['max_wait_seconds', '最长合并等待（秒）'], ['timeout_seconds', '模型响应超时（秒）'], ['max_daily_calls', '每会话每日调用上限']];
   return <div className="space-y-4">
     <div className="flex justify-between items-center"><h2 className="font-semibold">客服自动化与知识管理</h2>{onClose && <Button size="sm" onPress={onClose}>关闭</Button>}</div>
     {error && <Alert color="danger" title={error} />}
     <Tabs aria-label="客服管理功能">
       <Tab key="config" title="处理策略"><div className="mt-3 space-y-3">
-        <Alert title={ai.enabled ? '自动化已启用' : '纯人工模式（默认）'} description={Object.entries(object(settings.integrations)).map(([key, value]) => `${key}: ${value ? '已配置' : '未配置'}`).join(' · ')} />
-        <div className="grid gap-3 md:grid-cols-2">
-          <Switch isSelected={ai.enabled === true} isDisabled={!can('customer_service.ai.manage')} onValueChange={(enabled) => setAi({ ...ai, enabled })}>启用自动处理</Switch>
-          <Select label="回复策略" selectedKeys={[text(ai.mode) || 'draft']} onSelectionChange={(keys) => setAi({ ...ai, mode: String(Array.from(keys)[0]) })} isDisabled={!can('customer_service.ai.manage')}>
-            <SelectItem key="draft">全部先生成建议</SelectItem><SelectItem key="auto">有证据才允许自动发送</SelectItem>
-          </Select>
-          {settingFields.map(([key, label]) => <NumberInput key={key} label={label} value={number(ai[key])} step={key.includes('threshold') ? .05 : 1} onValueChange={(value) => setAi({ ...ai, [key]: value })} isDisabled={!can('customer_service.ai.manage')} />)}
-          <Input label="灰度分类ID（逗号分隔；空为全部）" value={strings(ai.only_categories).join(',')} onValueChange={(value) => setAi({ ...ai, only_categories: csv(value) })} />
-          <Input label="强制人工关键词" value={strings(ai.forbidden_keywords).join(',')} onValueChange={(value) => setAi({ ...ai, forbidden_keywords: csv(value) })} />
-          <Switch isSelected={ai.notify_handoff === true} onValueChange={(value) => setAi({ ...ai, notify_handoff: value })}>人工交接通知</Switch>
-          <Switch isSelected={ai.notify_draft === true} onValueChange={(value) => setAi({ ...ai, notify_draft: value })}>建议待审通知</Switch>
-          <Switch isSelected={learning.enabled === true} onValueChange={(enabled) => setLearning({ ...learning, enabled })}>自动提炼已解决的人工答复（仍须审核）</Switch>
-          <Switch isSelected={sla.enabled === true} isDisabled={!can('customer_service.ai.manage')} onValueChange={(enabled) => setSla({ ...sla, enabled })}>启用SLA自动提醒与升级（默认关闭）</Switch>
-          <NumberInput label="人工回复SLA（秒）" value={number(sla.first_response_seconds)} onValueChange={(value) => setSla({ ...sla, first_response_seconds: value })} />
-        </div>
-        <p className="text-xs text-default-500">Bark / 邮件 / Webhook 接收端仍在系统配置 → 在线客服 → 管理员通知中设置。默认不发送订单、正文到推送。</p>
+        <Alert color={ai.enabled ? 'success' : 'default'} title={ai.enabled ? `AI 代答已启用（${ai.mode === 'auto' ? '有证据自动发送' : '先生成建议，人工确认'}）` : '纯人工模式（默认，所有消息由客服处理）'} description={`外部依赖：${Object.entries(object(settings.integrations)).map(([key, value]) => `${({ chat: '代答', mining: '知识提炼', knowledge: '知识库', vision: '图片识别' } as Record<string, string>)[key] || key} ${value ? '已配置' : '未配置'}`).join(' · ')}。AI 只回复文本；用户发的图片/文件会先识别再交给模型，识别不了的直接转人工。`} />
+        <Card><CardBody className="gap-3">
+          <p className="text-sm font-semibold">第 1 步 · 打开需要的开关</p>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-1"><Switch isSelected={ai.enabled === true} isDisabled={!can('customer_service.ai.manage')} onValueChange={(enabled) => setAi({ ...ai, enabled })}>启用 AI 代答</Switch><p className="text-xs text-default-500 pl-1">总开关。关闭时全部人工。建议知识库有一定数量且验收过再开。</p></div>
+            <div className="space-y-1"><Switch isSelected={learning.enabled === true} isDisabled={!can('customer_service.ai.manage')} onValueChange={(enabled) => setLearning({ ...learning, enabled })}>自动学习已解决会话（只生成候选）</Switch><p className="text-xs text-default-500 pl-1">与代答独立，可先开：会话结束后自动提炼人工答复为待审知识，AI 不回复任何用户。</p></div>
+            <div className="space-y-1 md:col-span-2"><Switch isSelected={sla.enabled === true} isDisabled={!can('customer_service.ai.manage')} onValueChange={(enabled) => setSla({ ...sla, enabled })}>开启 SLA 超时提醒（默认关闭）</Switch><p className="text-xs text-default-500 pl-1">开启后人工超时未回复的会话自动升级到「主管待处理」组；不会回溯标记历史会话。</p></div>
+            {sla.enabled ? <NumberInput label="人工首次回复时限（秒）" value={number(sla.first_response_seconds)} step={30} onValueChange={(value) => setSla({ ...sla, first_response_seconds: value })} isDisabled={!can('customer_service.ai.manage')} /> : null}
+            <div className="space-y-1 md:col-span-2"><NumberInput label="接管闲置多久自动交还（小时，0=不自动交还）" value={number(ai.takeover_expire_hours)} onValueChange={(value) => setAi({ ...ai, takeover_expire_hours: value })} isDisabled={!can('customer_service.ai.manage')} /><p className="text-xs text-default-500 pl-1">客服接管后若双方都没有新消息超过该时长，自动取消接管；用户再来消息时按当时的开关交给 AI 或人工。敏感话题（退款、投诉等）的会话不会被自动交还。</p></div>
+          </div>
+        </CardBody></Card>
+        <Card><CardBody className="gap-3">
+          <p className="text-sm font-semibold">第 2 步 · AI 怎么回复（先小范围试用）</p>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-1"><Select label="回复策略" selectedKeys={[text(ai.mode) || 'draft']} onSelectionChange={(keys) => setAi({ ...ai, mode: String(Array.from(keys)[0]) })} isDisabled={!can('customer_service.ai.manage')}>
+              <SelectItem key="draft">先生成建议，客服确认后发送（推荐起步）</SelectItem><SelectItem key="auto">评分和证据都达标才自动发送</SelectItem>
+            </Select><p className="text-xs text-default-500">「建议」模式：AI 只给客服看草稿，点确认才发给用户；「自动」模式仍保留评分+真实知识库引用双门槛。</p></div>
+            <div className="space-y-1"><Input label="试用分类（分类ID，逗号分隔，留空=全部）" value={strings(ai.only_categories).join(',')} onValueChange={(value) => setAi({ ...ai, only_categories: csv(value) })} isDisabled={!can('customer_service.ai.manage')} /><p className="text-xs text-default-500">先填一个咨询量大的分类试运行，满意后清空放开全部。</p></div>
+            <div className="space-y-1"><NumberInput label="自动发送门槛（0-1）" value={number(ai.auto_threshold)} step={0.05} onValueChange={(value) => setAi({ ...ai, auto_threshold: value })} isDisabled={!can('customer_service.ai.manage')} /><p className="text-xs text-default-500">AI 自评把握达到该分数、且知识库确有命中，才允许自动发送。建议 0.85-0.95。</p></div>
+            <div className="space-y-1"><NumberInput label="生成建议门槛（0-1）" value={number(ai.draft_threshold)} step={0.05} onValueChange={(value) => setAi({ ...ai, draft_threshold: value })} isDisabled={!can('customer_service.ai.manage')} /><p className="text-xs text-default-500">低于该分数连建议都不生成，直接转人工。</p></div>
+          </div>
+        </CardBody></Card>
+        <Card><CardBody className="gap-3">
+          <p className="text-sm font-semibold">第 3 步 · 哪些消息必须交给人工</p>
+          <p className="text-xs text-default-500">命中任一词就整条转人工并推送通知；匹配不区分大小写，消息里包含该词即算命中。留空表示不启用该层。</p>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-1"><Input label="用户要人工的词（如：转人工、找客服）" value={strings(ai.handoff_keywords).join(',')} onValueChange={(value) => setAi({ ...ai, handoff_keywords: csv(value) })} isDisabled={!can('customer_service.ai.manage')} /><p className="text-xs text-default-500">用户明确想找人时立刻转人工，不再让 AI 接话。</p></div>
+            <div className="space-y-1"><Input label="敏感话题词（如：退款、投诉、发票）" value={strings(ai.forbidden_keywords).join(',')} onValueChange={(value) => setAi({ ...ai, forbidden_keywords: csv(value) })} isDisabled={!can('customer_service.ai.manage')} /><p className="text-xs text-default-500">涉及资金、纠纷、账号处置的话题永远不由 AI 处理。</p></div>
+          </div>
+          <p className="text-xs text-default-500">除关键词外，系统还会自动转人工：AI 没把握、知识库没有依据、图片识别不了、模型连续失败、超出每会话每日调用上限、建议长时间无人确认，以及模型自己判断用户情绪激动或反复未解决。</p>
+        </CardBody></Card>
+        <Card><CardBody className="gap-3">
+          <p className="text-sm font-semibold">通知</p>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Switch isSelected={ai.notify_handoff === true} onValueChange={(value) => setAi({ ...ai, notify_handoff: value })}>有人工交接时通知我</Switch>
+            <Switch isSelected={ai.notify_draft === true} onValueChange={(value) => setAi({ ...ai, notify_draft: value })}>有建议待确认时通知我</Switch>
+          </div>
+          <p className="text-xs text-default-500">Bark / 邮件 / Webhook 接收端在「系统配置 → 在线客服 → 管理员通知」设置；推送只带会话编号和原因，不含订单和聊天内容。</p>
+        </CardBody></Card>
+        <details><summary className="text-sm">高级参数（一般不用改）</summary><div className="grid gap-3 md:grid-cols-2 mt-2">
+          <div className="space-y-1"><NumberInput label="静默等待（秒）" value={number(ai.debounce_seconds)} onValueChange={(value) => setAi({ ...ai, debounce_seconds: value })} isDisabled={!can('customer_service.ai.manage')} /><p className="text-xs text-default-500">用户连发多条时先等这几秒合并成一个问题再处理。</p></div>
+          <div className="space-y-1"><NumberInput label="最长合并等待（秒）" value={number(ai.max_wait_seconds)} onValueChange={(value) => setAi({ ...ai, max_wait_seconds: value })} isDisabled={!can('customer_service.ai.manage')} /><p className="text-xs text-default-500">用户一直在发消息时，最多等这么久必须开始处理。</p></div>
+          <div className="space-y-1"><NumberInput label="模型响应超时（秒）" value={number(ai.timeout_seconds)} onValueChange={(value) => setAi({ ...ai, timeout_seconds: value })} isDisabled={!can('customer_service.ai.manage')} /><p className="text-xs text-default-500">超过该时间未返回就放弃并转人工。</p></div>
+          <div className="space-y-1"><NumberInput label="每会话每日 AI 调用上限" value={number(ai.max_daily_calls)} onValueChange={(value) => setAi({ ...ai, max_daily_calls: value })} isDisabled={!can('customer_service.ai.manage')} /><p className="text-xs text-default-500">防止异常会话无限消耗模型额度，超出后当天转人工。</p></div>
+        </div></details>
         <details><summary className="text-sm">分组与分类路由</summary><div className="space-y-2 mt-2">{groups.map((group, index) => <div key={text(group.id)} className="grid grid-cols-3 gap-2"><Input label="分组ID" value={text(group.id)} isReadOnly /><Input label="名称" value={text(group.name)} onValueChange={(value) => setGroups(groups.map((g, i) => i === index ? { ...g, name: value } : g))} /><Input label="匹配分类ID" value={strings(group.category_ids).join(',')} onValueChange={(value) => setGroups(groups.map((g, i) => i === index ? { ...g, category_ids: csv(value) } : g))} /></div>)}<Button size="sm" onPress={() => setGroups([...groups, { id: `group_${Date.now()}`, name: '新分组', category_ids: [], enabled: true }])}>添加分组</Button></div></details>
-        <div className="flex gap-2"><Button color="primary" isDisabled={busy || !can('customer_service.ai.manage')} onPress={() => void run(async () => { const value = await adminApiService.updateCsAiConfig({ revision: settings.revision, ai, learning, sla, groups }); setSettings(value); setAi(object(value.ai)); }, '策略已保存')}>保存策略</Button><Button color="danger" variant="flat" isDisabled={busy || !can('customer_service.conversation.manage')} onPress={() => void run(async () => { await adminApiService.stopCsAi(); await loadSettings(); })}>立即停止全部 AI</Button></div>
+        <div className="flex gap-2"><Button color="primary" isDisabled={busy || !can('customer_service.ai.manage')} onPress={() => void run(async () => { const value = await adminApiService.updateCsAiConfig({ revision: settings.revision, ai, learning, sla, groups }); setSettings(value); setAi(object(value.ai)); }, '策略已保存')}>保存策略</Button><Button color="danger" variant="flat" isDisabled={busy || !can('customer_service.ai.manage')} onPress={() => void run(async () => { await adminApiService.stopCsAi(); await loadSettings(); })}>立即停止全部 AI</Button></div>
       </div></Tab>
       <Tab key="knowledge" title="知识审核"><div className="space-y-3 mt-3">
         <Alert title="学习只生成候选，不自动批准" description="个人订单事实不能变成通用业务承诺；批准前核对来源与适用范围。" />
