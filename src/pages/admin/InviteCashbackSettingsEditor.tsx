@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Alert, Button, Card, CardBody, Input, NumberInput, Switch, Textarea } from '@heroui/react';
 import { Plus, Trash2 } from 'lucide-react';
 import { InviteCashbackCampaign, InviteCashbackConfig, InviteCashbackPackageRule } from '../../types/admin';
+import { toLocalDateTimeInput, fromLocalDateTimeInput } from '../../utils/localDateTime';
 
 interface Props {
   value: string;
@@ -17,8 +18,8 @@ const createCampaign = (): InviteCashbackCampaign => ({
   copywriting: { headline: '', share_template: '', ended_message: '' },
 });
 const fallback: InviteCashbackConfig = { enabled: false, withdrawal: { enabled: false, min_amount: 100, notice: '提现暂未开放' }, purchase_credit: { enabled: false, min_payable_amount: 10 }, campaigns: [] };
-const localValue = (value: string) => value ? value.slice(0, 16) : '';
-const isoValue = (value: string) => value ? new Date(value).toISOString() : '';
+const localValue = (value: string) => toLocalDateTimeInput(value);
+const isoValue = (value: string) => fromLocalDateTimeInput(value);
 
 export const InviteCashbackSettingsEditor: React.FC<Props> = ({ value, onChange, disabled }) => {
   const [packageIds, setPackageIds] = useState<Record<number, string>>({});

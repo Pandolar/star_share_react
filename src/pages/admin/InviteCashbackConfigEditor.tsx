@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button, Card, CardBody, CardHeader, Input, NumberInput, Switch, Textarea } from '@heroui/react';
 import { Plus, Save, Trash2 } from 'lucide-react';
 import { InviteCashbackCampaign, InviteCashbackConfig, InviteCashbackPackageRule } from '../../types/admin';
+import { toLocalDateTimeInput, fromLocalDateTimeInput } from '../../utils/localDateTime';
 
 interface Props {
   config: InviteCashbackConfig;
@@ -20,8 +21,8 @@ const createCampaign = (): InviteCashbackCampaign => ({
   copywriting: { headline: '', share_template: '', ended_message: '' },
 });
 
-const toLocalDateTime = (value: string) => value ? value.slice(0, 16) : '';
-const toIsoDateTime = (value: string) => value ? new Date(value).toISOString() : '';
+const toLocalDateTime = (value: string) => toLocalDateTimeInput(value);
+const toIsoDateTime = (value: string) => fromLocalDateTimeInput(value);
 
 const InviteCashbackConfigEditor: React.FC<Props> = ({ config, isLoading, isSaving, readOnly = false, onChange, onSave }) => {
   const [newPackageIds, setNewPackageIds] = useState<Record<number, string>>({});

@@ -12,6 +12,7 @@ import {
   Switch,
 } from '@heroui/react';
 import { Plus, TicketPercent, Trash2 } from 'lucide-react';
+import { toLocalDateTimeInput } from '../../utils/localDateTime';
 
 interface PackageOption {
   id: number;
@@ -82,7 +83,7 @@ const parseConfig = (value: string): { config: PromotionConfig; error: string } 
   }
 };
 
-const inputDateTime = (value: string | null) => String(value || '').replace(' ', 'T').slice(0, 16);
+const inputDateTime = (value: string | null) => toLocalDateTimeInput(value);
 
 export const PromotionCodeConfigEditor: React.FC<Props> = ({ value, onChange, disabled = false, packages }) => {
   const parsed = useMemo(() => parseConfig(value), [value]);
