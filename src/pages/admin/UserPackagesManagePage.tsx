@@ -626,6 +626,7 @@ const UserPackagesManagePage: React.FC = () => {
                             <Input
                                 label="激活时间（决定到期时间）"
                                 type="datetime-local"
+                                labelPlacement="outside"
                                 value={editCreatedAt}
                                 onValueChange={setEditCreatedAt}
                                 isDisabled={editSaving}

@@ -57,8 +57,8 @@ const InviteCashbackConfigEditor: React.FC<Props> = ({ config, isLoading, isSavi
               <Input label="活动名称" value={campaign.name} onValueChange={name => updateCampaign(index, c => ({ ...c, name }))} />
               <Switch isSelected={campaign.enabled} onValueChange={enabled => updateCampaign(index, c => ({ ...c, enabled }))}>启用本活动</Switch>
               <Switch isSelected={campaign.auto_enroll_eligible} onValueChange={auto_enroll_eligible => updateCampaign(index, c => ({ ...c, auto_enroll_eligible }))}>符合资格用户默认开启</Switch>
-              <Input type="datetime-local" label="开始时间" value={toLocalDateTime(campaign.starts_at)} onValueChange={starts_at => updateCampaign(index, c => ({ ...c, starts_at: toIsoDateTime(starts_at) }))} />
-              <Input type="datetime-local" label="结束时间" value={toLocalDateTime(campaign.ends_at)} onValueChange={ends_at => updateCampaign(index, c => ({ ...c, ends_at: toIsoDateTime(ends_at) }))} />
+              <Input type="datetime-local" labelPlacement="outside" label="开始时间" value={toLocalDateTime(campaign.starts_at)} onValueChange={starts_at => updateCampaign(index, c => ({ ...c, starts_at: toIsoDateTime(starts_at) }))} />
+              <Input type="datetime-local" labelPlacement="outside" label="结束时间" value={toLocalDateTime(campaign.ends_at)} onValueChange={ends_at => updateCampaign(index, c => ({ ...c, ends_at: toIsoDateTime(ends_at) }))} />
             </div>
             <div><h3 className="text-sm font-medium mb-3">参与资格</h3><div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <NumberInput label="注册满天数" value={campaign.eligibility.min_account_age_days} onValueChange={value => updateCampaign(index, c => ({ ...c, eligibility: { ...c.eligibility, min_account_age_days: Number.isNaN(value) ? 0 : value } }))} minValue={0} step={1} />

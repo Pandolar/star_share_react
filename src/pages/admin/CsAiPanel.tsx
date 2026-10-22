@@ -143,7 +143,7 @@ export const CsHandlingControls: React.FC<{ conversation: AdminCsConversation; o
       <Button size="sm" color={conversation.taken_over ? 'default' : 'primary'} isDisabled={!canManage || busy} onPress={() => void setTakenOver()}>{conversation.taken_over ? '取消接管' : '接管'}</Button>
     </div>
     <details className="text-xs"><summary>定时跟进</summary><div className="grid gap-2 mt-2 md:grid-cols-2">
-      <Input size="sm" type="datetime-local" label="跟进时间" value={due} onValueChange={setDue} />
+      <div className="space-y-1"><span className="block text-small text-foreground-500">跟进时间</span><Input size="sm" type="datetime-local" aria-label="跟进时间" value={due} onValueChange={setDue} /></div>
       <Select size="sm" label="跟进状态" selectedKeys={[followup]} onSelectionChange={(keys) => setFollowup(String(Array.from(keys)[0]))}>
         <SelectItem key="waiting_user">等待用户</SelectItem><SelectItem key="waiting_internal">内部处理</SelectItem><SelectItem key="escalated">升级主管</SelectItem>
       </Select>

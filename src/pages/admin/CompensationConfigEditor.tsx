@@ -104,7 +104,7 @@ export const CompensationConfigEditor: React.FC<Props> = ({ value, onChange, dis
 
             {/* 活动列表 */}
             {config.campaigns.map((c, index) => (
-                <Card key={c.id || index} shadow="sm">
+                <Card key={index} shadow="sm">
                     <CardBody className="space-y-3">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">

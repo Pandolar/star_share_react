@@ -686,6 +686,7 @@ const DistributorsManagePage: React.FC = () => {
                 <Input
                     type="date"
                     label="分销商有效期"
+                    labelPlacement="outside"
                     value={formData.expiresAt}
                     onValueChange={(expiresAt) => setFormData((current) => ({ ...current, expiresAt }))}
                     description="新建默认 365 天；到期后仍可登录和生成卡密，但卡密按套餐原价结算。留空表示折扣永久有效。"

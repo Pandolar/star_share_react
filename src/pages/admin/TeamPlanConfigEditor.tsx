@@ -114,7 +114,7 @@ export const TeamPlanConfigEditor: React.FC<Props> = ({ value, onChange, disable
         const invalidSeats = plan.min_seats < config.min_seats || plan.max_seats > config.max_seats || plan.min_seats > plan.max_seats;
         const invalidRate = !(plan.discount_rate > 0 && plan.discount_rate <= 1);
         return (
-          <Card key={`${index}-${plan.package_id}`} shadow="sm">
+          <Card key={index} shadow="sm">
             <CardBody className="gap-4 p-4">
               <div className="flex items-center justify-between gap-2"><span className="font-medium">团队套餐 {index + 1}</span><Button isIconOnly size="sm" color="danger" variant="light" aria-label={`删除团队套餐 ${index + 1}`} onPress={() => emit({ ...config, plans: config.plans.filter((_, itemIndex) => itemIndex !== index) })} isDisabled={disabled}><Trash2 className="h-4 w-4" /></Button></div>
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">

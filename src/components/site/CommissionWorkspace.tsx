@@ -93,9 +93,9 @@ export default function CommissionWorkspace({ distributor = false, fixedSiteId }
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         {!distributor && <Input label="代理 ID" type="number" value={owner} onValueChange={(value) => { setOwner(value); setPage(1); }} />}
         {!fixedSiteId && <Input label="站点 ID" type="number" value={siteId} onValueChange={(value) => { setSiteId(value); setPage(1); }} />}
-        <Input label="统计月份（北京时间）" type="month" value={month} isDisabled={Boolean(fromDate || toDate)} onValueChange={(value) => { setMonth(value); setPage(1); }} />
-        <Input label="开始日期" type="date" value={fromDate} onValueChange={(value) => { setFromDate(value); setPage(1); }} />
-        <Input label="结束日期" type="date" value={toDate} onValueChange={(value) => { setToDate(value); setPage(1); }} />
+        <Input label="统计月份（北京时间）" labelPlacement="outside" type="month" value={month} isDisabled={Boolean(fromDate || toDate)} onValueChange={(value) => { setMonth(value); setPage(1); }} />
+        <Input label="开始日期" labelPlacement="outside" type="date" value={fromDate} onValueChange={(value) => { setFromDate(value); setPage(1); }} />
+        <Input label="结束日期" labelPlacement="outside" type="date" value={toDate} onValueChange={(value) => { setToDate(value); setPage(1); }} />
         <Select label="列表状态" selectedKeys={[status || 'all']} onChange={(event) => { setStatus(event.target.value === 'all' ? '' : event.target.value); setPage(1); }}>{['all', ...statusOptions].map((value) => <SelectItem key={value}>{value === 'all' ? '全部' : statuses[value]}</SelectItem>)}</Select>
       </div>
       <div className="flex flex-wrap gap-3">

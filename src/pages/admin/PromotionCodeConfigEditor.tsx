@@ -156,7 +156,7 @@ export const PromotionCodeConfigEditor: React.FC<Props> = ({ value, onChange, di
         const missingScope = (rule.scope_type === 'packages' && rule.package_ids.length === 0)
           || (rule.scope_type === 'levels' && rule.levels.length === 0);
         return (
-          <Card key={`${index}-${rule.code}`} shadow="sm">
+          <Card key={index} shadow="sm">
             <CardBody className="gap-4 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
@@ -271,6 +271,7 @@ export const PromotionCodeConfigEditor: React.FC<Props> = ({ value, onChange, di
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   <Input
                     type="datetime-local"
+                    labelPlacement="outside"
                     label="开始时间"
                     value={inputDateTime(rule.starts_at)}
                     onValueChange={(starts_at) => updateRule(index, { starts_at: starts_at || null })}
@@ -279,6 +280,7 @@ export const PromotionCodeConfigEditor: React.FC<Props> = ({ value, onChange, di
                   />
                   <Input
                     type="datetime-local"
+                    labelPlacement="outside"
                     label="结束时间"
                     value={inputDateTime(rule.ends_at)}
                     onValueChange={(ends_at) => updateRule(index, { ends_at: ends_at || null })}
