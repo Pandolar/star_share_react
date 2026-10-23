@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Avatar, Button, Card, Image, Modal, ModalBody, ModalContent, ModalHeader, ScrollShadow, Spinner, Tooltip } from '@heroui/react';
+import { Button, Card, Image, Modal, ModalBody, ModalContent, ModalHeader, ScrollShadow, Spinner, Tooltip } from '@heroui/react';
+import { IdentityAvatar } from '../identity/IdentityAvatar';
 import { Download, FileText, Undo2 } from 'lucide-react';
 import type { ChatAttachment, ChatCard, ChatMessage } from './types';
 import { CHAT_RECALL_CONTENT_TYPE, CHAT_RECALL_NOTICE } from './types';
@@ -107,6 +108,14 @@ const AttachmentView: React.FC<{ attachment: ChatAttachment; scope: 'user' | 'ad
 const withinRecallWindow = (createdAt: string, minutes: number): boolean =>
   Date.now() - new Date(createdAt).getTime() <= minutes * 60_000;
 
+/** 客服头像固定种子：两侧系统显示同一只“客服小怪物”。 */
+const CUSTOMER_SERVICE_AVATAR_ID = 99999999;
+
+const messageSenderUserId = (message: ChatMessage): number | null => {
+  const id = Number((message as ChatMessage & { sender_id?: string | number }).sender_id);
+  return Number.isFinite(id) && id > 0 ? id : null;
+};
+
 export default function ChatMessageList({
   messages,
   conversationKey,
@@ -180,7 +189,7 @@ export default function ChatMessageList({
           return (
             <div key={message.id} className={`flex gap-2 ${mine ? 'justify-end' : 'justify-start'} ${grouped ? '-mt-1' : 'mt-3'}`}>
               {!mine && (
-                <Avatar size="sm" name={senderName(message).slice(0, 1)} className="flex-shrink-0" />
+                <IdentityAvatar userId={scope === 'admin' ? messageSenderUserId(message) : CUSTOMER_SERVICE_AVATAR_ID} name={senderName(message)} size={28} className="mt-4" />
               )}
               <div className={`max-w-[80%] ${mine ? 'items-end' : 'items-start'} flex flex-col`}>
                 {!grouped && <span className="mb-1 text-xs text-default-500">{senderName(message)}</span>}
@@ -225,7 +234,7 @@ export default function ChatMessageList({
                 </div>
               </div>
               {mine && (
-                <Avatar size="sm" name={senderName(message).slice(0, 1)} className="flex-shrink-0" />
+                <IdentityAvatar userId={scope === 'admin' ? CUSTOMER_SERVICE_AVATAR_ID : messageSenderUserId(message)} name={senderName(message)} size={28} className="mt-4" />
               )}
             </div>
           );
