@@ -109,7 +109,7 @@ const withinRecallWindow = (createdAt: string, minutes: number): boolean =>
   Date.now() - new Date(createdAt).getTime() <= minutes * 60_000;
 
 /** 客服头像固定种子：两侧系统显示同一只“客服小怪物”。 */
-const CUSTOMER_SERVICE_AVATAR_ID = 99999999;
+const CUSTOMER_SERVICE_AVATAR_ID = 9999999999;
 
 const messageSenderUserId = (message: ChatMessage): number | null => {
   const id = Number((message as ChatMessage & { sender_id?: string | number }).sender_id);
