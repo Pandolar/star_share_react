@@ -21,6 +21,7 @@ import adminApiService from '../../services/adminApi';
 import type { AdminCsConversation, AdminCsConversationDetail } from '../../types/admin';
 import { showToast } from '../../components/Toast';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
+import { IdentityAvatar } from '../../components/identity/IdentityAvatar';
 
 const ORDER_PAGE_SIZE = 8;
 
@@ -166,10 +167,13 @@ const CustomerServiceContextPanel: React.FC<CustomerServiceContextPanelProps> = 
               </Button>
             </Tooltip>
           </div>
-          <div className="mt-2 space-y-1 text-xs text-default-600">
+          <div className="mt-2 flex items-start gap-2">
+            <IdentityAvatar userId={user.id} name={user.profile.username || user.profile.email || undefined} size={40} />
+            <div className="min-w-0 flex-1 space-y-1 text-xs text-default-600">
             <p className="truncate">邮箱：{user.profile.email || '-'}</p>
             <p>用户ID：{user.id} · 状态：{user.profile.status === 1 ? '正常' : '已禁用'}</p>
             <p>注册：{formatDateTime(user.profile.created_at)}</p>
+            </div>
           </div>
           <div className="mt-2 rounded-lg bg-default-50 px-2.5 py-1.5">
             <div className="flex items-center justify-between gap-2">
@@ -189,8 +193,12 @@ const CustomerServiceContextPanel: React.FC<CustomerServiceContextPanelProps> = 
                 </div>
               </div>
             ) : (
-              <p className={`mt-1 whitespace-pre-wrap break-words text-xs ${user.profile.remarks ? 'text-warning-600' : 'text-default-400'}`}>
-                {user.profile.remarks || '暂无备注'}
+              <p
+                title={canEditRemark ? '双击编辑备注' : undefined}
+                onDoubleClick={() => { if (canEditRemark && !remarkEditing && !remarkSaving) startRemarkEdit(); }}
+                className={`mt-1 whitespace-pre-wrap break-words text-xs ${canEditRemark ? 'cursor-text' : ''} ${user.profile.remarks ? 'text-warning-600' : 'text-default-400'}`}
+              >
+                {user.profile.remarks || (canEditRemark ? '暂无备注（双击添加）' : '暂无备注')}
               </p>
             )}
           </div>

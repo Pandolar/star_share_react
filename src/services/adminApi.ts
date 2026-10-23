@@ -822,7 +822,7 @@ class AdminApiService {
         return response.data.data;
     }
 
-    async createCsQuickReply(data: { title: string; content: string }): Promise<{ id: string; title: string; content: string; attachments: ChatAttachment[]; enabled: boolean }> {
+    async createCsQuickReply(data: { title: string; content: string; group?: string; attachment_ids?: string[] }): Promise<{ id: string; title: string; content: string; group?: string; attachments: ChatAttachment[]; enabled: boolean }> {
         const response = await this.api.post('/star/cs_quick_replies', data);
         if (response.data.code !== 20000) throw new Error(response.data.msg || '保存快捷短语失败');
         return response.data.data;

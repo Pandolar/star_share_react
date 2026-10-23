@@ -3,6 +3,8 @@ import { Card, CardBody, Avatar, Chip, Spinner, Button, Modal, ModalContent, Mod
 import { User, Mail, Calendar, Shield, AlertCircle, Package, Crown, Edit3, MessageCircle, ArrowUpCircle, Gauge, Snowflake, Info, Gift } from 'lucide-react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { userInfoApi, compensationApi, CompensationItem } from '../../../services/userApi';
+import { getCookie } from '../../../utils/cookies';
+import { IdentityAvatar } from '../../../components/identity/IdentityAvatar';
 import { toast } from '../../../utils/toast';
 import { EditProfileModal } from './profile/EditProfileModal';
 import { UsageSection } from './UsageTab';
@@ -239,12 +241,11 @@ export const ProfileTab: React.FC = () => {
           <Card className="overflow-visible">
             <CardBody className="p-6">
               <div className="flex flex-col sm:flex-row items-start gap-6">
-                <Avatar
-                  size="lg"
-                  className="w-20 h-20 flex-shrink-0"
+                <IdentityAvatar
+                  userId={getCookie('xuserid')}
                   name={userInfo.username}
-                  showFallback
-                  fallback={<User size={32} />}
+                  size={80}
+                  className="flex-shrink-0"
                 />
 
                 <div className="flex-1 space-y-3">

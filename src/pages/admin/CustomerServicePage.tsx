@@ -4,6 +4,7 @@ import {
   Card,
   Checkbox,
   CardBody,
+  Chip,
   Dropdown,
   DropdownTrigger,
   DropdownMenu,
@@ -31,6 +32,7 @@ import type { ChatAttachment, ChatAttachmentConfig, ChatMessage } from '../../co
 import { newClientMessageId } from '../../components/chat/types';
 import ChatMessageList from '../../components/chat/ChatMessageList';
 import ChatComposer from '../../components/chat/ChatComposer';
+import { IdentityAvatar } from '../../components/identity/IdentityAvatar';
 import { formatBytes } from '../../components/chat/attachmentCache';
 import { useCustomerService } from '../../contexts/CustomerServiceContext';
 import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
@@ -138,7 +140,7 @@ const CustomerServicePage: React.FC = () => {
   const canManageConversation = can('customer_service.conversation.manage');
   const canSendPaymentCard = can('customer_service.payment_card.send');
   const [rows, setRows] = useState<AdminCsConversation[]>([]);
-  const [quickReplies, setQuickReplies] = useState<Array<{ id: string; title: string; content: string; attachments?: ChatAttachment[] }>>([]);
+  const [quickReplies, setQuickReplies] = useState<Array<{ id: string; title: string; content: string; group?: string; attachments?: ChatAttachment[] }>>([]);
   const [selected, setSelected] = useState<AdminCsConversation | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [filter, setFilter] = useState('all');
@@ -173,6 +175,10 @@ const CustomerServicePage: React.FC = () => {
   const [quickPhraseOpen, setQuickPhraseOpen] = useState(false);
   const [quickPhraseTitle, setQuickPhraseTitle] = useState('');
   const [quickPhraseContent, setQuickPhraseContent] = useState('');
+  const [quickPhraseGroup, setQuickPhraseGroup] = useState('');
+  const [quickPhraseAssets, setQuickPhraseAssets] = useState<ChatAttachment[]>([]);
+  const [quickPhraseUploading, setQuickPhraseUploading] = useState(false);
+  const quickPhraseImageInput = useRef<HTMLInputElement>(null);
   const [quickPhraseSaving, setQuickPhraseSaving] = useState(false);
   const [quickPhraseDeleteTarget, setQuickPhraseDeleteTarget] = useState<{ id: string; title: string; content: string } | null>(null);
   const [quickPhraseDeleting, setQuickPhraseDeleting] = useState(false);
@@ -654,7 +660,35 @@ const CustomerServicePage: React.FC = () => {
   const openQuickPhrase = () => {
     setQuickPhraseTitle('');
     setQuickPhraseContent(reply.trim());
+    setQuickPhraseGroup('');
+    setQuickPhraseAssets([]);
     setQuickPhraseOpen(true);
+  };
+  const uploadQuickPhraseImages = async (files: FileList | null) => {
+    if (!files?.length) return;
+    if (quickPhraseAssets.length + files.length > 4) {
+      showToast('快捷短语最多 4 张图片', 'warning');
+      return;
+    }
+    setQuickPhraseUploading(true);
+    try {
+      const uploaded: ChatAttachment[] = [];
+      for (const file of Array.from(files)) {
+        if (!file.type.startsWith('image/')) continue;
+        const dataBase64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || '').split(',')[1] || '');
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        uploaded.push(await adminApiService.uploadCsQuickReplyImage({ data_base64: dataBase64, filename: file.name, mime_type: file.type }));
+      }
+      if (uploaded.length) setQuickPhraseAssets((current) => [...current, ...uploaded]);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '上传快捷短语图片失败', 'error');
+    } finally {
+      setQuickPhraseUploading(false);
+    }
   };
   const saveQuickPhrase = async () => {
     if (!quickPhraseTitle.trim() || !quickPhraseContent.trim()) return;
@@ -663,6 +697,8 @@ const CustomerServicePage: React.FC = () => {
       const created = await adminApiService.createCsQuickReply({
         title: quickPhraseTitle.trim(),
         content: quickPhraseContent.trim(),
+        group: quickPhraseGroup.trim() || undefined,
+        attachment_ids: quickPhraseAssets.map((asset) => asset.id),
       });
       setQuickReplies((current) => [...current, created]);
       setQuickPhraseOpen(false);
@@ -852,7 +888,7 @@ const CustomerServicePage: React.FC = () => {
                 rows.map((item) => (
                   <div
                     key={item.id}
-                    className="mb-1 flex items-center gap-1"
+                    className="mb-0.5 flex items-center gap-1"
                     onContextMenu={(event) => {
                       event.preventDefault();
                       setListMenu({ x: event.clientX, y: event.clientY, conversation: item });
@@ -872,10 +908,12 @@ const CustomerServicePage: React.FC = () => {
                     <Button
                       variant={selected?.id === item.id ? 'flat' : 'light'}
                       color={selected?.id === item.id ? 'primary' : 'default'}
-                      className="h-auto min-w-0 flex-1 justify-start px-3 py-3 text-left"
+                      className="h-auto min-w-0 flex-1 justify-start px-2.5 py-1.5 text-left"
                       onPress={() => void openConversation(item)}
                     >
-                      <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 flex-1 items-center gap-2">
+                        <IdentityAvatar userId={item.user.id} name={item.user.profile.username || item.user.profile.email || undefined} size={30} />
+                        <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span
                             className={`h-2.5 w-2.5 shrink-0 rounded-full ${
@@ -897,15 +935,15 @@ const CustomerServicePage: React.FC = () => {
                           )}
                           {item.is_pinned && <Pin className="h-3.5 w-3.5 shrink-0 text-warning" aria-label="已置顶" />}
                           {item.group_id === 'supervisor' && <Tooltip content="主管待处理"><span className="shrink-0 text-secondary" aria-label="主管待处理"><Flag className="h-3.5 w-3.5" /></span></Tooltip>}
-                          {item.user.billing.has_entitlement && <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-success" aria-label="有有效权益" />}
                           <span className="shrink-0 text-xs text-default-500">{relativeTime(item.last_message_at)}</span>
                         </div>
-                        <div className="mt-1 flex items-center gap-2 text-xs text-default-500">
+                        <div className="mt-0.5 flex items-center gap-2 text-xs text-default-500">
                           <span className="shrink-0">{item.admin_unread > 0 ? '未读' : ['resolved', 'closed'].includes(item.status) ? '已完成' : '已读'}</span>
                           <span className="truncate">{item.last_message_preview || '暂无消息'}</span>
                         </div>
-                        <div className={`mt-1 truncate text-xs ${item.user.billing.has_entitlement ? 'text-success' : 'text-default-400'}`}>
+                        <div className={`mt-0.5 truncate text-xs ${item.user.billing.has_entitlement ? 'text-success' : 'text-default-400'}`}>
                           {item.user.billing.has_entitlement ? item.user.billing.entitlements.map((entitlement) => `${entitlement.name}${entitlement.source === 'team' ? '（团队）' : ''}`).join(' · ') : '暂无有效权益'}
+                        </div>
                         </div>
                       </div>
                     </Button>
@@ -924,6 +962,7 @@ const CustomerServicePage: React.FC = () => {
               <>
                 <div className="flex shrink-0 items-center gap-2 border-b border-divider pb-2">
                   <Button isIconOnly className="lg:hidden" size="sm" variant="light" aria-label="返回会话列表" onPress={() => setMobileChat(false)}><ArrowLeft className="h-4 w-4" /></Button>
+                  <IdentityAvatar userId={selected.user.id} name={selected.user.profile.username || selected.user.profile.email || undefined} size={32} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 text-sm font-semibold">
                       <span className="truncate">{selected.user.profile.username || selected.user.profile.email || '用户'}</span>
@@ -991,13 +1030,13 @@ const CustomerServicePage: React.FC = () => {
                     attachments={attachments}
                     onAttachmentsChange={setAttachments}
                     uploadAttachment={uploadAttachment}
+                    attachmentScope="admin"
                     quickReplies={canSend ? quickReplies : []}
                     onPickQuickReply={canSend ? ((id) => void sendQuickReply(id)) : undefined}
                     onDeleteQuickReply={canManageQuickReplies ? ((id) => {
                       const target = quickReplies.find((item) => item.id === id);
                       if (target) setQuickPhraseDeleteTarget(target);
                     }) : undefined}
-                    quickReplyPreview
                     extraActions={(
                       <div className="flex flex-wrap items-center gap-2">
                         {canSendPaymentCard && (
@@ -1180,6 +1219,13 @@ const CustomerServicePage: React.FC = () => {
               maxLength={20}
               isDisabled={quickPhraseSaving}
             />
+            <Input
+              label="分组（可选，留空显示在最外层）"
+              value={quickPhraseGroup}
+              onValueChange={setQuickPhraseGroup}
+              maxLength={20}
+              isDisabled={quickPhraseSaving}
+            />
             <Textarea
               label="内容"
               value={quickPhraseContent}
@@ -1189,6 +1235,35 @@ const CustomerServicePage: React.FC = () => {
               maxLength={500}
               isDisabled={quickPhraseSaving}
             />
+            <div className="space-y-2">
+              <input
+                ref={quickPhraseImageInput}
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(event) => {
+                  void uploadQuickPhraseImages(event.target.files);
+                  event.target.value = '';
+                }}
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="flat"
+                  isLoading={quickPhraseUploading}
+                  isDisabled={quickPhraseSaving || quickPhraseAssets.length >= 4}
+                  onPress={() => quickPhraseImageInput.current?.click()}
+                >
+                  添加图片（可选，最多 4 张）
+                </Button>
+                {quickPhraseAssets.map((asset, index) => (
+                  <Chip key={asset.id} onClose={() => setQuickPhraseAssets((current) => current.filter((item) => item.id !== asset.id))}>
+                    图片{index + 1}
+                  </Chip>
+                ))}
+              </div>
+            </div>
           </ModalBody>
           <ModalFooter>
             <Button variant="light" isDisabled={quickPhraseSaving} onPress={() => setQuickPhraseOpen(false)}>取消</Button>

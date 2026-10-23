@@ -52,7 +52,7 @@ export const InviteCashbackDataCenter: React.FC<Props> = ({ campaigns }) => {
   return <Card><CardBody className="space-y-5">
     <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
       <div><div className="flex items-center gap-2 font-semibold"><BarChart3 className="h-5 w-5 text-primary" />返现活动数据中心</div><p className="mt-1 text-sm text-default-500">查看某场活动的参与、返现、余额和具体获利用户。</p></div>
-      <div className="flex flex-wrap items-end gap-2"><Select label="选择活动" className="w-64" selectedKeys={campaignId ? [campaignId] : []} onSelectionChange={keys => { setCampaignId(String(Array.from(keys)[0] || '')); setPage(1); }}>{campaigns.map(campaign => <SelectItem key={campaign.id}>{campaign.name}</SelectItem>)}</Select><Button isIconOnly variant="flat" aria-label="刷新返现活动数据" onPress={load}><RefreshCw className="h-4 w-4" /></Button></div>
+      <div className="flex flex-wrap items-end gap-2"><Select label="选择活动" className="w-64" selectedKeys={campaignId ? [campaignId] : []} onSelectionChange={keys => { setCampaignId(String(Array.from(keys)[0] || '')); setPage(1); }}>{campaigns.map(campaign => <SelectItem key={String(campaign.id)}>{campaign.name}</SelectItem>)}</Select><Button isIconOnly variant="flat" aria-label="刷新返现活动数据" onPress={load}><RefreshCw className="h-4 w-4" /></Button></div>
     </div>
     {!campaignId ? <div className="py-8 text-center text-default-500">请先创建返现活动</div> : loading && !overview ? <div className="py-8 text-center"><Spinner label="加载活动数据..." /></div> : <>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

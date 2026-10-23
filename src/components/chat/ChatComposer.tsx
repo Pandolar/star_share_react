@@ -1,6 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Chip, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, Progress, Textarea, Tooltip } from '@heroui/react';
-import { Paperclip, Send, Trash2 } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Alert, Button, Chip, Progress, Textarea } from '@heroui/react';
+import { Paperclip, Send } from 'lucide-react';
+import EmojiPicker from './EmojiPicker';
+import QuickReplyMenu from './QuickReplyMenu';
 import type { ChatAttachment, ChatAttachmentConfig, ChatAttachmentKind } from './types';
 import { compressImageFile } from './imageCompression';
 import { toast } from '../../utils/toast';
@@ -18,10 +20,10 @@ export interface ChatComposerProps {
   attachments: ChatAttachment[];
   onAttachmentsChange: (next: ChatAttachment[]) => void;
   uploadAttachment: (file: File) => Promise<ChatAttachment>;
-  quickReplies?: { id: string; title: string; content: string }[];
+  quickReplies?: { id: string; title: string; content: string; group?: string; attachments?: ChatAttachment[] }[];
   onPickQuickReply?: (id: string, content: string) => void;
   onDeleteQuickReply?: (id: string) => void;
-  quickReplyPreview?: boolean;
+  attachmentScope?: 'user' | 'admin';
   extraActions?: React.ReactNode;
   footerNote?: React.ReactNode;
 }
@@ -51,40 +53,12 @@ export default function ChatComposer({
   quickReplies,
   onPickQuickReply,
   onDeleteQuickReply,
-  quickReplyPreview = false,
+  attachmentScope = 'user',
   extraActions,
   footerNote,
 }: ChatComposerProps): React.ReactElement {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const [quickRepliesOpen, setQuickRepliesOpen] = useState(false);
-  const closeQuickRepliesTimer = useRef<number | null>(null);
-  const openQuickReplies = () => {
-    if (closeQuickRepliesTimer.current !== null) window.clearTimeout(closeQuickRepliesTimer.current);
-    setQuickRepliesOpen(true);
-  };
-  const closeQuickReplies = () => {
-    if (closeQuickRepliesTimer.current !== null) window.clearTimeout(closeQuickRepliesTimer.current);
-    closeQuickRepliesTimer.current = window.setTimeout(() => setQuickRepliesOpen(false), 150);
-  };
-  useEffect(() => () => {
-    if (closeQuickRepliesTimer.current !== null) window.clearTimeout(closeQuickRepliesTimer.current);
-    if (previewTimer.current !== null) window.clearTimeout(previewTimer.current);
-  }, []);
-  const [previewReplyId, setPreviewReplyId] = useState<string | null>(null);
-  const previewTimer = useRef<number | null>(null);
-  const cancelQuickReplyPreview = () => {
-    if (previewTimer.current !== null) window.clearTimeout(previewTimer.current);
-    previewTimer.current = null;
-    setPreviewReplyId(null);
-  };
-  const scheduleQuickReplyPreview = (replyId: string) => {
-    cancelQuickReplyPreview();
-    previewTimer.current = window.setTimeout(() => {
-      previewTimer.current = null;
-      setPreviewReplyId(replyId);
-    }, 3000);
-  };
   const [dragging, setDragging] = useState(false);
   const accept = (Object.keys(attachmentConfig.types) as ChatAttachmentKind[])
     .filter((kind) => attachmentConfig.types[kind].enabled)
@@ -206,81 +180,18 @@ export default function ChatComposer({
         >
           <Paperclip size={18} />
         </Button>
-        {quickReplies?.length ? (
-          <Dropdown placement="top-start" isOpen={quickRepliesOpen} onOpenChange={setQuickRepliesOpen} closeOnSelect>
-            <DropdownTrigger>
-              <Button
-                size="sm"
-                variant="flat"
-                onMouseEnter={openQuickReplies}
-                onMouseLeave={closeQuickReplies}
-              >
-                快捷回复
-              </Button>
-            </DropdownTrigger>
-            <DropdownMenu
-              aria-label="快捷回复"
-              onMouseEnter={openQuickReplies}
-              onMouseLeave={() => {
-                closeQuickReplies();
-                cancelQuickReplyPreview();
-              }}
-              onAction={(key) => {
-                const reply = quickReplies.find((item) => item.id === String(key));
-                cancelQuickReplyPreview();
-                setQuickRepliesOpen(false);
-                if (reply) onPickQuickReply?.(reply.id, reply.content);
-              }}
-            >
-              {quickReplies.map((reply) => (
-                <DropdownItem
-                  key={reply.id}
-                  onMouseEnter={() => {
-                    if (quickReplyPreview) scheduleQuickReplyPreview(reply.id);
-                  }}
-                  onMouseLeave={() => {
-                    if (quickReplyPreview) cancelQuickReplyPreview();
-                  }}
-                  onFocus={() => {
-                    if (quickReplyPreview) scheduleQuickReplyPreview(reply.id);
-                  }}
-                  onBlur={() => {
-                    if (quickReplyPreview) cancelQuickReplyPreview();
-                  }}
-                  onClick={() => {
-                    if (quickReplyPreview) cancelQuickReplyPreview();
-                  }}
-                  endContent={onDeleteQuickReply ? (
-                    <Button
-                      isIconOnly
-                      size="sm"
-                      variant="light"
-                      color="danger"
-                      aria-label={`删除快捷短语：${reply.title}`}
-                      onClick={(event) => event.stopPropagation()}
-                      onPress={() => {
-                        cancelQuickReplyPreview();
-                        setQuickRepliesOpen(false);
-                        onDeleteQuickReply(reply.id);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  ) : undefined}
-                >
-                  {quickReplyPreview ? (
-                    <Tooltip
-                      content={<span className="block max-w-80 whitespace-pre-wrap break-words">{reply.content}</span>}
-                      isOpen={previewReplyId === reply.id}
-                      placement="right"
-                    >
-                      <span>{reply.title}</span>
-                    </Tooltip>
-                  ) : reply.title}
-                </DropdownItem>
-              ))}
-            </DropdownMenu>
-          </Dropdown>
+        <EmojiPicker
+          disabled={disabled}
+          onPick={(emoji) => onValueChange(value.length + emoji.length > maxLength ? value : value + emoji)}
+        />
+        {quickReplies?.length && onPickQuickReply ? (
+          <QuickReplyMenu
+            items={quickReplies}
+            scope={attachmentScope}
+            disabled={disabled}
+            onPick={onPickQuickReply}
+            onDelete={onDeleteQuickReply}
+          />
         ) : null}
         {extraActions}
         <span className="ml-auto text-xs text-default-500">

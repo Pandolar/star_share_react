@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Button, Card, CardBody, Chip, Input, Select, SelectItem, Textarea } from '@heroui/react';
-import { Bot, RefreshCw, Send, X } from 'lucide-react';
+import { Bot, ChevronDown, RefreshCw, Send, X } from 'lucide-react';
 import adminApiService from '../../services/adminApi';
 import { showToast } from '../../components/Toast';
 import type { AdminCsConversation } from '../../types/admin';
@@ -38,6 +38,14 @@ export const CsAiPanel: React.FC<{ conversation: AdminCsConversation; onConversa
   const [busy, setBusy] = useState<number | null>(null);
   const active = useRef(conversation.id);
   active.current = conversation.id;
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return window.localStorage.getItem('cs-suggest-collapsed') === '1'; } catch { return false; }
+  });
+  const toggleCollapsed = () => setCollapsed((previous) => {
+    const next = !previous;
+    try { window.localStorage.setItem('cs-suggest-collapsed', next ? '1' : '0'); } catch { /* 忽略本地存储异常 */ }
+    return next;
+  });
   const requestVersion = useRef(0);
   const localEditors = useRef(editor);
   localEditors.current = editor;
@@ -83,10 +91,11 @@ export const CsAiPanel: React.FC<{ conversation: AdminCsConversation; onConversa
     } finally { setBusy(null); }
   };
   return <div className="space-y-2">
-    <div className="flex justify-between items-center">
-      <span className="text-sm font-semibold flex gap-1 items-center"><Bot size={16} />内部回复建议</span>
+    <div className="flex items-center justify-between gap-1">
+      <Button size="sm" variant="light" className="min-w-0 px-1 text-sm font-semibold" aria-expanded={!collapsed} aria-label={collapsed ? '展开内部回复建议' : '收起内部回复建议'} onPress={toggleCollapsed} startContent={<Bot size={16} />} endContent={<ChevronDown size={14} className={`transition-transform ${collapsed ? '-rotate-90' : ''}`} />}>内部回复建议</Button>
       <Button size="sm" isIconOnly variant="light" aria-label="刷新建议" onPress={() => void load()}><RefreshCw size={14} /></Button>
     </div>
+    {collapsed ? null : <>
     {!conversation.taken_over && conversation.handoff_reason && <p className="text-xs text-warning">交接原因：{reasonText(conversation.handoff_reason)}</p>}
     {drafts.map((draft) => {
       const stale = draft.ai_meta?.revision !== conversation.ai_revision || draft.ai_meta?.draft?.status === 'stale';
@@ -104,6 +113,7 @@ export const CsAiPanel: React.FC<{ conversation: AdminCsConversation; onConversa
     })}
     {!drafts.length && <p className="text-xs text-default-500">暂无待确认建议。建议不对用户显示。</p>}
     {conversation.sla_overdue && <Alert color="warning" title="跟进或回复已超时" />}
+    </>}
   </div>;
 };
 

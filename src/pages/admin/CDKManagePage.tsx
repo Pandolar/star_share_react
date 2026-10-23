@@ -840,7 +840,7 @@ const CDKManagePage: React.FC = () => {
                                 variant="bordered"
                             >
                                 {packages.map((pkg) => (
-                                    <SelectItem key={pkg.id}>
+                                    <SelectItem key={String(pkg.id)} textValue={`${pkg.package_name} - ¥${pkg.price}`}>
                                         {pkg.package_name} - ¥{pkg.price}
                                     </SelectItem>
                                 ))}

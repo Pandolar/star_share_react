@@ -1198,7 +1198,7 @@ const UsersManagePage: React.FC = () => {
                                 description="仅列出系统中存在套餐的等级"
                             >
                                 {packageLevels.map((pl) => (
-                                    <SelectItem key={`${pl.level}|${pl.category}`}>
+                                    <SelectItem key={`${pl.level}|${pl.category}`} textValue={`${pl.level}（${pl.category}）`}>
                                         {pl.level}（{pl.category}）
                                     </SelectItem>
                                 ))}

@@ -192,7 +192,7 @@ export const CompensationConfigEditor: React.FC<Props> = ({ value, onChange, dis
                                     size="sm"
                                 >
                                     {levelOptions.map((pl) => (
-                                        <SelectItem key={`${pl.level}|${pl.category}`}>
+                                        <SelectItem key={`${pl.level}|${pl.category}`} textValue={`${pl.level}（${pl.category}）`}>
                                             {pl.level}（{pl.category}）
                                         </SelectItem>
                                     ))}

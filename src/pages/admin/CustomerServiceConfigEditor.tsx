@@ -503,9 +503,10 @@ export const CustomerServiceConfigEditor: React.FC<Props> = ({ value, onChange, 
         />
         {(config.quick_replies as JsonRecord[]).map((reply, index) => (
           <div key={`${String(reply.id)}-${index}`} className="space-y-3 rounded-medium border border-divider p-4">
-            <div className="grid gap-3 md:grid-cols-[1fr_1fr_2fr_auto_auto]">
+            <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_2fr_auto_auto]">
               <Input label="ID" value={String(reply.id)} onValueChange={(id) => updateReply(index, { id })} isDisabled={disabled} />
               <Input label="标题" value={String(reply.title)} onValueChange={(title) => updateReply(index, { title })} isDisabled={disabled} />
+              <Input label="分组（空=最外层）" value={String(reply.group || '')} onValueChange={(group) => updateReply(index, { group })} isDisabled={disabled} maxLength={20} />
               <Textarea label="内容" value={String(reply.content)} onValueChange={(content) => updateReply(index, { content })} minRows={1} isDisabled={disabled} />
               <Switch isSelected={reply.enabled === true} onValueChange={(enabled) => updateReply(index, { enabled })} isDisabled={disabled}>
                 启用
