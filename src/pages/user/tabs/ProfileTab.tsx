@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardBody, Chip, Spinner, Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from '@heroui/react';
-import { User, Mail, Calendar, Shield, AlertCircle, Package, Crown, Edit3, MessageCircle, ArrowUpCircle, Gauge, Snowflake, Info, Gift, Wallet, ReceiptText, Trash2, ChevronDown, Settings2 } from 'lucide-react';
+import { User, Mail, Calendar, Shield, AlertCircle, Package, Crown, MessageCircle, ArrowUpCircle, Gauge, Snowflake, Info, Gift, Wallet, ReceiptText, Trash2, ChevronDown, Settings2 } from 'lucide-react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { userInfoApi, compensationApi, CompensationItem } from '../../../services/userApi';
 import { getCookie } from '../../../utils/cookies';
@@ -17,6 +17,29 @@ const getStatusChip = (status: number) =>
   status === 1
     ? <Chip size="sm" color="success" variant="flat">活跃</Chip>
     : <Chip size="sm" color="danger" variant="flat">停用</Chip>;
+
+const maskPaymentAccount = (account?: string) => {
+  const value = (account || '').trim();
+  if (/^1\d{10}$/.test(value)) return `${value.slice(0, 3)}****${value.slice(-4)}`;
+  const at = value.indexOf('@');
+  if (at > 0) return `${value.slice(0, 1)}***${value.slice(at)}`;
+  return value.length > 6 ? `${value.slice(0, 3)}***${value.slice(-2)}` : value;
+};
+const maskRealName = (name?: string) => (name || '').trim() ? `${(name || '').trim().slice(0, 1)}*` : '';
+const maskTaxNumber = (tax?: string) => {
+  const value = (tax || '').trim();
+  return value.length > 10 ? `${value.slice(0, 4)}****${value.slice(-4)}` : value;
+};
+
+// 账号管理列表行：名称 + 当前状态摘要 + 箭头；点击行为由各行按内容密度决定。
+const ManageRow: React.FC<{ icon: React.ReactNode; label: string; status?: React.ReactNode; open?: boolean; danger?: boolean; onPress: () => void }> = ({ icon, label, status, open, danger, onPress }) => (
+  <button type="button" onClick={onPress} className="flex w-full items-center gap-2 px-3 py-2.5 text-left">
+    <span className={danger ? 'text-danger' : 'text-default-500'}>{icon}</span>
+    <span className={`shrink-0 text-sm font-medium ${danger ? 'text-danger-700' : 'text-default-800'}`}>{label}</span>
+    <span className="ml-auto min-w-0 truncate text-right text-xs text-default-400">{status}</span>
+    <ChevronDown size={14} className={`shrink-0 text-default-400 transition-transform ${open ? '' : '-rotate-90'}`} />
+  </button>
+);
 
 const getPackageLevelStyle = (level?: string) => {
   if (!level) return { icon: Package, color: 'default' as const, bgColor: 'bg-default/10' };
@@ -55,6 +78,7 @@ export const ProfileTab: React.FC = () => {
   const [editModal, setEditModal] = useState<{ open: boolean; tab: EditTabKey }>({ open: false, tab: 'username' });
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
   const [accountManageOpen, setAccountManageOpen] = useState(false);
+  const [manageRow, setManageRow] = useState<'payment' | 'billing' | 'delete' | null>(null);
 
   // 补偿活动
   const [compensations, setCompensations] = useState<CompensationItem[]>([]);
@@ -257,9 +281,6 @@ export const ProfileTab: React.FC = () => {
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                     <h2 className="text-xl font-bold text-default-900">{userInfo.username}</h2>
                     <div className="flex items-center gap-2">{getStatusChip(userInfo.status)}</div>
-                    <Button size="sm" color="primary" variant="flat" className="sm:ml-auto sm:shrink-0" startContent={<Edit3 size={14} />} onPress={() => openEditModal()}>
-                      编辑资料
-                    </Button>
                   </div>
 
                   <div className="space-y-2 text-sm">
@@ -310,41 +331,69 @@ export const ProfileTab: React.FC = () => {
                   <span className="text-xs text-default-400">安全、财务资料与注销</span>
                   <ChevronDown size={14} className={`ml-auto text-default-400 transition-transform ${accountManageOpen ? '' : '-rotate-90'}`} />
                 </button>
-                {accountManageOpen && (
-                  <div className="mt-3 space-y-4">
-                    <div>
-                      <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-default-500"><Shield size={13} />账号与安全</p>
-                      <div className="divide-y divide-default-100 rounded-lg border border-default-100">
-                        <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
-                          <div><p className="text-sm font-medium">登录邮箱</p><p className="text-xs text-default-500">{userInfo.email.endsWith('@default.com') ? '未绑定真实邮箱' : userInfo.email}</p></div>
-                          <Button size="sm" variant="bordered" onPress={() => openEditModal('email')}>{userInfo.email.endsWith('@default.com') ? '绑定邮箱' : '查看邮箱'}</Button>
-                        </div>
-                        <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
-                          <div><p className="text-sm font-medium">登录密码</p><p className="text-xs text-default-500">修改当前密码或通过邮箱重置</p></div>
-                          <Button size="sm" variant="bordered" onPress={() => openEditModal('password')}>修改密码</Button>
-                        </div>
-                      </div>
-                    </div>
-                    {(features.invite || features.invoice) && (
+                {accountManageOpen && (() => {
+                  const payment = userInfo.preferences?.payment_info;
+                  const billing = userInfo.preferences?.billing_profile;
+                  const emailBound = Boolean(userInfo.email) && !userInfo.email.endsWith('@default.com');
+                  return (
+                  <div className="mt-3 divide-y divide-default-100 rounded-lg border border-default-100">
+                    <ManageRow icon={<User size={15} />} label="用户名" status={userInfo.username} onPress={() => openEditModal('username')} />
+                    <ManageRow icon={<Mail size={15} />} label="登录邮箱" status={emailBound ? '已绑定' : <span className="text-warning">未绑定</span>} onPress={() => openEditModal('email')} />
+                    <ManageRow icon={<Shield size={15} />} label="登录密码" status="修改或邮箱重置" onPress={() => openEditModal('password')} />
+                    {features.invite && (
                       <div>
-                        <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-default-500"><Wallet size={13} />财务资料</p>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          {features.invite && <Button size="sm" variant="bordered" className="justify-start" startContent={<Wallet size={14} />} onPress={() => openEditModal('payment_info')}>收款方式</Button>}
-                          {features.invoice && <Button size="sm" variant="bordered" className="justify-start" startContent={<ReceiptText size={14} />} onPress={() => openEditModal('billing_profile')}>开票主体</Button>}
-                        </div>
+                        <ManageRow
+                          icon={<Wallet size={15} />}
+                          label="收款方式"
+                          open={manageRow === 'payment'}
+                          status={payment?.account ? `已设置 · ${maskRealName(payment.real_name)} ${maskPaymentAccount(payment.account)}` : <span className="text-warning">未设置</span>}
+                          onPress={() => setManageRow((row) => (row === 'payment' ? null : 'payment'))}
+                        />
+                        {manageRow === 'payment' && (
+                          <div className="mx-3 mb-2 rounded-lg bg-default-50 p-3 text-xs text-default-600">
+                            {payment?.account ? (
+                              <p>支付宝收款：{maskRealName(payment.real_name)} · {maskPaymentAccount(payment.account)}，用于邀请返利等收款；修改后即时生效。</p>
+                            ) : (
+                              <p>还未设置收款账号，返利到账前请先设置。</p>
+                            )}
+                            <Button size="sm" variant="bordered" className="mt-2" onPress={() => openEditModal('payment_info')}>{payment?.account ? '修改收款方式' : '设置收款方式'}</Button>
+                          </div>
+                        )}
                       </div>
                     )}
-                    <div className="rounded-lg border border-danger-100 bg-danger-50/40 p-3">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="flex items-center gap-1.5 text-sm font-medium text-danger-700"><Trash2 size={14} />注销账号</p>
-                          <p className="mt-0.5 text-xs text-danger-600/80">此操作不可恢复，请谨慎处理。</p>
-                        </div>
-                        <Button size="sm" color="danger" variant="flat" onPress={() => setDeleteAccountOpen(true)}>注销账号</Button>
+                    {features.invoice && (
+                      <div>
+                        <ManageRow
+                          icon={<ReceiptText size={15} />}
+                          label="开票主体"
+                          open={manageRow === 'billing'}
+                          status={billing?.title ? `已设置 · ${billing.title}` : <span className="text-warning">未设置</span>}
+                          onPress={() => setManageRow((row) => (row === 'billing' ? null : 'billing'))}
+                        />
+                        {manageRow === 'billing' && (
+                          <div className="mx-3 mb-2 rounded-lg bg-default-50 p-3 text-xs text-default-600">
+                            {billing?.title ? (
+                              <p>抬头：{billing.title}；税号：{maskTaxNumber(billing.tax_number)}。历史订单保留提交时的资料，修改只影响之后的新订单。</p>
+                            ) : (
+                              <p>设置后下单可直接申请开票，历史订单不受后续修改影响。</p>
+                            )}
+                            <Button size="sm" variant="bordered" className="mt-2" onPress={() => openEditModal('billing_profile')}>{billing?.title ? '修改开票主体' : '设置开票主体'}</Button>
+                          </div>
+                        )}
                       </div>
+                    )}
+                    <div>
+                      <ManageRow icon={<Trash2 size={15} />} label="注销账号" danger open={manageRow === 'delete'} status="不可恢复" onPress={() => setManageRow((row) => (row === 'delete' ? null : 'delete'))} />
+                      {manageRow === 'delete' && (
+                        <div className="mx-3 mb-2 rounded-lg border border-danger-100 bg-danger-50/40 p-3">
+                          <p className="text-xs text-danger-600/90">注销后账号不可恢复，已购权益失效且不退款，所有数据均已物理销毁；同邮箱/微信重新注册为全新账号。</p>
+                          <Button size="sm" color="danger" variant="flat" className="mt-2" onPress={() => setDeleteAccountOpen(true)}>注销账号</Button>
+                        </div>
+                      )}
                     </div>
                   </div>
-                )}
+                  );
+                })()}
               </div>
             </CardBody>
           </Card>
