@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { Suspense, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { setPendingNavigation } from './navPending';
 import {
     Button,
     Navbar,
@@ -15,6 +16,7 @@ import {
     DropdownTrigger,
     DropdownMenu,
     DropdownItem,
+    Spinner,
     User,
     Listbox,
     ListboxItem,
@@ -61,6 +63,9 @@ const AdminLayout: React.FC = () => {
 
     // 处理Tab切换
     const handleTabChange = (key: string): void => {
+        // React Router 转场会保留旧页面直到新 chunk 就绪；提示状态走模块级订阅，
+        // 独立子组件渲染，避免被挂起中的 Outlet 渲染回退掉。
+        if (key !== getCurrentTab()) setPendingNavigation(key);
         navigate(`/star-admin/${key}`);
     };
 
@@ -212,9 +217,11 @@ const AdminLayout: React.FC = () => {
                         </CardBody>
                     </Card>
 
-                    {/* 右侧内容 */}
+                    {/* 右侧内容：切换期间由 navPending 的 DOM 进度条提示；整页懒加载由 Suspense 兜底 */}
                     <div className="flex-1 min-w-0">
-                        <Outlet />
+                        <Suspense fallback={<div className="flex min-h-[40vh] items-center justify-center"><Spinner size="lg" color="primary" label="正在加载页面…" /></div>}>
+                            <Outlet />
+                        </Suspense>
                     </div>
                 </div>
 

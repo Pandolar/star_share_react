@@ -13,6 +13,7 @@ export interface LoginResponse {
   xuserid: string;
   xtoken: string;
   xy_uuid_token: string;
+  re_registered?: boolean;
 }
 
 // 微信二维码获取响应数据结构
@@ -24,6 +25,7 @@ export interface WechatQRResponse {
 // 微信登录状态检查响应数据结构
 export interface WechatLoginStatusResponse {
   wechat_temp_token?: string; // 新用户
+  re_registration_available?: boolean;
   xuserid?: string;           // 老用户直接登录
   xtoken?: string;            // 老用户直接登录  
   xy_uuid_token?: string;     // 老用户直接登录

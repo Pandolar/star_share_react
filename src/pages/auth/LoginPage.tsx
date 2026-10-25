@@ -9,7 +9,6 @@ import { toast } from '../../utils/toast';
 import { userInfoApi } from '../../services/userApi';
 import { useAutoLogin } from '../../hooks/useAutoLogin';
 import { useRedirect } from '../../hooks/useRedirect';
-import { useIsMobile } from '../../hooks/useIsMobile';
 import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
 import { UserAgreementConsent, useUserAgreementRequirement } from '../../components/UserAgreementConsent';
 
@@ -24,10 +23,8 @@ const LoginPage: React.FC = () => {
 
   // 微信登录相关状态
   const [qrCodeUrl, setQrCodeUrl] = useState('');
-  const [ticket, setTicket] = useState('');
   const [isLoadingQR, setIsLoadingQR] = useState(false);
   const [qrStatus, setQrStatus] = useState<'loading' | 'active' | 'expired' | 'scanned'>('loading');
-  const [wechatTempToken, setWechatTempToken] = useState('');
   const [isWechatBinding, setIsWechatBinding] = useState(false);
 
   // 邮箱绑定相关状态（微信登录后强制绑定）
@@ -53,7 +50,6 @@ const LoginPage: React.FC = () => {
   const isLoggedIn = useAutoLogin();
   const redirect = useRedirect();
   const location = useLocation();
-  const isMobile = useIsMobile();
 
   // 登录方式切换
   const [loginMethod, setLoginMethod] = useState<'wechat' | 'email'>('email');
@@ -84,7 +80,6 @@ const LoginPage: React.FC = () => {
     try {
       const data = await getWechatQRCode('login');
       setQrCodeUrl(data.qr_code_url);
-      setTicket(data.ticket);
       setQrStatus('active');
       startPolling(data.ticket);
 
@@ -144,10 +139,12 @@ const LoginPage: React.FC = () => {
           if (statusData.wechat_temp_token) {
             // 新用户，需要通过wechat_bind接口进行绑定/登录
             console.log('检测到新用户，获取到wechat_temp_token，开始绑定流程:', statusData.wechat_temp_token);
-            setWechatTempToken(statusData.wechat_temp_token);
 
             try {
-              await handleWechatLogin(statusData.wechat_temp_token);
+              await handleWechatLogin(
+                statusData.wechat_temp_token,
+                statusData.re_registration_available,
+              );
             } catch (loginError) {
               console.error('微信登录过程失败:', loginError);
               setQrStatus('expired');
@@ -235,7 +232,7 @@ const LoginPage: React.FC = () => {
   };
 
   // 处理微信登录（新用户绑定流程）
-  const handleWechatLogin = async (tempToken: string) => {
+  const handleWechatLogin = async (tempToken: string, reRegistrationAvailable = false) => {
     console.log('开始新用户微信绑定流程，tempToken:', tempToken);
     setIsWechatBinding(true);
     try {
@@ -254,6 +251,9 @@ const LoginPage: React.FC = () => {
           xtoken: data.xtoken,
           xy_uuid_token: data.xy_uuid_token
         });
+        if (data.re_registered || reRegistrationAvailable) {
+          toast.info('已创建全新账号，不继承原账号的数据或权益。');
+        }
 
         // 检查用户邮箱是否需要绑定
         try {
@@ -506,9 +506,7 @@ const LoginPage: React.FC = () => {
 
     setIsLoadingQR(false);
     setQrCodeUrl('');
-    setTicket('');
     setQrStatus('loading');
-    setWechatTempToken('');
     setIsWechatBinding(false);
   }, [hasAgreedUserAgreement, isAgreementRequired]);
 

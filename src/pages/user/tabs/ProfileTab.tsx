@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Card, CardBody, Avatar, Chip, Spinner, Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from '@heroui/react';
-import { User, Mail, Calendar, Shield, AlertCircle, Package, Crown, Edit3, MessageCircle, ArrowUpCircle, Gauge, Snowflake, Info, Gift } from 'lucide-react';
+import { Card, CardBody, Chip, Spinner, Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from '@heroui/react';
+import { User, Mail, Calendar, Shield, AlertCircle, Package, Crown, Edit3, MessageCircle, ArrowUpCircle, Gauge, Snowflake, Info, Gift, Wallet, ReceiptText, Trash2 } from 'lucide-react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { userInfoApi, compensationApi, CompensationItem } from '../../../services/userApi';
 import { getCookie } from '../../../utils/cookies';
@@ -11,6 +11,7 @@ import { UsageSection } from './UsageTab';
 import { useLimitUsage, summarizeQuotaRule } from '../../../hooks/useLimitUsage';
 import { useWhiteLabel } from '../../../contexts/WhiteLabelContext';
 import type { UserInfo, EditTabKey } from './profile/types';
+import { DeleteAccountModal } from './profile/DeleteAccountModal';
 
 const getStatusChip = (status: number) =>
   status === 1
@@ -52,6 +53,7 @@ export const ProfileTab: React.FC = () => {
   const quotaRule = summarizeQuotaRule(usageData);
 
   const [editModal, setEditModal] = useState<{ open: boolean; tab: EditTabKey }>({ open: false, tab: 'username' });
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
 
   // 补偿活动
   const [compensations, setCompensations] = useState<CompensationItem[]>([]);
@@ -103,12 +105,14 @@ export const ProfileTab: React.FC = () => {
     const openEdit = stateOpenEdit || queryOpenEdit;
     const publicEditTabs: EditTabKey[] = ['email', 'username', 'password'];
     const selfSiteEditTabs: EditTabKey[] = ['payment_info', 'billing_profile'];
+    const isSelfSiteEdit = selfSiteEditTabs.includes(openEdit as EditTabKey);
+    const selfSiteFeatureEnabled = openEdit === 'payment_info' ? features.invite : features.invoice;
     const canOpen = publicEditTabs.includes(openEdit as EditTabKey)
-      || ((features.invoice || features.cashback_credit) && selfSiteEditTabs.includes(openEdit as EditTabKey));
+      || (isSelfSiteEdit && selfSiteFeatureEnabled);
 
     if (openEdit && canOpen) {
       setEditModal({ open: true, tab: openEdit as EditTabKey });
-    } else if (openEdit && selfSiteEditTabs.includes(openEdit as EditTabKey)) {
+    } else if (openEdit && isSelfSiteEdit) {
       setEditModal((current) => ({ ...current, open: false }));
     }
 
@@ -120,7 +124,7 @@ export const ProfileTab: React.FC = () => {
         search: nextParams.toString() ? `?${nextParams.toString()}` : '',
       }, { replace: true, state: null });
     }
-  }, [location.pathname, location.state, navigate, searchParams, features.invoice, features.cashback_credit, whiteLabelLoading]);
+  }, [location.pathname, location.state, navigate, searchParams, features.invite, features.invoice, whiteLabelLoading]);
 
   const fetchUserInfo = async () => {
     try {
@@ -286,25 +290,11 @@ export const ProfileTab: React.FC = () => {
                     )}
                   </div>
 
-                  {/* 操作按钮 - 移动端显示在信息下方 */}
-                  <div className="flex items-center gap-2 pt-2 sm:hidden">
+                  <div className="pt-2">
                     <Button size="sm" color="primary" startContent={<Edit3 size={14} />} onPress={() => openEditModal()}>
-                      修改资料
-                    </Button>
-                    <Button size="sm" color="primary" variant="bordered" startContent={<Shield size={14} />} onPress={() => openEditModal('password')}>
-                      修改密码
+                      编辑资料
                     </Button>
                   </div>
-                </div>
-
-                {/* 操作按钮 - 桌面端显示在右侧 */}
-                <div className="hidden sm:flex flex-col gap-2 flex-shrink-0">
-                  <Button size="sm" color="primary" startContent={<Edit3 size={14} />} onPress={() => openEditModal()}>
-                    修改资料
-                  </Button>
-                  <Button size="sm" color="primary" variant="bordered" startContent={<Shield size={14} />} onPress={() => openEditModal('password')}>
-                    修改密码
-                  </Button>
                 </div>
               </div>
             </CardBody>
@@ -429,6 +419,38 @@ export const ProfileTab: React.FC = () => {
             </Card>
           </div>
 
+          <Card>
+            <CardBody className="p-6">
+              <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-default-900"><Shield size={18} className="text-primary" />账号与安全</h3>
+              <div className="divide-y divide-default-100">
+                <div className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div><p className="font-medium">登录邮箱</p><p className="text-sm text-default-500">{userInfo.email.endsWith('@default.com') ? '未绑定真实邮箱' : userInfo.email}</p></div>
+                  <Button size="sm" variant="bordered" onPress={() => openEditModal('email')}>{userInfo.email.endsWith('@default.com') ? '绑定邮箱' : '查看邮箱'}</Button>
+                </div>
+                <div className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div><p className="font-medium">登录密码</p><p className="text-sm text-default-500">修改当前密码或通过邮箱重置</p></div>
+                  <Button size="sm" variant="bordered" onPress={() => openEditModal('password')}>修改密码</Button>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+
+          {(features.invite || features.invoice) && <Card>
+            <CardBody className="p-6">
+              <h3 className="mb-4 text-lg font-bold text-default-900">财务资料</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {features.invite && <Button variant="bordered" className="justify-start" startContent={<Wallet size={16} />} onPress={() => openEditModal('payment_info')}>收款方式</Button>}
+                {features.invoice && <Button variant="bordered" className="justify-start" startContent={<ReceiptText size={16} />} onPress={() => openEditModal('billing_profile')}>开票主体</Button>}
+              </div>
+            </CardBody>
+          </Card>}
+
+          <Card className="border border-danger-100">
+            <CardBody className="flex flex-col gap-3 p-6 sm:flex-row sm:items-center sm:justify-between">
+              <div><h3 className="font-medium text-default-800">注销账号</h3><p className="text-sm text-default-500">此操作不可恢复，请谨慎处理。</p></div>
+              <Button size="sm" color="danger" variant="light" startContent={<Trash2 size={16} />} onPress={() => setDeleteAccountOpen(true)}>注销账号</Button>
+            </CardBody>
+          </Card>
           {/* 使用额度 */}
           <UsageSection usage={usageData} loading={usageLoading} error={usageError} onRefresh={refetchUsage} />
         </>
@@ -438,9 +460,15 @@ export const ProfileTab: React.FC = () => {
         isOpen={editModal.open}
         initialTab={editModal.tab}
         userInfo={userInfo}
-        showFinancialTabs={!whiteLabelLoading && (features.invoice || features.cashback_credit)}
+        showPaymentTab={!whiteLabelLoading && features.invite}
+        showBillingTab={!whiteLabelLoading && features.invoice}
         onClose={closeEditModal}
         onUserInfoChange={(next) => setUserInfo((prev) => (prev ? { ...prev, ...next } : prev))}
+      />
+      <DeleteAccountModal
+        isOpen={deleteAccountOpen}
+        onClose={() => setDeleteAccountOpen(false)}
+        onDeleted={() => navigate('/login', { replace: true, state: { message: '账号已注销' } })}
       />
 
       {/* 冻结套餐Modal */}

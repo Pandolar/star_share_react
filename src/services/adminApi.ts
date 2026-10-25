@@ -990,8 +990,8 @@ class AdminApiService {
         if (response.data.code !== 20000) throw new Error(response.data.msg || '提交 AI 审核失败');
     }
 
-    async getCsAiStats(): Promise<Record<string, unknown>> {
-        const response = await this.api.get('/star/cs_ai_stats');
+    async getCsAiStats(days?: number): Promise<Record<string, unknown>> {
+        const response = await this.api.get(`/star/cs_ai_stats${days ? `?days=${days}` : ''}`);
         if (response.data.code !== 20000) throw new Error(response.data.msg || '获取 AI 统计失败');
         return response.data.data;
     }

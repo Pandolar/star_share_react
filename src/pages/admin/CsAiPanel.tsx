@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Button, Card, CardBody, Chip, Input, Select, SelectItem, Textarea } from '@heroui/react';
-import { Bot, ChevronDown, RefreshCw, Send, X } from 'lucide-react';
+import { Bot, ChevronDown, RefreshCw, Send, Wrench, X } from 'lucide-react';
 import adminApiService from '../../services/adminApi';
 import { showToast } from '../../components/Toast';
 import type { AdminCsConversation } from '../../types/admin';
@@ -152,12 +152,55 @@ export const CsHandlingControls: React.FC<{ conversation: AdminCsConversation; o
       <Chip size="sm" color={conversation.taken_over ? 'primary' : 'default'}>{conversation.taken_over ? `已接管（${conversation.assigned_admin || '客服'}）` : '未接管'}</Chip>
       <Button size="sm" color={conversation.taken_over ? 'default' : 'primary'} isDisabled={!canManage || busy} onPress={() => void setTakenOver()}>{conversation.taken_over ? '取消接管' : '接管'}</Button>
     </div>
-    <details className="text-xs"><summary>定时跟进</summary><div className="grid gap-2 mt-2 md:grid-cols-2">
+    <details className="text-xs"><summary>定时跟进（设置到期回访提醒）</summary><div className="grid gap-2 mt-2 md:grid-cols-2">
+      <p className="text-xs text-default-500 md:col-span-2">定时跟进不会自动给用户发消息：到期后该会话会标记为「跟进已超时」、状态自动升为「升级主管」，并向管理员推送提醒（Bark/邮件/Webhook），可在左侧「已超时」筛选集中处理。适合约定“稍后回复您”的场景。</p>
       <div className="space-y-1"><span className="block text-small text-foreground-500">跟进时间</span><Input size="sm" type="datetime-local" aria-label="跟进时间" value={due} onValueChange={setDue} /></div>
       <Select size="sm" label="跟进状态" selectedKeys={[followup]} onSelectionChange={(keys) => setFollowup(String(Array.from(keys)[0]))}>
         <SelectItem key="waiting_user">等待用户</SelectItem><SelectItem key="waiting_internal">内部处理</SelectItem><SelectItem key="escalated">升级主管</SelectItem>
       </Select>
       <Button size="sm" isDisabled={!canManage || busy} onPress={() => void saveFollowup()}>保存跟进</Button>
     </div></details>
+  </div>;
+};
+
+const FOLLOW_UP_STATE_TEXT: Record<string, string> = { waiting_user: '等待用户', waiting_internal: '内部处理', escalated: '升级主管' };
+
+const shortDateTime = (value?: string | null) => {
+  if (!value) return '';
+  const time = new Date(value);
+  if (Number.isNaN(time.getTime())) return '';
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return `${pad(time.getMonth() + 1)}-${pad(time.getDate())} ${pad(time.getHours())}:${pad(time.getMinutes())}`;
+};
+
+/**
+ * 会话处理工具区：接管 / 定时跟进 / 内部回复建议合并为一个可折叠块。
+ * 默认收起（记住选择），收起时内部组件保持挂载只隐藏，AI 建议轮询不中断。
+ */
+export const CsConversationTools: React.FC<{ conversation: AdminCsConversation; onConversation: (value: AdminCsConversation) => void; canManage: boolean; canSend: boolean }> = (props) => {
+  const { conversation } = props;
+  const [open, setOpen] = useState(() => {
+    try { return window.localStorage.getItem('cs-tools-open') === '1'; } catch { return false; }
+  });
+  const toggle = () => setOpen((previous) => {
+    const next = !previous;
+    try { window.localStorage.setItem('cs-tools-open', next ? '1' : '0'); } catch { /* 忽略本地存储异常 */ }
+    return next;
+  });
+  const followUpText = conversation.follow_up_at
+    ? `${FOLLOW_UP_STATE_TEXT[conversation.follow_up_state || ''] || '跟进'} · ${shortDateTime(conversation.follow_up_at)}`
+    : '';
+  return <div className="shrink-0 rounded-xl border border-divider bg-content1">
+    <div className="flex flex-wrap items-center gap-2 px-2 py-1.5">
+      <Button size="sm" variant="light" className="min-w-0 px-1 text-sm font-semibold" aria-expanded={open} aria-label={open ? '收起处理与建议' : '展开处理与建议'} onPress={toggle} startContent={<Wrench size={15} />} endContent={<ChevronDown size={14} className={`transition-transform ${open ? '' : '-rotate-90'}`} />}>处理与建议</Button>
+      <Chip size="sm" color={conversation.taken_over ? 'primary' : 'default'}>{conversation.taken_over ? `已接管（${conversation.assigned_admin || '客服'}）` : '未接管'}</Chip>
+      {followUpText && <Chip size="sm" variant="flat" color={conversation.sla_overdue ? 'warning' : 'default'}>{followUpText}</Chip>}
+      {conversation.sla_overdue && <Chip size="sm" color="warning">跟进已超时</Chip>}
+      {!open && <span className="text-xs text-default-400">展开可接管、设置跟进、处理 AI 建议</span>}
+    </div>
+    <div className={open ? 'space-y-2 border-t border-divider p-2' : 'hidden'}>
+      <CsHandlingControls {...props} />
+      <CsAiPanel {...props} />
+    </div>
   </div>;
 };

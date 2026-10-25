@@ -5,15 +5,12 @@ import {
   ModalHeader,
   ModalBody,
   ModalFooter,
-  Tabs,
-  Tab,
   Input,
-  Spinner,
   Checkbox,
   Button,
   Alert,
 } from '@heroui/react';
-import { Edit3, User, Mail, Shield, AlertCircle, Send, Eye, EyeOff, Wallet, ReceiptText } from 'lucide-react';
+import { Edit3, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { userInfoApi } from '../../../../services/userApi';
 import { sendEmailCode as sendAuthEmailCode, resetPassword } from '../../../../services/authApi';
 import { setAuthCookies } from '../../../../utils/cookies';
@@ -22,7 +19,8 @@ import type { UserInfo, EditTabKey } from './types';
 interface EditProfileModalProps {
   isOpen: boolean;
   initialTab?: EditTabKey;
-  showFinancialTabs: boolean;
+  showPaymentTab: boolean;
+  showBillingTab: boolean;
   userInfo: UserInfo | null;
   onClose: () => void;
   onUserInfoChange: (next: Partial<UserInfo>) => void;
@@ -30,6 +28,13 @@ interface EditProfileModalProps {
 
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 const PHONE_REGEX = /^1[3-9]\d{9}$/;
+const EDIT_TITLES: Record<EditTabKey, string> = {
+  username: '修改用户名',
+  email: '登录邮箱',
+  password: '修改密码',
+  payment_info: '编辑收款方式',
+  billing_profile: '编辑开票主体',
+};
 const USCC_CHARSET = '0123456789ABCDEFGHJKLMNPQRTUWXY';
 const USCC_WEIGHTS = [1, 3, 9, 27, 19, 26, 16, 17, 20, 29, 25, 13, 8, 24, 10, 30, 28];
 
@@ -53,11 +58,15 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   isOpen,
   initialTab = 'username' as EditTabKey,
   userInfo,
-  showFinancialTabs,
+  showPaymentTab,
+  showBillingTab,
   onClose,
   onUserInfoChange,
 }) => {
-  const [activeTab, setActiveTab] = useState<EditTabKey>(initialTab);
+  const activeTab = initialTab;
+  const modalTitle = activeTab === 'email' && userInfo?.email?.endsWith('@default.com')
+    ? '绑定邮箱'
+    : EDIT_TITLES[activeTab];
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState('');
 
@@ -70,20 +79,21 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const [emailCodeSent, setEmailCodeSent] = useState(false);
   const [emailCodeSending, setEmailCodeSending] = useState(false);
   const [countdown, setCountdown] = useCountdown();
-  const [showEmailCode, setShowEmailCode] = useState(false);
   const [bindPassword, setBindPassword] = useState('');
   const [showBindPassword, setShowBindPassword] = useState(false);
 
   // 密码
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [pwdEmailCode, setPwdEmailCode] = useState('');
   const [pwdCodeSent, setPwdCodeSent] = useState(false);
   const [pwdCodeSending, setPwdCodeSending] = useState(false);
   const [pwdCountdown, setPwdCountdown] = useCountdown();
-  const [showPwdEmailCode, setShowPwdEmailCode] = useState(false);
+  const [useEmailReset, setUseEmailReset] = useState(false);
 
   // 收款方式
   const [realName, setRealName] = useState('');
@@ -98,7 +108,6 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   // Modal 打开时，初始化字段
   useEffect(() => {
     if (!isOpen) return;
-    setActiveTab(initialTab);
     setEditError('');
     setNewUsername(userInfo?.username || '');
     setNewEmail(userInfo?.email || '');
@@ -106,12 +115,13 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     setEmailCodeSent(false);
     setCountdown(0);
     setBindPassword('');
+    setCurrentPassword('');
     setNewPassword('');
     setConfirmPassword('');
     setPwdEmailCode('');
     setPwdCodeSent(false);
     setPwdCountdown(0);
-    setShowPwdEmailCode(false);
+    setUseEmailReset(false);
     setRealName(userInfo?.preferences?.payment_info?.real_name || '');
     setPaymentAccount(userInfo?.preferences?.payment_info?.account || '');
     setBillingTitle(userInfo?.preferences?.billing_profile?.title || '');
@@ -119,7 +129,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     setBillingConfirmed(false);
     setSpecialTaxWarningOpen(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [isOpen, initialTab]);
 
   const sendEmailCodeAction = async () => {
     setEditError('');
@@ -225,42 +235,34 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           setEditError(response.msg || '修改邮箱失败，请重试');
         }
       } else if (activeTab === 'password') {
-        if (!userInfo?.email || userInfo.email.endsWith('@default.com')) {
-          setEditError('请先绑定非默认邮箱再重置密码');
-          return;
-        }
-        if (!pwdEmailCode.trim()) {
-          setEditError('请输入邮箱验证码');
-          return;
-        }
-        if (!/^\d+$/.test(pwdEmailCode.trim())) {
-          setEditError('验证码只能是数字，请重新输入');
-          return;
-        }
-        if (!newPassword.trim()) {
-          setEditError('请输入新密码');
-          return;
-        }
-        if (newPassword.trim().length < 8) {
-          setEditError('密码长度至少为8位');
-          return;
-        }
-        if (!confirmPassword.trim()) {
-          setEditError('请再次输入密码进行确认');
+        if (!newPassword.trim() || newPassword.trim().length < 8) {
+          setEditError('新密码长度至少为8位');
           return;
         }
         if (newPassword !== confirmPassword) {
           setEditError('两次输入的密码不一致，请重新输入');
           return;
         }
-        try {
-          const ret: any = await resetPassword(userInfo.email, pwdEmailCode.trim(), newPassword.trim());
-          if (ret && ret.xtoken && ret.xuserid) {
-            setAuthCookies({ xuserid: String(ret.xuserid), xtoken: String(ret.xtoken) });
+        if (useEmailReset) {
+          if (!userInfo?.email || userInfo.email.endsWith('@default.com')) {
+            setEditError('请先绑定真实邮箱再通过邮箱验证重置密码');
+            return;
           }
+          if (!/^\d+$/.test(pwdEmailCode.trim())) {
+            setEditError('请输入数字邮箱验证码');
+            return;
+          }
+          const ret: any = await resetPassword(userInfo.email, pwdEmailCode.trim(), newPassword.trim());
+          if (ret?.xtoken && ret?.xuserid) setAuthCookies({ xuserid: String(ret.xuserid), xtoken: String(ret.xtoken), xy_uuid_token: ret.xy_uuid_token ? String(ret.xy_uuid_token) : undefined });
           onClose();
-        } catch {
-          // 错误已被拦截器提示
+        } else {
+          if (!currentPassword) {
+            setEditError('请输入当前密码');
+            return;
+          }
+          const response = await userInfoApi.changeUserInfo({ change_type: 'password', old_password: btoa(currentPassword), password: btoa(newPassword) });
+          if (response.code === 20000) onClose();
+          else setEditError(response.msg || '修改密码失败');
         }
       } else if (activeTab === 'payment_info') {
         if (!realName.trim()) {
@@ -348,9 +350,9 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     activeTab === 'username'
       ? !newUsername.trim()
       : activeTab === 'email'
-        ? !newEmail.trim()
+        ? (!userInfo?.email.endsWith('@default.com') || !newEmail.trim() || !emailCode.trim())
         : activeTab === 'password'
-          ? (!newPassword.trim() || !confirmPassword.trim())
+          ? (!newPassword.trim() || !confirmPassword.trim() || (!useEmailReset && !currentPassword) || (useEmailReset && !pwdEmailCode.trim()))
           : activeTab === 'billing_profile'
             ? (!billingTitle.trim() || !billingTaxNumber.trim() || !billingConfirmed)
             : (!realName.trim() || !paymentAccount.trim())
@@ -366,27 +368,12 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
         <ModalHeader className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
             <Edit3 size={20} className="text-primary" />
-            <span>修改资料</span>
+            <span>{modalTitle}</span>
           </div>
         </ModalHeader>
         <ModalBody className="overflow-x-hidden px-3 sm:px-6">
-          <Tabs
-            selectedKey={activeTab}
-            onSelectionChange={(key) => {
-              setActiveTab(key as EditTabKey);
-              setEditError('');
-              setEmailCodeSent(false);
-              setEmailCode('');
-              setCountdown(0);
-            }}
-            classNames={{
-              base: 'w-full',
-              tabList: 'w-full flex-wrap gap-1 overflow-visible p-1',
-              tab: 'h-9 min-w-fit flex-1 px-2 sm:px-3',
-              panel: 'px-0',
-            }}
-          >
-            <Tab key="username" title={<div className="flex items-center space-x-2"><User size={16} /><span>用户名</span></div>}>
+          <div>
+            {activeTab === 'username' && <div>
               <div className="space-y-4 mt-4">
                 <div>
                   <label className="block text-sm font-medium text-default-700 mb-2">当前用户名</label>
@@ -405,9 +392,9 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   />
                 </div>
               </div>
-            </Tab>
+            </div>}
 
-            <Tab key="email" title={<div className="flex items-center space-x-2"><Mail size={16} /><span>邮箱</span></div>}>
+            {activeTab === 'email' && <div>
               <div className="space-y-4 mt-4">
                 <div>
                   <label className="block text-sm font-medium text-default-700 mb-2">当前邮箱</label>
@@ -416,208 +403,47 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     <p className="text-xs text-warning mt-1">非微信新用户，无法修改邮箱</p>
                   )}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-default-700 mb-2">
-                    新邮箱地址 <span className="text-danger">*</span>
-                  </label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={newEmail}
-                      onChange={(e) => setNewEmail(e.target.value)}
-                      placeholder="请输入新邮箱地址"
-                      variant="bordered"
-                      isInvalid={!!editError && !newEmail.trim()}
-                      className="flex-1"
-                      type="email"
-                    />
-                    <button
-                      onClick={sendEmailCodeAction}
-                      disabled={sendCodeDisabled}
-                      style={{
-                        backgroundColor: sendCodeDisabled ? '#d1d5db' : '#006FEE',
-                        color: '#ffffff',
-                        border: '1px solid #006FEE',
-                        borderRadius: '6px',
-                        padding: '8px 12px',
-                        fontSize: '12px',
-                        fontWeight: '500',
-                        cursor: sendCodeDisabled ? 'not-allowed' : 'pointer',
-                        minWidth: '100px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      {emailCodeSending ? (
-                        <Spinner size="sm" color="white" />
-                      ) : (
-                        <>
-                          {!countdown && <Send size={14} />}
-                          {countdown > 0 ? `${countdown}s` : '发送验证码'}
-                        </>
-                      )}
-                    </button>
-                  </div>
-                  {emailCodeSent && (
-                    <p className="text-xs text-success mt-1">✓ 验证码已发送至您的邮箱，请查收</p>
-                  )}
-                  <p className="text-xs text-default-400 mt-1">
-                    验证码为纯数字。未收到验证码？请检查垃圾箱或确认邮箱地址是否正确
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-default-700 mb-2">
-                    邮箱验证码 <span className="text-danger">*</span>
-                  </label>
-                  <Input
-                    value={emailCode}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (value === '' || /^\d+$/.test(value)) setEmailCode(value);
-                    }}
-                    placeholder="请输入数字验证码"
-                    variant="bordered"
-                    type={showEmailCode ? 'text' : 'password'}
-                    isInvalid={!!editError && !emailCode.trim()}
-                    endContent={
-                      <button className="focus:outline-none" type="button" onClick={() => setShowEmailCode(!showEmailCode)}>
-                        {showEmailCode ? <EyeOff size={16} className="text-default-400" /> : <Eye size={16} className="text-default-400" />}
-                      </button>
-                    }
-                  />
-                </div>
-                {userInfo?.email && userInfo.email.endsWith('@default.com') && (
+                {userInfo?.email?.endsWith('@default.com') ? <>
                   <div>
-                    <label className="block text-sm font-medium text-default-700 mb-2">
-                      设置登录密码（可选，至少8位）
-                    </label>
-                    <Input
-                      value={bindPassword}
-                      onChange={(e) => setBindPassword(e.target.value)}
-                      placeholder="请输入新密码"
-                      variant="bordered"
-                      type={showBindPassword ? 'text' : 'password'}
-                      endContent={
-                        <button className="focus:outline-none" type="button" onClick={() => setShowBindPassword(!showBindPassword)}>
-                          {showBindPassword ? <EyeOff size={16} className="text-default-400" /> : <Eye size={16} className="text-default-400" />}
-                        </button>
-                      }
-                    />
+                    <label className="block text-sm font-medium text-default-700 mb-2">新邮箱地址 <span className="text-danger">*</span></label>
+                    <div className="flex gap-2">
+                      <Input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="请输入新邮箱地址" variant="bordered" isInvalid={!!editError && !newEmail.trim()} className="flex-1" type="email" />
+                      <Button color="primary" size="sm" isLoading={emailCodeSending} isDisabled={sendCodeDisabled} onPress={() => void sendEmailCodeAction}>{countdown > 0 ? `${countdown}s` : '发送验证码'}</Button>
+                    </div>
+                    {emailCodeSent && <p className="text-xs text-success mt-1">验证码已发送至您的邮箱，请查收</p>}
+                  </div>
+                </> : <Alert color="default" variant="flat" title="登录邮箱不可修改" description="为保障账号安全，已绑定的真实邮箱仅供查看。" />}
+                {userInfo?.email?.endsWith('@default.com') && <>
+                  <div>
+                    <label className="block text-sm font-medium text-default-700 mb-2">邮箱验证码 <span className="text-danger">*</span></label>
+                    <Input value={emailCode} onChange={(e) => { const value = e.target.value; if (value === '' || /^\d+$/.test(value)) setEmailCode(value); }} placeholder="请输入数字验证码" variant="bordered" type="text" inputMode="numeric" isInvalid={!!editError && !emailCode.trim()} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-default-700 mb-2">设置登录密码（可选，至少8位）</label>
+                    <Input value={bindPassword} onChange={(e) => setBindPassword(e.target.value)} placeholder="请输入新密码" variant="bordered" type={showBindPassword ? 'text' : 'password'} endContent={<button className="focus:outline-none" type="button" onClick={() => setShowBindPassword(!showBindPassword)}>{showBindPassword ? <EyeOff size={16} className="text-default-400" /> : <Eye size={16} className="text-default-400" />}</button>} />
                     <p className="text-xs text-default-400 mt-1">建议同时设置密码，便于邮箱+密码登录</p>
                   </div>
-                )}
+                </>}
               </div>
-            </Tab>
+            </div>}
 
-            <Tab key="password" title={<div className="flex items-center space-x-2"><Shield size={16} /><span>密码</span></div>}>
+            {activeTab === 'password' && <div>
               <div className="space-y-4 mt-4">
-                <div>
-                  <label className="block text-sm font-medium text-default-700 mb-2">当前邮箱</label>
-                  <Input value={userInfo?.email || ''} isReadOnly variant="flat" className="bg-default-100" />
-                  {userInfo?.email && userInfo.email.endsWith('@default.com') && (
-                    <p className="text-xs text-warning mt-1">请先在"邮箱"页绑定真实邮箱后再重置密码</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-default-700 mb-2">
-                    邮箱验证码 <span className="text-danger">*</span>
-                  </label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={pwdEmailCode}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (value === '' || /^\d+$/.test(value)) setPwdEmailCode(value);
-                      }}
-                      placeholder="请输入数字验证码"
-                      variant="bordered"
-                      type={showPwdEmailCode ? 'text' : 'password'}
-                      isInvalid={!!editError && !pwdEmailCode.trim()}
-                      className="flex-1"
-                      endContent={
-                        <button className="focus:outline-none" type="button" onClick={() => setShowPwdEmailCode(!showPwdEmailCode)}>
-                          {showPwdEmailCode ? <EyeOff size={16} className="text-default-400" /> : <Eye size={16} className="text-default-400" />}
-                        </button>
-                      }
-                    />
-                    <button
-                      onClick={sendPwdResetCode}
-                      disabled={sendPwdCodeDisabled}
-                      style={{
-                        backgroundColor: sendPwdCodeDisabled ? '#d1d5db' : '#006FEE',
-                        color: '#ffffff',
-                        border: '1px solid #006FEE',
-                        borderRadius: '6px',
-                        padding: '8px 12px',
-                        fontSize: '12px',
-                        fontWeight: '500',
-                        cursor: sendPwdCodeDisabled ? 'not-allowed' : 'pointer',
-                        minWidth: '100px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      {pwdCodeSending ? (
-                        <Spinner size="sm" color="white" />
-                      ) : (
-                        <>
-                          {!pwdCountdown && <Send size={14} />}
-                          {pwdCountdown > 0 ? `${pwdCountdown}s` : '发送验证码'}
-                        </>
-                      )}
-                    </button>
-                  </div>
-                  {pwdCodeSent && (
-                    <p className="text-xs text-success mt-1">✓ 验证码已发送至您的邮箱，请查收</p>
-                  )}
-                  <p className="text-xs text-default-400 mt-1">
-                    验证码为纯数字。未收到验证码？请检查垃圾箱或确认邮箱地址是否正确
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-default-700 mb-2">
-                    新密码 <span className="text-danger">*</span>
-                  </label>
-                  <Input
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="请输入新密码，至少8位"
-                    variant="bordered"
-                    type={showNewPassword ? 'text' : 'password'}
-                    endContent={
-                      <button className="focus:outline-none" type="button" onClick={() => setShowNewPassword(!showNewPassword)}>
-                        {showNewPassword ? <EyeOff size={16} className="text-default-400" /> : <Eye size={16} className="text-default-400" />}
-                      </button>
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-default-700 mb-2">
-                    确认新密码 <span className="text-danger">*</span>
-                  </label>
-                  <Input
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="请再次输入新密码"
-                    variant="bordered"
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    endContent={
-                      <button className="focus:outline-none" type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
-                        {showConfirmPassword ? <EyeOff size={16} className="text-default-400" /> : <Eye size={16} className="text-default-400" />}
-                      </button>
-                    }
-                  />
-                </div>
-                <p className="text-xs text-default-400">密码重置将通过邮箱验证码完成，发送至当前绑定邮箱</p>
+                <div className="flex items-center justify-between gap-3"><p className="text-sm text-default-600">{useEmailReset ? '通过已绑定邮箱验证来重置密码。' : '请输入当前密码以修改登录密码。'}</p><Button size="sm" variant="light" onPress={() => { setUseEmailReset(!useEmailReset); setEditError(''); }}>{useEmailReset ? '使用当前密码' : '未设置或忘记当前密码？通过邮箱验证'}</Button></div>
+                {!useEmailReset && <Input label="当前密码" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} type={showCurrentPassword ? 'text' : 'password'} endContent={<button className="focus:outline-none" type="button" onClick={() => setShowCurrentPassword(!showCurrentPassword)}>{showCurrentPassword ? <EyeOff size={16} className="text-default-400" /> : <Eye size={16} className="text-default-400" />}</button>} />}
+                {useEmailReset && <>
+                  {userInfo?.email?.endsWith('@default.com') && <Alert color="warning" title="请先绑定真实邮箱" description="请先从账号与安全中的“绑定邮箱”入口绑定真实邮箱，再使用邮箱验证。" />}
+                  <div className="flex gap-2"><Input label="邮箱验证码" value={pwdEmailCode} onValueChange={setPwdEmailCode} placeholder="请输入数字验证码" /><Button color="primary" variant="flat" isLoading={pwdCodeSending} isDisabled={sendPwdCodeDisabled} onPress={() => void sendPwdResetCode}>{pwdCountdown > 0 ? `${pwdCountdown}s` : '发送验证码'}</Button></div>
+                  {pwdCodeSent && <p className="text-xs text-success">验证码已发送至当前绑定邮箱</p>}
+                </>}
+                <Input label="新密码" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="至少8位" type={showNewPassword ? 'text' : 'password'} endContent={<button className="focus:outline-none" type="button" onClick={() => setShowNewPassword(!showNewPassword)}>{showNewPassword ? <EyeOff size={16} className="text-default-400" /> : <Eye size={16} className="text-default-400" />}</button>} />
+                <Input label="确认新密码" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} type={showConfirmPassword ? 'text' : 'password'} endContent={<button className="focus:outline-none" type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>{showConfirmPassword ? <EyeOff size={16} className="text-default-400" /> : <Eye size={16} className="text-default-400" />}</button>} />
               </div>
-            </Tab>
+            </div>}
 
-            {showFinancialTabs && (
+            {(showPaymentTab || showBillingTab) && (
               <>
-            <Tab key="payment_info" title={<div className="flex items-center space-x-2"><Wallet size={16} /><span>收款方式</span></div>}>
+            {showPaymentTab && activeTab === 'payment_info' && <div>
               <div className="space-y-4 mt-4">
                 <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
                   <p className="text-sm text-primary">支付宝收款信息</p>
@@ -666,8 +492,8 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   <p className="text-xs text-warning">⚠️ 请确保填写的信息准确无误，以免影响收款，且支付宝必须打开手机或邮箱收款，务必确认！否则无法收到款项</p>
                 </div>
               </div>
-            </Tab>
-            <Tab key="billing_profile" title={<div className="flex items-center gap-1.5"><ReceiptText size={16} /><span>开票主体</span></div>}>
+            </div>}
+            {showBillingTab && activeTab === 'billing_profile' && <div>
               <div className="space-y-4 mt-4">
                 {userInfo?.preferences?.billing_profile ? (
                   <Alert
@@ -699,10 +525,10 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   我已核对并确认主体名称和税号准确无误
                 </Checkbox>
               </div>
-            </Tab>
+            </div>}
               </>
             )}
-          </Tabs>
+          </div>
 
           {editError && (
             <div className="p-3 bg-danger/10 border border-danger/20 rounded-lg mt-4">

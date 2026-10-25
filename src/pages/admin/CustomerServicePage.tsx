@@ -24,7 +24,7 @@ import {
   Tooltip,
   Textarea,
 } from '@heroui/react';
-import { ArrowLeft, Bell, BellOff, CircleDollarSign, Flag, Gauge, Headphones, MoreHorizontal, Pin, Plus, RefreshCw, Search, Send, ShieldCheck, StickyNote, UserRound, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, Bell, BellOff, CircleDollarSign, Flag, Gauge, Headphones, MoreHorizontal, Pin, Plus, RefreshCw, Search, Send, ShieldCheck, StickyNote, UserRound, Volume2, VolumeX, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import adminApiService from '../../services/adminApi';
 import type { AdminCsConversation } from '../../types/admin';
@@ -42,7 +42,7 @@ import CustomerServiceUserInfo from './CustomerServiceUserInfo';
 import CustomerServiceContextPanel, { PaymentCardPrefill } from './CustomerServiceContextPanel';
 import { paymentMethodLabel } from '../../components/PaymentMethodSelector';
 import { CsAiManagementPanel } from './CsAiManagementPanel';
-import { CsAiPanel, CsHandlingControls } from './CsAiPanel';
+import { CsConversationTools } from './CsAiPanel';
 
 const FILTERS = [
   ['all', '全部'],
@@ -461,17 +461,32 @@ const CustomerServicePage: React.FC = () => {
       setPaymentCardSending(false);
     }
   };
-  const runUserAction = async (action: 'unban' | 'clear_limit') => {
+  const runUserAction = async (action: 'unban' | 'clear_limit' | 'clear_limit_all') => {
     if (!selected || userActionRef.current) return;
     const userId = selected.user.id;
     userActionRef.current = true;
     setUserActionLoading(true);
     try {
-      if (action === 'unban') {
-        await adminApiService.unbanCsUser(userId);
-        setSelected((current) => current?.user.id === userId ? { ...current, user: { ...current.user, profile: { ...current.user.profile, status: 1 } } } : current);
-      } else await adminApiService.clearCsUserLimit(userId);
-      showToast(action === 'unban' ? '用户已解封' : '当前限速已清除', 'success');
+      if (action === 'clear_limit_all') {
+        // 与用户管理「一键解除限速」同一接口：清限速 + next-admin 解封 + 加白，按结果逐段反馈。
+        const response = await adminApiService.clearUserLimit(userId);
+        if (response.code !== 20000) throw new Error(response.msg || '一键解除限速失败');
+        const detail = (response.data || {}) as Record<string, string>;
+        const parts: string[] = ['限速已清除'];
+        if (detail.unban === 'done') parts.push('已解封');
+        else if (detail.unban === 'skipped') parts.push('解封跳过(未封禁)');
+        else if (detail.unban) parts.push('解封未完成');
+        if (detail.whitelist === 'done') parts.push('已加白');
+        else if (detail.whitelist === 'skipped') parts.push('加白跳过(已在白名单)');
+        else if (detail.whitelist) parts.push('加白未完成');
+        showToast(parts.join(' | '), 'success');
+      } else {
+        if (action === 'unban') {
+          await adminApiService.unbanCsUser(userId);
+          setSelected((current) => current?.user.id === userId ? { ...current, user: { ...current.user, profile: { ...current.user.profile, status: 1 } } } : current);
+        } else await adminApiService.clearCsUserLimit(userId);
+        showToast(action === 'unban' ? '用户已解封' : '当前限速已清除', 'success');
+      }
       void loadListRef.current();
     } catch (error) {
       showToast(error instanceof Error ? error.message : '用户操作失败', 'error');
@@ -985,14 +1000,16 @@ const CustomerServicePage: React.FC = () => {
                       <DropdownItem key="group" isDisabled={!canManageConversation || conversationSaving} onPress={() => void updateConversation({ group_id: selected.group_id === 'supervisor' ? 'general' : 'supervisor' })}>{selected.group_id === 'supervisor' ? '移至普通跟进' : '转交主管待处理'}</DropdownItem>
                       <DropdownItem key="unban" isDisabled={!canUnbanUser || userActionLoading || selected.user.profile.status === 1} startContent={<ShieldCheck className="h-4 w-4" />} onPress={() => void runUserAction('unban')}>{selected.user.profile.status === 1 ? '账号正常' : '解封账号'}</DropdownItem>
                       <DropdownItem key="limit" isDisabled={!canClearUserLimit || userActionLoading} startContent={<Gauge className="h-4 w-4" />} onPress={() => void runUserAction('clear_limit')}>解除当前限速</DropdownItem>
+                      <DropdownItem key="limit_all" isDisabled={!canClearUserLimit || userActionLoading} startContent={<Zap className="h-4 w-4" />} onPress={() => void runUserAction('clear_limit_all')}>一键解除限速+解封+加白</DropdownItem>
                       <DropdownItem key="refresh" startContent={<RefreshCw className="h-4 w-4" />} onPress={() => { void loadList(); void refreshMessages(); }}>刷新会话</DropdownItem>
                       <DropdownItem key="notifications" isDisabled={notificationPermission === 'unsupported' || notificationPermission === 'granted'} startContent={<Bell className="h-4 w-4" />} onPress={() => void requestBrowserNotificationPermission()}>{notificationLabel}</DropdownItem>
                     </DropdownMenu>
                   </Dropdown>
                 </div>
-                <CsHandlingControls
+                <CsConversationTools
                   conversation={selected}
                   canManage={canManageConversation}
+                  canSend={canSend}
                   onConversation={(updated) => {
                     setSelected(updated);
                     setRows((current) => sortConversationsByRecent(current.map((item) => item.id === updated.id ? updated : item)));
@@ -1004,15 +1021,6 @@ const CustomerServicePage: React.FC = () => {
                   .map((attachment) => (
                     <AttachmentSummary key={attachment.id} attachment={attachment} />
                   ))}
-                <CsAiPanel
-                  conversation={selected}
-                  canManage={canManageConversation}
-                  canSend={canSend}
-                  onConversation={(updated) => {
-                    setSelected(updated);
-                    setRows((current) => sortConversationsByRecent(current.map((item) => item.id === updated.id ? updated : item)));
-                  }}
-                />
                 <div className="min-h-0 flex-1 overflow-hidden">
                   <ChatMessageList messages={messages.filter((message) => message.content_type !== 'ai_draft')} conversationKey={selected.id} selfRole="admin" loading={messageLoading} emptyText="暂无消息" scope="admin" userLastReadMessageId={selected.user_last_read_message_id} recallWindowMinutes={canRecall ? recallWindowMinutes : undefined} onRecall={canRecall ? setRecallTarget : undefined} />
                 </div>

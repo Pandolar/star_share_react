@@ -1,5 +1,6 @@
 import { lazy, ComponentType } from 'react';
 import { isStaleAssetError, recoverStaleAssets } from './assetRecovery';
+import { clearPendingNavigation } from '../components/admin/navPending';
 
 /**
  * 包装 React.lazy：动态 import 失败时先判断是否为「部署后旧 chunk 已下线」的资源版本不一致
@@ -16,7 +17,10 @@ export function lazyWithRetry<T extends ComponentType<any>>(
 ) {
     return lazy(async () => {
         try {
-            return await factory();
+            const module = await factory();
+            // 新页面 chunk 就绪：清掉管理后台「正在加载页面…」切换提示（无订阅时为空操作）
+            clearPendingNavigation();
+            return module;
         } catch (error) {
             if (isStaleAssetError(error)) {
                 console.error('[lazyWithRetry] chunk 加载失败，尝试清理缓存后重载', chunkName, error);
@@ -25,6 +29,7 @@ export function lazyWithRetry<T extends ComponentType<any>>(
                     return new Promise<{ default: T }>(() => {});
                 }
             }
+            clearPendingNavigation();
             throw error;
         }
     });

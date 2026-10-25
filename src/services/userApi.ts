@@ -262,6 +262,35 @@ export const userInfoApi = {
         });
     },
 };
+export interface DeleteAccountBlocker {
+    code: string;
+    message: string;
+}
+
+export interface DeleteAccountPreview {
+    can_delete: boolean;
+    blockers: DeleteAccountBlocker[];
+    consequences: {
+        packages: number;
+        team_memberships: number;
+        owned_teams: number;
+        pending_orders: number;
+        cashback_available: string;
+    };
+    verification_methods: Array<'password' | 'email' | 'wechat'>;
+    email: string | null;
+    wechat_bound: boolean;
+}
+
+export const deleteAccountApi = {
+    preview: async (): Promise<ApiResponse<DeleteAccountPreview>> => createUserRequest(getUserApiUrl('/u/delete_account/preview'), { method: 'GET' }),
+    sendCode: async (): Promise<ApiResponse<unknown>> => createUserRequest(getUserApiUrl('/u/delete_account/send_code'), { method: 'POST', body: JSON.stringify({}) }),
+    wechatQr: async (): Promise<ApiResponse<{ qr_code_url: string; ticket: string }>> => createUserRequest(getUserApiUrl('/u/delete_account/wechat_qr'), { method: 'GET' }),
+    wechatQrStatus: async (ticket: string): Promise<ApiResponse<{ status: 'waiting' | 'verified'; credential?: string }>> => createUserRequest(getUserApiUrl(`/u/delete_account/wechat_qr_status?ticket=${encodeURIComponent(ticket)}`), { method: 'GET' }),
+    submit: async (params: { method: 'password' | 'email' | 'wechat'; credential: string; confirmation: string }): Promise<ApiResponse<{ deleted: boolean }>> => createUserRequest(getUserApiUrl('/u/delete_account'), { method: 'POST', body: JSON.stringify(params) }),
+};
+
+ // 补偿活动API
 
 // 补偿活动API
 export interface CompensationItem {

@@ -141,7 +141,9 @@ const RegisterPage: React.FC = () => {
       if (data && data.xuserid && data.xtoken && data.xy_uuid_token) {
         setAuthCookies({ xuserid: data.xuserid, xtoken: data.xtoken, xy_uuid_token: data.xy_uuid_token });
         sessionStorage.removeItem(AFF_STORAGE_KEY);
-        toast.success('注册成功！正在跳转...');
+        toast.success(data.re_registered
+          ? '已创建全新账号，不继承原账号的数据或权益。正在跳转...'
+          : '注册成功！正在跳转...');
         redirect();
       }
     } catch (error) {
