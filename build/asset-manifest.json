@@ -1,7 +1,7 @@
 {
   "files": {
     "main.css": "/starstatic/css/main.1d79c263.css",
-    "main.js": "/starstatic/js/main.f0a37ef9.js",
+    "main.js": "/starstatic/js/main.0263102c.js",
     "starstatic/js/7767.2ed7ad84.chunk.js": "/starstatic/js/7767.2ed7ad84.chunk.js",
     "starstatic/js/1.7807640a.chunk.js": "/starstatic/js/1.7807640a.chunk.js",
     "starstatic/js/4396.d50e9609.chunk.js": "/starstatic/js/4396.d50e9609.chunk.js",
@@ -15,7 +15,7 @@
     "starstatic/js/5853.abd0a895.chunk.js": "/starstatic/js/5853.abd0a895.chunk.js",
     "starstatic/js/6780.44b98381.chunk.js": "/starstatic/js/6780.44b98381.chunk.js",
     "starstatic/js/952.2056f471.chunk.js": "/starstatic/js/952.2056f471.chunk.js",
-    "starstatic/js/6252.142a585d.chunk.js": "/starstatic/js/6252.142a585d.chunk.js",
+    "starstatic/js/6252.040668a4.chunk.js": "/starstatic/js/6252.040668a4.chunk.js",
     "starstatic/js/359.32ae262f.chunk.js": "/starstatic/js/359.32ae262f.chunk.js",
     "starstatic/js/919.14afc90d.chunk.js": "/starstatic/js/919.14afc90d.chunk.js",
     "starstatic/js/4833.e0788a3e.chunk.js": "/starstatic/js/4833.e0788a3e.chunk.js",
@@ -32,7 +32,7 @@
     "starstatic/js/2795.d372b388.chunk.js": "/starstatic/js/2795.d372b388.chunk.js",
     "starstatic/js/512.f3f68be9.chunk.js": "/starstatic/js/512.f3f68be9.chunk.js",
     "starstatic/js/9529.e76d864d.chunk.js": "/starstatic/js/9529.e76d864d.chunk.js",
-    "starstatic/js/1878.611ccfad.chunk.js": "/starstatic/js/1878.611ccfad.chunk.js",
+    "starstatic/js/1878.f881c90f.chunk.js": "/starstatic/js/1878.f881c90f.chunk.js",
     "starstatic/js/9548.6578ea61.chunk.js": "/starstatic/js/9548.6578ea61.chunk.js",
     "starstatic/js/7398.0121660d.chunk.js": "/starstatic/js/7398.0121660d.chunk.js",
     "starstatic/js/2354.49e8a127.chunk.js": "/starstatic/js/2354.49e8a127.chunk.js",
@@ -91,6 +91,6 @@
     "starstatic/js/heroui.5e45b4af.js",
     "starstatic/js/7058.bfc8b828.js",
     "starstatic/css/main.1d79c263.css",
-    "starstatic/js/main.f0a37ef9.js"
+    "starstatic/js/main.0263102c.js"
   ]
 }
