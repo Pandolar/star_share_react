@@ -301,16 +301,36 @@ export const CsAiManagementPanel: React.FC<Props> = ({ selectedConversationIds, 
           </ModalContent>
         </Modal>
       </div></Tab>
-      <Tab key="incident" title="事故话术"><div className="space-y-3 mt-3">
-        <Alert color="warning" title={incident ? `正在生效：${text(incident.title)}` : '无生效事故'} description="限时、限范围、每版本每会话一次。重复追问转人工，不自动关闭。" />
-        <Input label="事故标题" value={text(incidentForm.title)} onValueChange={(value) => setIncidentForm({ ...incidentForm, title: value })} />
-        <Textarea label="用户公告" value={text(incidentForm.announcement)} onValueChange={(value) => setIncidentForm({ ...incidentForm, announcement: value })} />
-        <Textarea label="已核实回复话术" value={text(incidentForm.canned_reply)} onValueChange={(value) => setIncidentForm({ ...incidentForm, canned_reply: value })} />
-        <Select label="范围" selectedKeys={[text(incidentForm.scope) || 'matched']} onSelectionChange={(keys) => setIncidentForm({ ...incidentForm, scope: String(Array.from(keys)[0]) })}><SelectItem key="matched">关键词 / 分类匹配</SelectItem><SelectItem key="all">全部新咨询（慎用）</SelectItem></Select>
-        <KeywordInput label="关键词（逗号分隔）" value={strings(incidentForm.keywords)} onChange={(next) => setIncidentForm({ ...incidentForm, keywords: next })} />
-        <KeywordInput label="分类ID（逗号分隔）" value={strings(incidentForm.category_ids)} onChange={(next) => setIncidentForm({ ...incidentForm, category_ids: next })} />
-        <div className="space-y-1"><span className="block text-small text-foreground-500">到期时间（必填，最长7天）</span><Input type="datetime-local" aria-label="到期时间（必填，最长7天）" value={toLocalDateTimeInput(text(incidentForm.expires_at))} onValueChange={(value) => setIncidentForm({ ...incidentForm, expires_at: value })} /></div>
+      <Tab key="incident" title="事故话术"><div className="space-y-4 mt-3">
+        <Alert
+          color={incident ? 'warning' : 'default'}
+          title={incident ? `正在生效：${text(incident.title)}` : '当前没有生效中的事故话术'}
+          description="事故话术是临时应急公告：系统出故障时，先自动回复安抚用户、说明在处理，到点自动失效。平时不用管它，没有事故就不要开。"
+        />
+        <Card shadow="none" className="border border-divider"><CardBody className="gap-2 p-4">
+          <p className="text-sm font-semibold">生效后会发生什么？</p>
+          <ul className="list-disc space-y-1 pl-5 text-xs text-default-600">
+            <li>命中范围的新咨询会先收到你写的「用户公告」，然后正常排队等人工。</li>
+            <li>同一用户同一件事只发一次，不会刷屏；用户继续追问会转给人工，不会一直自动回复。</li>
+            <li>到达「到期时间」自动失效，不需要手动关；也可以随时点「结束事故」。</li>
+            <li>它不会自动关闭会话、不承诺退款补偿，只负责安抚和说明。</li>
+          </ul>
+        </CardBody></Card>
+        <Card shadow="none" className="border border-divider"><CardBody className="gap-3 p-4">
+          <p className="text-sm font-semibold">怎么填？</p>
+          <Input label="事故标题（内部看的名字）" placeholder="例：10月25日支付回调延迟" value={text(incidentForm.title)} onValueChange={(value) => setIncidentForm({ ...incidentForm, title: value })} description="只给客服和管理员看，用户看不到。" />
+          <Textarea label="用户公告（用户先看到的安抚话）" placeholder="例：我们现在支付到账有延迟，技术正在处理，您的订单不会丢，恢复后会自动到账，请稍等片刻。" value={text(incidentForm.announcement)} onValueChange={(value) => setIncidentForm({ ...incidentForm, announcement: value })} description="命中范围的用户发第一条消息时自动收到这段话。说人话、别承诺做不到的事。" />
+          <Textarea label="已核实回复话术（人工可直接用的标准答复）" placeholder="例：已确认是回调延迟导致，预计2小时内恢复；您的钱款安全，恢复后自动到账，无需重复支付。" value={text(incidentForm.canned_reply)} onValueChange={(value) => setIncidentForm({ ...incidentForm, canned_reply: value })} description="给客服参考的统一口径，也可批量补发给已经在问的用户。" />
+          <Select label="发给谁" selectedKeys={[text(incidentForm.scope) || 'matched']} onSelectionChange={(keys) => setIncidentForm({ ...incidentForm, scope: String(Array.from(keys)[0]) })} description="建议选“关键词匹配”，只发给真正受影响的人。">
+            <SelectItem key="matched">只发给提到关键词/分类的用户（推荐）</SelectItem>
+            <SelectItem key="all">全部新咨询（仅限大面积故障，慎用）</SelectItem>
+          </Select>
+          <KeywordInput label="关键词（逗号分隔）" value={strings(incidentForm.keywords)} onChange={(next) => setIncidentForm({ ...incidentForm, keywords: next })} description="用户消息里包含任意一个词就命中。例：支付失败,没到账,扣款了" />
+          <KeywordInput label="分类ID（逗号分隔，可留空）" value={strings(incidentForm.category_ids)} onChange={(next) => setIncidentForm({ ...incidentForm, category_ids: next })} description="按咨询分类匹配；不会填就留空，用关键词就够了。" />
+          <div className="space-y-1"><span className="block text-small text-foreground-500">到期时间（必填，最长7天）</span><Input type="datetime-local" aria-label="到期时间（必填，最长7天）" value={toLocalDateTimeInput(text(incidentForm.expires_at))} onValueChange={(value) => setIncidentForm({ ...incidentForm, expires_at: value })} description="到点自动失效。一般设为预计恢复时间再加半天。" /></div>
+        </CardBody></Card>
         <div className="flex flex-wrap gap-2"><Button color="warning" isDisabled={busy || !can('customer_service.incident.manage')} onPress={() => void run(async () => { const value = await adminApiService.saveCsIncident({ ...incidentForm, expected_revision: incidentRevision }); setIncident(value.active); setIncidentRevision(value.revision); })}>发布 / 更新话术</Button><Button isDisabled={busy || !can('customer_service.incident.manage')} onPress={() => void run(async () => { await adminApiService.clearCsIncident(); await loadIncident(); })}>结束事故</Button>{(['reply', 'resolve'] as const).map((action) => <Button key={action} isDisabled={busy || !incident || !selectedConversationIds.length || !can('customer_service.incident.manage')} onPress={() => void run(async () => { await adminApiService.batchCsIncident({ conversation_ids: selectedConversationIds, action, client_msg_id: `incident-${Date.now()}` }); })}>{action === 'reply' ? '向所选事故会话补发' : '人工确认所选事故会话已解决'}</Button>)}</div>
+        <p className="text-xs text-default-400">批量按钮配合左侧会话列表的勾选使用：「补发」给已经在问的用户补发话术；「确认已解决」在恢复后批量标记。</p>
         <details><summary>事故历史</summary>{incidentHistory.map((item) => <p key={text(item.id)} className="text-sm">{text(item.title)} · {text(item.ended_at)}</p>)}</details>
       </div></Tab>
       <Tab key="audit" title="统计质检"><div className="space-y-4 mt-3">

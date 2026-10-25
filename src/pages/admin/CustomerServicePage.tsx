@@ -923,7 +923,7 @@ const CustomerServicePage: React.FC = () => {
                     <Button
                       variant={selected?.id === item.id ? 'flat' : 'light'}
                       color={selected?.id === item.id ? 'primary' : 'default'}
-                      className="h-auto min-w-0 flex-1 justify-start px-2.5 py-1.5 text-left"
+                      className={`h-auto min-w-0 flex-1 justify-start px-2.5 py-1.5 text-left ${item.is_pinned && selected?.id !== item.id ? 'bg-default-100' : ''}`}
                       onPress={() => void openConversation(item)}
                     >
                       <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -953,7 +953,9 @@ const CustomerServicePage: React.FC = () => {
                           <span className="shrink-0 text-xs text-default-500">{relativeTime(item.last_message_at)}</span>
                         </div>
                         <div className="mt-0.5 flex items-center gap-2 text-xs text-default-500">
-                          <span className="shrink-0">{item.admin_unread > 0 ? '未读' : ['resolved', 'closed'].includes(item.status) ? '已完成' : '已读'}</span>
+                          {(item.admin_unread > 0 || ['resolved', 'closed'].includes(item.status)) && (
+                            <span className="shrink-0">{item.admin_unread > 0 ? '未读' : '已完成'}</span>
+                          )}
                           <span className="truncate">{item.last_message_preview || '暂无消息'}</span>
                         </div>
                         <div className={`mt-0.5 truncate text-xs ${item.user.billing.has_entitlement ? 'text-success' : 'text-default-400'}`}>
