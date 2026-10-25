@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Button, Card, CardBody, Chip, Input, NumberInput, Pagination, Select, SelectItem, Switch, Tab, Tabs, Textarea } from '@heroui/react';
+import { Alert, Button, Card, CardBody, Chip, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, NumberInput, Pagination, Select, SelectItem, Switch, Tab, Tabs, Textarea } from '@heroui/react';
 import adminApiService from '../../services/adminApi';
 import { showToast } from '../../components/Toast';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
@@ -148,6 +148,7 @@ export const CsAiManagementPanel: React.FC<Props> = ({ selectedConversationIds, 
   const [editing, setEditing] = useState<Data | null>(null);
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
+  const [kbEditorOpen, setKbEditorOpen] = useState(false);
   const [mergeTarget, setMergeTarget] = useState('');
   const [auditId, setAuditId] = useState('');
   const [auditComment, setAuditComment] = useState('');
@@ -193,11 +194,18 @@ export const CsAiManagementPanel: React.FC<Props> = ({ selectedConversationIds, 
     const updated = await adminApiService.updateCsKbCandidate({ id: number(row.id), revision: number(row.revision), action });
     if (updated && number(updated.id)) setKb((current) => current.map((item) => number(item.id) === number(updated.id) ? updated : item)); else await loadKb();
   }, { approve: '已批准，开始同步到知识库', reject: '已标记为不需要', disable: '已停用', retry: '已重新排队同步' }[action]);
+  const openKbEditor = (row: Data | null) => {
+    setEditing(row);
+    setQuestion(row ? text(row.question) : '');
+    setAnswer(row ? text(row.answer) : '');
+    setKbEditorOpen(true);
+  };
+  const closeKbEditor = () => { setKbEditorOpen(false); setEditing(null); setQuestion(''); setAnswer(''); };
   const saveKbEdit = () => run(async () => {
     if (!editing) return;
     const updated = await adminApiService.updateCsKbCandidate({ id: number(editing.id), revision: number(editing.revision), action: 'edit', question, answer });
     if (updated && number(updated.id)) setKb((current) => current.map((item) => number(item.id) === number(updated.id) ? updated : item)); else await loadKb();
-    setEditing(null); setQuestion(''); setAnswer('');
+    closeKbEditor();
   }, '内容已保存');
   const pendingKb = kb.filter((row) => text(row.status) === 'pending');
   const processedKb = kb.filter((row) => text(row.status) !== 'pending');
@@ -207,7 +215,7 @@ export const CsAiManagementPanel: React.FC<Props> = ({ selectedConversationIds, 
     if (editing) { void saveKbEdit(); return; }
     void run(async () => {
       await adminApiService.createCsKbCandidate({ question, answer });
-      setQuestion(''); setAnswer(''); await loadKb();
+      closeKbEditor(); await loadKb();
     }, '已加入待审核');
   };
   return <div className="space-y-4">
@@ -265,21 +273,33 @@ export const CsAiManagementPanel: React.FC<Props> = ({ selectedConversationIds, 
       </div></Tab>
       <Tab key="knowledge" title="知识审核"><div className="space-y-3 mt-3">
         <Alert title="学习只生成候选，不自动批准" description="个人订单事实不能变成通用业务承诺；批准前核对来源与适用范围。" />
-        <div className="flex gap-2"><Select label="状态" selectedKeys={[status]} onSelectionChange={(keys) => { setStatus(String(Array.from(keys)[0])); setPage(1); }}>{['all', 'pending', 'approved', 'indexing', 'synced', 'error', 'disabled', 'rejected'].map((key) => <SelectItem key={key}>{key}</SelectItem>)}</Select><Button isDisabled={busy || !can('customer_service.knowledge.manage')} onPress={() => void run(async () => { await adminApiService.mineCsKb({ conversation_ids: selectedConversationIds.length ? selectedConversationIds : undefined, limit: 100 }); setMining(await adminApiService.getCsMineProgress()); })}>{selectedConversationIds.length ? '学习已选已结束会话' : '学习历史（最多100个）'}</Button></div>
+        <div className="flex flex-wrap gap-2"><Select label="状态" selectedKeys={[status]} onSelectionChange={(keys) => { setStatus(String(Array.from(keys)[0])); setPage(1); }}>{['all', 'pending', 'approved', 'indexing', 'synced', 'error', 'disabled', 'rejected'].map((key) => <SelectItem key={key}>{key}</SelectItem>)}</Select><Button isDisabled={busy || !can('customer_service.knowledge.manage')} onPress={() => void run(async () => { await adminApiService.mineCsKb({ conversation_ids: selectedConversationIds.length ? selectedConversationIds : undefined, limit: 100 }); setMining(await adminApiService.getCsMineProgress()); })}>{selectedConversationIds.length ? '学习已选已结束会话' : '学习历史（最多100个）'}</Button><Button color="primary" variant="flat" isDisabled={!can('customer_service.knowledge.manage')} onPress={() => openKbEditor(null)}>新增知识</Button></div>
         <p className="text-xs text-default-500">历史会话挖掘会分批处理长记录并识别图片素材；图片内容可能不完整，所有候选必须人工核对来源后批准。</p>
         <details><summary className="text-sm">挖掘进度</summary>{records(mining.jobs).map((job) => <div key={text(job.id)} className="border-b py-2 text-xs">
           <p>{text(job.status)} · 已处理 {number(job.processed)}/{number(job.limit)} · 分块 {number(job.chunks)} · 候选 {number(job.candidates)}</p>
           {strings(job.warnings).length > 0 && <p className="text-warning">警告：{strings(job.warnings).join('；')}</p>}
           {!!job.error && <p className="text-danger">错误：{text(job.error)}</p>}
         </div>)}</details>
-        <Card><CardBody className="gap-2"><p>{editing ? `编辑知识 #${editing.id}` : '人工新增知识'}</p><Input label="标准问题" value={question} onValueChange={setQuestion} /><Textarea label="可复用答案" value={answer} onValueChange={setAnswer} /><div className="flex gap-2"><Button size="sm" color="primary" isDisabled={busy || !can('customer_service.knowledge.manage')} onPress={() => void saveKnowledge()}>保存待审核</Button>{editing && <Button size="sm" onPress={() => { setEditing(null); setQuestion(''); setAnswer(''); }}>取消编辑</Button>}</div></CardBody></Card>
-        {(compactProcessed ? pendingKb : kb).map((row) => <Card key={number(row.id)}><CardBody className="gap-2"><p className="font-medium">#{number(row.id)} {text(row.question)}</p><p className="whitespace-pre-wrap text-sm">{text(row.answer)}</p><KbVariants row={row} /><p className="text-xs text-default-500"><Chip size="sm" variant="flat" color={({ synced: 'success', pending: 'warning', error: 'danger', rejected: 'default', disabled: 'default', approved: 'secondary', indexing: 'secondary' } as Record<string, 'success' | 'warning' | 'danger' | 'default' | 'secondary'>)[text(row.status)] || 'default'}>{{ pending: '待审核', approved: '已批准，同步中', indexing: '同步中', synced: '已生效', error: '同步失败', disabled: '已停用', rejected: '已拒绝' }[text(row.status)] || text(row.status)}</Chip> · 来源 {({ history: '历史学习', miss: '未命中转人工', manual: '人工录入', draft_edited: '建议修改', incident: '事故话术' } as Record<string, string>)[text(row.source)] || text(row.source)} · 出现过 {number(row.frequency)} 次{number(row.conversation_id) ? ` · 来自会话 #${number(row.conversation_id)}` : ''}</p>{records(row.evidence).length > 0 && <details><summary className="text-xs">来源证据（点开发对）</summary>{records(row.evidence).map((evidence, index) => <div key={index} className="mt-1 text-xs"><p>会话 {number(evidence.conversation_id) || '未知'} · 消息ID {strings(evidence.message_ids || (evidence.message_id !== undefined ? [evidence.message_id] : [])).join(', ') || '未提供'}</p>{strings(evidence.quotes).map((quote, quoteIndex) => <blockquote key={quoteIndex} className="border-l-2 pl-2 text-default-500">{quote}</blockquote>)}</div>)}</details>}{!!row.last_error && <p className="text-danger text-xs">{text(row.last_error)}</p>}<div className="flex flex-wrap items-center gap-2"><Button size="sm" isDisabled={busy || !can('customer_service.knowledge.manage')} onPress={() => { setEditing(row); setQuestion(text(row.question)); setAnswer(text(row.answer)); }}>改内容</Button>{text(row.status) === 'pending' && <Button size="sm" color="primary" isDisabled={busy || !can('customer_service.knowledge.manage')} onPress={() => void kbAction(row, 'approve')}>批准，让 AI 用</Button>}{text(row.status) === 'pending' && <Button size="sm" variant="flat" isDisabled={busy || !can('customer_service.knowledge.manage')} onPress={() => void kbAction(row, 'reject')}>不要这条</Button>}{['approved', 'indexing', 'synced'].includes(text(row.status)) && <Button size="sm" variant="flat" isDisabled={busy || !can('customer_service.knowledge.manage')} onPress={() => void kbAction(row, 'disable')}>停用</Button>}<details className="text-xs"><summary className="cursor-pointer text-default-500">更多</summary><div className="mt-2 space-y-2">{text(row.status) === 'error' && <Button size="sm" variant="flat" isDisabled={busy || !can('customer_service.knowledge.manage')} onPress={() => void kbAction(row, 'retry')}>重试同步</Button>}<div className="flex gap-2"><Input size="sm" label="并入另一条（填它的ID）" value={mergeTarget} onValueChange={setMergeTarget} /><Button size="sm" variant="flat" isDisabled={busy || !can('customer_service.knowledge.manage') || !Number(mergeTarget)} onPress={() => void run(async () => { await adminApiService.updateCsKbCandidate({ id: number(row.id), revision: number(row.revision), action: 'merge', target_id: Number(mergeTarget) }); await loadKb(); })}>合并</Button></div></div></details></div></CardBody></Card>)}
+        {(compactProcessed ? pendingKb : kb).map((row) => <Card key={number(row.id)}><CardBody className="gap-2"><p className="font-medium">#{number(row.id)} {text(row.question)}</p><p className="whitespace-pre-wrap text-sm">{text(row.answer)}</p><KbVariants row={row} /><p className="text-xs text-default-500"><Chip size="sm" variant="flat" color={({ synced: 'success', pending: 'warning', error: 'danger', rejected: 'default', disabled: 'default', approved: 'secondary', indexing: 'secondary' } as Record<string, 'success' | 'warning' | 'danger' | 'default' | 'secondary'>)[text(row.status)] || 'default'}>{{ pending: '待审核', approved: '已批准，同步中', indexing: '同步中', synced: '已生效', error: '同步失败', disabled: '已停用', rejected: '已拒绝' }[text(row.status)] || text(row.status)}</Chip> · 来源 {({ history: '历史学习', miss: '未命中转人工', manual: '人工录入', draft_edited: '建议修改', incident: '事故话术' } as Record<string, string>)[text(row.source)] || text(row.source)} · 出现过 {number(row.frequency)} 次{number(row.conversation_id) ? ` · 来自会话 #${number(row.conversation_id)}` : ''}</p>{records(row.evidence).length > 0 && <details><summary className="text-xs">来源证据（点开发对）</summary>{records(row.evidence).map((evidence, index) => <div key={index} className="mt-1 text-xs"><p>会话 {number(evidence.conversation_id) || '未知'} · 消息ID {strings(evidence.message_ids || (evidence.message_id !== undefined ? [evidence.message_id] : [])).join(', ') || '未提供'}</p>{strings(evidence.quotes).map((quote, quoteIndex) => <blockquote key={quoteIndex} className="border-l-2 pl-2 text-default-500">{quote}</blockquote>)}</div>)}</details>}{!!row.last_error && <p className="text-danger text-xs">{text(row.last_error)}</p>}<div className="flex flex-wrap items-center gap-2"><Button size="sm" isDisabled={busy || !can('customer_service.knowledge.manage')} onPress={() => openKbEditor(row)}>改内容</Button>{text(row.status) === 'pending' && <Button size="sm" color="primary" isDisabled={busy || !can('customer_service.knowledge.manage')} onPress={() => void kbAction(row, 'approve')}>批准，让 AI 用</Button>}{text(row.status) === 'pending' && <Button size="sm" variant="flat" isDisabled={busy || !can('customer_service.knowledge.manage')} onPress={() => void kbAction(row, 'reject')}>不要这条</Button>}{['approved', 'indexing', 'synced'].includes(text(row.status)) && <Button size="sm" variant="flat" isDisabled={busy || !can('customer_service.knowledge.manage')} onPress={() => void kbAction(row, 'disable')}>停用</Button>}<details className="text-xs"><summary className="cursor-pointer text-default-500">更多</summary><div className="mt-2 space-y-2">{text(row.status) === 'error' && <Button size="sm" variant="flat" isDisabled={busy || !can('customer_service.knowledge.manage')} onPress={() => void kbAction(row, 'retry')}>重试同步</Button>}<div className="flex gap-2"><Input size="sm" label="并入另一条（填它的ID）" value={mergeTarget} onValueChange={setMergeTarget} /><Button size="sm" variant="flat" isDisabled={busy || !can('customer_service.knowledge.manage') || !Number(mergeTarget)} onPress={() => void run(async () => { await adminApiService.updateCsKbCandidate({ id: number(row.id), revision: number(row.revision), action: 'merge', target_id: Number(mergeTarget) }); await loadKb(); })}>合并</Button></div></div></details></div></CardBody></Card>)}
         {compactProcessed && pendingKb.length === 0 && kb.length > 0 && <Alert color="success" variant="flat" title="本页没有待审核的知识" description="下面的条目都已处理，自动收起显示。" />}
         {compactProcessed && processedKb.length > 0 && <div className="space-y-1">
           <p className="text-xs text-default-400">已处理（{processedKb.length} 条，自动收起半隐藏；点“改内容”可继续编辑）</p>
-          {processedKb.map((row) => <KbCompactRow key={number(row.id)} row={row} busy={busy} canManage={can('customer_service.knowledge.manage')} onEdit={(target) => { setEditing(target); setQuestion(text(target.question)); setAnswer(text(target.answer)); }} onAction={(target, action) => void kbAction(target, action)} onMerge={(target, targetId) => void run(async () => { await adminApiService.updateCsKbCandidate({ id: number(target.id), revision: number(target.revision), action: 'merge', target_id: targetId }); await loadKb(); })} />)}
+          {processedKb.map((row) => <KbCompactRow key={number(row.id)} row={row} busy={busy} canManage={can('customer_service.knowledge.manage')} onEdit={openKbEditor} onAction={(target, action) => void kbAction(target, action)} onMerge={(target, targetId) => void run(async () => { await adminApiService.updateCsKbCandidate({ id: number(target.id), revision: number(target.revision), action: 'merge', target_id: targetId }); await loadKb(); })} />)}
         </div>}
         <Pagination page={page} total={Math.max(1, Math.ceil(kbTotal / 20))} onChange={setPage} />
+        <Modal isOpen={kbEditorOpen} onClose={closeKbEditor} size="xl" scrollBehavior="inside">
+          <ModalContent>
+            <ModalHeader>{editing ? `编辑知识 #${editing.id}` : '人工新增知识'}</ModalHeader>
+            <ModalBody className="gap-3">
+              <Input label="标准问题" value={question} onValueChange={setQuestion} placeholder="用户会怎么问这个问题" />
+              <Textarea label="可复用答案" value={answer} onValueChange={setAnswer} minRows={6} placeholder="可以直接发给用户的通用答案，不要包含个人订单等隐私信息" />
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="light" onPress={closeKbEditor}>取消</Button>
+              <Button color="primary" isDisabled={busy || !can('customer_service.knowledge.manage') || !question.trim() || !answer.trim()} isLoading={busy} onPress={() => void saveKnowledge()}>保存待审核</Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
       </div></Tab>
       <Tab key="incident" title="事故话术"><div className="space-y-3 mt-3">
         <Alert color="warning" title={incident ? `正在生效：${text(incident.title)}` : '无生效事故'} description="限时、限范围、每版本每会话一次。重复追问转人工，不自动关闭。" />

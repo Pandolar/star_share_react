@@ -400,7 +400,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   <label className="block text-sm font-medium text-default-700 mb-2">当前邮箱</label>
                   <Input value={userInfo?.email || ''} isReadOnly variant="flat" className="bg-default-100" />
                   {userInfo?.email && !userInfo.email.endsWith('@default.com') && (
-                    <p className="text-xs text-warning mt-1">非微信新用户，无法修改邮箱</p>
+                    <p className="text-xs text-warning mt-1">邮箱不支持修改</p>
                   )}
                 </div>
                 {userInfo?.email?.endsWith('@default.com') ? <>

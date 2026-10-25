@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardBody, Chip, Spinner, Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from '@heroui/react';
-import { User, Mail, Calendar, Shield, AlertCircle, Package, Crown, Edit3, MessageCircle, ArrowUpCircle, Gauge, Snowflake, Info, Gift, Wallet, ReceiptText, Trash2 } from 'lucide-react';
+import { User, Mail, Calendar, Shield, AlertCircle, Package, Crown, Edit3, MessageCircle, ArrowUpCircle, Gauge, Snowflake, Info, Gift, Wallet, ReceiptText, Trash2, ChevronDown, Settings2 } from 'lucide-react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { userInfoApi, compensationApi, CompensationItem } from '../../../services/userApi';
 import { getCookie } from '../../../utils/cookies';
@@ -54,6 +54,7 @@ export const ProfileTab: React.FC = () => {
 
   const [editModal, setEditModal] = useState<{ open: boolean; tab: EditTabKey }>({ open: false, tab: 'username' });
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+  const [accountManageOpen, setAccountManageOpen] = useState(false);
 
   // 补偿活动
   const [compensations, setCompensations] = useState<CompensationItem[]>([]);
@@ -253,9 +254,12 @@ export const ProfileTab: React.FC = () => {
                 />
 
                 <div className="flex-1 space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                     <h2 className="text-xl font-bold text-default-900">{userInfo.username}</h2>
                     <div className="flex items-center gap-2">{getStatusChip(userInfo.status)}</div>
+                    <Button size="sm" color="primary" variant="flat" className="sm:ml-auto sm:shrink-0" startContent={<Edit3 size={14} />} onPress={() => openEditModal()}>
+                      编辑资料
+                    </Button>
                   </div>
 
                   <div className="space-y-2 text-sm">
@@ -290,12 +294,57 @@ export const ProfileTab: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="pt-2">
-                    <Button size="sm" color="primary" startContent={<Edit3 size={14} />} onPress={() => openEditModal()}>
-                      编辑资料
-                    </Button>
-                  </div>
                 </div>
+              </div>
+
+              {/* 账号管理：安全 / 财务资料 / 注销 折叠收纳，默认收起 */}
+              <div className="mt-4 border-t border-divider pt-3">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 py-1 text-left"
+                  aria-expanded={accountManageOpen}
+                  onClick={() => setAccountManageOpen((value) => !value)}
+                >
+                  <Settings2 size={16} className="text-default-500" />
+                  <span className="text-sm font-medium text-default-800">账号管理</span>
+                  <span className="text-xs text-default-400">安全、财务资料与注销</span>
+                  <ChevronDown size={14} className={`ml-auto text-default-400 transition-transform ${accountManageOpen ? '' : '-rotate-90'}`} />
+                </button>
+                {accountManageOpen && (
+                  <div className="mt-3 space-y-4">
+                    <div>
+                      <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-default-500"><Shield size={13} />账号与安全</p>
+                      <div className="divide-y divide-default-100 rounded-lg border border-default-100">
+                        <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div><p className="text-sm font-medium">登录邮箱</p><p className="text-xs text-default-500">{userInfo.email.endsWith('@default.com') ? '未绑定真实邮箱' : userInfo.email}</p></div>
+                          <Button size="sm" variant="bordered" onPress={() => openEditModal('email')}>{userInfo.email.endsWith('@default.com') ? '绑定邮箱' : '查看邮箱'}</Button>
+                        </div>
+                        <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div><p className="text-sm font-medium">登录密码</p><p className="text-xs text-default-500">修改当前密码或通过邮箱重置</p></div>
+                          <Button size="sm" variant="bordered" onPress={() => openEditModal('password')}>修改密码</Button>
+                        </div>
+                      </div>
+                    </div>
+                    {(features.invite || features.invoice) && (
+                      <div>
+                        <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-default-500"><Wallet size={13} />财务资料</p>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {features.invite && <Button size="sm" variant="bordered" className="justify-start" startContent={<Wallet size={14} />} onPress={() => openEditModal('payment_info')}>收款方式</Button>}
+                          {features.invoice && <Button size="sm" variant="bordered" className="justify-start" startContent={<ReceiptText size={14} />} onPress={() => openEditModal('billing_profile')}>开票主体</Button>}
+                        </div>
+                      </div>
+                    )}
+                    <div className="rounded-lg border border-danger-100 bg-danger-50/40 p-3">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="flex items-center gap-1.5 text-sm font-medium text-danger-700"><Trash2 size={14} />注销账号</p>
+                          <p className="mt-0.5 text-xs text-danger-600/80">此操作不可恢复，请谨慎处理。</p>
+                        </div>
+                        <Button size="sm" color="danger" variant="flat" onPress={() => setDeleteAccountOpen(true)}>注销账号</Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardBody>
           </Card>
@@ -393,6 +442,9 @@ export const ProfileTab: React.FC = () => {
             );
           })()}
 
+          {/* 使用额度：紧跟当前套餐 */}
+          <UsageSection usage={usageData} loading={usageLoading} error={usageError} onRefresh={refetchUsage} />
+
           {/* 账户统计 */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Card>
@@ -418,41 +470,6 @@ export const ProfileTab: React.FC = () => {
               </CardBody>
             </Card>
           </div>
-
-          <Card>
-            <CardBody className="p-6">
-              <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-default-900"><Shield size={18} className="text-primary" />账号与安全</h3>
-              <div className="divide-y divide-default-100">
-                <div className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div><p className="font-medium">登录邮箱</p><p className="text-sm text-default-500">{userInfo.email.endsWith('@default.com') ? '未绑定真实邮箱' : userInfo.email}</p></div>
-                  <Button size="sm" variant="bordered" onPress={() => openEditModal('email')}>{userInfo.email.endsWith('@default.com') ? '绑定邮箱' : '查看邮箱'}</Button>
-                </div>
-                <div className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div><p className="font-medium">登录密码</p><p className="text-sm text-default-500">修改当前密码或通过邮箱重置</p></div>
-                  <Button size="sm" variant="bordered" onPress={() => openEditModal('password')}>修改密码</Button>
-                </div>
-              </div>
-            </CardBody>
-          </Card>
-
-          {(features.invite || features.invoice) && <Card>
-            <CardBody className="p-6">
-              <h3 className="mb-4 text-lg font-bold text-default-900">财务资料</h3>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {features.invite && <Button variant="bordered" className="justify-start" startContent={<Wallet size={16} />} onPress={() => openEditModal('payment_info')}>收款方式</Button>}
-                {features.invoice && <Button variant="bordered" className="justify-start" startContent={<ReceiptText size={16} />} onPress={() => openEditModal('billing_profile')}>开票主体</Button>}
-              </div>
-            </CardBody>
-          </Card>}
-
-          <Card className="border border-danger-100">
-            <CardBody className="flex flex-col gap-3 p-6 sm:flex-row sm:items-center sm:justify-between">
-              <div><h3 className="font-medium text-default-800">注销账号</h3><p className="text-sm text-default-500">此操作不可恢复，请谨慎处理。</p></div>
-              <Button size="sm" color="danger" variant="light" startContent={<Trash2 size={16} />} onPress={() => setDeleteAccountOpen(true)}>注销账号</Button>
-            </CardBody>
-          </Card>
-          {/* 使用额度 */}
-          <UsageSection usage={usageData} loading={usageLoading} error={usageError} onRefresh={refetchUsage} />
         </>
       )}
 
