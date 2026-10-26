@@ -24,7 +24,7 @@ import {
   Tooltip,
   Textarea,
 } from '@heroui/react';
-import { ArrowLeft, Bell, BellOff, CircleDollarSign, Flag, Gauge, Headphones, MoreHorizontal, Pin, Plus, RefreshCw, Search, Send, ShieldCheck, StickyNote, UserRound, Volume2, VolumeX, Zap } from 'lucide-react';
+import { ArrowLeft, Bell, BellOff, CircleDollarSign, Flag, Gauge, Headphones, ListTodo, MoreHorizontal, Pin, Plus, RefreshCw, Search, Send, ShieldCheck, StickyNote, UserRound, Volume2, VolumeX, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import adminApiService from '../../services/adminApi';
 import type { AdminCsConversation } from '../../types/admin';
@@ -133,6 +133,41 @@ const CustomerServicePage: React.FC = () => {
   const canSend = can('customer_service.message.send');
   const canManageAi = can('customer_service.ai.manage');
   const [aiManagementOpen, setAiManagementOpen] = useState(false);
+  // 跨客服共享轻量待办（存 star_config，30s 轮询）
+  const [todos, setTodos] = useState<{ revision: number; items: Array<Record<string, unknown>>; todo_count: number } | null>(null);
+  const [todoOpen, setTodoOpen] = useState(false);
+  const [todoTitle, setTodoTitle] = useState('');
+  const [todoBusy, setTodoBusy] = useState(false);
+  const loadTodos = useCallback(async () => {
+    try { setTodos(await adminApiService.listCsTodos()); } catch { /* 静默，不影响会话主流程 */ }
+  }, []);
+  useEffect(() => {
+    void loadTodos();
+    const timer = window.setInterval(() => void loadTodos(), 30000);
+    return () => window.clearInterval(timer);
+  }, [loadTodos]);
+  const addTodo = async () => {
+    const title = todoTitle.trim();
+    if (!title || todoBusy) return;
+    setTodoBusy(true);
+    try {
+      await adminApiService.createCsTodo({ title });
+      setTodoTitle('');
+      await loadTodos();
+    } catch (error) { showToast(error instanceof Error ? error.message : '新增待办失败', 'error'); }
+    finally { setTodoBusy(false); }
+  };
+  const toggleTodo = async (item: Record<string, unknown>) => {
+    if (!todos || todoBusy) return;
+    setTodoBusy(true);
+    try {
+      await adminApiService.updateCsTodo({ id: Number(item.id), revision: todos.revision });
+      await loadTodos();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '更新待办失败', 'error');
+      await loadTodos();
+    } finally { setTodoBusy(false); }
+  };
   const canBatchSend = can('customer_service.message.batch_send');
   const canRecall = can('customer_service.message.recall');
   const canManageQuickReplies = can('customer_service.quick_reply.manage');
@@ -874,6 +909,42 @@ const CustomerServicePage: React.FC = () => {
               placeholder="搜索用户或消息"
               startContent={<Search className="h-4 w-4" />}
             />
+            <div className="shrink-0 rounded-lg border border-default-100 bg-default-50/60">
+              <button type="button" className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left" aria-expanded={todoOpen} onClick={() => setTodoOpen((value) => !value)}>
+                <ListTodo className="h-4 w-4 text-default-500" />
+                <span className="text-sm font-medium">共享待办</span>
+                {todos && todos.todo_count > 0 && <Chip size="sm" color="warning" variant="flat">{todos.todo_count}</Chip>}
+                <span className="ml-auto text-xs text-default-400">{todoOpen ? '收起' : '展开'}</span>
+              </button>
+              {todoOpen && (
+                <div className="space-y-1.5 px-2.5 pb-2">
+                  <div className="flex gap-1.5">
+                    <Input
+                      size="sm"
+                      aria-label="新增待办"
+                      placeholder="记一笔（如：用户反馈支付页白屏）"
+                      value={todoTitle}
+                      onValueChange={setTodoTitle}
+                      onKeyDown={(event) => { if (event.key === 'Enter') void addTodo(); }}
+                    />
+                    <Button size="sm" color="primary" isDisabled={!todoTitle.trim() || todoBusy} isLoading={todoBusy} onPress={() => void addTodo()}>记</Button>
+                  </div>
+                  <div className="max-h-56 space-y-0.5 overflow-y-auto">
+                    {(todos?.items || []).map((item) => (
+                      <div key={String(item.id)} className="flex items-start gap-2 rounded px-1 py-1 hover:bg-default-100">
+                        <Checkbox size="sm" aria-label={Boolean(item.done) ? '重开待办' : '完成待办'} isSelected={Boolean(item.done)} isDisabled={todoBusy} onValueChange={() => void toggleTodo(item)} />
+                        <div className="min-w-0 flex-1">
+                          <p className={`truncate text-sm ${item.done ? 'text-default-400 line-through' : ''}`}>{String(item.title)}</p>
+                          {!!item.note && <p className="truncate text-xs text-default-400">{String(item.note)}</p>}
+                        </div>
+                        <span className="shrink-0 text-[10px] text-default-400">{String(item.created_by || '')}</span>
+                      </div>
+                    ))}
+                    {todos && todos.items.length === 0 && <p className="py-3 text-center text-xs text-default-400">没有待办，用户反馈的 bug、待跟进的事都可以记在这里，全客服可见</p>}
+                  </div>
+                </div>
+              )}
+            </div>
             {canBatchSend && <div className="flex items-center justify-between gap-2">
               <Checkbox
                 size="sm"

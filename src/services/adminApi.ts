@@ -949,6 +949,24 @@ class AdminApiService {
         return response.data.data;
     }
 
+    async listCsTodos(): Promise<{ revision: number; items: Array<Record<string, unknown>>; todo_count: number }> {
+        const response = await this.api.get('/star/cs_todos');
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '获取待办失败');
+        return response.data.data;
+    }
+
+    async createCsTodo(data: { title: string; note?: string }): Promise<{ revision: number; item: Record<string, unknown> }> {
+        const response = await this.api.post('/star/cs_todos', data);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '新增待办失败');
+        return response.data.data;
+    }
+
+    async updateCsTodo(data: { id: number; revision: number; action?: 'delete' }): Promise<{ revision: number; item: Record<string, unknown> }> {
+        const response = await this.api.put('/star/cs_todos', data);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '更新待办失败');
+        return response.data.data;
+    }
+
     async dedupeCsKb(): Promise<{ scanned: number; clusters: number; merged: number; details: Array<Record<string, unknown>> }> {
         const response = await this.api.post('/star/cs_kb_dedupe', {});
         if (response.data.code !== 20000) throw new Error(response.data.msg || '清理重复知识失败');

@@ -602,7 +602,7 @@ export const SubscriptionTab: React.FC = () => {
           <button type="button" onClick={() => setShowSubscriptionGuide((p) => !p)} className="w-full flex items-center justify-between gap-4 text-left">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center"><Info className="w-4 h-4 text-primary" /></div>
-              <div><div className="font-semibold text-default-900">订阅说明</div><div className="text-sm text-default-500">购买前展开查看套餐购买相关规则(必读)</div></div>
+              <div><div className="font-semibold text-default-900">订阅说明</div><div className="text-sm text-default-500">购买前展开查看套餐购买相关规则(<span className="font-bold text-default-700">必读</span>)</div></div>
             </div>
             <ChevronDown className={`w-4 h-4 text-default-500 transition-transform ${showSubscriptionGuide ? 'rotate-180' : ''}`} />
           </button>

@@ -5,6 +5,8 @@
 
 html {
   scroll-behavior: smooth;
+  /* 恒留纵向滚动条槽位：内容高度变化时页面不再水平抖动 */
+  scrollbar-gutter: stable;
 }
 
 body {

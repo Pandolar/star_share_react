@@ -318,8 +318,8 @@ export const ProfileTab: React.FC = () => {
                 </div>
               </div>
 
-              {/* 账号管理：安全 / 财务资料 / 注销 折叠收纳，默认收起 */}
-              <div className="mt-4 border-t border-divider pt-3">
+              {/* 账号管理：安全 / 财务资料 / 注销 折叠收纳，默认收起；灰底与白卡分区 */}
+              <div className="mt-4 rounded-xl bg-default-50 p-3">
                 <button
                   type="button"
                   className="flex w-full items-center gap-2 py-1 text-left"
@@ -336,7 +336,7 @@ export const ProfileTab: React.FC = () => {
                   const billing = userInfo.preferences?.billing_profile;
                   const emailBound = Boolean(userInfo.email) && !userInfo.email.endsWith('@default.com');
                   return (
-                  <div className="mt-3 divide-y divide-default-100 rounded-lg border border-default-100">
+                  <div className="mt-3 divide-y divide-default-100 rounded-lg border border-default-100 bg-content1">
                     <ManageRow icon={<User size={15} />} label="用户名" status={userInfo.username} onPress={() => openEditModal('username')} />
                     <ManageRow icon={<Mail size={15} />} label="登录邮箱" status={emailBound ? '已绑定' : <span className="text-warning">未绑定</span>} onPress={() => openEditModal('email')} />
                     <ManageRow icon={<Shield size={15} />} label="登录密码" status="修改或邮箱重置" onPress={() => openEditModal('password')} />
