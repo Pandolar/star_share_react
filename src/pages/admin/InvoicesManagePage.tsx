@@ -108,6 +108,12 @@ const InvoicesManagePage: React.FC = () => {
   const issuableSelectedIds = useMemo(() => Array.from(selectedRows.values())
     .filter((record) => record.order_status === 'paid' && record.invoice_status === 'processing')
     .map((record) => record.id), [selectedRows]);
+  const cancellableSelectedIds = useMemo(() => Array.from(selectedRows.values())
+    .filter((record) => record.order_status === 'paid' && (record.invoice_status === 'pending_issue' || record.invoice_status === 'processing'))
+    .map((record) => record.id), [selectedRows]);
+  const [cancelTarget, setCancelTarget] = useState<InvoiceRecord | 'batch' | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelSaving, setCancelSaving] = useState(false);
 
   const queryParams = useCallback((): InvoiceQueryParams => ({
     current_page: page,
@@ -239,6 +245,37 @@ const InvoicesManagePage: React.FC = () => {
   };
 
 
+  const submitCancel = async () => {
+    if (!cancelTarget) return;
+    setCancelSaving(true);
+    try {
+      const reason = cancelReason.trim();
+      if (cancelTarget === 'batch') {
+        const response = await adminApiService.updateInvoiceStatuses(cancellableSelectedIds, 'cancelled', reason || undefined);
+        if (response.code !== 20000) throw new Error(response.msg || '批量取消开票失败');
+        const updatedCount = Number(response.data?.updated_count) || cancellableSelectedIds.length;
+        showToast(`已取消 ${updatedCount} 条开票申请`, 'success');
+        setSelectedRows((current) => {
+          const next = new Map(current);
+          cancellableSelectedIds.forEach((id) => next.delete(id));
+          return next;
+        });
+      } else {
+        const response = await adminApiService.updateInvoiceStatus(cancelTarget.id, 'cancelled', reason || undefined);
+        if (response.code !== 20000) throw new Error(response.msg || '取消开票失败');
+        showToast('已取消开票', 'success');
+        setSelectedRows((current) => { const next = new Map(current); next.delete(cancelTarget.id); return next; });
+      }
+      setCancelTarget(null);
+      setCancelReason('');
+      await load();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '取消开票失败', 'error');
+    } finally {
+      setCancelSaving(false);
+    }
+  };
+
   const exportCsv = async () => {
     setExporting(true);
     try {
@@ -298,6 +335,7 @@ const InvoicesManagePage: React.FC = () => {
         <div className="flex flex-wrap gap-2">
           {canUpdate && <Button color="primary" variant="flat" startContent={<PlayCircle size={16} />} onPress={batchStartProcessing} isLoading={batchUpdating} isDisabled={!processableSelectedIds.length}>批量开始开票{processableSelectedIds.length ? `（${processableSelectedIds.length}）` : ''}</Button>}
           {canUpdate && <Button color="success" variant="flat" onPress={batchMarkIssued} isLoading={batchUpdating} isDisabled={!issuableSelectedIds.length}>批量标记已开票{issuableSelectedIds.length ? `（${issuableSelectedIds.length}）` : ''}</Button>}
+          {canUpdate && <Button color="danger" variant="flat" onPress={() => { setCancelTarget('batch'); setCancelReason(''); }} isDisabled={!cancellableSelectedIds.length}>批量取消开票{cancellableSelectedIds.length ? `（${cancellableSelectedIds.length}）` : ''}</Button>}
           {canExport && <Button startContent={<Copy size={16} />} onPress={openCopy} isLoading={copying}>复制文本{selectedIds.length ? `（${selectedIds.length}）` : ''}</Button>}
           {canExport && <Button startContent={<Download size={16} />} onPress={exportCsv} isLoading={exporting}>导出{selectedIds.length ? `选中 ${selectedIds.length} 条` : '当前筛选'}</Button>}
         </div>
@@ -334,7 +372,7 @@ const InvoicesManagePage: React.FC = () => {
               <TableCell><div className="space-y-1 text-sm"><p>实付 ¥{record.paid_amount ?? record.payable_amount}</p><p className="text-default-500">{record.pricing_type === 'team' ? '席位原价' : '套餐原价'} ¥{record.original_amount ?? record.base_amount}</p>{Number(record.discount_amount || 0) > 0 && <p className="text-success">{record.pricing_type === 'team' ? '团队折扣' : `优惠码 ${record.promotion_code || ''}`}：-¥{Number(record.discount_amount).toFixed(2)}</p>}{Number(record.cashback_credit_amount || 0) > 0 && <p className="text-success">返现抵扣：-¥{Number(record.cashback_credit_amount).toFixed(2)}</p>}{Number(record.invoice_base_amount || 0) > 0 && <p className="text-default-500">开票计价基数 ¥{Number(record.invoice_base_amount).toFixed(2)}</p>}{Number(record.surcharge_amount || 0) > 0 && <p className="text-warning">开票加价 +¥{Number(record.surcharge_amount).toFixed(2)}</p>}</div></TableCell>
               <TableCell><Chip size="sm" color={record.invoice_status === 'issued' ? 'success' : record.invoice_status === 'processing' ? 'primary' : record.invoice_status === 'pending_issue' ? 'warning' : 'default'} variant="flat">{statusLabels[record.invoice_status]}</Chip></TableCell>
               <TableCell><div className="text-xs"><p>支付：{record.paid_at || '-'}</p><p>开票：{record.invoice_issued_at || '-'}</p>{record.invoice_status_history?.length ? <p className="text-default-500">最近流转：{record.invoice_status_history.at(-1)?.at}</p> : null}</div></TableCell>
-              <TableCell><div className="flex flex-wrap items-center gap-1.5">{canUpdate && record.order_status === 'paid' && record.invoice_status === 'pending_issue' ? <Button size="sm" color="primary" variant="flat" isLoading={updatingId === record.id} onPress={() => updateStatus(record, 'processing')}>开始开票</Button> : canUpdate && record.order_status === 'paid' && record.invoice_status === 'processing' ? <Button size="sm" color="success" isLoading={updatingId === record.id} onPress={() => updateStatus(record, 'issued')}>标记已开票</Button> : null}{canUpdate && (record.invoice_status === 'pending_issue' || record.invoice_status === 'processing') && <Button size="sm" variant="light" onPress={() => openAmountEditor(record)}>修改金额</Button>}{!(canUpdate && (record.invoice_status === 'pending_issue' || record.invoice_status === 'processing')) && '-'}</div></TableCell>
+              <TableCell><div className="flex flex-wrap items-center gap-1.5">{canUpdate && record.order_status === 'paid' && record.invoice_status === 'pending_issue' ? <Button size="sm" color="primary" variant="flat" isLoading={updatingId === record.id} onPress={() => updateStatus(record, 'processing')}>开始开票</Button> : canUpdate && record.order_status === 'paid' && record.invoice_status === 'processing' ? <Button size="sm" color="success" isLoading={updatingId === record.id} onPress={() => updateStatus(record, 'issued')}>标记已开票</Button> : null}{canUpdate && (record.invoice_status === 'pending_issue' || record.invoice_status === 'processing') && <Button size="sm" variant="light" onPress={() => openAmountEditor(record)}>修改金额</Button>}{canUpdate && record.order_status === 'paid' && (record.invoice_status === 'pending_issue' || record.invoice_status === 'processing') && <Button size="sm" color="danger" variant="light" isDisabled={updatingId === record.id} onPress={() => { setCancelTarget(record); setCancelReason(''); }}>取消开票</Button>}{!(canUpdate && (record.invoice_status === 'pending_issue' || record.invoice_status === 'processing')) && '-'}</div></TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -347,6 +385,24 @@ const InvoicesManagePage: React.FC = () => {
 
       <Modal isOpen={copyModal.isOpen} onClose={copyModal.onClose} size="4xl" scrollBehavior="inside">
         <ModalContent><ModalHeader>开票信息简版</ModalHeader><ModalBody><div className="space-y-2"><p className="text-sm text-default-500">开票信息简版，每条记录一行。</p><Textarea aria-label="开票信息简版文本" value={invoiceSummaryPreview} onValueChange={setInvoiceSummaryPreview} minRows={12} /></div></ModalBody><ModalFooter><Button variant="light" onPress={copyModal.onClose}>关闭</Button><Button color="primary" startContent={<Copy size={16} />} onPress={() => copyText(invoiceSummaryPreview, '开票信息简版已复制')}>复制开票信息</Button></ModalFooter></ModalContent>
+      </Modal>
+
+      <Modal isOpen={cancelTarget !== null} onOpenChange={(open) => { if (!open && !cancelSaving) { setCancelTarget(null); setCancelReason(''); } }} size="sm" placement="center">
+        <ModalContent>
+          <ModalHeader>确认取消开票</ModalHeader>
+          <ModalBody className="gap-3">
+            <p className="text-xs text-default-500">
+              {cancelTarget === 'batch'
+                ? `将取消选中的 ${cancellableSelectedIds.length} 条开票申请。取消后记录保留在列表中并标记为「已取消」，不可再进入开票流程；如需开票，请让用户重新申请。`
+                : `订单 ${cancelTarget?.order_id} · ${cancelTarget?.title}。取消后记录保留在列表中并标记为「已取消」，不可再进入开票流程；如需开票，请让用户重新申请。`}
+            </p>
+            <Textarea label="取消原因（选填，记入状态流转历史）" value={cancelReason} onValueChange={setCancelReason} minRows={2} placeholder="例：用户重复申请 / 抬头填写错误" />
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" isDisabled={cancelSaving} onPress={() => { setCancelTarget(null); setCancelReason(''); }}>返回</Button>
+            <Button color="danger" isLoading={cancelSaving} onPress={() => void submitCancel()}>确认取消开票</Button>
+          </ModalFooter>
+        </ModalContent>
       </Modal>
 
       <Modal isOpen={amountTarget !== null} onOpenChange={(open) => { if (!open && !amountSaving) setAmountTarget(null); }} size="sm" placement="center">

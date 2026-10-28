@@ -16,11 +16,12 @@ import {
   ModalFooter,
   ModalHeader,
   Pagination,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   Select,
   SelectItem,
   Spinner,
-  Tab,
-  Tabs,
   Tooltip,
   Textarea,
 } from '@heroui/react';
@@ -135,7 +136,6 @@ const CustomerServicePage: React.FC = () => {
   const [aiManagementOpen, setAiManagementOpen] = useState(false);
   // 跨客服共享轻量待办（存 star_config，30s 轮询）
   const [todos, setTodos] = useState<{ revision: number; items: Array<Record<string, unknown>>; todo_count: number } | null>(null);
-  const [todoOpen, setTodoOpen] = useState(false);
   const [todoTitle, setTodoTitle] = useState('');
   const [todoBusy, setTodoBusy] = useState(false);
   const loadTodos = useCallback(async () => {
@@ -834,6 +834,41 @@ const CustomerServicePage: React.FC = () => {
           返回后台
         </Button>
         {canManageAi && <Button size="sm" variant="flat" startContent={<ShieldCheck className="h-4 w-4" />} onPress={() => setAiManagementOpen((value) => !value)}>AI 管理</Button>}
+        <Popover placement="bottom-start" showArrow>
+          <PopoverTrigger>
+            <Button size="sm" variant="flat" startContent={<ListTodo className="h-4 w-4" />}>
+              待办{todos && todos.todo_count > 0 ? `（${todos.todo_count}）` : ''}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80 p-3">
+            <div className="space-y-2">
+              <div className="flex gap-1.5">
+                <Input
+                  size="sm"
+                  aria-label="新增待办"
+                  placeholder="记一笔（如：用户反馈支付页白屏）"
+                  value={todoTitle}
+                  onValueChange={setTodoTitle}
+                  onKeyDown={(event) => { if (event.key === 'Enter') void addTodo(); }}
+                />
+                <Button size="sm" color="primary" isDisabled={!todoTitle.trim() || todoBusy} isLoading={todoBusy} onPress={() => void addTodo()}>记</Button>
+              </div>
+              <div className="max-h-64 space-y-0.5 overflow-y-auto">
+                {(todos?.items || []).map((item) => (
+                  <div key={String(item.id)} className="flex items-start gap-2 rounded px-1 py-1 hover:bg-default-100">
+                    <Checkbox size="sm" aria-label={Boolean(item.done) ? '重开待办' : '完成待办'} isSelected={Boolean(item.done)} isDisabled={todoBusy} onValueChange={() => void toggleTodo(item)} />
+                    <div className="min-w-0 flex-1">
+                      <p className={`truncate text-sm ${item.done ? 'text-default-400 line-through' : ''}`}>{String(item.title)}</p>
+                      {!!item.note && <p className="truncate text-xs text-default-400">{String(item.note)}</p>}
+                    </div>
+                    <span className="shrink-0 text-[10px] text-default-400">{String(item.created_by || '')}</span>
+                  </div>
+                ))}
+                {todos && todos.items.length === 0 && <p className="py-3 text-center text-xs text-default-400">没有待办，用户反馈的 bug、待跟进的事都可以记在这里，全客服可见</p>}
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
         <div className="flex min-w-0 items-center gap-2">
           <Headphones className="h-5 w-5 shrink-0 text-primary" />
           <h1 className="truncate text-base font-bold">客服工作台</h1>
@@ -857,48 +892,46 @@ const CustomerServicePage: React.FC = () => {
       <div className={`${aiManagementOpen ? 'hidden' : 'grid'} min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden p-3 lg:grid-cols-[340px_minmax(0,1fr)] lg:p-4 xl:grid-cols-[340px_minmax(0,1fr)_320px]`}>
         <Card className={`${mobileChat ? 'hidden lg:block' : 'block'} min-h-0 overflow-hidden`}>
           <CardBody className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-3">
-            <div className="flex shrink-0 items-center justify-between gap-1">
-            <Tabs
-              selectedKey={filter}
-              onSelectionChange={(key) => {
-                const nextFilter = String(key);
-                if (nextFilter === filter) {
-                  void loadList();
-                  return;
-                }
-                setRows([]);
-                setTotal(0);
-                setFilter(nextFilter);
-                setPage(1);
-                setBatchSelection(new Set());
-              }}
-              aria-label="会话筛选"
-              size="sm"
-            >
+            <div className="flex shrink-0 items-center gap-1 overflow-x-auto pb-0.5">
               {FILTERS.map(([key, label]) => (
-                <Tab key={key} title={label} />
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    if (key === filter) { void loadList(); return; }
+                    setRows([]);
+                    setTotal(0);
+                    setFilter(key);
+                    setPage(1);
+                    setBatchSelection(new Set());
+                  }}
+                  className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-xs ${filter === key ? 'bg-primary text-white' : 'bg-default-100 text-default-600'}`}
+                >
+                  {label}
+                </button>
               ))}
-            </Tabs>
-              <div className="flex items-center gap-0.5">
-                <Tooltip content="刷新会话">
-                  <Button isIconOnly size="sm" variant="light" aria-label="刷新会话" isLoading={listLoading} onPress={() => void loadList()}><RefreshCw className="h-4 w-4" /></Button>
-                </Tooltip>
-              </div>
+              <span className="mx-0.5 h-4 w-px shrink-0 bg-default-200" />
+              <Select
+                size="sm"
+                aria-label="客服分组"
+                className="w-28 shrink-0"
+                selectedKeys={[groupId]}
+                onSelectionChange={(keys) => {
+                  setGroupId(String(Array.from(keys)[0]));
+                  setRows([]);
+                  setTotal(0);
+                  setPage(1);
+                }}
+              >
+                {[
+                  <SelectItem key="all">全部分组</SelectItem>,
+                  ...groups.map((group) => <SelectItem key={group.id}>{group.name}</SelectItem>),
+                ]}
+              </Select>
+              <Tooltip content="刷新会话">
+                <Button isIconOnly size="sm" variant="light" aria-label="刷新会话" isLoading={listLoading} onPress={() => void loadList()}><RefreshCw className="h-4 w-4" /></Button>
+              </Tooltip>
             </div>
-            <Tabs
-              selectedKey={groupId}
-              onSelectionChange={(key) => {
-                setGroupId(String(key));
-                setRows([]);
-                setTotal(0);
-                setPage(1);
-              }}
-              aria-label="客服分组"
-              size="sm"
-            >
-              <Tab key="all" title="全部分组" />
-              {groups.map((group) => <Tab key={group.id} title={group.name} />)}
-            </Tabs>
             <Input
               value={query}
               onValueChange={(value) => {
@@ -909,42 +942,6 @@ const CustomerServicePage: React.FC = () => {
               placeholder="搜索用户或消息"
               startContent={<Search className="h-4 w-4" />}
             />
-            <div className="shrink-0 rounded-lg border border-default-100 bg-default-50/60">
-              <button type="button" className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left" aria-expanded={todoOpen} onClick={() => setTodoOpen((value) => !value)}>
-                <ListTodo className="h-4 w-4 text-default-500" />
-                <span className="text-sm font-medium">共享待办</span>
-                {todos && todos.todo_count > 0 && <Chip size="sm" color="warning" variant="flat">{todos.todo_count}</Chip>}
-                <span className="ml-auto text-xs text-default-400">{todoOpen ? '收起' : '展开'}</span>
-              </button>
-              {todoOpen && (
-                <div className="space-y-1.5 px-2.5 pb-2">
-                  <div className="flex gap-1.5">
-                    <Input
-                      size="sm"
-                      aria-label="新增待办"
-                      placeholder="记一笔（如：用户反馈支付页白屏）"
-                      value={todoTitle}
-                      onValueChange={setTodoTitle}
-                      onKeyDown={(event) => { if (event.key === 'Enter') void addTodo(); }}
-                    />
-                    <Button size="sm" color="primary" isDisabled={!todoTitle.trim() || todoBusy} isLoading={todoBusy} onPress={() => void addTodo()}>记</Button>
-                  </div>
-                  <div className="max-h-56 space-y-0.5 overflow-y-auto">
-                    {(todos?.items || []).map((item) => (
-                      <div key={String(item.id)} className="flex items-start gap-2 rounded px-1 py-1 hover:bg-default-100">
-                        <Checkbox size="sm" aria-label={Boolean(item.done) ? '重开待办' : '完成待办'} isSelected={Boolean(item.done)} isDisabled={todoBusy} onValueChange={() => void toggleTodo(item)} />
-                        <div className="min-w-0 flex-1">
-                          <p className={`truncate text-sm ${item.done ? 'text-default-400 line-through' : ''}`}>{String(item.title)}</p>
-                          {!!item.note && <p className="truncate text-xs text-default-400">{String(item.note)}</p>}
-                        </div>
-                        <span className="shrink-0 text-[10px] text-default-400">{String(item.created_by || '')}</span>
-                      </div>
-                    ))}
-                    {todos && todos.items.length === 0 && <p className="py-3 text-center text-xs text-default-400">没有待办，用户反馈的 bug、待跟进的事都可以记在这里，全客服可见</p>}
-                  </div>
-                </div>
-              )}
-            </div>
             {canBatchSend && <div className="flex items-center justify-between gap-2">
               <Checkbox
                 size="sm"

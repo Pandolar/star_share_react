@@ -647,12 +647,12 @@ class AdminApiService {
         return response.data;
     }
 
-    async updateInvoiceStatus(id: number, invoice_status: 'processing' | 'issued', remarks?: string): Promise<AdminApiResponse> {
+    async updateInvoiceStatus(id: number, invoice_status: 'processing' | 'issued' | 'cancelled', remarks?: string): Promise<AdminApiResponse> {
         const response = await this.api.put('/star/invoices', { id, invoice_status, remarks });
         return response.data;
     }
 
-    async updateInvoiceStatuses(ids: number[], invoice_status: 'processing' | 'issued', remarks?: string): Promise<AdminApiResponse> {
+    async updateInvoiceStatuses(ids: number[], invoice_status: 'processing' | 'issued' | 'cancelled', remarks?: string): Promise<AdminApiResponse> {
         const response = await this.api.put('/star/invoices', { ids, invoice_status, remarks });
         return response.data;
     }
