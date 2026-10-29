@@ -317,6 +317,16 @@ class AdminApiService {
     }
 
 
+    async updateAdministratorRole(data: { code: string; name?: string; description?: string; permissions: string[]; revision: number }): Promise<AdminApiResponse<{ revision: number; sessions_revoked: number; affected_accounts: number }>> {
+        const response = await this.api.put('/star/admin/roles', data);
+        return response.data;
+    }
+
+    async resetAdministratorRole(data: { code: string; revision: number }): Promise<AdminApiResponse<{ revision: number; sessions_revoked: number; affected_accounts: number }>> {
+        const response = await this.api.put('/star/admin/roles', { ...data, reset: true });
+        return response.data;
+    }
+
     async getAdministratorPermissions(): Promise<AdminApiResponse<AdminPermission[]>> {
         const response = await this.api.get('/star/admin/permissions');
         return response.data;

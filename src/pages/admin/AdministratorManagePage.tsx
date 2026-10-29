@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   CardBody,
+  Checkbox,
   Chip,
   Divider,
   Dropdown,
@@ -58,7 +59,7 @@ const formatTime = (value?: string | null) => value ? new Date(value).toLocaleSt
 const errorMessage = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
 
 const AdministratorManagePage: React.FC = () => {
-  const { can } = useAdminAuth();
+  const { can, principal } = useAdminAuth();
   const [tab, setTab] = useState('accounts');
   const [accounts, setAccounts] = useState<AdministratorAccount[]>([]);
   const [roles, setRoles] = useState<AdminRole[]>([]);
@@ -74,6 +75,7 @@ const AdministratorManagePage: React.FC = () => {
 
   const accountModal = useDisclosure();
   const roleDetailModal = useDisclosure();
+  const roleEditModal = useDisclosure();
   const confirmModal = useDisclosure();
   const passwordModal = useDisclosure();
   const auditDetailModal = useDisclosure();
@@ -93,6 +95,61 @@ const AdministratorManagePage: React.FC = () => {
     () => new Map(permissions.map((permission) => [permission.permission_key, permission])),
     [permissions],
   );
+  const [roleEditForm, setRoleEditForm] = useState<{ name: string; description: string; permissions: Set<string> }>({ name: '', description: '', permissions: new Set() });
+  const [roleSaving, setRoleSaving] = useState(false);
+  const permissionGroups = useMemo(() => {
+    const groups = new Map<string, AdminPermission[]>();
+    for (const permission of permissions) {
+      const list = groups.get(permission.module) || [];
+      list.push(permission);
+      groups.set(permission.module, list);
+    }
+    return Array.from(groups.entries());
+  }, [permissions]);
+
+  const openRoleEdit = (role: AdminRole) => {
+    setSelectedRole(role);
+    setRoleEditForm({ name: role.name, description: role.description || '', permissions: new Set(role.permissions) });
+    roleEditModal.onOpen();
+  };
+
+  const saveRole = async () => {
+    if (!selectedRole) return;
+    setRoleSaving(true);
+    try {
+      const response = await adminApiService.updateAdministratorRole({
+        code: selectedRole.code,
+        name: roleEditForm.name.trim(),
+        description: roleEditForm.description.trim(),
+        permissions: Array.from(roleEditForm.permissions),
+        revision: selectedRole.revision,
+      });
+      if (response.code !== 20000) throw new Error(response.msg || '保存角色失败');
+      showToast(`角色权限已更新${response.data?.affected_accounts ? `，${response.data.affected_accounts} 个账号会话已吊销需重新登录` : ''}`, 'success');
+      roleEditModal.onClose();
+      await load();
+    } catch (error) {
+      showToast(errorMessage(error, '保存角色失败'), 'error');
+      if (errorMessage(error, '').includes('已被其他人修改')) await load();
+    } finally {
+      setRoleSaving(false);
+    }
+  };
+
+  const confirmResetRole = (role: AdminRole) => {
+    roleEditModal.onClose();
+    setConfirmAction({
+      title: `恢复「${role.name}」为默认权限`,
+      description: `将删除「${role.name}」的自定义覆盖并恢复为代码内置权限；该角色下 ${role.assigned_accounts} 个账号的会话会被吊销，需要重新登录。`,
+      run: async () => {
+        const response = await adminApiService.resetAdministratorRole({ code: role.code, revision: role.revision });
+        if (response.code !== 20000) throw new Error(response.msg || '恢复默认失败');
+        showToast('已恢复默认权限', 'success');
+        await load();
+      },
+    });
+    confirmModal.onOpen();
+  };
 
   const loadCatalog = useCallback(async () => {
     if (!can('administrator.role.read')) return;
@@ -424,7 +481,7 @@ const AdministratorManagePage: React.FC = () => {
 
       {tab === 'roles' && (
         <>
-          <Alert color="primary" variant="flat" title="角色固定为六个" description="角色及权限由代码统一维护，后台只能查看和给管理员分配，避免自定义规则长期漂移。" />
+          <Alert color="primary" variant="flat" title="角色与权限" description="固定六种角色。超级管理员可编辑每个角色的权限，改动立即生效并吊销该角色全部账号会话；任何修改都可一键恢复为代码默认。" />
           <Table aria-label="固定管理员角色列表">
             <TableHeader>
               <TableColumn>角色</TableColumn><TableColumn>权限数</TableColumn><TableColumn>已分配账号</TableColumn><TableColumn>权限详情</TableColumn>
@@ -432,15 +489,20 @@ const AdministratorManagePage: React.FC = () => {
             <TableBody isLoading={loading} loadingContent={<Spinner label="加载中" />} emptyContent="暂无角色">
               {roles.map((role) => (
                 <TableRow key={role.code}>
-                  <TableCell><div><div className="font-medium">{role.name}</div><p className="text-xs text-default-500">{role.code} · {role.description || '-'}</p></div></TableCell>
+                  <TableCell><div><div className="flex items-center gap-2 font-medium">{role.name}{role.customized && <Chip size="sm" color="warning" variant="flat">已自定义{role.updated_by ? ` · ${role.updated_by}` : ''}</Chip>}</div><p className="text-xs text-default-500">{role.code} · {role.description || '-'}</p></div></TableCell>
                   <TableCell>{role.permissions.length}</TableCell>
                   <TableCell>{role.assigned_accounts}</TableCell>
                   <TableCell>
-                    <Tooltip content="查看权限">
-                      <Button isIconOnly size="sm" variant="light" aria-label={`查看${role.name}权限`} onPress={() => { setSelectedRole(role); roleDetailModal.onOpen(); }}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </Tooltip>
+                    <div className="flex items-center gap-1">
+                      <Tooltip content="查看权限">
+                        <Button isIconOnly size="sm" variant="light" aria-label={`查看${role.name}权限`} onPress={() => { setSelectedRole(role); roleDetailModal.onOpen(); }}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </Tooltip>
+                      {principal?.is_superadmin && (
+                        <Button size="sm" variant="flat" onPress={() => openRoleEdit(role)}>编辑权限</Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -540,6 +602,59 @@ const AdministratorManagePage: React.FC = () => {
             </div>
           </ModalBody>
           <ModalFooter><Button color="primary" onPress={roleDetailModal.onClose}>关闭</Button></ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <Modal isOpen={roleEditModal.isOpen} onOpenChange={(open) => { if (!open && !roleSaving) roleEditModal.onClose(); }} size="4xl" scrollBehavior="inside">
+        <ModalContent>
+          <ModalHeader>编辑「{selectedRole?.name}」权限</ModalHeader>
+          <ModalBody className="gap-4">
+            <Alert color="warning" variant="flat" title="改动立即生效" description={`保存后「${selectedRole?.name}」下 ${selectedRole?.assigned_accounts || 0} 个账号的会话会被吊销并需重新登录。权限只允许从目录中选择，无法任意添加。`} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Input label="角色名称" value={roleEditForm.name} onValueChange={(value) => setRoleEditForm((form) => ({ ...form, name: value }))} maxLength={64} />
+              <Input label="角色说明" value={roleEditForm.description} onValueChange={(value) => setRoleEditForm((form) => ({ ...form, description: value }))} maxLength={255} />
+            </div>
+            <div className="space-y-3">
+              {permissionGroups.map(([module, group]) => {
+                const selectedCount = group.filter((permission) => roleEditForm.permissions.has(permission.permission_key)).length;
+                return (
+                  <div key={module} className="rounded-lg border border-default-100 p-3">
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="text-sm font-semibold">{module}</span>
+                      <span className="text-xs text-default-400">{selectedCount}/{group.length}</span>
+                      <Button size="sm" variant="light" className="ml-auto h-6 px-2 text-xs" onPress={() => setRoleEditForm((form) => ({ ...form, permissions: new Set([...Array.from(form.permissions), ...group.map((permission) => permission.permission_key)]) }))}>全选</Button>
+                      <Button size="sm" variant="light" className="h-6 px-2 text-xs" onPress={() => setRoleEditForm((form) => { const next = new Set(form.permissions); group.forEach((permission) => next.delete(permission.permission_key)); return { ...form, permissions: next }; })}>清空</Button>
+                    </div>
+                    <div className="grid gap-1.5 sm:grid-cols-2">
+                      {group.map((permission) => (
+                        <label key={permission.permission_key} className="flex cursor-pointer items-start gap-2 text-sm" title={permission.permission_key}>
+                          <Checkbox
+                            size="sm"
+                            isSelected={roleEditForm.permissions.has(permission.permission_key)}
+                            onValueChange={(checked) => setRoleEditForm((form) => {
+                              const next = new Set(form.permissions);
+                              if (checked) next.add(permission.permission_key); else next.delete(permission.permission_key);
+                              return { ...form, permissions: next };
+                            })}
+                          />
+                          <span className="min-w-0 flex-1">
+                            {permission.label}
+                            <span className="ml-1 text-xs text-default-400">{permission.description || permission.permission_key}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <span className="mr-auto text-xs text-default-500">已选 {roleEditForm.permissions.size} 项权限</span>
+            {selectedRole?.customized && <Button color="warning" variant="flat" isDisabled={roleSaving} onPress={() => selectedRole && confirmResetRole(selectedRole)}>恢复默认</Button>}
+            <Button variant="light" isDisabled={roleSaving} onPress={roleEditModal.onClose}>取消</Button>
+            <Button color="primary" isLoading={roleSaving} isDisabled={!roleEditForm.name.trim()} onPress={() => void saveRole()}>保存权限</Button>
+          </ModalFooter>
         </ModalContent>
       </Modal>
 

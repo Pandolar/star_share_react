@@ -47,6 +47,9 @@ export interface AdminRole extends AdminRoleSummary {
     sort_order: number;
     permissions: string[];
     assigned_accounts: number;
+    revision: number;
+    customized?: boolean;
+    updated_by?: string | null;
 }
 
 
