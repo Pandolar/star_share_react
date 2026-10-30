@@ -63,6 +63,8 @@ export interface CustomerServiceContextPanelProps {
   onOpenPaymentCard: (prefill?: PaymentCardPrefill) => void;
   /** 保存用户备注（仅内部可见，同一用户所有会话共用）。 */
   onUpdateUserRemark: (remark: string) => Promise<void>;
+  /** 发送站内消息后刷新聊天区（发送开票资料指引用）。 */
+  onRefreshMessages?: () => void;
   className?: string;
 }
 
@@ -70,7 +72,7 @@ export interface CustomerServiceContextPanelProps {
  * 客服工作台右侧上下文面板：用户资料与备注、权益、购买记录、补开发票与收款卡片入口。
  * 信息密度面向全职客服设计，高频操作就地完成，不打断聊天。
  */
-const CustomerServiceContextPanel: React.FC<CustomerServiceContextPanelProps> = ({ conversation, onOpenPaymentCard, onUpdateUserRemark, className }) => {
+const CustomerServiceContextPanel: React.FC<CustomerServiceContextPanelProps> = ({ conversation, onOpenPaymentCard, onUpdateUserRemark, onRefreshMessages, className }) => {
   const { can } = useAdminAuth();
   const canCreateInvoice = can('invoice.create');
   const canEditRemark = can('customer_service.conversation.manage');
@@ -85,6 +87,7 @@ const CustomerServiceContextPanel: React.FC<CustomerServiceContextPanelProps> = 
   const [invoiceEmail, setInvoiceEmail] = useState('');
   const [invoiceNotice, setInvoiceNotice] = useState(true);
   const [invoiceSaving, setInvoiceSaving] = useState(false);
+  const [guideSending, setGuideSending] = useState(false);
   const requestId = useRef(0);
 
   const load = useCallback(async (page: number, silent = false) => {
@@ -134,6 +137,26 @@ const CustomerServiceContextPanel: React.FC<CustomerServiceContextPanelProps> = 
     setInvoiceEmail(user.profile.email || '');
     setInvoiceNotice(true);
     setInvoiceOpen(true);
+  };
+
+  // 用户没填开票资料时，不再只给灰色按钮：一键把填写指引发到会话里，附直达深链。
+  const sendInvoiceGuide = async () => {
+    if (guideSending) return;
+    setGuideSending(true);
+    try {
+      const link = `${window.location.origin}/user-center?tab=profile&openEdit=billing_profile`;
+      await adminApiService.sendCsMessage({
+        conversation_id: conversation.id,
+        content: `您好，开具发票需要您先填写开票信息（发票抬头和税号）。\n请点击链接直接填写：${link}\n也可以在「个人主页 → 账号管理 → 开票主体」里填写。填好后回复我，我马上为您补开发票。`,
+        attachment_ids: [],
+      });
+      showToast('已把开票资料填写指引发送给用户', 'success');
+      onRefreshMessages?.();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '发送指引失败', 'error');
+    } finally {
+      setGuideSending(false);
+    }
   };
 
   const submitInvoice = async () => {
@@ -240,9 +263,9 @@ const CustomerServiceContextPanel: React.FC<CustomerServiceContextPanelProps> = 
                   补开发票
                 </Button>
               ) : (
-                <Tooltip content="需用户先在个人中心完善发票抬头">
-                  <Button size="sm" variant="flat" isDisabled startContent={<ReceiptText className="h-4 w-4" />}>
-                    补开发票
+                <Tooltip content="发送开票资料填写指引给用户，附直达填写链接">
+                  <Button size="sm" color="warning" variant="flat" isLoading={guideSending} startContent={<ReceiptText className="h-4 w-4" />} onPress={() => void sendInvoiceGuide()}>
+                    提示用户填开票资料
                   </Button>
                 </Tooltip>
               )

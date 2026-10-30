@@ -1151,6 +1151,7 @@ const CustomerServicePage: React.FC = () => {
                 onUpdateUserRemark={async (remark) => {
                   if (selected) await updateConversationFor(selected, { user_remark: remark });
                 }}
+                onRefreshMessages={() => void refreshMessages()}
                 className="h-full"
               />
             ) : (
