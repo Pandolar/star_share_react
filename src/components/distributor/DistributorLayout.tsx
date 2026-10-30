@@ -27,6 +27,7 @@ import {
     KeyRound,
     LogOut,
     Home,
+    Users,
 } from 'lucide-react';
 import distributorApiService from '../../services/distributorApi';
 import type { DistributorInfo } from '../../services/distributorApi';
@@ -61,10 +62,15 @@ const DistributorLayout: React.FC = () => {
 
     const currentTab = location.pathname.split('/').pop() || 'purchase';
 
+    const isSubAccount = Boolean(distributor?.parent_distributor_id);
+    const canUseCdk = distributor?.can_generate_cdk !== false && !isSubAccount;
     const menuItems = [
-        { key: 'purchase', label: '卡密采购', icon: <Ticket className="w-5 h-5" /> },
-        { key: 'cdks', label: '我的卡密', icon: <Copy className="w-5 h-5" /> },
+        ...(canUseCdk ? [
+            { key: 'purchase', label: '卡密采购', icon: <Ticket className="w-5 h-5" /> },
+            { key: 'cdks', label: '我的卡密', icon: <Copy className="w-5 h-5" /> },
+        ] : []),
         { key: 'sites', label: '站点经营', icon: <Store className="w-5 h-5" /> },
+        ...(!isSubAccount ? [{ key: 'sub-accounts', label: '二级代理', icon: <Users className="w-5 h-5" /> }] : []),
         { key: 'commissions', label: '佣金对账', icon: <ReceiptText className="w-5 h-5" /> },
         { key: 'security', label: '账号安全', icon: <KeyRound className="w-5 h-5" /> },
     ];

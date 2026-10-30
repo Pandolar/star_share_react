@@ -1,4 +1,4 @@
-export type SiteStatus = 'active' | 'paused';
+export type SiteStatus = 'active' | 'paused' | 'pending_approval';
 export type SiteBranding = 'white_label' | 'branded';
 export type SiteSalesMode = 'cdk' | 'online' | 'hybrid';
 export type SiteEditPermission = 'edit_branding' | 'edit_notice' | 'edit_features' | 'edit_prices' | 'edit_packages';

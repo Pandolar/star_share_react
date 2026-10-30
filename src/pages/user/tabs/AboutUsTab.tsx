@@ -34,7 +34,7 @@ const UptimeTicker: React.FC = () => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
-  return <p className="mt-6 border-t border-divider pt-4 text-center text-xs text-default-400">{formatUptime(now)}</p>;
+  return <p className="mt-6 border-t border-divider pt-4 text-center text-base font-medium text-default-500">{formatUptime(now)}</p>;
 };
 
 export const AboutUsTab: React.FC = () => {

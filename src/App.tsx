@@ -50,6 +50,7 @@ const DistributorProtectedRoute = lazyWithRetry(() => import('./components/distr
 const SitesManagePage = lazyWithRetry(() => import('./pages/admin/SitesManagePage'), 'SitesManagePage');
 const CommissionsManagePage = lazyWithRetry(() => import('./pages/admin/CommissionsManagePage'), 'CommissionsManagePage');
 const DistributorSitesPage = lazyWithRetry(() => import('./pages/distributor/DistributorSitesPage'), 'DistributorSitesPage');
+const DistributorSubAccountsPage = lazyWithRetry(() => import('./pages/distributor/DistributorSubAccountsPage'), 'DistributorSubAccountsPage');
 
 const RouteLoadingFallback: React.FC = () => (
   <div className="flex min-h-screen items-center justify-center bg-white px-4 text-sm text-default-500">
@@ -138,6 +139,7 @@ const App: React.FC = () => {
                       <Route path="purchase" element={<DistributorPurchasePage />} />
                       <Route path="cdks" element={<DistributorCdksPage />} />
                       <Route path="sites" element={<DistributorSitesPage />} />
+                      <Route path="sub-accounts" element={<DistributorSubAccountsPage />} />
                       <Route path="commissions" element={<DistributorCommissionsPage />} />
                       <Route path="security" element={<DistributorSecurityPage />} />
                     </Route>

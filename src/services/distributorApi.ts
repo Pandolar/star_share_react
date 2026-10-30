@@ -27,6 +27,8 @@ export interface DistributorInfo {
     expires_at?: string | null;
     discount_active?: boolean;
     permissions?: DistributorPermissions;
+    can_generate_cdk?: boolean;
+    parent_distributor_id?: number | null;
     created_at: string | null;
     updated_at: string | null;
 }
@@ -37,6 +39,36 @@ export interface DistributorInfo {
 export interface DistributorPermissions {
     can_login: boolean;
     can_generate_cdk: boolean;
+}
+
+export interface SubAccount {
+    id: number;
+    username: string;
+    status: number;
+    remarks: string | null;
+    created_at: string | null;
+    site_count: number;
+    pending_sites: number;
+}
+
+export interface SubCommissionConfig {
+    id: number;
+    child_id: number;
+    package_id: number | null;
+    mode: 'fixed' | 'parent_rate';
+    value: string;
+    revision: number;
+    updated_by: string | null;
+    updated_at: string | null;
+}
+
+export interface SubSiteApproval {
+    id: number;
+    name: string;
+    distributor_id: number;
+    branding: string;
+    domains: string[];
+    created_at: string | null;
 }
 
 /**
@@ -291,6 +323,53 @@ class DistributorApiService {
     /**
      * 登出当前设备
      */
+    // ==================== 二级代理（仅一级可用） ====================
+
+    async getSubAccounts(): Promise<DistributorApiResponse<SubAccount[]>> {
+        const response = await this.api.get('/sub_accounts');
+        return response.data;
+    }
+
+    async createSubAccount(data: { username: string; password: string; remarks?: string }): Promise<DistributorApiResponse<SubAccount>> {
+        const response = await this.api.post('/sub_accounts', data);
+        return response.data;
+    }
+
+    async updateSubAccountStatus(id: number, action: 'enable' | 'disable'): Promise<DistributorApiResponse<SubAccount>> {
+        const response = await this.api.put('/sub_accounts', { id, action });
+        return response.data;
+    }
+
+    async getSubCommissions(): Promise<DistributorApiResponse<SubCommissionConfig[]>> {
+        const response = await this.api.get('/sub_commissions');
+        return response.data;
+    }
+
+    async saveSubCommission(data: { child_id: number; package_id?: number | null; mode: 'fixed' | 'parent_rate'; value: string; revision: number }): Promise<DistributorApiResponse<SubCommissionConfig>> {
+        const response = await this.api.put('/sub_commissions', data);
+        return response.data;
+    }
+
+    async deleteSubCommission(data: { child_id: number; package_id?: number | null }): Promise<DistributorApiResponse> {
+        const response = await this.api.post('/sub_commissions', { ...data, action: 'delete' });
+        return response.data;
+    }
+
+    async getSubSiteApprovals(): Promise<DistributorApiResponse<SubSiteApproval[]>> {
+        const response = await this.api.get('/sub_site_approvals');
+        return response.data;
+    }
+
+    async reviewSubSite(id: number, action: 'approve' | 'reject'): Promise<DistributorApiResponse> {
+        const response = await this.api.post('/sub_site_approvals', { id, action });
+        return response.data;
+    }
+
+    async proposeSite(data: { name: string; domain: string }): Promise<DistributorApiResponse<{ id: number; status: string }>> {
+        const response = await this.api.post('/sites', data);
+        return response.data;
+    }
+
     async logout(): Promise<void> {
         try {
             await this.api.post('/logout');
