@@ -3,7 +3,8 @@ import { Alert, Button, Card, CardBody, Chip, Input, Modal, ModalBody, ModalCont
 import adminApiService from '../../services/adminApi';
 import { showToast } from '../../components/Toast';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
-import { toLocalDateTimeInput } from '../../utils/localDateTime';
+import { CsCommandPanel } from './CsCommandPanel';
+import { CsAiConnectionsPanel } from './CsAiConnectionsPanel';
 
 type Data = Record<string, unknown>;
 const object = (value: unknown): Data => value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Data : {};
@@ -136,10 +137,6 @@ export const CsAiManagementPanel: React.FC<Props> = ({ selectedConversationIds, 
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('all');
   const [mining, setMining] = useState<Data>({});
-  const [incident, setIncident] = useState<Data | null>(null);
-  const [incidentForm, setIncidentForm] = useState<Data>({ scope: 'matched', keywords: [], category_ids: [] });
-  const [incidentRevision, setIncidentRevision] = useState(0);
-  const [incidentHistory, setIncidentHistory] = useState<Data[]>([]);
   const [stats, setStats] = useState<Data>({});
   const [statsDays, setStatsDays] = useState(7);
   const [statsLoading, setStatsLoading] = useState(false);
@@ -153,20 +150,19 @@ export const CsAiManagementPanel: React.FC<Props> = ({ selectedConversationIds, 
   const [auditId, setAuditId] = useState('');
   const [auditComment, setAuditComment] = useState('');
   const kbRequestVersion = useRef(0);
+  const canReadConfig = can('customer_service.runtime_config.read');
+  const canReadConversation = can('customer_service.conversation.read');
   const loadKb = useCallback(async () => {
+    if (!canReadConversation) return;
     const version = ++kbRequestVersion.current;
     const result = await adminApiService.listCsKbCandidates({ current_page: page, page_size: 20, status: status === 'all' ? undefined : status });
     if (version === kbRequestVersion.current) { setKb(result.data); setKbTotal(result.total); }
-  }, [page, status]);
+  }, [canReadConversation, page, status]);
   const loadSettings = useCallback(async () => {
+    if (!canReadConfig) return;
     const value = await adminApiService.getCsAiConfig();
     setSettings(value); setAi(object(value.ai)); setLearning(object(value.learning)); setSla(object(value.sla)); setGroups(records(value.groups));
-  }, []);
-  const loadIncident = useCallback(async () => {
-    const value = await adminApiService.getCsIncident();
-    setIncident(value.active); setIncidentRevision(value.revision); setIncidentHistory(value.history);
-    if (value.active) setIncidentForm(value.active);
-  }, []);
+  }, [canReadConfig]);
   const refreshStats = async (days = statsDays) => {
     setStatsLoading(true);
     try { setStats(await adminApiService.getCsAiStats(days)); }
@@ -180,8 +176,14 @@ export const CsAiManagementPanel: React.FC<Props> = ({ selectedConversationIds, 
     catch (e) { setError(e instanceof Error ? e.message : '操作失败'); }
     finally { setBusy(false); }
   };
-  useEffect(() => { void run(async () => { await loadSettings(); await loadIncident(); setStats(await adminApiService.getCsAiStats()); }, ''); }, [loadSettings, loadIncident]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { void loadKb().catch((e: Error) => setError(e.message)); }, [loadKb]);
+  useEffect(() => {
+    if (!canReadConfig && !canReadConversation) return;
+    void run(async () => {
+      if (canReadConfig) await loadSettings();
+      if (canReadConversation) setStats(await adminApiService.getCsAiStats());
+    }, '');
+  }, [canReadConfig, canReadConversation, loadSettings]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (canReadConversation) void loadKb().catch((e: Error) => setError(e.message)); }, [canReadConversation, loadKb]);
   useEffect(() => {
     if (!can('customer_service.knowledge.manage')) return;
     let cancelled = false;
@@ -218,12 +220,19 @@ export const CsAiManagementPanel: React.FC<Props> = ({ selectedConversationIds, 
       closeKbEditor(); await loadKb();
     }, '已加入待审核');
   };
+  const publishedAi = object(settings.ai);
+  const strategyDirty = JSON.stringify(ai) !== JSON.stringify(publishedAi)
+    || JSON.stringify(learning) !== JSON.stringify(object(settings.learning))
+    || JSON.stringify(sla) !== JSON.stringify(object(settings.sla));
   return <div className="space-y-4">
     <div className="flex justify-between items-center"><h2 className="font-semibold">客服自动化与知识管理</h2>{onClose && <Button size="sm" onPress={onClose}>关闭</Button>}</div>
+    {!canReadConfig && <Alert color="warning" title="处理策略不可读" description="当前账号缺少“读取客服运行配置”权限；模型连接和已获授权的命令操作仍可使用。" />}
+    {!canReadConversation && <Alert color="warning" title="会话数据不可读" description="当前账号缺少“查看客服会话”权限；知识审核、统计和命令任务记录不会加载。" />}
     {error && <Alert color="danger" title={error} />}
     <Tabs aria-label="客服管理功能">
-      <Tab key="config" title="处理策略"><div className="mt-3 space-y-3">
-        <Alert color={ai.enabled ? 'success' : 'default'} title={ai.enabled ? `AI 代答已启用（${ai.mode === 'auto' ? '有证据自动发送' : '先生成建议，人工确认'}）` : '纯人工模式（默认，所有消息由客服处理）'} description={`外部依赖：${Object.entries(object(settings.integrations)).map(([key, value]) => `${({ chat: '代答', mining: '知识提炼', knowledge: '知识库', vision: '图片识别' } as Record<string, string>)[key] || key} ${value ? '已配置' : '未配置'}`).join(' · ')}。AI 只回复文本；用户发的图片/文件会先识别再交给模型，识别不了的直接转人工。`} />
+      <Tab key="config" title="处理策略">{!canReadConfig ? <div className="mt-3"><Alert color="warning" title="处理策略不可用" description="需要“读取客服运行配置”权限才能读取当前值并安全修改 AI 策略。" /></div> : <div className="mt-3 space-y-3">
+        <Alert color={publishedAi.enabled ? 'success' : 'default'} title={publishedAi.enabled ? `已生效：AI 代答（${publishedAi.mode === 'auto' ? '有依据时自动发送' : '先生成建议，人工确认'}）` : '已生效：人工模式，AI 代答关闭'} description={`外部依赖：${Object.entries(object(settings.integrations)).map(([key, value]) => `${({ chat: '对客回复', command: '指令理解', mining: '知识提炼', knowledge: '知识库', vision: '图片识别' } as Record<string, string>)[key] || key} ${value ? '已配置' : '未配置'}`).join(' · ')}。修改下方表单需要保存后才生效；保存失败会保留原运行设置。`} />
+        {strategyDirty && <p className="text-sm text-warning-700">表单有尚未保存的修改；上方显示的是当前已生效的策略。</p>}
         <Card><CardBody className="gap-3">
           <p className="text-sm font-semibold">第 1 步 · 打开需要的开关</p>
           <div className="grid gap-3 md:grid-cols-2">
@@ -269,8 +278,8 @@ export const CsAiManagementPanel: React.FC<Props> = ({ selectedConversationIds, 
           <div className="space-y-1"><NumberInput label="每会话每日 AI 调用上限" value={number(ai.max_daily_calls)} onValueChange={(value) => setAi({ ...ai, max_daily_calls: value })} isDisabled={!can('customer_service.ai.manage')} /><p className="text-xs text-default-500">防止异常会话无限消耗模型额度，超出后当天转人工。</p></div>
         </div></details>
         <details><summary className="text-sm">分组与分类路由</summary><div className="space-y-2 mt-2">{groups.map((group, index) => <div key={text(group.id)} className="grid grid-cols-3 gap-2"><Input label="分组ID" value={text(group.id)} isReadOnly /><Input label="名称" value={text(group.name)} onValueChange={(value) => setGroups(groups.map((g, i) => i === index ? { ...g, name: value } : g))} /><KeywordInput label="匹配分类ID" value={strings(group.category_ids)} onChange={(next) => setGroups(groups.map((g, i) => i === index ? { ...g, category_ids: next } : g))} /></div>)}<Button size="sm" onPress={() => setGroups([...groups, { id: `group_${Date.now()}`, name: '新分组', category_ids: [], enabled: true }])}>添加分组</Button></div></details>
-        <div className="flex gap-2"><Button color="primary" isDisabled={busy || !can('customer_service.ai.manage')} onPress={() => void run(async () => { const value = await adminApiService.updateCsAiConfig({ revision: settings.revision, ai, learning, sla, groups }); setSettings(value); setAi(object(value.ai)); }, '策略已保存')}>保存策略</Button><Button color="danger" variant="flat" isDisabled={busy || !can('customer_service.ai.manage')} onPress={() => void run(async () => { await adminApiService.stopCsAi(); await loadSettings(); })}>立即停止全部 AI</Button></div>
-      </div></Tab>
+        <div className="flex gap-2"><Button color="primary" isDisabled={busy || !can('customer_service.ai.manage')} onPress={() => void run(async () => { const value = await adminApiService.updateCsAiConfig({ revision: settings.revision, ai, learning, sla, groups }); setSettings(value); setAi(object(value.ai)); setLearning(object(value.learning)); setSla(object(value.sla)); }, '策略已保存')}>保存策略</Button><Button color="danger" variant="flat" isDisabled={busy || !can('customer_service.ai.manage')} onPress={() => void run(async () => { await adminApiService.stopCsAi(); await loadSettings(); })}>立即停止全部 AI</Button></div>
+      </div>}</Tab>
       <Tab key="knowledge" title="知识审核"><div className="space-y-3 mt-3">
         <Alert title="学习只生成候选，不自动批准" description="个人订单事实不能变成通用业务承诺；批准前核对来源与适用范围。" />
         <div className="flex flex-wrap gap-2"><Select label="状态" selectedKeys={[status]} onSelectionChange={(keys) => { setStatus(String(Array.from(keys)[0])); setPage(1); }}>{['all', 'pending', 'approved', 'indexing', 'synced', 'error', 'disabled', 'rejected'].map((key) => <SelectItem key={key}>{key}</SelectItem>)}</Select><Button isDisabled={busy || !can('customer_service.knowledge.manage')} onPress={() => void run(async () => { await adminApiService.mineCsKb({ conversation_ids: selectedConversationIds.length ? selectedConversationIds : undefined, limit: 100 }); setMining(await adminApiService.getCsMineProgress()); })}>{selectedConversationIds.length ? '学习已选已结束会话' : '学习历史（最多100个）'}</Button><Button color="primary" variant="flat" isDisabled={!can('customer_service.knowledge.manage')} onPress={() => openKbEditor(null)}>新增知识</Button><Button variant="flat" isDisabled={busy || !can('customer_service.knowledge.manage')} onPress={() => void run(async () => { const result = await adminApiService.dedupeCsKb(); showToast(result.merged > 0 ? `已合并 ${result.merged} 条重复问题（${result.clusters} 组），可在「已处理」里查看变体` : '没有发现重复问题', 'success'); await loadKb(); }, '')}>清理重复待审</Button></div>
@@ -301,38 +310,8 @@ export const CsAiManagementPanel: React.FC<Props> = ({ selectedConversationIds, 
           </ModalContent>
         </Modal>
       </div></Tab>
-      <Tab key="incident" title="事故话术"><div className="space-y-4 mt-3">
-        <Alert
-          color={incident ? 'warning' : 'default'}
-          title={incident ? `正在生效：${text(incident.title)}` : '当前没有生效中的事故话术'}
-          description="事故话术是临时应急公告：系统出故障时，先自动回复安抚用户、说明在处理，到点自动失效。平时不用管它，没有事故就不要开。"
-        />
-        <Card shadow="none" className="border border-divider"><CardBody className="gap-2 p-4">
-          <p className="text-sm font-semibold">生效后会发生什么？</p>
-          <ul className="list-disc space-y-1 pl-5 text-xs text-default-600">
-            <li>命中范围的新咨询会先收到你写的「用户公告」，然后正常排队等人工。</li>
-            <li>同一用户同一件事只发一次，不会刷屏；用户继续追问会转给人工，不会一直自动回复。</li>
-            <li>到达「到期时间」自动失效，不需要手动关；也可以随时点「结束事故」。</li>
-            <li>它不会自动关闭会话、不承诺退款补偿，只负责安抚和说明。</li>
-          </ul>
-        </CardBody></Card>
-        <Card shadow="none" className="border border-divider"><CardBody className="gap-3 p-4">
-          <p className="text-sm font-semibold">怎么填？</p>
-          <Input label="事故标题（内部看的名字）" placeholder="例：10月25日支付回调延迟" value={text(incidentForm.title)} onValueChange={(value) => setIncidentForm({ ...incidentForm, title: value })} description="只给客服和管理员看，用户看不到。" />
-          <Textarea label="用户公告（用户先看到的安抚话）" placeholder="例：我们现在支付到账有延迟，技术正在处理，您的订单不会丢，恢复后会自动到账，请稍等片刻。" value={text(incidentForm.announcement)} onValueChange={(value) => setIncidentForm({ ...incidentForm, announcement: value })} description="命中范围的用户发第一条消息时自动收到这段话。说人话、别承诺做不到的事。" />
-          <Textarea label="已核实回复话术（人工可直接用的标准答复）" placeholder="例：已确认是回调延迟导致，预计2小时内恢复；您的钱款安全，恢复后自动到账，无需重复支付。" value={text(incidentForm.canned_reply)} onValueChange={(value) => setIncidentForm({ ...incidentForm, canned_reply: value })} description="给客服参考的统一口径，也可批量补发给已经在问的用户。" />
-          <Select label="发给谁" selectedKeys={[text(incidentForm.scope) || 'matched']} onSelectionChange={(keys) => setIncidentForm({ ...incidentForm, scope: String(Array.from(keys)[0]) })} description="建议选“关键词匹配”，只发给真正受影响的人。">
-            <SelectItem key="matched">只发给提到关键词/分类的用户（推荐）</SelectItem>
-            <SelectItem key="all">全部新咨询（仅限大面积故障，慎用）</SelectItem>
-          </Select>
-          <KeywordInput label="关键词（逗号分隔）" value={strings(incidentForm.keywords)} onChange={(next) => setIncidentForm({ ...incidentForm, keywords: next })} description="用户消息里包含任意一个词就命中。例：支付失败,没到账,扣款了" />
-          <KeywordInput label="分类ID（逗号分隔，可留空）" value={strings(incidentForm.category_ids)} onChange={(next) => setIncidentForm({ ...incidentForm, category_ids: next })} description="按咨询分类匹配；不会填就留空，用关键词就够了。" />
-          <div className="space-y-1"><span className="block text-small text-foreground-500">到期时间（必填，最长7天）</span><Input type="datetime-local" aria-label="到期时间（必填，最长7天）" value={toLocalDateTimeInput(text(incidentForm.expires_at))} onValueChange={(value) => setIncidentForm({ ...incidentForm, expires_at: value })} description="到点自动失效。一般设为预计恢复时间再加半天。" /></div>
-        </CardBody></Card>
-        <div className="flex flex-wrap gap-2"><Button color="warning" isDisabled={busy || !can('customer_service.incident.manage')} onPress={() => void run(async () => { const value = await adminApiService.saveCsIncident({ ...incidentForm, expected_revision: incidentRevision }); setIncident(value.active); setIncidentRevision(value.revision); })}>发布 / 更新话术</Button><Button isDisabled={busy || !can('customer_service.incident.manage')} onPress={() => void run(async () => { await adminApiService.clearCsIncident(); await loadIncident(); })}>结束事故</Button>{(['reply', 'resolve'] as const).map((action) => <Button key={action} isDisabled={busy || !incident || !selectedConversationIds.length || !can('customer_service.incident.manage')} onPress={() => void run(async () => { await adminApiService.batchCsIncident({ conversation_ids: selectedConversationIds, action, client_msg_id: `incident-${Date.now()}` }); })}>{action === 'reply' ? '向所选事故会话补发' : '人工确认所选事故会话已解决'}</Button>)}</div>
-        <p className="text-xs text-default-400">批量按钮配合左侧会话列表的勾选使用：「补发」给已经在问的用户补发话术；「确认已解决」在恢复后批量标记。</p>
-        <details><summary>事故历史</summary>{incidentHistory.map((item) => <p key={text(item.id)} className="text-sm">{text(item.title)} · {text(item.ended_at)}</p>)}</details>
-      </div></Tab>
+      <Tab key="command" title="命令中心"><CsCommandPanel selectedConversationIds={selectedConversationIds} /></Tab>
+      <Tab key="connections" title="模型连接"><CsAiConnectionsPanel /></Tab>
       <Tab key="audit" title="统计质检"><div className="space-y-4 mt-3">
         <div className="flex flex-wrap items-center gap-2">
           <Select size="sm" label="统计周期" className="w-36" selectedKeys={[String(statsDays)]} onSelectionChange={(keys) => { const next = Number(Array.from(keys)[0] || 7); setStatsDays(next); void refreshStats(next); }}>

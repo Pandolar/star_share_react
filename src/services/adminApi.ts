@@ -995,29 +995,6 @@ class AdminApiService {
         return response.data.data;
     }
 
-    async getCsIncident(): Promise<{ active: Record<string, unknown> | null; history: Array<Record<string, unknown>>; revision: number }> {
-        const response = await this.api.get('/star/cs_incident');
-        if (response.data.code !== 20000) throw new Error(response.data.msg || '获取事件公告失败');
-        return response.data.data;
-    }
-
-    async saveCsIncident(data: Record<string, unknown>): Promise<{ active: Record<string, unknown> | null; history: Array<Record<string, unknown>>; revision: number }> {
-        const response = await this.api.post('/star/cs_incident', data);
-        if (response.data.code !== 20000) throw new Error(response.data.msg || '保存事件公告失败');
-        return response.data.data;
-    }
-
-    async clearCsIncident(): Promise<{ active: Record<string, unknown> | null; history: Array<Record<string, unknown>>; revision: number }> {
-        const response = await this.api.delete('/star/cs_incident');
-        if (response.data.code !== 20000) throw new Error(response.data.msg || '结束事件公告失败');
-        return response.data.data;
-    }
-
-    async batchCsIncident(data: { conversation_ids: number[]; action: 'reply' | 'resolve'; client_msg_id: string }): Promise<{ count: number }> {
-        const response = await this.api.post('/star/cs_incident/batch', data);
-        if (response.data.code !== 20000) throw new Error(response.data.msg || '批量事件操作失败');
-        return response.data.data;
-    }
 
     async postCsAiAudit(data: { message_id: number; score: 'correct' | 'incorrect' | 'tone'; comment?: string }): Promise<void> {
         const response = await this.api.post('/star/cs_ai_audit', data);
