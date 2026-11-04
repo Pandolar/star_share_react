@@ -16,6 +16,7 @@ const SubAccountsPage: React.FC = () => {
   const [packages, setPackages] = useState<DistributorPackage[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   const createModal = useDisclosure();
   const configModal = useDisclosure();
   const [form, setForm] = useState({ username: '', password: '', remarks: '' });
@@ -23,6 +24,7 @@ const SubAccountsPage: React.FC = () => {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError('');
     try {
       const [accountsRes, configsRes, approvalsRes, packagesRes] = await Promise.all([
         distributorApiService.getSubAccounts(),
@@ -30,10 +32,15 @@ const SubAccountsPage: React.FC = () => {
         distributorApiService.getSubSiteApprovals(),
         distributorApiService.getPackages(),
       ]);
-      if (accountsRes.code === 20000) setAccounts(accountsRes.data || []);
-      if (configsRes.code === 20000) setConfigs(configsRes.data || []);
-      if (approvalsRes.code === 20000) setApprovals(approvalsRes.data || []);
-      if (packagesRes.code === 20000) setPackages(packagesRes.data || []);
+      for (const response of [accountsRes, configsRes, approvalsRes, packagesRes]) {
+        if (response.code !== 20000) throw new Error(response.msg || '二级代理配置加载失败');
+      }
+      setAccounts(accountsRes.data || []);
+      setConfigs(configsRes.data || []);
+      setApprovals(approvalsRes.data || []);
+      setPackages(packagesRes.data || []);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '二级代理配置加载失败');
     } finally {
       setLoading(false);
     }
@@ -94,26 +101,46 @@ const SubAccountsPage: React.FC = () => {
   };
 
   const openConfigEditor = (childId: number, existing?: SubCommissionConfig) => {
+    const config = existing || configs.find((row) => row.child_id === childId && row.package_id === null);
     setConfigForm({
       child_id: childId,
-      package_id: existing?.package_id ?? null,
-      mode: existing?.mode || 'fixed',
-      value: existing ? String(existing.value) : '',
-      revision: existing?.revision ?? 0,
-      id: existing?.id ?? null,
+      package_id: config?.package_id ?? null,
+      mode: config?.mode || 'fixed',
+      value: config ? String(config.mode === 'parent_rate' ? Number(config.value) * 100 : config.value) : '',
+      revision: config?.revision ?? 0,
+      id: config?.id ?? null,
     });
     configModal.onOpen();
   };
 
+  const selectConfigPackage = (packageId: number | null) => {
+    const config = configs.find((row) => row.child_id === configForm.child_id && row.package_id === packageId);
+    setConfigForm((current) => ({
+      ...current, package_id: packageId,
+      mode: config?.mode || current.mode,
+      value: config ? String(config.mode === 'parent_rate' ? Number(config.value) * 100 : config.value) : '',
+      revision: config?.revision ?? 0, id: config?.id ?? null,
+    }));
+  };
+
+  const configValue = Number(configForm.value);
+  const configValid = Boolean(configForm.value.trim()) && Number.isFinite(configValue)
+    && (configForm.mode === 'fixed' ? configValue >= 0 && configValue <= 100000 : configValue > 0 && configValue <= 100);
+  const exampleChildShare = configValid ? Math.min(50, configForm.mode === 'fixed' ? configValue : 50 * configValue / 100) : 0;
+
   const saveConfig = async () => {
     if (configForm.child_id === null) return;
+    if (!configValid) {
+      showToast(configForm.mode === 'fixed' ? '固定金额需在 0-100000 元之间' : '分佣比例需大于 0% 且不超过 100%', 'warning');
+      return;
+    }
     setBusy(true);
     try {
       const response = await distributorApiService.saveSubCommission({
         child_id: configForm.child_id,
         package_id: configForm.package_id,
         mode: configForm.mode,
-        value: configForm.value.trim(),
+        value: configForm.mode === 'parent_rate' ? String(configValue / 100) : configForm.value.trim(),
         revision: configForm.revision,
       });
       if (response.code !== 20000) throw new Error(response.msg || '保存失败');
@@ -158,7 +185,8 @@ const SubAccountsPage: React.FC = () => {
         </div>
       </div>
 
-      <Alert variant="flat" color="primary" title="分佣怎么算" description="每个有效支付订单先算你的佣金，再按配置切一部分给二级：固定金额（每件多少元）或按你佣金的比例。二级份额永不超过你的佣金；CDK、返现抵扣、开票加价不参与分佣。修改配置只影响之后的新订单。" />
+      <Alert variant="flat" color="primary" title="从你的佣金中分配给二级" description="例如一笔订单总佣金为 ¥50，给二级 ¥30（或总佣金的 60%），你实得 ¥20。比例最高 100%；固定金额超过该笔总佣金时，以总佣金封顶，不会倒扣你的钱。指定套餐规则优先于默认规则，只影响之后的新订单。" />
+      {error && <Alert color="danger" title="配置加载失败" description={error} endContent={<Button size="sm" variant="flat" onPress={() => void load()}>重试</Button>} />}
 
       {approvals.length > 0 && (
         <Card className="border-warning-200"><CardBody className="gap-3">
@@ -191,7 +219,7 @@ const SubAccountsPage: React.FC = () => {
                 <TableCell className="text-xs text-default-500">{account.created_at?.slice(0, 10) || '-'}</TableCell>
                 <TableCell>
                   <div className="flex gap-1.5">
-                    <Button size="sm" variant="flat" onPress={() => openConfigEditor(account.id)}>分佣配置</Button>
+                    <Button size="sm" variant="flat" isDisabled={loading || Boolean(error)} onPress={() => openConfigEditor(account.id)}>分佣配置</Button>
                     <Button size="sm" color={account.status === 1 ? 'danger' : 'success'} variant="flat" isDisabled={busy} onPress={() => void toggleAccount(account)}>{account.status === 1 ? '禁用' : '启用'}</Button>
                   </div>
                 </TableCell>
@@ -212,8 +240,8 @@ const SubAccountsPage: React.FC = () => {
               <TableRow key={config.id}>
                 <TableCell>{childName(config.child_id)}</TableCell>
                 <TableCell>{packageName(config.package_id)}</TableCell>
-                <TableCell><Chip size="sm" variant="flat">{config.mode === 'fixed' ? '固定金额/件' : '按佣金比例'}</Chip></TableCell>
-                <TableCell>{config.mode === 'fixed' ? `¥${config.value}` : `${(Number(config.value) * 100).toFixed(0)}%`}</TableCell>
+                <TableCell><Chip size="sm" variant="flat">{config.mode === 'fixed' ? '固定金额/单' : '按一级总佣金比例'}</Chip></TableCell>
+                <TableCell>{config.mode === 'fixed' ? `¥${Number(config.value).toFixed(2)}` : `${Number((Number(config.value) * 100).toFixed(4))}%`}</TableCell>
                 <TableCell>
                   <div className="flex gap-1.5">
                     <Button size="sm" variant="light" onPress={() => openConfigEditor(config.child_id, config)}>编辑</Button>
@@ -245,28 +273,33 @@ const SubAccountsPage: React.FC = () => {
         <ModalContent>
           <ModalHeader>分佣配置 · {configForm.child_id !== null ? childName(configForm.child_id) : ''}</ModalHeader>
           <ModalBody className="gap-3">
-            <Select label="套餐" selectedKeys={[String(configForm.package_id ?? 'all')]} onSelectionChange={(keys) => setConfigForm((current) => ({ ...current, package_id: String(Array.from(keys)[0]) === 'all' ? null : Number(Array.from(keys)[0]) }))}>
+            <Select label="套餐" selectedKeys={[String(configForm.package_id ?? 'all')]} isDisabled={busy} onSelectionChange={(keys) => { const key = Array.from(keys)[0]; if (key !== undefined) selectConfigPackage(String(key) === 'all' ? null : Number(key)); }}>
               {[
                 <SelectItem key="all">全部套餐（默认）</SelectItem>,
                 ...packages.map((item) => <SelectItem key={String(item.package_id)}>{item.package_name}</SelectItem>),
               ]}
             </Select>
-            <Select label="分佣方式" selectedKeys={[configForm.mode]} onSelectionChange={(keys) => setConfigForm((current) => ({ ...current, mode: String(Array.from(keys)[0]) as 'fixed' | 'parent_rate' }))}>
-              <SelectItem key="fixed">固定金额（每件多少元）</SelectItem>
-              <SelectItem key="parent_rate">按我佣金的比例</SelectItem>
+            <Select label="分佣方式" selectedKeys={[configForm.mode]} isDisabled={busy} onSelectionChange={(keys) => { const mode = Array.from(keys)[0]; if (mode) setConfigForm((current) => ({ ...current, mode: String(mode) as 'fixed' | 'parent_rate', value: '' })); }}>
+              <SelectItem key="fixed">固定金额（每笔订单）</SelectItem>
+              <SelectItem key="parent_rate">按一级总佣金的比例</SelectItem>
             </Select>
             <Input
-              label={configForm.mode === 'fixed' ? '每件给二级多少元' : '给二级我佣金的比例（0-1，如 0.5 = 一半）'}
+              label={configForm.mode === 'fixed' ? '每笔订单分给二级（元）' : '分给二级的比例（%）'}
               type="number"
+              min={0}
+              max={configForm.mode === 'fixed' ? 100000 : 100}
+              step={configForm.mode === 'fixed' ? '0.01' : '0.0001'}
+              isDisabled={busy}
               value={configForm.value}
               onValueChange={(value) => setConfigForm((current) => ({ ...current, value }))}
               isRequired
-              description="二级份额永不超过你的佣金；只影响之后的新订单"
+              description={configForm.mode === 'fixed' ? '实际二级佣金以该笔总佣金封顶；0 表示不分配。' : '填写 60 表示将一级总佣金的 60% 分给二级，上限为 100%。'}
             />
+            {configValid && <p className="text-sm text-default-600">以一笔总佣金 ¥50 为例：二级 ¥{exampleChildShare.toFixed(2)}，你实得 ¥{(50 - exampleChildShare).toFixed(2)}。</p>}
           </ModalBody>
           <ModalFooter>
             <Button variant="light" onPress={configModal.onClose}>取消</Button>
-            <Button color="primary" isLoading={busy} isDisabled={!configForm.value.trim()} onPress={() => void saveConfig()}>保存</Button>
+            <Button color="primary" isLoading={busy} isDisabled={!configValid || Boolean(error)} onPress={() => void saveConfig()}>保存</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

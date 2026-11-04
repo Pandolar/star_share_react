@@ -735,7 +735,7 @@ export const SubscriptionTab: React.FC = () => {
                       <div className="package-price">
                         {showMonthlyPrice ? (
                           <>
-                            <div className="price-main"><span className="price-amount">≈¥{monthlyPrice}</span><span className="price-unit">/ 月</span></div>
+                            <div className="price-main"><span className="price-amount">≈¥{monthlyPrice}</span><span className="price-unit">/ 30天</span></div>
                             <p className="price-daily">共 ¥{pkg.price} / {getDurationText(pkg.duration)}</p>
                           </>
                         ) : <div className="price-main"><span className="price-amount">¥{pkg.price}</span><span className="price-unit">/ {getDurationText(pkg.duration)}</span></div>}
@@ -788,7 +788,7 @@ export const SubscriptionTab: React.FC = () => {
                     </div>
                     {canPurchaseOnline && (
                       <div className="package-price" style={{ margin: '16px 0' }}>
-                        {showMonthlyPrice ? <><div className="price-main"><span className="price-amount" style={{ fontSize: '28px' }}>≈¥{monthlyPrice}</span><span className="price-unit">/ 月</span></div><p className="price-daily">共 ¥{pkg.price} / {getDurationText(pkg.duration)}</p></> : <div className="price-main"><span className="price-amount" style={{ fontSize: '28px' }}>¥{pkg.price}</span><span className="price-unit">/ {getDurationText(pkg.duration)}</span></div>}
+                        {showMonthlyPrice ? <><div className="price-main"><span className="price-amount" style={{ fontSize: '28px' }}>≈¥{monthlyPrice}</span><span className="price-unit">/ 30天</span></div><p className="price-daily">共 ¥{pkg.price} / {getDurationText(pkg.duration)}</p></> : <div className="price-main"><span className="price-amount" style={{ fontSize: '28px' }}>¥{pkg.price}</span><span className="price-unit">/ {getDurationText(pkg.duration)}</span></div>}
                       </div>
                     )}
                     <div className="package-description" style={{ margin: '12px 0 20px 0' }}><div className="description-box" style={{ minHeight: '60px', padding: '12px' }}><p className="description-text" style={{ fontSize: '13px' }}>{pkg.introduce || '暂无详细描述'}</p></div></div>

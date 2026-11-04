@@ -3,6 +3,7 @@ import { Alert, Button, Card, CardBody, Chip, Input, Modal, ModalBody, ModalCont
 import type { DistributorSite, SiteEditPermission } from '../../types/site';
 import { siteFeatureLabels, sitePermissionLabels } from '../../types/site';
 import { UserMarkdown } from '../UserMarkdown';
+import AdminDistributorSelect from './AdminDistributorSelect';
 
 interface Props {
   site: DistributorSite;
@@ -14,7 +15,7 @@ interface Props {
 }
 
 const fieldLabels: Record<string, string> = {
-  name: '站点名称', distributor_id: '所属代理', status: '经营状态', branding: '品牌展示', sales_mode: '销售方式',
+  name: '站点名称', distributor_id: '所属代理', remarks: '内部备注', status: '经营状态', branding: '品牌展示', sales_mode: '销售方式',
   domains: '域名', logo_url: 'Logo', customer_service_url: '客服链接', notice_mode: '公告来源', notice: '公告内容',
   features: '站点功能', feature_limits: '功能许可', permissions: '编辑权限', commission_enabled: '计佣开关',
   commission_mode: '佣金方式', commission_rate: '佣金比例', allow_reward_stacking: '邀请奖励叠加',
@@ -30,7 +31,7 @@ export default function SiteEditor({ site, distributor = false, canManage = true
   // 旧后端不返回 commission_mode：既不渲染选择器，也绝不把它放进保存载荷。
   const modeSupported = site.commission_mode === 'rate' || site.commission_mode === 'margin';
   const changed: Partial<DistributorSite> = {};
-  const keys: Array<keyof DistributorSite> = ['name', 'status', 'distributor_id', 'branding', 'sales_mode', 'logo_url', 'customer_service_url', 'notice_mode', 'notice', 'features', 'feature_limits', 'permissions', 'commission_enabled', 'commission_rate', 'allow_reward_stacking'];
+  const keys: Array<keyof DistributorSite> = ['name', 'status', 'distributor_id', 'remarks', 'branding', 'sales_mode', 'logo_url', 'customer_service_url', 'notice_mode', 'notice', 'features', 'feature_limits', 'permissions', 'commission_enabled', 'commission_rate', 'allow_reward_stacking'];
   if (modeSupported) keys.push('commission_mode');
   for (const key of keys) {
     if (JSON.stringify(draft[key]) !== JSON.stringify(site[key])) Object.assign(changed, { [key]: draft[key] });
@@ -54,7 +55,8 @@ export default function SiteEditor({ site, distributor = false, canManage = true
         <Input label="客服地址" placeholder="留空使用已启用的内置客服" value={draft.customer_service_url || ''} isReadOnly={!allowed('edit_branding')} onValueChange={(customer_service_url) => patch({ customer_service_url })} />
         <Select label="销售方式" selectedKeys={[draft.sales_mode]} isDisabled={distributor || !canManage} onChange={(event) => patch({ sales_mode: event.target.value as DistributorSite['sales_mode'] })}><SelectItem key="cdk">纯 CDK 兑换</SelectItem><SelectItem key="online">在线购买与续费</SelectItem><SelectItem key="hybrid">在线购买＋CDK</SelectItem></Select>
         <Select label="经营状态" selectedKeys={[draft.status]} isDisabled={distributor || !canManage} onChange={(event) => patch({ status: event.target.value as DistributorSite['status'] })}><SelectItem key="active">正常经营</SelectItem><SelectItem key="paused">暂停新销售</SelectItem></Select>
-        {!distributor && <Input label="所属代理 ID" type="number" value={draft.distributor_id?.toString() || ''} isReadOnly={!canFinancial} description="留空为未分配站点；更改归属不改变历史订单。" onValueChange={(value) => patch({ distributor_id: value ? Number(value) : null })} />}
+        {!distributor && <AdminDistributorSelect value={draft.distributor_id} isDisabled={!canFinancial} onChange={(distributor_id) => patch({ distributor_id })} />}
+        {!distributor && <Textarea label="内部备注" value={draft.remarks || ''} maxLength={2000} minRows={3} isReadOnly={!canManage} onValueChange={(remarks) => patch({ remarks })} description="仅管理员可见，不会展示给代理或客户。" />}
         {!distributor && <Textarea label="访问域名" value={domainText} onValueChange={setDomainText} isReadOnly={!canManage} description="每行一个已配置好的域名；本功能不修改 DNS 或网关。" />}
         <Alert className="md:col-span-2" color="default" title="账号与权益保持共享" description="站点控制展示和新交易，不限制用户跨站登录。暂停销售不会撤销已购权益或已有有效卡密。代理站不提供跨节点测速跳转。" />
       </CardBody></Card></Tab>

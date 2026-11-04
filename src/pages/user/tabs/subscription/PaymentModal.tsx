@@ -425,7 +425,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         <ModalHeader className="flex items-start justify-between gap-3 pr-12">
           <div>
             <h2 className="text-xl font-bold">完成支付</h2>
-            {selectedPackage && <p className="mt-1 text-sm text-default-500">{selectedPackage.package_name}</p>}
+            {selectedPackage && <p className="mt-1 text-sm text-default-500">{selectedPackage.package_name} · {getDurationText(selectedPackage.duration)}</p>}
           </div>
           {enablePromotionCode && paymentStatus === 'pending' && !qrCodeExpired && (
             <Button

@@ -87,14 +87,8 @@ export const categorizePackage = (duration: number): SubscriptionType => {
   return 'more';
 };
 
-/** 时长文案 */
-export const getDurationText = (duration: number) => {
-  if (duration === 7) return '1周';
-  if (duration >= 30 && duration <= 31) return '1个月';
-  if (duration >= 90 && duration <= 93) return '1季度';
-  if (duration >= 364 && duration <= 366) return '1年';
-  return `${duration}天`;
-};
+/** 按实际天数展示，避免被理解为自然月、季度或年。 */
+export const getDurationText = (duration: number) => `${duration}天`;
 
 /** 日均价格（保留 1 位小数，四舍五入） */
 export const calculateDailyPrice = (price: number, duration: number): string => {

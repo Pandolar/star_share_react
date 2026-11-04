@@ -5,6 +5,13 @@ export type SiteEditPermission = 'edit_branding' | 'edit_notice' | 'edit_feature
 export type SiteCommissionMode = 'rate' | 'margin';
 export interface SiteDomainRule { hostname: string; include_subdomains: boolean; }
 export type SitePermissions = Partial<Record<SiteEditPermission, boolean>>;
+export interface DistributorOption {
+  id: number;
+  username: string;
+  status: number;
+  parent_distributor_id: number | null;
+}
+
 export interface DistributorSite {
   id: number;
   distributor_id: number | null;
@@ -28,6 +35,7 @@ export interface DistributorSite {
   commission_mode: SiteCommissionMode;
   commission_rate: string;
   allow_reward_stacking: boolean;
+  remarks?: string;
   revision: number;
   created_at?: string;
   updated_at?: string;
@@ -76,6 +84,9 @@ export interface SiteOrder {
   order_id: string;
   site_id: number | null;
   distributor_id: number | null;
+  seller_distributor_id?: number | null;
+  seller_distributor_username?: string | null;
+  seller_is_sub_distributor?: boolean;
   source_domain: string | null;
   status: string;
   paid_amount: string;
@@ -96,7 +107,7 @@ export interface CommissionLedger {
   order_id: number;
   site_id: number;
   distributor_id: number;
-  kind: 'accrual' | 'refund';
+  kind: 'accrual' | 'refund' | 'sub_accrual' | 'sub_refund';
   amount: string;
   basis_amount: string;
   refund_amount: string;
@@ -113,6 +124,7 @@ export interface CommissionSummary {
   site_id: number | null;
   sales_order_count: number;
   sales_amount: string;
+  sales_scope: 'self' | 'self_and_direct_children' | null;
   opening_net_commission: string;
   period_commission: string;
   period_refund_commission: string;
