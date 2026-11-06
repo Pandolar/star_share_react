@@ -19,4 +19,5 @@ class CsKnowledgeApi {
  async dedupe() { return unwrap((await this.client.post<Response<unknown>>('/star/cs_kb_dedupe',{})).data); }
  async mine(data:Record<string,unknown>={}) { return unwrap((await this.client.post<Response<unknown>>('/star/cs_kb_mine',data)).data); }
 }
-export default new CsKnowledgeApi();
+const csKnowledgeApi = new CsKnowledgeApi();
+export default csKnowledgeApi;
