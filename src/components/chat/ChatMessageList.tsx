@@ -21,6 +21,7 @@ export interface ChatMessageListProps {
   recallWindowMinutes?: number;
   onRecall?: (message: ChatMessage) => void;
   userLastReadMessageId?: number | null;
+  onInspectKnowledge?: (messageId: number) => void;
   /** 用户侧点击卡片支付。 */
   onPayCard?: (message: ChatMessage, card: ChatCard) => void;
   payingCardId?: number | null;
@@ -131,6 +132,7 @@ export default function ChatMessageList({
   userLastReadMessageId,
   onPayCard,
   payingCardId,
+  onInspectKnowledge,
 }: ChatMessageListProps): React.ReactElement {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [previewUrl, setPreviewUrl] = useState('');
@@ -216,6 +218,7 @@ export default function ChatMessageList({
                 )}
                 <div className="mt-1 flex items-center gap-1">
                   {scope === 'admin' && message.ai_meta?.source && <span className="text-xs text-secondary">{message.ai_meta.source === 'human_reviewed' ? '人工确认建议' : message.ai_meta.source === 'incident' ? '事故话术' : '自动回复'}</span>}
+                  {scope === 'admin' && message.role === 'admin' && message.ai_meta?.source && onInspectKnowledge && <Button size="sm" variant="light" className="h-6 min-w-0 px-1 text-xs" onPress={() => onInspectKnowledge(message.id)}>查看知识来源</Button>}
                   <Tooltip content={new Date(message.created_at).toLocaleString()}>
                     <span className="text-xs text-default-400">{relativeTime(message.created_at)}</span>
                   </Tooltip>

@@ -32,7 +32,7 @@ type Draft = {
   ai_meta?: { reason?: string; revision?: number; kb_hits?: Array<{ document_name?: string; content?: string }>; draft?: { status?: string; reason?: string } };
 };
 
-export const CsAiPanel: React.FC<{ conversation: AdminCsConversation; onConversation: (value: AdminCsConversation) => void; canManage: boolean; canSend: boolean }> = ({ conversation, onConversation, canManage, canSend }) => {
+export const CsAiPanel: React.FC<{ conversation: AdminCsConversation; onConversation: (value: AdminCsConversation) => void; canManage: boolean; canSend: boolean; onInspectKnowledge?: (id: number) => void }> = ({ conversation, onConversation, canManage, canSend, onInspectKnowledge }) => {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [editor, setEditor] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState<number | null>(null);
@@ -103,6 +103,7 @@ export const CsAiPanel: React.FC<{ conversation: AdminCsConversation; onConversa
         <Chip size="sm" color={stale ? 'warning' : 'secondary'}>{stale ? '会话已变化，请核对最新内容' : '等待人工确认'}</Chip>
         <p className="text-xs text-default-500">{reasonText(draft.ai_meta?.draft?.reason || draft.ai_meta?.reason)}</p>
         {(draft.ai_meta?.kb_hits || []).map((hit, index) => <details key={index} className="text-xs text-default-500"><summary>{hit.document_name || '检索来源'}</summary><p className="whitespace-pre-wrap">{hit.content}</p></details>)}
+        {onInspectKnowledge && <Button size="sm" variant="light" className="self-start" onPress={() => onInspectKnowledge(draft.id)}>查看引用知识与来源</Button>}
         <Textarea label="回复建议（编辑后发送）" value={editor[draft.id] ?? draft.content ?? ''} onValueChange={(content) => setEditor((current) => ({ ...current, [draft.id]: content }))} minRows={3} isReadOnly={!canSend} />
         <div className="flex gap-2">
           <Button size="sm" color="primary" startContent={<Send size={14} />} isDisabled={!canSend || stale || busy !== null} onPress={() => void act(draft, 'send')}>确认发送</Button>
@@ -177,7 +178,7 @@ const shortDateTime = (value?: string | null) => {
  * 会话处理工具区：接管 / 定时跟进 / 内部回复建议合并为一个可折叠块。
  * 默认收起（记住选择），收起时内部组件保持挂载只隐藏，AI 建议轮询不中断。
  */
-export const CsConversationTools: React.FC<{ conversation: AdminCsConversation; onConversation: (value: AdminCsConversation) => void; canManage: boolean; canSend: boolean }> = (props) => {
+export const CsConversationTools: React.FC<{ conversation: AdminCsConversation; onConversation: (value: AdminCsConversation) => void; canManage: boolean; canSend: boolean; onInspectKnowledge?: (id: number) => void }> = (props) => {
   const { conversation } = props;
   const [open, setOpen] = useState(() => {
     try { return window.localStorage.getItem('cs-tools-open') === '1'; } catch { return false; }

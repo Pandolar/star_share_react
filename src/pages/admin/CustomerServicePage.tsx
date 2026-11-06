@@ -134,6 +134,8 @@ const CustomerServicePage: React.FC = () => {
   const canSend = can('customer_service.message.send');
   const canManageAi = can('customer_service.ai.manage');
   const [aiManagementOpen, setAiManagementOpen] = useState(false);
+  const [knowledgeMessageId, setKnowledgeMessageId] = useState<number | null>(null);
+  const inspectKnowledge = (messageId: number) => { setKnowledgeMessageId(messageId); setAiManagementOpen(true); };
   // 跨客服共享轻量待办（存 star_config，30s 轮询）
   const [todos, setTodos] = useState<{ revision: number; items: Array<Record<string, unknown>>; todo_count: number } | null>(null);
   const [todoTitle, setTodoTitle] = useState('');
@@ -888,7 +890,7 @@ const CustomerServicePage: React.FC = () => {
           )}
         </div>
       </header>
-      {aiManagementOpen && canManageAi && <div className="min-h-0 flex-1 overflow-y-auto border-b border-divider bg-content1 p-3"><CsAiManagementPanel selectedConversationIds={Array.from(batchSelection)} onClose={() => setAiManagementOpen(false)} /></div>}
+      {aiManagementOpen && canManageAi && <div className="min-h-0 flex-1 overflow-y-auto border-b border-divider bg-content1 p-3"><CsAiManagementPanel selectedConversationIds={Array.from(batchSelection)} knowledgeMessageId={knowledgeMessageId} onOpenConversation={(id) => { void adminApiService.getCsConversation(id).then((conversation) => { setAiManagementOpen(false); void openConversation(conversation); }).catch((error) => showToast(error instanceof Error ? error.message : '无法打开来源会话', 'error')); }} onClose={() => setAiManagementOpen(false)} /></div>}
       <div className={`${aiManagementOpen ? 'hidden' : 'grid'} min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden p-3 lg:grid-cols-[340px_minmax(0,1fr)] lg:p-4 xl:grid-cols-[340px_minmax(0,1fr)_320px]`}>
         <Card className={`${mobileChat ? 'hidden lg:block' : 'block'} min-h-0 overflow-hidden`}>
           <CardBody className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-3">
@@ -1080,6 +1082,7 @@ const CustomerServicePage: React.FC = () => {
                   conversation={selected}
                   canManage={canManageConversation}
                   canSend={canSend}
+                  onInspectKnowledge={canManageAi ? inspectKnowledge : undefined}
                   onConversation={(updated) => {
                     setSelected(updated);
                     setRows((current) => sortConversationsByRecent(current.map((item) => item.id === updated.id ? updated : item)));
@@ -1092,7 +1095,7 @@ const CustomerServicePage: React.FC = () => {
                     <AttachmentSummary key={attachment.id} attachment={attachment} />
                   ))}
                 <div className="min-h-0 flex-1 overflow-hidden">
-                  <ChatMessageList messages={messages.filter((message) => message.content_type !== 'ai_draft')} conversationKey={selected.id} selfRole="admin" loading={messageLoading} emptyText="暂无消息" scope="admin" userLastReadMessageId={selected.user_last_read_message_id} recallWindowMinutes={canRecall ? recallWindowMinutes : undefined} onRecall={canRecall ? setRecallTarget : undefined} />
+                  <ChatMessageList messages={messages.filter((message) => message.content_type !== 'ai_draft')} conversationKey={selected.id} selfRole="admin" loading={messageLoading} emptyText="暂无消息" scope="admin" userLastReadMessageId={selected.user_last_read_message_id} recallWindowMinutes={canRecall ? recallWindowMinutes : undefined} onRecall={canRecall ? setRecallTarget : undefined} onInspectKnowledge={canManageAi ? inspectKnowledge : undefined} />
                 </div>
                 {composerAttachmentConfig ? (
                   <ChatComposer

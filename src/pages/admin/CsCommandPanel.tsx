@@ -73,6 +73,7 @@ export const CsCommandPanel: React.FC<{ selectedConversationIds: number[] }> = (
   const [command, setCommand] = useState('');
   const [contextId, setContextId] = useState<string>('none');
   const [tab, setTab] = useState('console');
+  const [thread, setThread] = useState<Directive | null>(null);
   const [taskPage, setTaskPage] = useState(1);
   const [taskStatus, setTaskStatus] = useState('all');
   const [taskKind, setTaskKind] = useState('all');
@@ -103,7 +104,7 @@ export const CsCommandPanel: React.FC<{ selectedConversationIds: number[] }> = (
     if (canReadConversation) {
       requests.push(csCommandApi.listTasks({ current_page: taskPage, page_size: 30,
         status: taskStatus === 'all' ? undefined : taskStatus, kind: taskKind === 'all' ? undefined : taskKind }));
-      requests.push(csCommandApi.listDirectives({ status: 'draft', page_size: 50 }));
+      requests.push(csCommandApi.listDirectives({ page_size: 100 }));
       requests.push(csCommandApi.listBatches({ page_size: 50 }));
     }
     const results = await Promise.allSettled(requests);
@@ -159,10 +160,21 @@ export const CsCommandPanel: React.FC<{ selectedConversationIds: number[] }> = (
   const createDraft = async () => {
     if (!command.trim()) throw new Error('请先输入要交代客服的事情');
     const next = await csCommandApi.createDirective({ text: command.trim(), request_key: requestKey.current,
+      parent_directive_id: thread?.id,
       selected_task_id: contextId === 'none' ? undefined : Number(contextId),
       conversation_ids: selectedConversationIds.length ? selectedConversationIds : undefined });
-    setDirective(next); requestKey.current = keyForRequest();
-    await load();
+    setDirective(next); setThread((current) => { if (!current || current.thread_id !== next.thread_id) return next; return { ...current, ...next, chat_history: [...(current.chat_history || []), ...(next.chat_history || []).slice(-2)] }; });
+    setCommand(''); requestKey.current = keyForRequest(); await load();
+  };
+  const newConversation = () => { setThread(null); setDirective(null); setCommand(''); requestKey.current = keyForRequest(); };
+  const restoreConversation = async (item: Directive) => {
+    const rows = item.thread_id ? await csCommandApi.listDirectives({ thread_id: item.thread_id, page_size: 100 }) : [item];
+    const latest = rows[0] || item;
+    const history: NonNullable<Directive['chat_history']> = [...rows].reverse().flatMap((row) => [
+      { role: 'user' as const, content: row.input_text },
+      { role: 'assistant' as const, content: row.plan.question || row.plan.explanation || row.chat_history?.slice(-1)[0]?.content || '请核对这轮安排。' },
+    ]);
+    setThread({ ...latest, chat_history: history }); setDirective(latest); setTab('console');
   };
   const manualDraft = async (kind: 'incident' | 'knowledge', target?: Task) => {
     const value: DirectivePlan = target ? { ...target, action: 'update_task', task_id: target.id, expected_task_revision: target.revision } : {
@@ -184,9 +196,10 @@ export const CsCommandPanel: React.FC<{ selectedConversationIds: number[] }> = (
     const saved = await saveDraft();
     const result = await csCommandApi.applyDirective(saved.id, saved.revision);
     setDirective(result.directive);
+    setThread((current) => current ? { ...current, ...result.directive, chat_history: current.chat_history } : result.directive);
     if (result.task) {
       if (canReadConversation) setDetail(await csCommandApi.getTask(result.task.id));
-      setTab(canReadConversation ? 'tasks' : 'console');
+      setContextId(String(result.task.id)); setTab('console');
       setNotice(result.task.status === 'draft' ? '任务草稿已保存。核对后点击“发布生效”，才会用于接待。' : '任务已按预览更新。');
     } else if (result.batch) {
       if (canReadConversation) { setBatch(await csCommandApi.getBatch(result.batch.id)); setTab('batches'); }
@@ -213,17 +226,31 @@ export const CsCommandPanel: React.FC<{ selectedConversationIds: number[] }> = (
     <Tabs aria-label="客服指令台功能" selectedKey={tab} onSelectionChange={(key) => setTab(String(key))} classNames={{ tabList: 'max-w-full overflow-x-auto' }}>
       <Tab key="console" title="交代客服">
         <section className="mt-3 space-y-4">
-          <Alert color="default" title="像交代真人客服一样说清楚事情" description="先生成草稿，核对范围、话术和时间；明确应用后才更新任务。生成草稿不会向客户发送消息。请勿在指令中填写密钥或密码。" />
+          <div className="grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)]">
+            <Card shadow="none" className="border border-divider"><CardBody className="gap-2 p-3">
+              <div className="flex items-center justify-between"><b>交代记录</b><Button size="sm" isDisabled={busy} onPress={newConversation}>新对话</Button></div>
+              {Array.from(new Map([...directives].reverse().map((item) => [item.thread_id || `legacy-${item.id}`, item])).values()).reverse().slice(0, 30).map((item) => <Button key={item.thread_id || item.id} variant="light" className="h-auto justify-start whitespace-normal py-2 text-left" isDisabled={busy} onPress={() => void run(() => restoreConversation(item))}>{item.chat_history?.find((turn) => turn.role === 'user')?.content?.slice(0, 32) || item.input_text.slice(0, 32)}</Button>)}
+              {!directives.length && <p className="text-xs text-default-400">交代后自动保存，可随时接着说。</p>}
+            </CardBody></Card>
+            <div className="min-w-0 rounded-xl border border-divider p-4">
+              <p className="mb-3 text-sm text-default-500">像交代真人客服一样说明事情，可以继续补充和纠正。所有变更仍需核对确认。</p>
+              <div className="max-h-96 min-h-40 space-y-3 overflow-y-auto" aria-label="交代客服对话记录">
+                {(thread?.chat_history || []).map((turn, index) => <div key={`${thread?.id}-${index}`} className={`flex ${turn.role === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[90%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm ${turn.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-default-100'}`}><p className="mb-1 text-xs opacity-70">{turn.role === 'user' ? '你的交代' : '客服助手'}</p>{turn.content}</div></div>)}
+                {!thread && <p className="py-6 text-center text-sm text-default-400">先说要处理什么、适用于哪里；信息不足时助手会继续问你。</p>}
+                {busy && <p role="status" className="text-sm text-default-500">正在理解这轮交代…</p>}
+              </div>
+            </div>
+          </div>
           <Textarea label="想让客服做什么" minRows={3} value={command} isDisabled={busy || !canManage || !installed}
             placeholder="例如：自营站的文件导出有故障，预计半天修复，期间只给问导出的用户解释正在处理，其他问题正常回答。"
-            onValueChange={(value) => { if (value !== command) requestKey.current = keyForRequest(); setCommand(value); }} />
+            onValueChange={(value) => { if (value !== command) requestKey.current = keyForRequest(); setCommand(value); }} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); if (command.trim()) void run(createDraft); } }} description="Enter 发送，Shift+Enter 换行；请勿填写密钥和密码。" />
           <Select label="这句话对应哪件事" items={taskItems} selectedKeys={[contextId]} isDisabled={busy || !canReadConversation}
             onSelectionChange={(keys) => { const value = Array.from(keys)[0]; if (value !== undefined) { setContextId(String(value)); requestKey.current = keyForRequest(); } }}
             description="说“恢复了”“再延迟两小时”前先选任务；未选择且有多个可能对象时，系统会要求澄清。">
             {(item) => <SelectItem key={item.id}>{item.name}</SelectItem>}
           </Select>
           <div className="flex flex-wrap gap-2">
-            <Button color="primary" isLoading={busy} isDisabled={!canManage || !installed || !command.trim()} onPress={() => void run(createDraft)}>理解并生成草稿</Button>
+            <Button color="primary" isLoading={busy} isDisabled={!canManage || !installed || !command.trim()} onPress={() => void run(createDraft)}>发送交代</Button>
             <Button variant="flat" isDisabled={busy || !canManage || !installed} onPress={() => void run(() => manualDraft('incident'))}>手工填写故障</Button>
             <Button variant="flat" isDisabled={busy || !canManage || !installed} onPress={() => void run(() => manualDraft('knowledge'))}>手工填写长期答复</Button>
           </div>
@@ -234,6 +261,7 @@ export const CsCommandPanel: React.FC<{ selectedConversationIds: number[] }> = (
             {plan?.explanation && <p className="text-sm">{plan.explanation}</p>}
             {plan?.question && <Alert color="warning" title="还需要确认" description={plan.question} />}
             {(plan?.missing_fields || []).length > 0 && <p className="text-sm text-warning-700">解析时待补充：{plan?.missing_fields?.map((field) => fields[field] || field).join('、')}。填写后以服务端核对结果为准。</p>}
+            <details className="rounded-lg border border-divider p-3"><summary className="cursor-pointer text-sm font-medium">核对与调整具体安排</summary><div className="mt-3 space-y-3">
             <Select label="准备执行什么" items={actions} selectedKeys={[plan?.action || 'clarify']} isDisabled={busy || directive.status !== 'draft' || !canManage}
               onSelectionChange={(keys) => { const action = Array.from(keys)[0]; if (action) changePlan({ action: String(action) }); }}>
               {(item) => <SelectItem key={item.id}>{item.name}</SelectItem>}
@@ -276,6 +304,7 @@ export const CsCommandPanel: React.FC<{ selectedConversationIds: number[] }> = (
               </>}
               <Textarea label="内部备注（客户看不到）" value={plan?.internal_note || ''} maxLength={4000} isDisabled={busy || directive.status !== 'draft'} onValueChange={(internal_note) => changePlan({ internal_note })} />
             </>}
+            </div></details>
             <div className="flex flex-wrap gap-2">
               <Button variant="flat" isDisabled={busy || !canManage || directive.status !== 'draft'} onPress={() => void run(async () => { await saveDraft(); setNotice('仅保存了草稿，任务尚未生效。'); })}>仅保存草稿</Button>
               <Button color="primary" isDisabled={busy || !canManage || directive.status !== 'draft' || plan?.action === 'clarify'} onPress={() => void run(applyDraft)}>
@@ -284,7 +313,6 @@ export const CsCommandPanel: React.FC<{ selectedConversationIds: number[] }> = (
             </div>
             {directive.status === 'applied' && <p className="text-sm text-default-500">这条指令已处理，不会重复执行。后续修改请生成新的草稿。</p>}
           </CardBody></Card>}
-          <details className="rounded-xl border border-divider p-3"><summary>找回未应用的指令草稿</summary><div className="mt-2 flex flex-wrap gap-2">{directives.map((item) => <Button key={item.id} size="sm" variant="flat" isDisabled={busy} onPress={() => setDirective(item)}>#{item.id} {item.input_text.slice(0, 35)}</Button>)}{!directives.length && <p className="text-sm text-default-500">没有待确认草稿</p>}</div></details>
         </section>
       </Tab>
       <Tab key="tasks" title="任务与进展">

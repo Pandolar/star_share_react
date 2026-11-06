@@ -17,7 +17,7 @@ class CsCommandApi {
   private async put<T>(url: string, data: object) { return unwrap((await this.client.put<CsResponse<T>>(url, data)).data); }
   getSettings() { return this.get<CommandSettings>('/star/cs_command_settings'); }
   saveSettings(data: CommandSettings) { return this.put<CommandSettings>('/star/cs_command_settings', data); }
-  createDirective(data: { text: string; request_key: string; selected_task_id?: number; conversation_ids?: number[]; manual?: boolean; plan?: DirectivePlan }) { return this.post<Directive>('/star/cs_directives', data); }
+  createDirective(data: { text: string; request_key: string; parent_directive_id?: number; thread_id?: string; selected_task_id?: number; conversation_ids?: number[]; manual?: boolean; plan?: DirectivePlan }) { return this.post<Directive>('/star/cs_directives', data); }
   updateDirective(id: number, revision: number, plan: DirectivePlan) { return this.put<Directive>(`/star/cs_directives/${id}`, { revision, plan }); }
   listDirectives(params?: object) { return this.get<Directive[]>('/star/cs_directives', params); }
   applyDirective(id: number, revision: number) { return this.post<{ directive: Directive; task?: Task; batch?: Batch }>(`/star/cs_directives/${id}/apply`, { revision }); }
