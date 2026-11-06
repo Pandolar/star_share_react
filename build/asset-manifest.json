@@ -1,7 +1,7 @@
 {
   "files": {
-    "main.css": "/starstatic/css/main.ea81dc6a.css",
-    "main.js": "/starstatic/js/main.e39ea413.js",
+    "main.css": "/starstatic/css/main.b6b484a4.css",
+    "main.js": "/starstatic/js/main.d297b9a6.js",
     "starstatic/js/7767.2ed7ad84.chunk.js": "/starstatic/js/7767.2ed7ad84.chunk.js",
     "starstatic/js/1.7807640a.chunk.js": "/starstatic/js/1.7807640a.chunk.js",
     "starstatic/js/4396.1b0a254c.chunk.js": "/starstatic/js/4396.1b0a254c.chunk.js",
@@ -18,7 +18,7 @@
     "starstatic/js/6252.040668a4.chunk.js": "/starstatic/js/6252.040668a4.chunk.js",
     "starstatic/js/359.32ae262f.chunk.js": "/starstatic/js/359.32ae262f.chunk.js",
     "starstatic/js/919.14afc90d.chunk.js": "/starstatic/js/919.14afc90d.chunk.js",
-    "starstatic/js/4833.e0788a3e.chunk.js": "/starstatic/js/4833.e0788a3e.chunk.js",
+    "starstatic/js/975.91e76d1a.chunk.js": "/starstatic/js/975.91e76d1a.chunk.js",
     "starstatic/js/9402.9f4655d4.chunk.js": "/starstatic/js/9402.9f4655d4.chunk.js",
     "starstatic/js/6410.607c7cc2.chunk.js": "/starstatic/js/6410.607c7cc2.chunk.js",
     "starstatic/js/4890.ff61eb70.chunk.js": "/starstatic/js/4890.ff61eb70.chunk.js",
@@ -32,7 +32,7 @@
     "starstatic/js/2795.d372b388.chunk.js": "/starstatic/js/2795.d372b388.chunk.js",
     "starstatic/js/512.f3f68be9.chunk.js": "/starstatic/js/512.f3f68be9.chunk.js",
     "starstatic/js/9529.e76d864d.chunk.js": "/starstatic/js/9529.e76d864d.chunk.js",
-    "starstatic/js/3595.6b4ccfb0.chunk.js": "/starstatic/js/3595.6b4ccfb0.chunk.js",
+    "starstatic/js/3595.34aa5d76.chunk.js": "/starstatic/js/3595.34aa5d76.chunk.js",
     "starstatic/js/9548.0775ccf3.chunk.js": "/starstatic/js/9548.0775ccf3.chunk.js",
     "starstatic/js/7398.54744b9d.chunk.js": "/starstatic/js/7398.54744b9d.chunk.js",
     "starstatic/js/2354.49e8a127.chunk.js": "/starstatic/js/2354.49e8a127.chunk.js",
@@ -44,7 +44,7 @@
     "starstatic/js/6091.39fc1339.chunk.js": "/starstatic/js/6091.39fc1339.chunk.js",
     "starstatic/js/3901.97a4b600.chunk.js": "/starstatic/js/3901.97a4b600.chunk.js",
     "starstatic/js/9901.02f13de9.chunk.js": "/starstatic/js/9901.02f13de9.chunk.js",
-    "starstatic/js/911.2dd50452.chunk.js": "/starstatic/js/911.2dd50452.chunk.js",
+    "starstatic/js/911.6532ee34.chunk.js": "/starstatic/js/911.6532ee34.chunk.js",
     "starstatic/js/4576.1907cc84.chunk.js": "/starstatic/js/4576.1907cc84.chunk.js",
     "starstatic/js/2382.7807640a.chunk.js": "/starstatic/js/2382.7807640a.chunk.js",
     "starstatic/js/8902.32e96b4e.chunk.js": "/starstatic/js/8902.32e96b4e.chunk.js",
@@ -66,7 +66,7 @@
     "starstatic/js/7396.68cce264.chunk.js": "/starstatic/js/7396.68cce264.chunk.js",
     "starstatic/js/1527.f301aa70.chunk.js": "/starstatic/js/1527.f301aa70.chunk.js",
     "starstatic/js/7058.bfc8b828.js": "/starstatic/js/7058.bfc8b828.js",
-    "starstatic/js/2331.c4c10f04.chunk.js": "/starstatic/js/2331.c4c10f04.chunk.js",
+    "starstatic/js/2940.eb091f86.chunk.js": "/starstatic/js/2940.eb091f86.chunk.js",
     "starstatic/js/9133.327087e6.chunk.js": "/starstatic/js/9133.327087e6.chunk.js",
     "starstatic/js/3723.29f740f1.chunk.js": "/starstatic/js/3723.29f740f1.chunk.js",
     "starstatic/js/9109.da9dbfd6.chunk.js": "/starstatic/js/9109.da9dbfd6.chunk.js",
@@ -82,7 +82,7 @@
     "starstatic/js/9896.66a5c745.chunk.js": "/starstatic/js/9896.66a5c745.chunk.js",
     "starstatic/js/7747.501a122a.chunk.js": "/starstatic/js/7747.501a122a.chunk.js",
     "starstatic/js/6708.06a58c8e.chunk.js": "/starstatic/js/6708.06a58c8e.chunk.js",
-    "starstatic/js/4101.79c30171.chunk.js": "/starstatic/js/4101.79c30171.chunk.js",
+    "starstatic/js/4101.638765aa.chunk.js": "/starstatic/js/4101.638765aa.chunk.js",
     "starstatic/js/5273.06b2fd55.chunk.js": "/starstatic/js/5273.06b2fd55.chunk.js",
     "starstatic/js/6271.a32ee4d9.chunk.js": "/starstatic/js/6271.a32ee4d9.chunk.js",
     "starstatic/js/2592.94223482.chunk.js": "/starstatic/js/2592.94223482.chunk.js",
@@ -91,7 +91,7 @@
   "entrypoints": [
     "starstatic/js/heroui.5e45b4af.js",
     "starstatic/js/7058.bfc8b828.js",
-    "starstatic/css/main.ea81dc6a.css",
-    "starstatic/js/main.e39ea413.js"
+    "starstatic/css/main.b6b484a4.css",
+    "starstatic/js/main.d297b9a6.js"
   ]
 }

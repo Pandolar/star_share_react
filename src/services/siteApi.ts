@@ -1,7 +1,7 @@
 import axios from 'axios';
 import type { AxiosInstance } from 'axios';
 import { storage } from '../config';
-import type { CommissionLedger, CommissionSummary, DistributorOption, DistributorSite, PageQuery, SiteAuditLog, SiteOrder, SitePackagePatch, SitePackagesPayload } from '../types/site';
+import type { CommissionLedger, CommissionSummary, DistributorOption, DistributorSite, DistributorSiteStats, PageQuery, SiteAuditLog, SiteOrder, SitePackagePatch, SitePackagesPayload } from '../types/site';
 
 export interface SiteApiResponse<T> { code: number; msg?: string; data?: T; total?: number; }
 export function siteData<T>(response: SiteApiResponse<T>): T { if (response.code !== 20000 || response.data === undefined) throw new Error(response.msg || '操作失败'); return response.data; }
@@ -28,6 +28,7 @@ class SiteApiService {
   getDistributorSitePackages(site_id: number) { return this.get<SitePackagesPayload>(this.distributor, '/site_packages', { site_id }); }
   updateDistributorSitePackages(site_id: number, revision: number, items: SitePackagePatch[]) { return this.put<SitePackagesPayload>(this.distributor, '/site_packages', { site_id, revision, items }); }
   getDistributorSiteAudit(site_id: number, params?: PageQuery) { return this.get<SiteAuditLog[]>(this.distributor, '/site_audit', { ...params, site_id }); }
+  getDistributorSiteStats() { return this.get<DistributorSiteStats>(this.distributor, '/site_stats'); }
   orders(params?: PageQuery, distributor = false) { return this.get<SiteOrder[]>(distributor ? this.distributor : this.admin, distributor ? '/site_orders' : '/star/site_orders', params); }
   ledger(params?: PageQuery, distributor = false) { return this.get<CommissionLedger[]>(distributor ? this.distributor : this.admin, distributor ? '/commissions' : '/star/commissions', params); }
   summary(params?: PageQuery, distributor = false) { return this.get<CommissionSummary>(distributor ? this.distributor : this.admin, distributor ? '/commission_summary' : '/star/commission_summary', params); }

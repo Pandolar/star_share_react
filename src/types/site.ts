@@ -134,6 +134,21 @@ export interface CommissionSummary {
   lifetime_net_commission: string;
   reconciliation_text: string;
 }
+export interface DistributorSiteStat {
+  site_id: number;
+  name: string;
+  status: string;
+  domains: string[];
+  new_users: number;
+  paid_orders: number;
+  paid_amount: string;
+}
+export interface DistributorSiteStats {
+  distributor_id: number;
+  sites: DistributorSiteStat[];
+  totals: { new_users: number; paid_orders: number; paid_amount: string };
+  note: string;
+}
 export const siteFeatureLabels: Record<string, string> = {
   register: '注册账号', wechat_login: '微信登录', invite: '邀请入口', invite_rewards: '邀请奖励',
   activity: '活动与补偿', about: '关于与教程', customer_service: '客服', team: '组织团队',

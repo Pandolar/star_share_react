@@ -50,6 +50,7 @@ import adminApiService from '../../services/adminApi';
 import { User, CreateUserRequest, UpdateUserRequest, UserQueryParams, UserPackage, Order } from '../../types/admin';
 import { showToast } from '../../components/Toast';
 import ExactSearchPopover from '../../components/admin/ExactSearchPopover';
+import UserPasswordResetModal from '../../components/admin/UserPasswordResetModal';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
 /**
@@ -66,6 +67,7 @@ const UsersManagePage: React.FC = () => {
     const canRefreshPackages = can('user.package_cache.refresh');
     const canGrantCompensation = can('user.compensation.grant');
     const canReadPackages = can('package.read');
+    const canResetPassword = can('user.password.reset');
     // 状态管理
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(false);
@@ -79,6 +81,8 @@ const UsersManagePage: React.FC = () => {
     const [total, setTotal] = useState(0);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [formData, setFormData] = useState<Partial<CreateUserRequest | UpdateUserRequest>>({});
+    const [passwordResetUser, setPasswordResetUser] = useState<User | null>(null);
+    const [passwordResetOpen, setPasswordResetOpen] = useState(false);
 
     // Modal控制
     const { isOpen: isCreateOpen, onOpen: onCreateOpen, onClose: onCreateClose } = useDisclosure();
@@ -523,6 +527,7 @@ const UsersManagePage: React.FC = () => {
                 ...(!canRefreshPackages ? ['refresh-packages'] : []),
                 ...(!canGrantCompensation ? ['compensation'] : []),
                 ...(!canUpdate ? ['edit'] : []),
+                ...(!canResetPassword ? ['reset-password'] : []),
                 ...(!canDelete ? ['delete'] : []),
             ]}>
                 <DropdownItem
@@ -531,6 +536,12 @@ const UsersManagePage: React.FC = () => {
                     onPress={() => openViewModal(user)}
                 >
                     查看详情
+                </DropdownItem>
+                <DropdownItem
+                    key="reset-password"
+                    onPress={() => { setPasswordResetUser(user); setPasswordResetOpen(true); }}
+                >
+                    重置密码
                 </DropdownItem>
                 <DropdownItem
                     key="clear-limit"
@@ -1224,6 +1235,12 @@ const UsersManagePage: React.FC = () => {
                     </ModalFooter>
                 </ModalContent>
             </Modal>
+            <UserPasswordResetModal
+                isOpen={passwordResetOpen}
+                user={passwordResetUser}
+                canReset={canResetPassword}
+                onClose={() => { setPasswordResetOpen(false); setPasswordResetUser(null); }}
+            />
         </div>
     );
 };

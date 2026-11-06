@@ -25,9 +25,10 @@ import {
   Tooltip,
   Textarea,
 } from '@heroui/react';
-import { ArrowLeft, Bell, BellOff, CircleDollarSign, Flag, Gauge, Headphones, ListTodo, MoreHorizontal, Pin, Plus, RefreshCw, Search, Send, ShieldCheck, StickyNote, UserRound, Volume2, VolumeX, Zap } from 'lucide-react';
+import { ArrowLeft, Bell, BellOff, CircleDollarSign, Flag, Gauge, Headphones, KeyRound, ListTodo, MoreHorizontal, Pin, Plus, RefreshCw, Search, Send, ShieldCheck, StickyNote, UserRound, Volume2, VolumeX, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import adminApiService from '../../services/adminApi';
+import UserPasswordResetModal from '../../components/admin/UserPasswordResetModal';
 import type { AdminCsConversation } from '../../types/admin';
 import type { ChatAttachment, ChatAttachmentConfig, ChatMessage } from '../../components/chat/types';
 import { newClientMessageId } from '../../components/chat/types';
@@ -202,6 +203,8 @@ const CustomerServicePage: React.FC = () => {
   const [recalling, setRecalling] = useState(false);
   const canUnbanUser = can('user.status.update');
   const canClearUserLimit = can('user.limit.reset');
+  const canResetUserPassword = can('user.password.reset');
+  const [passwordResetOpen, setPasswordResetOpen] = useState(false);
   const [reply, setReply] = useState('');
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [batchSelection, setBatchSelection] = useState<Set<number>>(new Set());
@@ -1073,6 +1076,7 @@ const CustomerServicePage: React.FC = () => {
                       <DropdownItem key="unban" isDisabled={!canUnbanUser || userActionLoading || selected.user.profile.status === 1} startContent={<ShieldCheck className="h-4 w-4" />} onPress={() => void runUserAction('unban')}>{selected.user.profile.status === 1 ? '账号正常' : '解封账号'}</DropdownItem>
                       <DropdownItem key="limit" isDisabled={!canClearUserLimit || userActionLoading} startContent={<Gauge className="h-4 w-4" />} onPress={() => void runUserAction('clear_limit')}>解除当前限速</DropdownItem>
                       <DropdownItem key="limit_all" isDisabled={!canClearUserLimit || userActionLoading} startContent={<Zap className="h-4 w-4" />} onPress={() => void runUserAction('clear_limit_all')}>一键解除限速+解封+加白</DropdownItem>
+                      <DropdownItem key="reset_password" isDisabled={!canResetUserPassword || userActionLoading} startContent={<KeyRound className="h-4 w-4" />} onPress={() => setPasswordResetOpen(true)}>重置登录密码</DropdownItem>
                       <DropdownItem key="refresh" startContent={<RefreshCw className="h-4 w-4" />} onPress={() => { void loadList(); void refreshMessages(); }}>刷新会话</DropdownItem>
                       <DropdownItem key="notifications" isDisabled={notificationPermission === 'unsupported' || notificationPermission === 'granted'} startContent={<Bell className="h-4 w-4" />} onPress={() => void requestBrowserNotificationPermission()}>{notificationLabel}</DropdownItem>
                     </DropdownMenu>
@@ -1431,6 +1435,12 @@ const CustomerServicePage: React.FC = () => {
           </div>
         </div>
       )}
+      <UserPasswordResetModal
+        isOpen={passwordResetOpen}
+        user={selected ? { id: selected.user.id, email: selected.user.profile.email } : null}
+        canReset={canResetUserPassword}
+        onClose={() => setPasswordResetOpen(false)}
+      />
     </div>
   );
 };
