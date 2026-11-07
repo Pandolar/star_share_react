@@ -88,7 +88,10 @@ export const CsKnowledgeWorkspace: React.FC<Props> = ({ selectedConversationIds,
   useEffect(() => {
     if (!initialMessageId) return;
     setMessageId(initialMessageId); setMessageInput(String(initialMessageId));
-    void csKnowledgeApi.messageSources(initialMessageId).then((result) => setMessageSources(result.data)).catch((caught) => setError(caught instanceof Error ? caught.message : '引用信息加载失败'));
+    void csKnowledgeApi.messageSources(initialMessageId).then((result) => {
+      const data = result.data as Sources;
+      setMessageSources({ ...data, citations: Array.isArray(data?.citations) ? data.citations : [], candidate_ids: Array.isArray(data?.candidate_ids) ? data.candidate_ids : [] });
+    }).catch((caught) => setError(caught instanceof Error ? caught.message : '引用信息加载失败'));
   }, [initialMessageId]);
 
   useEffect(() => {
@@ -103,12 +106,21 @@ export const CsKnowledgeWorkspace: React.FC<Props> = ({ selectedConversationIds,
     return () => window.clearTimeout(timer);
   }, [job, load, loadMetrics]);
 
+  const normalizeDetail = (value: KnowledgeClusterDetail | KnowledgeCluster): KnowledgeClusterDetail => ({
+    ...(value as KnowledgeClusterDetail),
+    questions: Array.isArray((value as KnowledgeClusterDetail).questions) ? (value as KnowledgeClusterDetail).questions : [],
+    answers: Array.isArray((value as KnowledgeClusterDetail).answers) ? (value as KnowledgeClusterDetail).answers : [],
+    absorbed: Array.isArray((value as KnowledgeClusterDetail).absorbed) ? (value as KnowledgeClusterDetail).absorbed : [],
+    similar_published: Array.isArray((value as KnowledgeClusterDetail).similar_published) ? (value as KnowledgeClusterDetail).similar_published : [],
+    evidence: Array.isArray(value.evidence) ? value.evidence : [],
+  });
+
   const refreshDetail = async (id: number) => {
     const version = ++detailVersion.current;
     setDetailLoading(true);
     try {
       const result = await csKnowledgeApi.cluster(id);
-      if (version === detailVersion.current) setDetail(result.data);
+      if (version === detailVersion.current) setDetail(normalizeDetail(result.data));
     } catch (caught) { setError(caught instanceof Error ? caught.message : '详情加载失败'); }
     finally { if (version === detailVersion.current) setDetailLoading(false); }
   };
@@ -233,7 +245,7 @@ export const CsKnowledgeWorkspace: React.FC<Props> = ({ selectedConversationIds,
           <td className="px-3 py-2 tabular-nums">{row.frequency}</td>
           <td className="px-3 py-2 text-xs">{sources[row.source] || row.source}</td>
           <td className="whitespace-nowrap px-3 py-2 text-xs text-default-500">{date(row.updated_at)}</td>
-          <td className="px-3 py-2"><div className="flex flex-wrap gap-1"><Button size="sm" variant="light" isDisabled={busy} onPress={() => { setDetail(row as unknown as KnowledgeClusterDetail); void refreshDetail(row.id); }}>查看</Button>{row.blocked ? <Button size="sm" variant="light" isDisabled={!canManage || busy} onPress={() => void run(async () => { await csKnowledgeApi.unblock(row.id); await load(); await loadMetrics(); })}>解除拉黑</Button> : <>{['pending', 'needs_answer'].includes(row.status) && <><Button size="sm" color="primary" isDisabled={!canManage || busy} onPress={() => void act(row, 'approve')}>批准</Button><Button size="sm" color="danger" variant="light" isDisabled={!canManage || busy} onPress={() => void act(row, 'reject', { remember: true })}>拒绝并拉黑</Button></>}{row.status === 'error' && <Button size="sm" isDisabled={!canManage || busy} onPress={() => void act(row, 'retry')}>重试</Button>}</>}</div></td>
+          <td className="px-3 py-2"><div className="flex flex-wrap gap-1"><Button size="sm" variant="light" isDisabled={busy} onPress={() => { setDetail(normalizeDetail(row)); void refreshDetail(row.id); }}>查看</Button>{row.blocked ? <Button size="sm" variant="light" isDisabled={!canManage || busy} onPress={() => void run(async () => { await csKnowledgeApi.unblock(row.id); await load(); await loadMetrics(); })}>解除拉黑</Button> : <>{['pending', 'needs_answer'].includes(row.status) && <><Button size="sm" color="primary" isDisabled={!canManage || busy} onPress={() => void act(row, 'approve')}>批准</Button><Button size="sm" color="danger" variant="light" isDisabled={!canManage || busy} onPress={() => void act(row, 'reject', { remember: true })}>拒绝并拉黑</Button></>}{row.status === 'error' && <Button size="sm" isDisabled={!canManage || busy} onPress={() => void act(row, 'retry')}>重试</Button>}</>}</div></td>
         </tr>)}</tbody>
       </table></div>
       {loading && <p className="p-3 text-center text-sm" role="status">正在加载知识…</p>}
@@ -246,8 +258,8 @@ export const CsKnowledgeWorkspace: React.FC<Props> = ({ selectedConversationIds,
 
     {messageSources && <Card shadow="none" className="border border-divider"><CardBody className="gap-2">
       <div className="flex items-center justify-between"><h3 className="font-semibold">答复 #{messageSources.message_id} 引用的知识</h3><Button size="sm" variant="light" onPress={() => { setMessageSources(null); setMessageId(0); }}>关闭</Button></div>
-      {messageSources.citations.map((item, index) => <div key={index} className="rounded border border-divider p-2 text-sm"><p className="text-xs text-default-500">{item.document_name || item.document_id || '未命名'}</p><p className="whitespace-pre-wrap">{item.content}</p></div>)}
-      {!messageSources.citations.length && <p className="text-sm text-default-500">该答复没有引用记录。</p>}
+      {(messageSources.citations || []).map((item, index) => <div key={index} className="rounded border border-divider p-2 text-sm"><p className="text-xs text-default-500">{item.document_name || item.document_id || '未命名'}</p><p className="whitespace-pre-wrap">{item.content}</p></div>)}
+      {!(messageSources.citations || []).length && <p className="text-sm text-default-500">该答复没有引用记录。</p>}
     </CardBody></Card>}
 
     <Modal isOpen={Boolean(detail)} onClose={() => { detailVersion.current += 1; setDetail(null); }} size="4xl" scrollBehavior="inside">
@@ -260,22 +272,22 @@ export const CsKnowledgeWorkspace: React.FC<Props> = ({ selectedConversationIds,
               <span className="flex-1">{item.question}<span className="ml-2 text-xs text-default-400">出现 {item.count} 次 · 相似 {item.similarity}</span></span>
               {item.question !== detail.question && <Button size="sm" variant="light" isDisabled={!canManage || busy} onPress={() => void act(detail as unknown as KnowledgeCluster, 'split', { question_index: index })}>拆出</Button>}
             </label>)}
-            {!detail.questions.length && <p className="text-sm text-default-500">暂无其他相似问法。</p>}
+            {!(detail.questions || []).length && <p className="text-sm text-default-500">暂无其他相似问法。</p>}
           </section>
           <section><h3 className="font-semibold">答案候选（{detail.answer_variant_count}）</h3>
             {detail.answers.map((item, index) => <label key={item.hash} className={`mt-2 flex items-start gap-2 rounded border p-2 text-sm ${item.state === 'conflict' ? 'border-danger-200 bg-danger-50/40' : 'border-divider'}`}>
               <input type="radio" className="mt-1" name="canonical-answer" checked={item.state === 'chosen'} disabled={!canManage || busy} onChange={() => void act(detail as unknown as KnowledgeCluster, 'resolve', { answer_index: index })} />
               <span className="flex-1 whitespace-pre-wrap">{item.answer}<span className="ml-2 text-xs text-default-400">命中 {item.count} 次{item.has_human ? ' · 人工' : ''}{item.state === 'conflict' ? ' · 冲突待裁决' : ''}</span></span>
             </label>)}
-            {!detail.answers.length && <p className="text-sm text-default-500">还没有答案，补充后再批准。</p>}
+            {!(detail.answers || []).length && <p className="text-sm text-default-500">还没有答案，补充后再批准。</p>}
           </section>
-          <section><h3 className="font-semibold">已并入的问法（{detail.absorbed.length}）</h3>
+          <section><h3 className="font-semibold">已并入的问法（{(detail.absorbed || []).length}）</h3>
             {detail.absorbed.map((item) => <p key={item.id} className="mt-1 text-sm">#{item.id} {item.question} <span className="text-xs text-default-400">{statuses[item.status] || item.status} · {item.frequency} 次</span></p>)}
-            {!detail.absorbed.length && <p className="text-sm text-default-500">没有历史合并行。</p>}
+            {!(detail.absorbed || []).length && <p className="text-sm text-default-500">没有历史合并行。</p>}
           </section>
           <section><h3 className="font-semibold">已发布知识里的相近条目</h3>
             {detail.similar_published.map((item) => <div key={item.id} className="mt-2 flex items-center justify-between gap-2 rounded border border-divider p-2 text-sm"><span>#{item.id} {item.question}<span className="ml-2 text-xs text-default-400">相似 {item.similarity} · {statuses[item.status] || item.status}</span></span><Button size="sm" variant="light" isDisabled={!canManage || busy} onPress={() => void act(detail as unknown as KnowledgeCluster, 'merge', { target_id: item.id })}>并入该条</Button></div>)}
-            {!detail.similar_published.length && <p className="text-sm text-default-500">没有相近的已发布知识。</p>}
+            {!(detail.similar_published || []).length && <p className="text-sm text-default-500">没有相近的已发布知识。</p>}
           </section>
           <section className="space-y-2"><h3 className="font-semibold">证据（{detail.evidence?.length || 0}）</h3>
             {(detail.evidence as Array<Record<string, unknown>> | undefined)?.map((item, index) => <p key={index} className="text-xs text-default-500">会话 #{String(item.conversation_id || '—')} · 消息 {String(item.message_id || '—')} · {String(item.source || '')} · {String(item.at || '')}</p>)}
