@@ -36,7 +36,7 @@ export interface KnowledgeBackfillReport {
   token:string;
 }
 export type KnowledgeTab = 'pending'|'conflict'|'needs_answer'|'published'|'blocked'|'rejected';
-export interface KnowledgeFilters { tab:KnowledgeTab; source?:string; min_frequency?:string; query?:string }
+export interface KnowledgeFilters { tab:KnowledgeTab; source?:string; min_frequency?:string; query?:string; product_id?:number }
 
 const unwrap = <T>(r:Response<T>): { data:T; total?:number } => { if (r.code !== 20000 || r.data === undefined) throw new Error(r.msg || '请求失败'); return { data:r.data, total:r.total }; };
 class CsKnowledgeApi {
@@ -46,7 +46,7 @@ class CsKnowledgeApi {
   async detail(id:number, params:Record<string,unknown>={}) { return unwrap((await this.client.get<Response<KnowledgeDetail>>(`/star/cs_kb_candidates/${id}`,{params})).data); }
   async clusters(params:Record<string,unknown>={}) { return unwrap((await this.client.get<Response<KnowledgeCluster[]>>('/star/cs_kb_clusters',{params})).data); }
   async cluster(id:number) { return unwrap((await this.client.get<Response<KnowledgeClusterDetail>>(`/star/cs_kb_cluster/${id}`)).data); }
-  async metrics() { return unwrap((await this.client.get<Response<KnowledgeMetrics>>('/star/cs_kb_metrics')).data); }
+  async metrics(params:Record<string,unknown>={}) { return unwrap((await this.client.get<Response<KnowledgeMetrics>>('/star/cs_kb_metrics',{params})).data); }
   async act(data:Record<string,unknown>) { return unwrap((await this.client.put<Response<KnowledgeCluster>>('/star/cs_kb_candidates',data)).data); }
   async batch(data:{ action:'approve'|'reject'|'merge'|'retry'; items?:KnowledgeBatchItem[]; filters?:Omit<KnowledgeFilters,'tab'> & { tab:KnowledgeTab }; target_id?:number; reason?:string; remember?:boolean; background?:boolean }) {
     return unwrap((await this.client.post<Response<{ action:string; queued:boolean; job_id?:string; total?:number; results?:KnowledgeBatchResult[]; succeeded:number; failed:number }>>('/star/cs_kb_batch',data)).data);

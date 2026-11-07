@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Button, Card, CardBody, Checkbox, Chip, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Pagination, Select, SelectItem, Spinner, Textarea } from '@heroui/react';
 import csKnowledgeApi, { KnowledgeBackfillReport, KnowledgeCluster, KnowledgeClusterDetail, KnowledgeFilters, KnowledgeMetrics, KnowledgeTab } from '../../services/csKnowledgeApi';
+import csProductApi from '../../services/csProductApi';
 import adminApi from '../../services/adminApi';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
@@ -24,6 +25,10 @@ export const CsKnowledgeWorkspace: React.FC<Props> = ({ selectedConversationIds,
   const { can } = useAdminAuth();
   const canManage = can('customer_service.knowledge.manage');
   const [tab, setTab] = useState<KnowledgeTab>('pending');
+  const [productId, setProductId] = useState(0);
+  const [products, setProducts] = useState<Array<{ id: number; name: string }>>([]);
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copyTarget, setCopyTarget] = useState<number | null>(null);
   const [source, setSource] = useState('all');
   const [minFrequency, setMinFrequency] = useState('');
   const [input, setInput] = useState('');
@@ -56,25 +61,29 @@ export const CsKnowledgeWorkspace: React.FC<Props> = ({ selectedConversationIds,
   const [mining, setMining] = useState<Record<string, unknown>>({});
   const detailVersion = useRef(0);
 
-  const filters = (): Omit<KnowledgeFilters, 'tab'> => ({ source: source === 'all' ? undefined : source, min_frequency: minFrequency || undefined, query: query || undefined });
+  const filters = (): Omit<KnowledgeFilters, 'tab'> => ({ source: source === 'all' ? undefined : source, min_frequency: minFrequency || undefined, query: query || undefined, product_id: productId });
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const result = await csKnowledgeApi.clusters({ tab, ...filters(), current_page: page, page_size: size, sort: 'frequency' });
+      const result = await csKnowledgeApi.clusters({ tab, ...filters(), product_id: productId, current_page: page, page_size: size, sort: 'frequency' });
       setRows(result.data); setTotal(result.total || 0);
       setSelected((current) => Object.fromEntries(Object.entries(current).filter(([id]) => result.data.some((row) => row.id === Number(id)))));
     } catch (caught) { setError(caught instanceof Error ? caught.message : '知识加载失败'); }
     finally { setLoading(false); }
-  }, [tab, source, minFrequency, query, page, size]);
+  }, [tab, source, minFrequency, query, page, size, productId]);
 
   const loadMetrics = useCallback(async () => {
-    try { setMetrics((await csKnowledgeApi.metrics()).data); } catch { /* 指标失败不阻塞列表 */ }
+    try { setMetrics((await csKnowledgeApi.metrics({ product_id: productId })).data); } catch { /* 指标失败不阻塞列表 */ }
+  }, []);
+
+  useEffect(() => {
+    void csProductApi.list().then((result) => setProducts(result.data.map((item) => ({ id: item.id, name: item.name })))).catch(() => undefined);
   }, []);
 
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => { void loadMetrics(); }, [loadMetrics]);
-  useEffect(() => { setSelected({}); setPage(1); }, [tab, source, minFrequency, query]);
+  useEffect(() => { void loadMetrics(); }, [loadMetrics, productId]);
+  useEffect(() => { setSelected({}); setPage(1); }, [tab, source, minFrequency, query, productId]);
 
   useEffect(() => {
     if (!initialMessageId) return;
@@ -195,6 +204,7 @@ export const CsKnowledgeWorkspace: React.FC<Props> = ({ selectedConversationIds,
     </div>
 
     <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+      <Select label="产品" selectedKeys={[String(productId)]} onSelectionChange={(keys) => setProductId(Number(Array.from(keys)[0] || 0))}>{products.map((product) => <SelectItem key={String(product.id)}>{product.name}</SelectItem>)}</Select>
       <Select label="来源" selectedKeys={[source]} onSelectionChange={(keys) => setSource(String(Array.from(keys)[0] || 'all'))}>{[{ id: 'all', name: '全部来源' }, ...Object.entries(sources).map(([id, name]) => ({ id, name }))].map((item) => <SelectItem key={item.id}>{item.name}</SelectItem>)}</Select>
       <Input label="最少出现次数" type="number" min="1" value={minFrequency} onValueChange={setMinFrequency} />
       <Select label="每页条数" selectedKeys={[String(size)]} onSelectionChange={(keys) => setSize(Number(Array.from(keys)[0] || 20))}>{[10, 20, 50, 100].map((value) => <SelectItem key={String(value)}>{value} 条</SelectItem>)}</Select>

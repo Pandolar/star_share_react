@@ -28,6 +28,8 @@ const PackagesManagePage = lazyWithRetry(() => import('./pages/admin/PackagesMan
 const SettingsManagePage = lazyWithRetry(() => import('./pages/admin/SettingsManagePage'), 'SettingsManagePage');
 const OrdersManagePage = lazyWithRetry(() => import('./pages/admin/OrdersManagePage'), 'OrdersManagePage');
 const CDKManagePage = lazyWithRetry(() => import('./pages/admin/CDKManagePage'), 'CDKManagePage');
+const ProductsManagePage = lazyWithRetry(() => import('./pages/admin/ProductsManagePage'), 'ProductsManagePage');
+const EmbedChatPage = lazyWithRetry(() => import('./pages/embed/EmbedChatPage'), 'EmbedChatPage');
 const UserPackagesManagePage = lazyWithRetry(() => import('./pages/admin/UserPackagesManagePage'), 'UserPackagesManagePage');
 const TeamsManagePage = lazyWithRetry(() => import('./pages/admin/TeamsManagePage'), 'TeamsManagePage');
 const InviteManagePage = lazyWithRetry(() => import('./pages/admin/InviteManagePage'), 'InviteManagePage');
@@ -146,6 +148,7 @@ const App: React.FC = () => {
 
                     {/* Admin管理后台路由 */}
                     <Route path="/star-admin/login" element={<AdminLoginPage />} />
+                    <Route path="/embed/chat" element={<EmbedChatPage />} />
                     {/* 客服工作台：独立于后台布局的全屏大页面 */}
                     <Route
                       path="/star-admin/service"
@@ -167,6 +170,7 @@ const App: React.FC = () => {
                       <Route path="orders" element={<RequireAdminPermission permission="order.read"><OrdersManagePage /></RequireAdminPermission>} />
                       <Route path="invoices" element={<RequireAdminPermission permission="invoice.read"><InvoicesManagePage /></RequireAdminPermission>} />
                       <Route path="cdk" element={<RequireAdminPermission permission="cdk.read"><CDKManagePage /></RequireAdminPermission>} />
+                      <Route path="products" element={<RequireAdminPermission permission="customer_service.knowledge.manage"><ProductsManagePage /></RequireAdminPermission>} />
                       <Route path="distributors" element={<RequireAdminPermission permission="distributor.read"><DistributorsManagePage /></RequireAdminPermission>} />
                       <Route path="sites" element={<RequireAdminPermission permission="site.read"><SitesManagePage /></RequireAdminPermission>} />
                       <Route path="commissions" element={<RequireAdminPermission permission="commission.read"><CommissionsManagePage /></RequireAdminPermission>} />

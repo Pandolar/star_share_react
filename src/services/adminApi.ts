@@ -771,7 +771,7 @@ class AdminApiService {
         return response.data.data;
     }
 
-    async getCsConversations(params: { current_page?: number; page_size?: number; filter?: string; category_id?: string; group_id?: string; querystring?: string } = {}): Promise<{ data: AdminCsConversation[]; total: number }> {
+    async getCsConversations(params: { current_page?: number; page_size?: number; filter?: string; category_id?: string; group_id?: string; query?: string; product_id?: number; querystring?: string } = {}): Promise<{ data: AdminCsConversation[]; total: number }> {
         const queryString = this.buildQueryString(params);
         const active = this.csConversationRequests.get(queryString);
         if (active) return active;

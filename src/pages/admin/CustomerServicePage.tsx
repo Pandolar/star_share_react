@@ -183,6 +183,8 @@ const CustomerServicePage: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [filter, setFilter] = useState('all');
   const [groupId, setGroupId] = useState('all');
+  const [productId, setProductId] = useState('all');
+  const [products, setProducts] = useState<Array<{ id: number; name: string }>>([]);
   const [groups, setGroups] = useState(GROUPS);
   const [remarkDraft, setRemarkDraft] = useState('');
   const [remarkOpen, setRemarkOpen] = useState(false);
@@ -259,7 +261,7 @@ const CustomerServicePage: React.FC = () => {
   const loadList = useCallback(
     async (silent = false) => {
       if (silent && (document.hidden || !document.hasFocus())) return;
-      const requestKey = `${page}:${filter}:${groupId}:${query.trim()}`;
+      const requestKey = `${page}:${filter}:${groupId}:${productId}:${query.trim()}`;
       const now = Date.now();
       if (silent && lastListRequest.current.key === requestKey && now - lastListRequest.current.at < 250) return;
       lastListRequest.current = { key: requestKey, at: now };
@@ -271,6 +273,7 @@ const CustomerServicePage: React.FC = () => {
           page_size: pageSize,
           filter,
           group_id: groupId === 'all' ? undefined : groupId,
+          product_id: productId === 'all' ? undefined : Number(productId),
           querystring: query.trim() || undefined,
         });
         if (requestId !== listRequestId.current) return;
@@ -325,7 +328,7 @@ const CustomerServicePage: React.FC = () => {
         if (requestId === listRequestId.current && !silent) setListLoading(false);
       }
     },
-    [filter, groupId, page, query]
+    [filter, groupId, productId, page, query]
   );
   const loadListRef = useRef(loadList);
   loadListRef.current = loadList;
@@ -553,6 +556,12 @@ const CustomerServicePage: React.FC = () => {
   useEffect(() => {
     void loadList();
   }, [loadList]);
+
+  useEffect(() => {
+    void import('../../services/csProductApi').then(({ default: api }) => api.list())
+      .then((result) => setProducts(result.data.map((item) => ({ id: item.id, name: item.name }))))
+      .catch(() => undefined);
+  }, []);
   // 浏览器自动播放策略：首次交互后解锁 AudioContext，后续提示音才能出声。
   useEffect(() => {
     const unlock = () => {
@@ -931,6 +940,24 @@ const CustomerServicePage: React.FC = () => {
                 {[
                   <SelectItem key="all">全部分组</SelectItem>,
                   ...groups.map((group) => <SelectItem key={group.id}>{group.name}</SelectItem>),
+                ]}
+              </Select>
+              <Select
+                size="sm"
+                aria-label="客服产品"
+                className="w-32 shrink-0"
+                selectedKeys={[productId]}
+                onSelectionChange={(keys) => {
+                  setProductId(String(Array.from(keys)[0] || 'all'));
+                  setRows([]);
+                  setTotal(0);
+                  setPage(1);
+                  setBatchSelection(new Set());
+                }}
+              >
+                {[
+                  <SelectItem key="all">全部产品</SelectItem>,
+                  ...products.map((product) => <SelectItem key={String(product.id)}>{product.name}</SelectItem>),
                 ]}
               </Select>
               <Tooltip content="刷新会话">
