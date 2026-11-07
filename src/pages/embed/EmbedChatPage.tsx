@@ -48,7 +48,7 @@ const EmbedChatPage: React.FC = () => {
   useEffect(() => {
     if (!productKey) { setError('缺少 product 参数'); setLoading(false); return; }
     setLoading(true);
-    void call(`/cs/public/config?key=${encodeURIComponent(productKey)}`)
+    void call(`/star-api/cs/config?key=${encodeURIComponent(productKey)}`)
       .then((data) => setConfig(data))
       .catch((caught) => setError(caught instanceof Error ? caught.message : '客服暂不可用'))
       .finally(() => setLoading(false));
@@ -56,7 +56,7 @@ const EmbedChatPage: React.FC = () => {
 
   useEffect(() => {
     if (!token) return;
-    void call('/cs/public/conversation')
+    void call('/star-api/cs/conversation')
       .then((data) => {
         setConversation(data.conversation);
         setMessages(data.messages || []);
@@ -68,7 +68,7 @@ const EmbedChatPage: React.FC = () => {
   useEffect(() => {
     if (!token) return;
     const timer = window.setInterval(() => {
-      void call(`/cs/public/conversation?after_id=${lastId.current}`)
+      void call(`/star-api/cs/conversation?after_id=${lastId.current}`)
         .then((data) => {
           if (!data.conversation) return;
           setConversation(data.conversation);
@@ -92,7 +92,7 @@ const EmbedChatPage: React.FC = () => {
     if (!content || busy) return;
     setBusy(true); setError('');
     try {
-      const data = await call('/cs/public/messages', {
+      const data = await call('/star-api/cs/messages', {
         method: 'POST',
         body: JSON.stringify({ content, client_msg_id: `web:${Date.now()}:${Math.random().toString(36).slice(2, 8)}` }),
       });

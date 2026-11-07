@@ -45,8 +45,8 @@ const Docs: React.FC<{ product: CsProduct }> = ({ product }) => {
   const widget = product.widget_key || '<尚未生成 widget_key>';
   const sdk = `<script src="${origin}/embed.js" data-cs-product="${key}" defer></script>\n<script>\n  CS.init({\n    product: '${key}',\n    tokenProvider: async () => (await fetch('/api/cs-token')).text(),\n    user: { id: '123', name: '张三' }\n  });\n</script>`;
   const iframe = `<iframe src="${origin}/embed/chat?product=${key}"\n        style="width:380px;height:560px;border:0"></iframe>`;
-  const signNode = `import crypto from 'node:crypto';\n\nconst key = '${key}';\nconst secret = process.env.CS_TOKEN_SECRET; // 后台创建/轮换时展示一次\nconst ts = Math.floor(Date.now() / 1000);\nconst signature = crypto.createHmac('sha256', secret)\n  .update(\`\${key}\\n\${ts}\\n\${userId}\`)\n  .digest('base64url');\n\nawait fetch('${origin}/cs/public/token', {\n  method: 'POST',\n  headers: { 'Content-Type': 'application/json', 'X-CS-Key': '${widget}', 'X-CS-Timestamp': String(ts), 'X-CS-Signature': signature },\n  body: JSON.stringify({ user_id: userId }),\n});`;
-  const signPython = `import base64, hashlib, hmac, time, requests\n\nkey = '${key}'\nsecret = os.environ['CS_TOKEN_SECRET']\nts = int(time.time())\nmessage = f'{key}\\n{ts}\\n{user_id}'.encode()\nsignature = base64.urlsafe_b64encode(hmac.new(secret.encode(), message, hashlib.sha256).digest()).rstrip(b'=').decode()\n\nrequests.post('${origin}/cs/public/token', json={'user_id': user_id},\n              headers={'X-CS-Key': '${widget}', 'X-CS-Timestamp': str(ts), 'X-CS-Signature': signature}, timeout=10)`;
+  const signNode = `import crypto from 'node:crypto';\n\nconst key = '${key}';\nconst secret = process.env.CS_TOKEN_SECRET; // 后台创建/轮换时展示一次\nconst ts = Math.floor(Date.now() / 1000);\nconst signature = crypto.createHmac('sha256', secret)\n  .update(\`\${key}\\n\${ts}\\n\${userId}\`)\n  .digest('base64url');\n\nawait fetch('${origin}/star-api/cs/token', {\n  method: 'POST',\n  headers: { 'Content-Type': 'application/json', 'X-CS-Key': '${widget}', 'X-CS-Timestamp': String(ts), 'X-CS-Signature': signature },\n  body: JSON.stringify({ user_id: userId }),\n});`;
+  const signPython = `import base64, hashlib, hmac, time, requests\n\nkey = '${key}'\nsecret = os.environ['CS_TOKEN_SECRET']\nts = int(time.time())\nmessage = f'{key}\\n{ts}\\n{user_id}'.encode()\nsignature = base64.urlsafe_b64encode(hmac.new(secret.encode(), message, hashlib.sha256).digest()).rstrip(b'=').decode()\n\nrequests.post('${origin}/star-api/cs/token', json={'user_id': user_id},\n              headers={'X-CS-Key': '${widget}', 'X-CS-Timestamp': str(ts), 'X-CS-Signature': signature}, timeout=10)`;
   return <Tabs aria-label="接入文档" variant="underlined">
     <Tab key="sdk" title="SDK 气泡（推荐）"><div className="space-y-3">
       <p className="text-sm text-default-600">在任意页面引入一行脚本即可出现右下角气泡；已登录用户由产品后端签发 token。未配置 <Code>tokenProvider</Code> 时按匿名处理（若产品允许）。</p>
@@ -67,11 +67,11 @@ const Docs: React.FC<{ product: CsProduct }> = ({ product }) => {
     </div></Tab>
     <Tab key="rest" title="REST 接口"><div className="space-y-2 text-sm">
       {[
-        ['POST /cs/public/token', '产品后端换取 15 分钟用户令牌（需签名头）'],
-        ['GET /cs/public/config?…', '拉取欢迎语、入口、分类；需 X-CS-Key'],
-        ['GET /cs/public/conversation', '拉取当前用户在本产品的会话与消息（X-CS-Key + X-CS-User-Token）'],
-        ['POST /cs/public/conversation', '创建/复用会话'],
-        ['POST /cs/public/messages', '发送文本消息，触发 AI/转人工'],
+        ['POST /star-api/cs/token', '产品后端换取 15 分钟用户令牌（需签名头）'],
+        ['GET /star-api/cs/config?…', '拉取欢迎语、入口、分类；需 X-CS-Key'],
+        ['GET /star-api/cs/conversation', '拉取当前用户在本产品的会话与消息（X-CS-Key + X-CS-User-Token）'],
+        ['POST /star-api/cs/conversation', '创建/复用会话'],
+        ['POST /star-api/cs/messages', '发送文本消息，触发 AI/转人工'],
       ].map(([path, desc]) => <div key={path} className="flex flex-wrap items-baseline gap-2 rounded border border-divider p-2"><Code>{path}</Code><span className="text-default-600">{desc}</span></div>)}
       <p className="text-xs text-default-500">所有接口都按产品隔离；请勿把 widget_key 与 token 密钥写进前端。</p>
     </div></Tab>
