@@ -386,7 +386,7 @@ export const ProfileTab: React.FC = () => {
                       <ManageRow icon={<Trash2 size={15} />} label="注销账号" danger open={manageRow === 'delete'} status="不可恢复" onPress={() => setManageRow((row) => (row === 'delete' ? null : 'delete'))} />
                       {manageRow === 'delete' && (
                         <div className="mx-3 mb-2 rounded-lg border border-danger-100 bg-danger-50/40 p-3">
-                          <p className="text-xs text-danger-600/90">注销后账号不可恢复，已购权益失效且不退款，所有数据均已物理销毁；同邮箱/微信重新注册为全新账号。</p>
+                          <p className="text-xs text-danger-600/90">注销后账号不可恢复，已购权益失效且不退款；该邮箱将被平台拉黑，永久无法再次注册，如需继续使用平台只能更换邮箱。</p>
                           <Button size="sm" color="danger" variant="flat" className="mt-2" onPress={() => setDeleteAccountOpen(true)}>注销账号</Button>
                         </div>
                       )}

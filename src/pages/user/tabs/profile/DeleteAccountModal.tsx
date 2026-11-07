@@ -153,7 +153,7 @@ export const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({ isOpen, 
         {loading && <div className="flex justify-center py-12"><Spinner label="正在加载注销条件..." /></div>}
         {error && <Alert color="danger" title={error} />}
         {preview && <div className="space-y-5">
-          <Alert color="danger" variant="flat" title="此操作不可撤销" description="账号不可恢复，已购权益失效且不退款，所有数据均已物理销毁。同邮箱/微信重新注册为全新账号，不恢复旧数据或权益。" />
+          <Alert color="danger" variant="flat" title="此操作不可撤销" description="账号不可恢复，已购权益失效且不退款。注销后该邮箱将被平台拉黑，永久无法再次注册；如需继续使用平台，只能更换其他邮箱注册。" />
           <div className="rounded-lg border border-default-200 p-4 text-sm"><p className="mb-2 font-medium">注销将影响</p><div className="grid grid-cols-2 gap-2 text-default-600"><span>套餐：{preview.consequences.packages}</span><span>团队成员身份：{preview.consequences.team_memberships}</span><span>拥有的团队：{preview.consequences.owned_teams}</span><span>待处理订单：{preview.consequences.pending_orders}</span><span className="col-span-2">可用返现：{preview.consequences.cashback_available}</span></div></div>
           {blocked ? <Alert color="warning" title="暂时无法注销" description={<ul className="list-disc pl-4">{preview.blockers.map((item) => <li key={item.code}>{item.message}</li>)}</ul>} /> : <>
             <RadioGroup label="二次验证" value={method || undefined} onValueChange={(value) => { setMethod(value as VerificationMethod); setCredential(''); setQrUrl(''); }}>
