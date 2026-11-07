@@ -75,6 +75,12 @@ const CDKManagePage: React.FC = () => {
     const [total, setTotal] = useState(0);
     const [selectedCDK, setSelectedCDK] = useState<CDK | null>(null);
     const [formData, setFormData] = useState<Partial<CreateCDKRequest & UpdateCDKRequest>>({});
+    // 生成CDK使用独立表单：数量/有效期按字符串保存，提交时再严格解析，避免受控数值组件丢值。
+    const [createForm, setCreateForm] = useState<{ number: string; expires_days: string; package_id?: number; distributor_id: number | null; remarks: string }>({
+        number: '', expires_days: '', package_id: undefined, distributor_id: null, remarks: '',
+    });
+    const [packagesError, setPackagesError] = useState('');
+    const [packagesLoading, setPackagesLoading] = useState(false);
 
     // Modal控制
     const { isOpen: isCreateOpen, onOpen: onCreateOpen, onClose: onCreateClose } = useDisclosure();
@@ -102,13 +108,21 @@ const CDKManagePage: React.FC = () => {
 
     // 获取套餐列表（用于生成CDK）
     const fetchPackages = useCallback(async () => {
+        setPackagesLoading(true);
+        setPackagesError('');
         try {
             const response = await adminApiService.getPackages({ current_page: 1, page_size: 1000 });
-            if (response.code === 20000) {
-                setPackages(Array.isArray(response.data) ? response.data : []);
-            }
-        } catch {
-            showToast('获取套餐选项失败', 'error');
+            if (response.code !== 20000) throw new Error(response.msg || '获取套餐选项失败');
+            const list = Array.isArray(response.data) ? response.data : [];
+            setPackages(list);
+            if (!list.length) setPackagesError('后端没有返回任何套餐，请先在「套餐管理」创建套餐');
+            return list.length > 0;
+        } catch (error) {
+            setPackages([]);
+            setPackagesError(error instanceof Error ? error.message : '获取套餐选项失败');
+            return false;
+        } finally {
+            setPackagesLoading(false);
         }
     }, []);
 
@@ -269,22 +283,33 @@ const CDKManagePage: React.FC = () => {
         }
     };
 
+    const openCreate = () => {
+        setCreateForm({ number: '', expires_days: '', package_id: undefined, distributor_id: null, remarks: '' });
+        onCreateOpen();
+        void fetchPackages();
+    };
+
+    const digitsOnly = (value: string) => value.replace(/[^0-9]/g, '');
+
     // 处理批量生成CDK
     const handleCreate = async () => {
         try {
-            const createData = formData as CreateCDKRequest;
-            if (!createData.number || !createData.package_id) {
-                showToast('生成数量和关联套餐不能为空', 'warning');
-                return;
-            }
-            if (!Number.isInteger(createData.number) || createData.number < 1 || createData.number > 10000) {
-                showToast('生成数量必须是 1-10000 的整数', 'warning');
-                return;
-            }
-            if (createData.expires_days !== undefined && (!Number.isInteger(createData.expires_days) || createData.expires_days < 0)) {
-                showToast('有效期必须是大于等于 0 的整数', 'warning');
-                return;
-            }
+            const countText = createForm.number.trim();
+            const count = Number(countText);
+            const expiresText = createForm.expires_days.trim();
+            const expiresDays = expiresText === '' ? 0 : Number(expiresText);
+            if (!countText) { showToast('请填写生成数量', 'warning'); return; }
+            if (!Number.isInteger(count) || count < 1 || count > 10000) { showToast('生成数量必须是 1-10000 的整数', 'warning'); return; }
+            if (!Number.isInteger(expiresDays) || expiresDays < 0) { showToast('有效期必须是大于等于 0 的整数', 'warning'); return; }
+            if (!createForm.package_id) { showToast('请选择关联套餐', 'warning'); return; }
+            if (!packages.length) { showToast(packagesError || '套餐列表为空，请先刷新套餐', 'warning'); return; }
+            const createData: CreateCDKRequest = {
+                number: count,
+                package_id: createForm.package_id,
+                expires_days: expiresDays,
+                distributor_id: createForm.distributor_id,
+                remarks: createForm.remarks.trim() || undefined,
+            };
 
             const response = await adminApiService.createCDKs(createData);
             if (response.code === 20000) {
@@ -294,12 +319,12 @@ const CDKManagePage: React.FC = () => {
                 showToast(`成功生成 ${count} 个CDK${batchId ? `（批次：${batchId}）` : ''}`, 'success');
                 onCreateClose();
                 fetchCDKs();
-                setFormData({});
+                setCreateForm({ number: '', expires_days: '', package_id: undefined, distributor_id: null, remarks: '' });
             } else {
                 showToast(response.msg || '生成CDK失败', 'error');
             }
-        } catch {
-            showToast('生成CDK失败', 'error');
+        } catch (error) {
+            showToast(error instanceof Error ? error.message : '生成CDK失败', 'error');
         }
     };
 
@@ -638,7 +663,7 @@ const CDKManagePage: React.FC = () => {
                             <DropdownItem key="export-full" startContent={<Download className="w-4 h-4" />} onPress={() => handleExport('full')}>导出完整版</DropdownItem>
                         </DropdownMenu>
                     </Dropdown>}
-                    {canCreate && <Button color="primary" startContent={<Plus className="w-4 h-4" />} onPress={onCreateOpen}>
+                    {canCreate && <Button color="primary" startContent={<Plus className="w-4 h-4" />} onPress={openCreate}>
                         批量生成
                     </Button>}
                 </div>
@@ -810,33 +835,35 @@ const CDKManagePage: React.FC = () => {
                     </ModalHeader>
                     <ModalBody>
                         <div className="space-y-4">
+                            {packagesError && <Alert color="warning" title="套餐选项不可用" description={packagesError} endContent={<Button size="sm" variant="flat" onPress={() => void fetchPackages()}>重新加载</Button>} />}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <NumberInput
+                                <Input
                                     label="生成数量"
-                                    placeholder="请输入生成数量"
-                                    value={formData.number}
-                                    onValueChange={(number) => setFormData({ ...formData, number: Number.isNaN(number) ? undefined : number })}
-                                    minValue={1}
-                                    maxValue={10000}
-                                    step={1}
+                                    placeholder="请输入生成数量（1-10000）"
+                                    value={createForm.number}
+                                    onValueChange={(value) => setCreateForm((current) => ({ ...current, number: digitsOnly(value) }))}
+                                    inputMode="numeric"
                                     isRequired
                                 />
-                                <NumberInput
+                                <Input
                                     label="有效期（天）"
                                     placeholder="0 或留空 = 永不过期"
-                                    value={(formData as CreateCDKRequest).expires_days}
-                                    onValueChange={(expires_days) => setFormData({ ...formData, expires_days: Number.isNaN(expires_days) ? undefined : expires_days })}
-                                    minValue={0}
-                                    step={1}
+                                    value={createForm.expires_days}
+                                    onValueChange={(value) => setCreateForm((current) => ({ ...current, expires_days: digitsOnly(value) }))}
+                                    inputMode="numeric"
                                     description="从生成时起算"
                                 />
                             </div>
                             <Select
                                 label="关联套餐"
-                                placeholder="选择关联套餐"
-                                selectedKeys={formData.package_id ? [String(formData.package_id)] : []}
-                                onSelectionChange={(keys) => setFormData({ ...formData, package_id: Number(Array.from(keys)[0]) })}
+                                placeholder={packagesLoading ? '正在加载套餐…' : packages.length ? '选择关联套餐' : '暂无可用套餐'}
+                                selectedKeys={createForm.package_id ? [String(createForm.package_id)] : []}
+                                onSelectionChange={(keys) => {
+                                    const key = Array.from(keys)[0];
+                                    setCreateForm((current) => ({ ...current, package_id: key ? Number(key) : undefined }));
+                                }}
                                 isRequired
+                                isDisabled={!packages.length}
                                 variant="bordered"
                             >
                                 {packages.map((pkg) => (
@@ -849,10 +876,10 @@ const CDKManagePage: React.FC = () => {
                                 <Select
                                     label="归属"
                                     placeholder="选择归属"
-                                    selectedKeys={[(formData as CreateCDKRequest).distributor_id ? String((formData as CreateCDKRequest).distributor_id) : 'self']}
+                                    selectedKeys={[createForm.distributor_id ? String(createForm.distributor_id) : 'self']}
                                     onSelectionChange={(keys) => {
                                         const val = String(Array.from(keys)[0] || 'self');
-                                        setFormData({ ...formData, distributor_id: val === 'self' ? null : Number(val) });
+                                        setCreateForm((current) => ({ ...current, distributor_id: val === 'self' ? null : Number(val) }));
                                     }}
                                     variant="bordered"
                                 >
@@ -867,8 +894,8 @@ const CDKManagePage: React.FC = () => {
                             <Textarea
                                 label="备注"
                                 placeholder="请输入备注信息（可选）"
-                                value={formData.remarks || ''}
-                                onValueChange={(remarks) => setFormData({ ...formData, remarks })}
+                                value={createForm.remarks}
+                                onValueChange={(remarks) => setCreateForm((current) => ({ ...current, remarks }))}
                                 minRows={2}
                                 variant="bordered"
                             />
@@ -878,7 +905,7 @@ const CDKManagePage: React.FC = () => {
                         <Button variant="light" onPress={onCreateClose}>
                             取消
                         </Button>
-                        <Button color="primary" onPress={handleCreate}>
+                        <Button color="primary" onPress={handleCreate} isDisabled={packagesLoading || !packages.length}>
                             生成
                         </Button>
                     </ModalFooter>
