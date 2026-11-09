@@ -183,8 +183,11 @@ const CustomerServicePage: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [filter, setFilter] = useState('all');
   const [groupId, setGroupId] = useState('all');
-  const [productId, setProductId] = useState('all');
+  const [productId, setProductId] = useState<string>(() => {
+    try { return window.localStorage.getItem('cs_product_filter') || '0'; } catch { return '0'; }
+  });
   const [products, setProducts] = useState<Array<{ id: number; name: string }>>([]);
+  const productName = (id?: number | null) => (id ? (products.find((product) => product.id === id)?.name || `产品 #${id}`) : '默认产品');
   const [groups, setGroups] = useState(GROUPS);
   const [remarkDraft, setRemarkDraft] = useState('');
   const [remarkOpen, setRemarkOpen] = useState(false);
@@ -847,6 +850,25 @@ const CustomerServicePage: React.FC = () => {
         <Button size="sm" variant="light" startContent={<ArrowLeft className="h-4 w-4" />} onPress={() => navigate('/star-admin')}>
           返回后台
         </Button>
+        <Select
+          size="sm"
+          aria-label="切换客服产品"
+          className="w-44 shrink-0"
+          labelPlacement="outside-left"
+          selectedKeys={[productId]}
+          onSelectionChange={(keys) => {
+            const value = String(Array.from(keys)[0] || '0');
+            setProductId(value);
+            try { window.localStorage.setItem('cs_product_filter', value); } catch { /* 忽略隐私模式 */ }
+            setRows([]); setTotal(0); setPage(1); setBatchSelection(new Set());
+          }}
+        >
+          {[
+            <SelectItem key="0">默认产品</SelectItem>,
+            ...products.map((product) => <SelectItem key={String(product.id)}>{product.name}</SelectItem>),
+            <SelectItem key="all">全部产品</SelectItem>,
+          ]}
+        </Select>
         {canManageAi && <Button size="sm" variant="flat" startContent={<ShieldCheck className="h-4 w-4" />} onPress={() => setAiManagementOpen((value) => !value)}>AI 管理</Button>}
         <Popover placement="bottom-start" showArrow>
           <PopoverTrigger>
@@ -942,24 +964,6 @@ const CustomerServicePage: React.FC = () => {
                   ...groups.map((group) => <SelectItem key={group.id}>{group.name}</SelectItem>),
                 ]}
               </Select>
-              <Select
-                size="sm"
-                aria-label="客服产品"
-                className="w-32 shrink-0"
-                selectedKeys={[productId]}
-                onSelectionChange={(keys) => {
-                  setProductId(String(Array.from(keys)[0] || 'all'));
-                  setRows([]);
-                  setTotal(0);
-                  setPage(1);
-                  setBatchSelection(new Set());
-                }}
-              >
-                {[
-                  <SelectItem key="all">全部产品</SelectItem>,
-                  ...products.map((product) => <SelectItem key={String(product.id)}>{product.name}</SelectItem>),
-                ]}
-              </Select>
               <Tooltip content="刷新会话">
                 <Button isIconOnly size="sm" variant="light" aria-label="刷新会话" isLoading={listLoading} onPress={() => void loadList()}><RefreshCw className="h-4 w-4" /></Button>
               </Tooltip>
@@ -1043,6 +1047,7 @@ const CustomerServicePage: React.FC = () => {
                           <span className="min-w-0 flex-1 truncate text-sm font-medium">
                             {item.user.profile.username || item.user.profile.email || `用户 ${item.user.id}`}
                           </span>
+                          {productId === 'all' && <Chip size="sm" variant="flat" className="shrink-0">{productName(item.product_id)}</Chip>}
                           {item.admin_unread > 0 && (
                             <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-danger px-1 text-[11px] font-semibold text-white">
                               {item.admin_unread > 99 ? '99+' : item.admin_unread}
@@ -1083,6 +1088,7 @@ const CustomerServicePage: React.FC = () => {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 text-sm font-semibold">
                       <span className="truncate">{selected.user.profile.username || selected.user.profile.email || '用户'}</span>
+                      {productId === 'all' && <Chip size="sm" variant="flat" className="shrink-0">{productName(selected.product_id)}</Chip>}
                       {selected.is_pinned && <Pin className="h-3 w-3 shrink-0 text-warning" aria-label="已置顶" />}
                       {selected.group_id === 'supervisor' && <Tooltip content="主管待处理"><span className="shrink-0 text-secondary" aria-label="主管待处理"><Flag className="h-3 w-3" /></span></Tooltip>}
                     </div>

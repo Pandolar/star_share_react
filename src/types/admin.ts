@@ -983,6 +983,7 @@ export interface AdminCsUserSummary {
 }
 
 export interface AdminCsConversation extends ChatConversation {
+    product_id?: number;
     user: AdminCsUserSummary;
     waiting_seconds: number | null;
     assigned_admin: string | null;
