@@ -7,6 +7,7 @@ import type { Batch, CommandSettings, Directive, DirectivePlan, ScopeKind, Task,
 interface ScopeOptions {
   sites?: Array<{ id: number; name: string; domains: string[] }>;
   distributors?: Array<{ id: number; username: string; status: number }>;
+  products?: Array<{ id: number; key: string; name: string; status: string }>;
 }
 const statusLabels: Record<string, string> = {
   draft: '草稿', applied: '已应用', active: '生效中', needs_review: '待核实', paused: '已暂停',
@@ -93,6 +94,8 @@ export const CsCommandPanel: React.FC<{ selectedConversationIds: number[] }> = (
   const plan = directive?.plan;
   const scope = plan?.scope;
   const hasTaskFields = ['create_incident', 'create_knowledge', 'update_task'].includes(plan?.action || '');
+  const incidentScope = plan?.action === 'create_incident'
+    || (plan?.action === 'update_task' && (plan?.kind === 'incident' || tasks.find((task) => task.id === plan.task_id)?.kind === 'incident'));
   const requiresTarget = ['update_task', 'resolve_task', 'pause_task', 'resume_task', 'retire_task', 'prepare_batch'].includes(plan?.action || '');
   const canTask = (task: Task) => canManage && can(task.kind === 'incident' ? 'customer_service.incident.manage' : 'customer_service.knowledge.manage');
 
@@ -156,7 +159,7 @@ export const CsCommandPanel: React.FC<{ selectedConversationIds: number[] }> = (
     finally { busyRef.current = false; if (mounted.current) setBusy(false); }
   };
   const changePlan = (patch: Partial<DirectivePlan>) => setDirective((current) => current ? { ...current, plan: { ...current.plan, ...patch } } : null);
-  const changeScope = (patch: Partial<TaskScope>) => changePlan({ scope: { kind: 'self', site_ids: [], distributor_ids: [], domains: [], ...scope, ...patch } });
+  const changeScope = (patch: Partial<TaskScope>) => changePlan({ scope: { kind: 'self', site_ids: [], distributor_ids: [], domains: [], product_ids: [], ...scope, ...patch } });
   const createDraft = async () => {
     if (!command.trim()) throw new Error('请先输入要交代客服的事情');
     const next = await csCommandApi.createDirective({ text: command.trim(), request_key: requestKey.current,
@@ -178,7 +181,8 @@ export const CsCommandPanel: React.FC<{ selectedConversationIds: number[] }> = (
   };
   const manualDraft = async (kind: 'incident' | 'knowledge', target?: Task, preset: Partial<DirectivePlan> = {}) => {
     const value: DirectivePlan = target ? { ...target, action: 'update_task', task_id: target.id, expected_task_revision: target.revision } : {
-      action: kind === 'incident' ? 'create_incident' : 'create_knowledge', title: '', feature_key: '', scope: null,
+      action: kind === 'incident' ? 'create_incident' : 'create_knowledge', title: '', feature_key: '',
+      scope: kind === 'incident' ? { kind: 'products', site_ids: [], distributor_ids: [], domains: [], product_ids: [] } : null,
       keywords: [], excluded_keywords: [], reply: '', fallback_reply: '', internal_note: '',
       estimated_recovery_at: null, review_at: null, expires_at: null, missing_fields: [],
       explanation: '手工完善草稿，不调用模型，也不会自动生效。',
@@ -265,7 +269,14 @@ export const CsCommandPanel: React.FC<{ selectedConversationIds: number[] }> = (
             {(plan?.missing_fields || []).length > 0 && <p className="text-sm text-warning-700">解析时待补充：{plan?.missing_fields?.map((field) => fields[field] || field).join('、')}。填写后以服务端核对结果为准。</p>}
             <details className="rounded-lg border border-divider p-3"><summary className="cursor-pointer text-sm font-medium">核对与调整具体安排</summary><div className="mt-3 space-y-3">
             <Select label="准备执行什么" items={actions} selectedKeys={[plan?.action || 'clarify']} isDisabled={busy || directive.status !== 'draft' || !canManage}
-              onSelectionChange={(keys) => { const action = Array.from(keys)[0]; if (action) changePlan({ action: String(action) }); }}>
+              onSelectionChange={(keys) => {
+                const action = Array.from(keys)[0];
+                if (!action) return;
+                const next = String(action);
+                changePlan(next === 'create_incident' && scope?.kind !== 'products'
+                  ? { action: next, scope: { kind: 'products', site_ids: [], distributor_ids: [], domains: [], product_ids: [] } }
+                  : { action: next });
+              }}>
               {(item) => <SelectItem key={item.id}>{item.name}</SelectItem>}
             </Select>
             {requiresTarget && <Select label="对应任务" items={tasks} selectedKeys={plan?.task_id ? [String(plan.task_id)] : []}
@@ -278,19 +289,30 @@ export const CsCommandPanel: React.FC<{ selectedConversationIds: number[] }> = (
                 <Input label="内部任务名称（可留空）" placeholder="留空自动生成" value={plan?.title || ''} maxLength={255} isDisabled={busy || directive.status !== 'draft'} onValueChange={(title) => changePlan({ title })} />
                 <Input label="对应功能（可留空）" placeholder="默认 general" value={plan?.feature_key || ''} maxLength={128} isDisabled={busy || directive.status !== 'draft'} onValueChange={(feature_key) => changePlan({ feature_key })} description="同一功能保持同一个名称，用于发现重复或矛盾话术。" />
               </div>
-              <Select label="适用范围" items={scopeKinds} selectedKeys={scope ? [scope.kind] : []} placeholder={plan?.action === 'create_incident' ? '留空默认全站（临时故障）' : '必须明确选择，不会默认为全站'}
-                isDisabled={busy || directive.status !== 'draft'} onSelectionChange={(keys) => { const kind = Array.from(keys)[0]; if (kind) changeScope({ kind: String(kind) as ScopeKind }); }}>
-                {(item) => <SelectItem key={item.id}>{item.name}</SelectItem>}
-              </Select>
-              {scope?.kind === 'sites' && <Select label="选择站点" selectionMode="multiple" items={options.sites || []} selectedKeys={scope.site_ids.map(String)} isDisabled={busy || directive.status !== 'draft'}
-                onSelectionChange={(keys) => changeScope({ site_ids: Array.from(keys).map(Number) })}>
-                {(item) => <SelectItem key={String(item.id)}>{item.name} · {item.domains.join('、')}</SelectItem>}
-              </Select>}
-              {scope?.kind === 'distributors' && <Select label="选择代理" selectionMode="multiple" items={options.distributors || []} selectedKeys={scope.distributor_ids.map(String)} isDisabled={busy || directive.status !== 'draft'}
-                onSelectionChange={(keys) => changeScope({ distributor_ids: Array.from(keys).map(Number) })}>
-                {(item) => <SelectItem key={String(item.id)}>{item.username} · #{item.id}</SelectItem>}
-              </Select>}
-              {scope?.kind === 'domains' && <Textarea label="指定域名" value={scope.domains.join('\n')} isDisabled={busy || directive.status !== 'draft'} description="每行一个域名。按实际消息来源核对，不接受用户自报站点。" onValueChange={(value) => changeScope({ domains: splitWords(value) })} />}
+              {incidentScope ? <>
+                <Select label="产品范围（必选，可多选）" selectionMode="multiple" items={options.products || []}
+                  selectedKeys={(scope?.product_ids || []).map(String)} isDisabled={busy || directive.status !== 'draft'}
+                  placeholder="选择这个故障影响的产品"
+                  onSelectionChange={(keys) => changeScope({ kind: 'products', product_ids: Array.from(keys).map(Number) })}
+                  description="故障话术只对所选产品的会话生效；不选不能发布。默认产品=主站与未分配产品的会话。">
+                  {(item) => <SelectItem key={String(item.id)}>{item.name}{item.id === 0 ? '（主站）' : ''}</SelectItem>}
+                </Select>
+                {!(scope?.product_ids || []).length && <p className="text-xs text-warning-700">请选择至少一个产品，故障不会默认全站。</p>}
+              </> : <>
+                <Select label="适用范围" items={scopeKinds} selectedKeys={scope ? [scope.kind] : []} placeholder="必须明确选择，不会默认为全站"
+                  isDisabled={busy || directive.status !== 'draft'} onSelectionChange={(keys) => { const kind = Array.from(keys)[0]; if (kind) changeScope({ kind: String(kind) as ScopeKind }); }}>
+                  {(item) => <SelectItem key={item.id}>{item.name}</SelectItem>}
+                </Select>
+                {scope?.kind === 'sites' && <Select label="选择站点" selectionMode="multiple" items={options.sites || []} selectedKeys={scope.site_ids.map(String)} isDisabled={busy || directive.status !== 'draft'}
+                  onSelectionChange={(keys) => changeScope({ site_ids: Array.from(keys).map(Number) })}>
+                  {(item) => <SelectItem key={String(item.id)}>{item.name} · {item.domains.join('、')}</SelectItem>}
+                </Select>}
+                {scope?.kind === 'distributors' && <Select label="选择代理" selectionMode="multiple" items={options.distributors || []} selectedKeys={scope.distributor_ids.map(String)} isDisabled={busy || directive.status !== 'draft'}
+                  onSelectionChange={(keys) => changeScope({ distributor_ids: Array.from(keys).map(Number) })}>
+                  {(item) => <SelectItem key={String(item.id)}>{item.username} · #{item.id}</SelectItem>}
+                </Select>}
+                {scope?.kind === 'domains' && <Textarea label="指定域名" value={scope.domains.join('\n')} isDisabled={busy || directive.status !== 'draft'} description="每行一个域名。按实际消息来源核对，不接受用户自报站点。" onValueChange={(value) => changeScope({ domains: splitWords(value) })} />}
+              </>}
               <div className="grid gap-3 md:grid-cols-2">
                 <Input label="相关功能关键词" value={(plan?.keywords || []).join('，')} isDisabled={busy || directive.status !== 'draft'} onValueChange={(value) => changePlan({ keywords: splitWords(value) })} description="帮助识别话题，命中关键词不代表整段问题都属于故障。" />
                 <Input label="排除词" value={(plan?.excluded_keywords || []).join('，')} isDisabled={busy || directive.status !== 'draft'} onValueChange={(value) => changePlan({ excluded_keywords: splitWords(value) })} description="明确不应使用这份话术的问题。" />
@@ -309,7 +331,7 @@ export const CsCommandPanel: React.FC<{ selectedConversationIds: number[] }> = (
             </div></details>
             <div className="flex flex-wrap gap-2">
               <Button variant="flat" isDisabled={busy || !canManage || directive.status !== 'draft'} onPress={() => void run(async () => { await saveDraft(); setNotice('仅保存了草稿，任务尚未生效。'); })}>仅保存草稿</Button>
-              <Button color="primary" isDisabled={busy || !canManage || directive.status !== 'draft' || plan?.action === 'clarify'} onPress={() => void run(applyDraft)}>
+              <Button color="primary" isDisabled={busy || !canManage || directive.status !== 'draft' || plan?.action === 'clarify' || (incidentScope && !(scope?.product_ids || []).length)} onPress={() => void run(applyDraft)}>
                 {plan?.action?.startsWith('create_') ? '确认保存为任务草稿' : '确认执行已预览操作'}
               </Button>
             </div>
