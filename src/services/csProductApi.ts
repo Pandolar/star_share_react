@@ -14,6 +14,9 @@ export interface CsProduct {
   persona: { name?: string; tone?: string; forbidden?: string; escalate?: string };
   config_override: Record<string, unknown>;
   dataset_id: string | null;
+  context_url?: string | null;
+  has_context_secret?: boolean;
+  auto_refresh?: boolean;
   has_app_key: boolean;
   has_dataset_key: boolean;
   has_token_secret: boolean;
@@ -43,10 +46,10 @@ class CsProductApi {
     });
   }
   async list() { return unwrap((await this.client.get<Response<CsProduct[]>>('/star/cs_products')).data); }
-  async create(data: Partial<CsProduct> & { app_key?: string; dataset_key?: string }) {
+  async create(data: Partial<CsProduct> & { app_key?: string; dataset_key?: string; context_secret?: string }) {
     return unwrap((await this.client.post<Response<CsProduct>>('/star/cs_products', data)).data);
   }
-  async update(data: Partial<CsProduct> & { id: number; app_key?: string; dataset_key?: string }) {
+  async update(data: Partial<CsProduct> & { id: number; app_key?: string; dataset_key?: string; context_secret?: string }) {
     return unwrap((await this.client.put<Response<CsProduct>>('/star/cs_products', data)).data);
   }
   async rotate(id: number, action: 'widget_key' | 'token_secret') {

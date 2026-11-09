@@ -22,7 +22,7 @@ import {
 } from '@heroui/react';
 import { RefreshCw } from 'lucide-react';
 import adminApiService from '../../services/adminApi';
-import type { AdminCsConversationDetail } from '../../types/admin';
+import type { AdminCsConversationDetail, AdminCsProductContext } from '../../types/admin';
 
 const ORDER_PAGE_SIZE = 10;
 
@@ -58,6 +58,114 @@ const formatMoney = (value: string | number | null | undefined): string => {
 };
 
 const profileStatus = (status: number): string => (status === 1 ? '正常' : '已禁用');
+
+const BILLING_MODEL_LABELS: Record<string, string> = {
+  subscription: '订阅制', credits: '积分制', one_time: '一次性购买', usage: '按量计费', seat: '席位制', mixed: '混合计费', custom: '自定义计费',
+};
+const BILLING_STATUS_LABELS: Record<string, string> = {
+  active: '有效', trial: '试用', expired: '已过期', cancelled: '已取消', paid: '已支付', pending: '待支付', refunded: '已退款', failed: '支付失败',
+};
+const billingStatusColor = (status: string): 'success' | 'warning' | 'danger' | 'default' => {
+  if (status === 'active' || status === 'paid') return 'success';
+  if (status === 'trial' || status === 'pending') return 'warning';
+  if (status === 'expired' || status === 'failed') return 'danger';
+  return 'default';
+};
+const scalarEntries = (value: Record<string, string | number | boolean> | undefined | null): Array<[string, string]> =>
+  Object.entries(value || {}).map(([key, item]) => [key, typeof item === 'boolean' ? (item ? '是' : '否') : String(item)]);
+
+const ProductContextSection: React.FC<{ data: AdminCsProductContext; onRefresh: () => Promise<void> }> = ({ data, onRefresh }) => {
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState('');
+  const external = data.external;
+  const refresh = async () => {
+    setRefreshing(true); setRefreshError('');
+    try { await onRefresh(); }
+    catch (caught) { setRefreshError(caught instanceof Error ? caught.message : '刷新失败'); }
+    finally { setRefreshing(false); }
+  };
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-sm font-semibold">产品侧计费信息</h3>
+          <Chip size="sm" variant="flat">{data.product.name}</Chip>
+          {external ? <Chip size="sm" variant="flat" color={data.stale ? 'warning' : 'success'}>{data.stale ? '数据可能已过期' : '数据正常'}</Chip> : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {external?.as_of ? <span className="text-xs text-default-500">截至 {formatDateTime(external.as_of)}</span> : null}
+          {external?.links?.billing ? <a className="text-xs text-primary underline" href={external.links.billing} target="_blank" rel="noreferrer">产品账单</a> : null}
+          {external?.links?.orders ? <a className="text-xs text-primary underline" href={external.links.orders} target="_blank" rel="noreferrer">产品订单</a> : null}
+          {data.can_refresh ? <Button size="sm" variant="flat" isLoading={refreshing} startContent={<RefreshCw className="h-4 w-4" />} onPress={() => void refresh()}>刷新</Button> : null}
+        </div>
+      </div>
+      {refreshError ? <Alert color="danger" title="刷新失败" description={refreshError} /> : null}
+      {!external ? <p className="text-sm text-default-500">该产品未提供订阅/订单数据{data.error ? `（${data.error}）` : '。'}</p> : <>
+        {external.billing ? (
+          <p className="text-sm text-default-600">
+            <Chip size="sm" variant="flat">{BILLING_MODEL_LABELS[external.billing.model] || external.billing.model}</Chip>
+            {external.billing.summary ? <span className="ml-2">{external.billing.summary}</span> : null}
+          </p>
+        ) : null}
+        {external.balances?.length ? (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {external.balances.map((item) => (
+              <Card key={item.key} shadow="none" className="border border-divider"><CardBody className="gap-1 p-3">
+                <span className="text-xs text-default-500">{item.label}</span>
+                <span className="text-sm font-medium">{item.remaining}{item.unit || ''}{typeof item.total === 'number' ? ` / ${item.total}${item.unit || ''}` : ''}</span>
+                {item.reset_at ? <span className="text-xs text-default-400">重置：{formatDateTime(item.reset_at)}</span> : null}
+              </CardBody></Card>
+            ))}
+          </div>
+        ) : null}
+        {external.subscriptions?.length ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {external.subscriptions.map((item, index) => (
+              <Card key={`${item.id || item.plan_name}-${index}`} shadow="none" className="border border-divider"><CardBody className="gap-1 p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium">{item.plan_name}</span>
+                  <Chip size="sm" variant="flat" color={billingStatusColor(item.status)}>{BILLING_STATUS_LABELS[item.status] || item.status}</Chip>
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-default-600">
+                  {item.expires_at ? <span>到期：{formatDateTime(item.expires_at)}</span> : null}
+                  {typeof item.seats === 'number' ? <span>席位：{item.seats}</span> : null}
+                  {item.auto_renew ? <span>自动续费</span> : null}
+                </div>
+                {item.features?.length ? <span className="text-xs text-default-500">{item.features.join('、')}</span> : null}
+              </CardBody></Card>
+            ))}
+          </div>
+        ) : null}
+        {external.orders?.length ? (
+          <div className="overflow-x-auto rounded border border-divider">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-default-50 text-xs text-default-500"><tr><th className="px-2 py-1.5">订单</th><th className="px-2 py-1.5">套餐</th><th className="px-2 py-1.5">金额</th><th className="px-2 py-1.5">状态</th><th className="px-2 py-1.5">支付时间</th></tr></thead>
+              <tbody>
+                {external.orders.slice(0, 10).map((item, index) => (
+                  <tr key={`${item.id || item.plan_name}-${index}`} className="border-t border-divider">
+                    <td className="px-2 py-1.5 font-mono text-xs">{item.id || '-'}</td>
+                    <td className="px-2 py-1.5">{item.plan_name}</td>
+                    <td className="px-2 py-1.5">{item.amount} {item.currency}</td>
+                    <td className="px-2 py-1.5"><Chip size="sm" variant="flat" color={billingStatusColor(item.status)}>{BILLING_STATUS_LABELS[item.status] || item.status}</Chip></td>
+                    <td className="px-2 py-1.5 text-xs text-default-500">{formatDateTime(item.paid_at || item.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+        {scalarEntries(external.account).length || scalarEntries(external.extra).length ? (
+          <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+            {[...scalarEntries(external.account), ...scalarEntries(external.extra)].map(([key, value]) => (
+              <div key={key} className="rounded-medium bg-default-50 p-2"><span className="text-default-500">{key}：</span>{value}</div>
+            ))}
+          </div>
+        ) : null}
+        {data.error ? <Alert color="warning" variant="flat" title="最近一次同步失败" description={data.error} /> : null}
+      </>}
+    </section>
+  );
+};
 
 export interface Props {
   conversationId: number | null;
@@ -173,6 +281,14 @@ export default function CustomerServiceUserInfo({ conversationId, onClose }: Pro
                 </div>
               )}
             </section>
+
+            {detail.product_context && (detail.product_context.product.id !== 0 || detail.product_context.external) ? <>
+              <Divider />
+              <ProductContextSection data={detail.product_context} onRefresh={async () => {
+                await adminApiService.refreshCsProductContext(conversationId as number);
+                setRetry((value) => value + 1);
+              }} />
+            </> : null}
 
             <Divider />
 

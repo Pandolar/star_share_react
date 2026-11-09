@@ -10,6 +10,7 @@ import { showToast } from '../../components/Toast';
 
 type Draft = {
   id?: number; key: string; name: string; domains: string; app_key: string; dataset_id: string; dataset_key: string;
+  contextUrl: string; contextSecret: string; autoRefresh: boolean;
   personaName: string; personaTone: string; personaForbidden: string; personaEscalate: string;
   overrideText: string; status: 'active' | 'disabled';
   sdk: boolean; iframe: boolean; rest: boolean;
@@ -17,6 +18,7 @@ type Draft = {
 
 const emptyDraft = (): Draft => ({
   key: '', name: '', domains: '', app_key: '', dataset_id: '', dataset_key: '',
+  contextUrl: '', contextSecret: '', autoRefresh: false,
   personaName: '', personaTone: '', personaForbidden: '', personaEscalate: '',
   overrideText: '{\n  "welcome": {"message": "您好，请描述您的问题。"},\n  "entry": {"floating_bubble": "需要帮助？联系我们"}\n}',
   status: 'active', sdk: true, iframe: true, rest: true,
@@ -25,6 +27,7 @@ const emptyDraft = (): Draft => ({
 const draftOf = (product: CsProduct): Draft => ({
   id: product.id, key: product.key, name: product.name, domains: (product.domains || []).join('\n'),
   app_key: '', dataset_id: product.dataset_id || '', dataset_key: '',
+  contextUrl: product.context_url || '', contextSecret: '', autoRefresh: Boolean(product.auto_refresh),
   personaName: product.persona?.name || '', personaTone: product.persona?.tone || '',
   personaForbidden: product.persona?.forbidden || '', personaEscalate: product.persona?.escalate || '',
   overrideText: JSON.stringify(product.config_override || {}, null, 2),
@@ -50,6 +53,7 @@ const Docs: React.FC<{ product: CsProduct }> = ({ product }) => {
   return <Tabs aria-label="接入文档" variant="underlined">
     <Tab key="sdk" title="SDK 气泡（推荐）"><div className="space-y-3">
       <p className="text-sm text-default-600">在任意页面引入一行脚本即可出现右下角气泡；已登录用户由产品后端签发 token。未配置 <Code>tokenProvider</Code> 时按匿名处理（若产品允许）。</p>
+      <p className="text-sm text-default-600">如需客服展示该用户的订阅/积分/订单，签发 token 时一并提交 <Code>external_context</Code>（签名版本 2），详见仓库 <Code>docs/cs-product-integration.md</Code>。</p>
       <pre className="overflow-x-auto rounded-lg bg-default-100 p-3 text-xs">{sdk}</pre>
       <div className="flex gap-2"><CopyButton text={sdk} /><CopyButton text={widget} label="复制 widget_key" /></div>
       <p className="text-xs text-default-500">可选事件：<Code>CS.on('unread', n =&gt; ...)</Code>、<Code>CS.open()</Code>、<Code>CS.close()</Code>、<Code>CS.refreshToken()</Code>。</p>
@@ -130,9 +134,11 @@ export default function ProductsManagePage() {
       persona: { name: editor.personaName, tone: editor.personaTone, forbidden: editor.personaForbidden, escalate: editor.personaEscalate },
       config_override: override, status: editor.status,
       embed_modes: { sdk: editor.sdk, iframe: editor.iframe, rest: editor.rest },
+      context_url: editor.contextUrl.trim() || null, auto_refresh: editor.autoRefresh,
     };
     if (editor.app_key.trim()) payload.app_key = editor.app_key.trim();
     if (editor.dataset_key.trim()) payload.dataset_key = editor.dataset_key.trim();
+    if (editor.contextSecret.trim()) payload.context_secret = editor.contextSecret.trim();
     setBusy(true);
     try {
       if (editor.id) await csProductApi.update({ ...payload, id: editor.id } as never);
@@ -241,6 +247,11 @@ export default function ProductsManagePage() {
             <Input label="Dify 知识库 ID" value={editor.dataset_id} onValueChange={(value) => setEditor({ ...editor, dataset_id: value })} />
           </div>
           <Input label="Dify 知识库 key" type="password" placeholder={editor.id ? '留空表示不修改' : 'dataset-...'} value={editor.dataset_key} onValueChange={(value) => setEditor({ ...editor, dataset_key: value })} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input label="上下文拉取地址（可选）" placeholder="https://product.example.com/internal/cs/context" value={editor.contextUrl} onValueChange={(value) => setEditor({ ...editor, contextUrl: value })} description="产品提供只读接口时填写；留空则只接受推送" />
+            <Input label="上下文拉取密钥" type="password" placeholder={editor.id ? '留空表示不修改' : '与 token 密钥分开'} value={editor.contextSecret} onValueChange={(value) => setEditor({ ...editor, contextSecret: value })} />
+          </div>
+          <Checkbox isSelected={editor.autoRefresh} onValueChange={(value) => setEditor({ ...editor, autoRefresh: value })}>快照过期时，AI 回答前自动拉取最新上下文</Checkbox>
           <div className="grid gap-3 sm:grid-cols-2">
             <Input label="人设称呼" placeholder="例如：NiceCode 小助手" value={editor.personaName} onValueChange={(value) => setEditor({ ...editor, personaName: value })} />
             <Input label="语气" placeholder="简洁、专业" value={editor.personaTone} onValueChange={(value) => setEditor({ ...editor, personaTone: value })} />

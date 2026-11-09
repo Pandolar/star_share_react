@@ -1018,6 +1018,27 @@ export interface AdminCsPurchaseOrder {
     invoice_status?: string | null;
 }
 
+export interface AdminCsProductContext {
+    external: {
+        version: number;
+        as_of: string;
+        billing?: { model: string; summary?: string };
+        account?: Record<string, string | number | boolean>;
+        balances?: Array<{ key: string; label: string; remaining: number; total?: number; unit?: string; reset_at?: string }>;
+        subscriptions?: Array<{ id?: string; plan_name: string; status: string; started_at?: string; expires_at?: string; auto_renew?: boolean; seats?: number; features?: string[] }>;
+        orders?: Array<{ id?: string; plan_name: string; amount: string; currency: string; status: string; created_at?: string; paid_at?: string }>;
+        links?: Record<string, string>;
+        extra?: Record<string, string | number | boolean>;
+    } | null;
+    as_of: string | null;
+    received_at: string | null;
+    stale: boolean;
+    source?: string;
+    error: string | null;
+    can_refresh: boolean;
+    product: { id: number; key: string; name: string };
+}
+
 export interface AdminCsConversationDetail extends AdminCsConversation {
     purchase_history: {
         orders: AdminCsPurchaseOrder[];
@@ -1025,6 +1046,7 @@ export interface AdminCsConversationDetail extends AdminCsConversation {
         current_page: number;
         page_size: number;
     };
+    product_context?: AdminCsProductContext;
 }
 
 export interface AdminCsStats {

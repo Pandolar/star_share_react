@@ -50,6 +50,7 @@ import type {
     AdminTeamRecord,
     AdminCsConversation,
     AdminCsConversationDetail,
+    AdminCsProductContext,
     AdminCsStats,
     AdminLoginResult,
     AdminPermission,
@@ -795,6 +796,18 @@ class AdminApiService {
         const queryString = this.buildQueryString(params);
         const response = await this.api.get(`/star/cs_conversations/${id}${queryString ? `?${queryString}` : ''}`);
         if (response.data.code !== 20000) throw new Error(response.data.msg || '获取客服会话失败');
+        return response.data.data;
+    }
+
+    async getCsProductContext(conversationId: number): Promise<AdminCsProductContext> {
+        const response = await this.api.get(`/star/cs_conversation/product_context?id=${conversationId}`);
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '获取产品侧计费信息失败');
+        return response.data.data;
+    }
+
+    async refreshCsProductContext(conversationId: number): Promise<AdminCsProductContext> {
+        const response = await this.api.post('/star/cs_conversation/product_context', { id: conversationId });
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '刷新产品侧计费信息失败');
         return response.data.data;
     }
 
