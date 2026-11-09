@@ -176,12 +176,13 @@ export const CsCommandPanel: React.FC<{ selectedConversationIds: number[] }> = (
     ]);
     setThread({ ...latest, chat_history: history }); setDirective(latest); setTab('console');
   };
-  const manualDraft = async (kind: 'incident' | 'knowledge', target?: Task) => {
+  const manualDraft = async (kind: 'incident' | 'knowledge', target?: Task, preset: Partial<DirectivePlan> = {}) => {
     const value: DirectivePlan = target ? { ...target, action: 'update_task', task_id: target.id, expected_task_revision: target.revision } : {
       action: kind === 'incident' ? 'create_incident' : 'create_knowledge', title: '', feature_key: '', scope: null,
       keywords: [], excluded_keywords: [], reply: '', fallback_reply: '', internal_note: '',
       estimated_recovery_at: null, review_at: null, expires_at: null, missing_fields: [],
       explanation: '手工完善草稿，不调用模型，也不会自动生效。',
+      ...preset,
     };
     const next = await csCommandApi.createDirective({ text: target ? `手工修改任务 #${target.id}` : `手工创建${kind === 'incident' ? '故障' : '知识'}草稿`,
       request_key: keyForRequest(), manual: true, plan: value });
@@ -252,6 +253,7 @@ export const CsCommandPanel: React.FC<{ selectedConversationIds: number[] }> = (
           <div className="flex flex-wrap gap-2">
             <Button color="primary" isLoading={busy} isDisabled={!canManage || !installed || !command.trim()} onPress={() => void run(createDraft)}>发送交代</Button>
             <Button variant="flat" isDisabled={busy || !canManage || !installed} onPress={() => void run(() => manualDraft('incident'))}>手工填写故障</Button>
+            <Button variant="flat" color="warning" isDisabled={busy || !canManage || !installed} onPress={() => void run(() => manualDraft('incident', undefined, { reply: '当前功能出现临时故障，工程师正在处理，请稍后再试；如急需可直接联系我们。' }))}>快速登记故障</Button>
             <Button variant="flat" isDisabled={busy || !canManage || !installed} onPress={() => void run(() => manualDraft('knowledge'))}>手工填写长期答复</Button>
           </div>
           {directive && <Card><CardBody className="gap-4 p-4">
@@ -273,10 +275,10 @@ export const CsCommandPanel: React.FC<{ selectedConversationIds: number[] }> = (
             </Select>}
             {hasTaskFields && <>
               <div className="grid gap-3 md:grid-cols-2">
-                <Input label="内部任务名称" value={plan?.title || ''} maxLength={255} isDisabled={busy || directive.status !== 'draft'} onValueChange={(title) => changePlan({ title })} />
-                <Input label="对应功能" value={plan?.feature_key || ''} maxLength={128} isDisabled={busy || directive.status !== 'draft'} onValueChange={(feature_key) => changePlan({ feature_key })} description="同一功能保持同一个名称，用于发现重复或矛盾话术。" />
+                <Input label="内部任务名称（可留空）" placeholder="留空自动生成" value={plan?.title || ''} maxLength={255} isDisabled={busy || directive.status !== 'draft'} onValueChange={(title) => changePlan({ title })} />
+                <Input label="对应功能（可留空）" placeholder="默认 general" value={plan?.feature_key || ''} maxLength={128} isDisabled={busy || directive.status !== 'draft'} onValueChange={(feature_key) => changePlan({ feature_key })} description="同一功能保持同一个名称，用于发现重复或矛盾话术。" />
               </div>
-              <Select label="适用范围" items={scopeKinds} selectedKeys={scope ? [scope.kind] : []} placeholder="必须明确选择，不会默认为全站"
+              <Select label="适用范围" items={scopeKinds} selectedKeys={scope ? [scope.kind] : []} placeholder={plan?.action === 'create_incident' ? '留空默认全站（临时故障）' : '必须明确选择，不会默认为全站'}
                 isDisabled={busy || directive.status !== 'draft'} onSelectionChange={(keys) => { const kind = Array.from(keys)[0]; if (kind) changeScope({ kind: String(kind) as ScopeKind }); }}>
                 {(item) => <SelectItem key={item.id}>{item.name}</SelectItem>}
               </Select>
@@ -297,8 +299,8 @@ export const CsCommandPanel: React.FC<{ selectedConversationIds: number[] }> = (
               {(plan?.action === 'create_incident' || (plan?.action === 'update_task' && tasks.find((task) => task.id === plan.task_id)?.kind === 'incident')) && <>
                 <div className="grid gap-3 md:grid-cols-3">
                   <Input type="datetime-local" label="预计恢复（北京时间）" value={inputTime(plan?.estimated_recovery_at)} isDisabled={busy || directive.status !== 'draft'} onValueChange={(value) => changePlan({ estimated_recovery_at: transportTime(value) })} />
-                  <Input type="datetime-local" label="下次核实（北京时间）" value={inputTime(plan?.review_at)} isDisabled={busy || directive.status !== 'draft'} onValueChange={(value) => changePlan({ review_at: transportTime(value) })} isRequired />
-                  <Input type="datetime-local" label="旧话术到期（北京时间）" value={inputTime(plan?.expires_at)} isDisabled={busy || directive.status !== 'draft'} onValueChange={(value) => changePlan({ expires_at: transportTime(value) })} isRequired />
+                  <Input type="datetime-local" label="下次核实（可留空）" value={inputTime(plan?.review_at)} isDisabled={busy || directive.status !== 'draft'} onValueChange={(value) => changePlan({ review_at: transportTime(value) })} description="留空自动 30 分钟后核实" />
+                  <Input type="datetime-local" label="旧话术到期（可留空）" value={inputTime(plan?.expires_at)} isDisabled={busy || directive.status !== 'draft'} onValueChange={(value) => changePlan({ expires_at: transportTime(value) })} description="留空自动 2 小时后到期；到期只停止话术，不会宣称已恢复" />
                 </div>
                 <Textarea label="到点仍未确认恢复时怎么说" value={plan?.fallback_reply || ''} maxLength={2000} isDisabled={busy || directive.status !== 'draft'} onValueChange={(fallback_reply) => changePlan({ fallback_reply })} description="留空则转人工。到期不会自动宣称恢复，也不会继续引用过时的预计时间。" />
               </>}
