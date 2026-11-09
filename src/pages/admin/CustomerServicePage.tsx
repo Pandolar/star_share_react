@@ -562,7 +562,8 @@ const CustomerServicePage: React.FC = () => {
 
   useEffect(() => {
     void import('../../services/csProductApi').then(({ default: api }) => api.list())
-      .then((result) => setProducts(result.data.map((item) => ({ id: item.id, name: item.name }))))
+      // 接口会带回“默认产品”条目，这里剔除，避免下拉出现两个默认产品。
+      .then((result) => setProducts(result.data.filter((item) => !item.is_default && item.id !== 0).map((item) => ({ id: item.id, name: item.name }))))
       .catch(() => undefined);
   }, []);
   // 浏览器自动播放策略：首次交互后解锁 AudioContext，后续提示音才能出声。
