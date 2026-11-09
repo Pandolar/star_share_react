@@ -89,7 +89,7 @@ const ProductContextSection: React.FC<{ data: AdminCsProductContext; onRefresh: 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-semibold">产品侧计费信息</h3>
-          <Chip size="sm" variant="flat">{data.product.name}</Chip>
+          <Chip size="sm" variant="flat">{data.product?.name || '产品'}</Chip>
           {external ? <Chip size="sm" variant="flat" color={data.stale ? 'warning' : 'success'}>{data.stale ? '数据可能已过期' : '数据正常'}</Chip> : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -282,7 +282,7 @@ export default function CustomerServiceUserInfo({ conversationId, onClose }: Pro
               )}
             </section>
 
-            {detail.product_context && (detail.product_context.product.id !== 0 || detail.product_context.external) ? <>
+            {detail.product_context && (detail.product_context.product?.id !== 0 || detail.product_context.external) ? <>
               <Divider />
               <ProductContextSection data={detail.product_context} onRefresh={async () => {
                 await adminApiService.refreshCsProductContext(conversationId as number);
