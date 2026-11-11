@@ -41,6 +41,7 @@ import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
 import { showToast } from '../../components/Toast';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import CustomerServiceUserInfo from './CustomerServiceUserInfo';
+import ReplyDiagnosisBadge from '../../components/admin/ReplyDiagnosisBadge';
 import CustomerServiceContextPanel, { PaymentCardPrefill } from './CustomerServiceContextPanel';
 import { paymentMethodLabel } from '../../components/PaymentMethodSelector';
 import { CsAiManagementPanel } from './CsAiManagementPanel';
@@ -1070,6 +1071,7 @@ const CustomerServicePage: React.FC = () => {
                         </div>
                       </div>
                     </Button>
+                    {item.reply_diagnosis && <div className="shrink-0"><ReplyDiagnosisBadge diagnosis={item.reply_diagnosis} /></div>}
                   </div>
                 ))
               ) : (
@@ -1098,6 +1100,7 @@ const CustomerServicePage: React.FC = () => {
                       <span className="truncate">{selected.user.billing.has_entitlement ? selected.user.billing.entitlements.map((item) => item.name).join(' · ') : '暂无有效权益'}</span>
                     </div>
                   </div>
+                  {selected.reply_diagnosis && <div className="shrink-0"><ReplyDiagnosisBadge diagnosis={selected.reply_diagnosis} /></div>}
                   <Tooltip content={selected.user.profile.remarks ? `用户备注：${selected.user.profile.remarks}` : '添加用户备注'}>
                     <Button isIconOnly size="sm" variant="light" aria-label="用户备注" color={selected.user.profile.remarks ? 'primary' : 'default'} onPress={openRemark}><StickyNote className="h-4 w-4" /></Button>
                   </Tooltip>

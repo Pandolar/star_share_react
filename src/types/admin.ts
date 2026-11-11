@@ -1001,6 +1001,7 @@ export interface AdminCsConversation extends ChatConversation {
     follow_up_at?: string | null;
     follow_up_state?: 'waiting_user' | 'waiting_internal' | 'escalated' | null;
     handoff_reason?: string | null;
+    reply_diagnosis?: { code: string; label: string; detail: string; at?: string | null } | null;
     sla_overdue?: boolean;
 }
 
