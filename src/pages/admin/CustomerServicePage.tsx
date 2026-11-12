@@ -25,7 +25,7 @@ import {
   Tooltip,
   Textarea,
 } from '@heroui/react';
-import { ArrowLeft, Bell, BellOff, Bot, CircleDollarSign, Flag, Gauge, Headphones, KeyRound, ListTodo, MoreHorizontal, Pin, Plus, RefreshCw, RotateCcw, Search, Send, ShieldCheck, StickyNote, UserRound, Volume2, VolumeX, X, Zap } from 'lucide-react';
+import { ArrowLeft, Bell, BellOff, Bot, CircleDollarSign, Flag, Gauge, Headphones, KeyRound, ListTodo, MoreHorizontal, Pin, Plus, RefreshCw, RotateCcw, Search, Send, ShieldCheck, Sparkles, StickyNote, UserRound, Volume2, VolumeX, X, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import adminApiService from '../../services/adminApi';
 import UserPasswordResetModal from '../../components/admin/UserPasswordResetModal';
@@ -219,10 +219,17 @@ const CustomerServicePage: React.FC = () => {
   const [aiDraft, setAiDraft] = useState<ActiveAiDraft | null>(null);
   const [draftBusy, setDraftBusy] = useState(false);
   const [retryingAi, setRetryingAi] = useState(false);
+  const [generatingReply, setGeneratingReply] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const replyRef = useRef(reply); replyRef.current = reply;
   const aiDraftRef = useRef<ActiveAiDraft | null>(aiDraft); aiDraftRef.current = aiDraft;
   const sendingRef = useRef(sending); sendingRef.current = sending;
-  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
+  const attachmentsRef = useRef(attachments); attachmentsRef.current = attachments;
+  const messagesRef = useRef(messages); messagesRef.current = messages;
+  const generationTimerRef = useRef<number | null>(null);
+  const composerStates = useRef<Map<number, { reply: string; attachments: ChatAttachment[]; aiDraft: ActiveAiDraft | null }>>(new Map());
   const [batchSelection, setBatchSelection] = useState<Set<number>>(new Set());
   const [batchReplyOpen, setBatchReplyOpen] = useState(false);
   const [batchReply, setBatchReply] = useState('');
@@ -349,13 +356,24 @@ const CustomerServicePage: React.FC = () => {
   const openConversation = useCallback(
     async (conversation: AdminCsConversation) => {
       const requestId = ++messageRequestId.current;
+      const previousId = activeConversationId.current;
+      if (previousId && previousId !== conversation.id) {
+        composerStates.current.set(previousId, { reply: replyRef.current, attachments: attachmentsRef.current, aiDraft: aiDraftRef.current });
+      }
+      const savedComposer = composerStates.current.get(conversation.id);
+      if (generationTimerRef.current) {
+        window.clearInterval(generationTimerRef.current);
+        generationTimerRef.current = null;
+        setGeneratingReply(false);
+      }
       activeConversationId.current = conversation.id;
       refreshRequestId.current += 1;
       setSelected(conversation);
       setMessages([]);
-      setAttachments([]);
-      setReply('');
-      setAiDraft(null);
+      setHasMoreMessages(false);
+      setAttachments(savedComposer?.attachments ?? []);
+      setReply(savedComposer?.reply ?? '');
+      setAiDraft(savedComposer?.aiDraft ?? null);
       setRecallTarget(null);
       setMobileChat(true);
       setMessageLoading(true);
@@ -363,6 +381,7 @@ const CustomerServicePage: React.FC = () => {
         const result = await adminApiService.getCsMessages({ conversation_id: conversation.id, limit: 50 });
         if (requestId !== messageRequestId.current || activeConversationId.current !== conversation.id) return;
         setMessages(result.messages);
+        setHasMoreMessages(result.has_more);
         const latestDelivered = result.messages[result.messages.length - 1];
         const readResult = await adminApiService.markCsRead(conversation.id, latestDelivered?.id);
         if (requestId !== messageRequestId.current || activeConversationId.current !== conversation.id) return;
@@ -396,7 +415,12 @@ const CustomerServicePage: React.FC = () => {
       if (afterId && result.messages.some((message) => message.role === 'system')) {
         const fresh = await adminApiService.getCsMessages({ conversation_id: conversationId, limit: 50 });
         if (requestId !== refreshRequestId.current || activeConversationId.current !== conversationId) return;
-        setMessages(fresh.messages);
+        const hadOlder = messagesRef.current.length > fresh.messages.length;
+        setMessages((current) => {
+          const known = new Set(fresh.messages.map((message) => message.id));
+          return [...current.filter((message) => !known.has(message.id)), ...fresh.messages];
+        });
+        if (!hadOlder) setHasMoreMessages(fresh.has_more);
         result.messages = fresh.messages;
         result.conversation = fresh.conversation;
       } else {
@@ -684,6 +708,7 @@ const CustomerServicePage: React.FC = () => {
         setReply('');
         setAttachments([]);
       }
+      composerStates.current.set(conversationId, { reply: '', attachments: [], aiDraft: null });
       void loadList(true);
     } catch (error) {
       showToast(error instanceof Error ? error.message : '发送消息失败', 'error');
@@ -692,11 +717,18 @@ const CustomerServicePage: React.FC = () => {
     }
   };
   const loadAiDraft = useCallback(async (conversationId: number) => {
-    if (aiDraftRef.current || replyRef.current.trim() || sendingRef.current) return;
+    if (sendingRef.current) return;
     try {
       const result = await adminApiService.listCsDrafts({ conversation_id: conversationId });
+      const currentDraft = aiDraftRef.current;
+      if (currentDraft) {
+        // The draft may have been sent/expired elsewhere: drop the chip but keep any edited text.
+        if (!result.data.some((draft) => draft.id === currentDraft.id)) setAiDraft(null);
+        return;
+      }
+      if (replyRef.current.trim()) return;
       const draft = result.data[0];
-      if (!draft || aiDraftRef.current || replyRef.current.trim() || activeConversationId.current !== conversationId) return;
+      if (!draft || activeConversationId.current !== conversationId) return;
       setAiDraft({
         id: draft.id,
         content: draft.content || '',
@@ -728,6 +760,7 @@ const CustomerServicePage: React.FC = () => {
       }
       setAiDraft(null);
       setReply('');
+      composerStates.current.set(selected.id, { reply: '', attachments: [], aiDraft: null });
       showToast('已丢弃 AI 草稿', 'success');
     } catch (error) {
       showToast(error instanceof Error ? error.message : '丢弃草稿失败', 'error');
@@ -744,11 +777,100 @@ const CustomerServicePage: React.FC = () => {
       setRows((current) => sortConversationsByRecent(current.map((item) => item.id === updated.id ? { ...item, ...updated, reply_diagnosis: updated.reply_diagnosis ?? null } : item)));
       setAiDraft(null);
       setReply('');
+      composerStates.current.set(selected.id, { reply: '', attachments: [], aiDraft: null });
       showToast('已重新生成，请稍候', 'success');
     } catch (error) {
       showToast(error instanceof Error ? error.message : '重新生成失败', 'error');
     } finally {
       setRetryingAi(false);
+    }
+  };
+  const stopGenerationPoll = () => {
+    if (generationTimerRef.current) {
+      window.clearInterval(generationTimerRef.current);
+      generationTimerRef.current = null;
+    }
+  };
+  const generateReplyNow = async () => {
+    if (!selected || generatingReply || !canManageConversation) return;
+    if (selected.last_message_role !== 'user') {
+      showToast('当前没有待回复的用户消息', 'warning');
+      return;
+    }
+    const conversationId = selected.id;
+    setGeneratingReply(true);
+    try {
+      const updated = await adminApiService.retryCsAi(conversationId, selected.ai_revision ?? 0);
+      setSelected((current) => (current?.id === conversationId ? { ...current, ...updated, reply_diagnosis: updated.reply_diagnosis ?? null } : current));
+      setRows((current) => sortConversationsByRecent(current.map((item) => item.id === conversationId ? { ...item, ...updated, reply_diagnosis: updated.reply_diagnosis ?? null } : item)));
+      setAiDraft(null);
+      setReply('');
+      composerStates.current.set(conversationId, { reply: '', attachments: [], aiDraft: null });
+      stopGenerationPoll();
+      const startedAt = Date.now();
+      generationTimerRef.current = window.setInterval(async () => {
+        if (activeConversationId.current !== conversationId) {
+          stopGenerationPoll();
+          setGeneratingReply(false);
+          return;
+        }
+        try {
+          const drafts = await adminApiService.listCsDrafts({ conversation_id: conversationId });
+          const draft = drafts.data[0];
+          if (draft) {
+            const activeDraft: ActiveAiDraft = {
+              id: draft.id,
+              content: draft.content || '',
+              revision: draft.ai_meta?.revision ?? updated.ai_revision ?? -1,
+              reason: draft.ai_meta?.draft?.reason || draft.ai_meta?.reason,
+              confidence: draft.ai_meta?.confidence,
+            };
+            setAiDraft(activeDraft);
+            setReply(activeDraft.content);
+            composerStates.current.set(conversationId, { reply: activeDraft.content, attachments: [], aiDraft: activeDraft });
+            stopGenerationPoll();
+            setGeneratingReply(false);
+            showToast('AI 已生成回复，请确认发送', 'success');
+            return;
+          }
+          const latest = messagesRef.current[messagesRef.current.length - 1]?.id;
+          const fresh = await adminApiService.getCsMessages({ conversation_id: conversationId, after_id: latest, limit: 50 });
+          if (latest && fresh.messages.some((message) => message.role === 'admin')) {
+            stopGenerationPoll();
+            setGeneratingReply(false);
+            showToast('AI 已直接回复', 'success');
+          }
+        } catch { /* 继续轮询 */ }
+        if (Date.now() - startedAt > 90000) {
+          stopGenerationPoll();
+          setGeneratingReply(false);
+          showToast('AI 生成超时，请稍后再试', 'warning');
+        }
+      }, 2500);
+    } catch (error) {
+      stopGenerationPoll();
+      setGeneratingReply(false);
+      showToast(error instanceof Error ? error.message : 'AI 生成失败', 'error');
+    }
+  };
+  const loadMoreMessages = async () => {
+    if (!selected || loadingMoreMessages || !hasMoreMessages) return;
+    const conversationId = selected.id;
+    const firstId = messagesRef.current[0]?.id;
+    if (!firstId) return;
+    setLoadingMoreMessages(true);
+    try {
+      const result = await adminApiService.getCsMessages({ conversation_id: conversationId, before_id: firstId, limit: 50 });
+      if (activeConversationId.current !== conversationId) return;
+      setMessages((current) => {
+        const known = new Set(current.map((message) => message.id));
+        return [...result.messages.filter((message) => !known.has(message.id)), ...current];
+      });
+      setHasMoreMessages(result.has_more);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '加载更早消息失败', 'error');
+    } finally {
+      setLoadingMoreMessages(false);
     }
   };
   const sendQuickReply = async (quickReplyId: string) => {
@@ -1221,7 +1343,24 @@ const CustomerServicePage: React.FC = () => {
                     <AttachmentSummary key={attachment.id} attachment={attachment} />
                   ))}
                 <div className="min-h-0 flex-1 overflow-hidden">
-                  <ChatMessageList messages={messages.filter((message) => message.content_type !== 'ai_draft')} conversationKey={selected.id} selfRole="admin" loading={messageLoading} emptyText="暂无消息" scope="admin" userLastReadMessageId={selected.user_last_read_message_id} recallWindowMinutes={canRecall ? recallWindowMinutes : undefined} onRecall={canRecall ? setRecallTarget : undefined} onInspectKnowledge={canManageAi ? inspectKnowledge : undefined} />
+                  <ChatMessageList messages={messages.filter((message) => message.content_type !== 'ai_draft')} conversationKey={selected.id} selfRole="admin" loading={messageLoading} emptyText="暂无消息" scope="admin" hasMore={hasMoreMessages} loadingMore={loadingMoreMessages} onLoadMore={() => void loadMoreMessages()} userLastReadMessageId={selected.user_last_read_message_id} recallWindowMinutes={canRecall ? recallWindowMinutes : undefined} onRecall={canRecall ? setRecallTarget : undefined} onInspectKnowledge={canManageAi ? inspectKnowledge : undefined} />
+                </div>
+                <div className="mb-2 flex items-center justify-end gap-2">
+                  <Tooltip content={selected.last_message_role === 'user' ? '让 AI 立刻生成回复并填入输入框' : '当前没有待回复的用户消息'}>
+                    <span>
+                      <Button
+                        size="sm"
+                        variant="flat"
+                        color="secondary"
+                        isLoading={generatingReply}
+                        isDisabled={!canManageConversation || selected.last_message_role !== 'user'}
+                        startContent={!generatingReply ? <Sparkles className="h-3.5 w-3.5" /> : undefined}
+                        onPress={() => void generateReplyNow()}
+                      >
+                        立刻 AI 生成回复
+                      </Button>
+                    </span>
+                  </Tooltip>
                 </div>
                 <ReplyDiagnosisBanner
                   diagnosis={selected.reply_diagnosis}
