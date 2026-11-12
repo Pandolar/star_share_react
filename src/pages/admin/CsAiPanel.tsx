@@ -5,25 +5,8 @@ import adminApiService from '../../services/adminApi';
 import { showToast } from '../../components/Toast';
 import type { AdminCsConversation } from '../../types/admin';
 import { toLocalDateTimeInput } from '../../utils/localDateTime';
-const REASON_TEXT: Record<string, string> = {
-  provider_unavailable: '模型服务暂时不可用，已转人工',
-  ai_queue_overloaded: '处理排队超时，已转人工',
-  worker_timeout: '模型响应超时，已转人工',
-  draft_timeout: '建议长时间未确认，已转人工',
-  ai_disabled: '自动处理已关闭，转人工',
-  human_takeover: '客服已接管',
-  user_requested_human: '用户要求人工客服',
-  sensitive_request: '涉及敏感话题，转人工处理',
-  incident_followup: '事故话术后用户追问，转人工',
-  draft_rejected: '建议被驳回，转人工',
-  takeover_released: '接管已取消',
-  takeover_expired: '接管闲置超时，已自动交还',
-  new_episode: '新会话周期',
-  new_user_message: '用户补充了新消息',
-  incident_reply: '事故话术自动回复',
-  review_required: '等待人工确认后发送',
-};
-const reasonText = (reason?: string) => (reason ? REASON_TEXT[reason] || reason : '');
+import { csReasonText } from '../../utils/csReasonText';
+const reasonText = (reason?: string) => csReasonText(reason);
 
 
 type Draft = {

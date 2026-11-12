@@ -833,6 +833,12 @@ class AdminApiService {
         return response.data.data;
     }
 
+    async retryCsAi(conversationId: number, expected_revision: number): Promise<AdminCsConversation> {
+        const response = await this.api.post(`/star/cs_conversations/${conversationId}/ai_retry`, { expected_revision });
+        if (response.data.code !== 20000) throw new Error(response.data.msg || '重新生成失败');
+        return response.data.data;
+    }
+
     async sendCsMessage(data: { conversation_id: number; content: string; attachment_ids: string[]; quick_reply_id?: string; client_msg_id?: string }): Promise<ChatMessage> {
         const response = await this.api.post('/star/cs_messages', data);
         if (response.data.code !== 20000) throw new Error(response.data.msg || '发送客服消息失败');
@@ -930,7 +936,7 @@ class AdminApiService {
         if (response.data.code !== 20000) throw new Error(response.data.msg || '停止 AI 失败');
     }
 
-    async listCsDrafts(params: { conversation_id: number }): Promise<{ data: Array<{ id: number; content?: string; ai_meta?: { reason?: string; revision?: number; kb_hits?: Array<{ document_name?: string; content?: string }>; draft?: { status?: string; reason?: string } } }>; total: number }> {
+    async listCsDrafts(params: { conversation_id: number }): Promise<{ data: Array<{ id: number; content?: string; ai_meta?: { reason?: string; revision?: number; confidence?: number; kb_hits?: Array<{ document_name?: string; content?: string }>; draft?: { status?: string; reason?: string } } }>; total: number }> {
         const response = await this.api.get(`/star/cs_drafts?${this.buildQueryString(params)}`);
         if (response.data.code !== 20000) throw new Error(response.data.msg || '获取 AI 草稿失败');
         return { data: response.data.data || [], total: Number(response.data.total) || 0 };

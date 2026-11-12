@@ -25,7 +25,7 @@ import {
   Tooltip,
   Textarea,
 } from '@heroui/react';
-import { ArrowLeft, Bell, BellOff, CircleDollarSign, Flag, Gauge, Headphones, KeyRound, ListTodo, MoreHorizontal, Pin, Plus, RefreshCw, Search, Send, ShieldCheck, StickyNote, UserRound, Volume2, VolumeX, Zap } from 'lucide-react';
+import { ArrowLeft, Bell, BellOff, Bot, CircleDollarSign, Flag, Gauge, Headphones, KeyRound, ListTodo, MoreHorizontal, Pin, Plus, RefreshCw, RotateCcw, Search, Send, ShieldCheck, StickyNote, UserRound, Volume2, VolumeX, X, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import adminApiService from '../../services/adminApi';
 import UserPasswordResetModal from '../../components/admin/UserPasswordResetModal';
@@ -41,11 +41,15 @@ import { useWhiteLabel } from '../../contexts/WhiteLabelContext';
 import { showToast } from '../../components/Toast';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import CustomerServiceUserInfo from './CustomerServiceUserInfo';
-import ReplyDiagnosisBadge from '../../components/admin/ReplyDiagnosisBadge';
+import { csReasonText } from '../../utils/csReasonText';
+import ReplyDiagnosisBanner from '../../components/admin/ReplyDiagnosisBanner';
 import CustomerServiceContextPanel, { PaymentCardPrefill } from './CustomerServiceContextPanel';
+
 import { paymentMethodLabel } from '../../components/PaymentMethodSelector';
 import { CsAiManagementPanel } from './CsAiManagementPanel';
 import { CsConversationTools } from './CsAiPanel';
+
+type ActiveAiDraft = { id: number; content: string; revision: number; reason?: string; confidence?: number };
 
 const FILTERS = [
   ['all', '全部'],
@@ -212,6 +216,12 @@ const CustomerServicePage: React.FC = () => {
   const canResetUserPassword = can('user.password.reset');
   const [passwordResetOpen, setPasswordResetOpen] = useState(false);
   const [reply, setReply] = useState('');
+  const [aiDraft, setAiDraft] = useState<ActiveAiDraft | null>(null);
+  const [draftBusy, setDraftBusy] = useState(false);
+  const [retryingAi, setRetryingAi] = useState(false);
+  const replyRef = useRef(reply); replyRef.current = reply;
+  const aiDraftRef = useRef<ActiveAiDraft | null>(aiDraft); aiDraftRef.current = aiDraft;
+  const sendingRef = useRef(sending); sendingRef.current = sending;
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [batchSelection, setBatchSelection] = useState<Set<number>>(new Set());
   const [batchReplyOpen, setBatchReplyOpen] = useState(false);
@@ -345,6 +355,7 @@ const CustomerServicePage: React.FC = () => {
       setMessages([]);
       setAttachments([]);
       setReply('');
+      setAiDraft(null);
       setRecallTarget(null);
       setMobileChat(true);
       setMessageLoading(true);
@@ -644,15 +655,31 @@ const CustomerServicePage: React.FC = () => {
     const conversationId = selected.id;
     const content = reply.trim();
     const attachmentIds = attachments.map((item) => item.id);
+    if (aiDraft && attachments.length) {
+      showToast('AI 草稿暂不支持附件，请先丢弃草稿或改用普通回复', 'warning');
+      return;
+    }
     setSending(true);
     try {
-      const message = await adminApiService.sendCsMessage({
-        conversation_id: conversationId,
-        content,
-        attachment_ids: attachmentIds,
-        client_msg_id: newClientMessageId(),
-      });
-      applySentMessage(conversationId, message);
+      if (aiDraft) {
+        const result = await adminApiService.sendCsDraft(aiDraft.id, {
+          expected_revision: selected.ai_revision ?? aiDraft.revision,
+          content,
+          client_msg_id: newClientMessageId(),
+        });
+        applySentMessage(conversationId, result.message);
+        setSelected((current) => (current?.id === conversationId ? { ...current, ...result.conversation, reply_diagnosis: result.conversation.reply_diagnosis ?? null } : current));
+        setRows((current) => sortConversationsByRecent(current.map((item) => item.id === conversationId ? { ...item, ...result.conversation, reply_diagnosis: result.conversation.reply_diagnosis ?? null } : item)));
+        setAiDraft(null);
+      } else {
+        const message = await adminApiService.sendCsMessage({
+          conversation_id: conversationId,
+          content,
+          attachment_ids: attachmentIds,
+          client_msg_id: newClientMessageId(),
+        });
+        applySentMessage(conversationId, message);
+      }
       if (activeConversationId.current === conversationId) {
         setReply('');
         setAttachments([]);
@@ -662,6 +689,66 @@ const CustomerServicePage: React.FC = () => {
       showToast(error instanceof Error ? error.message : '发送消息失败', 'error');
     } finally {
       setSending(false);
+    }
+  };
+  const loadAiDraft = useCallback(async (conversationId: number) => {
+    if (aiDraftRef.current || replyRef.current.trim() || sendingRef.current) return;
+    try {
+      const result = await adminApiService.listCsDrafts({ conversation_id: conversationId });
+      const draft = result.data[0];
+      if (!draft || aiDraftRef.current || replyRef.current.trim() || activeConversationId.current !== conversationId) return;
+      setAiDraft({
+        id: draft.id,
+        content: draft.content || '',
+        revision: draft.ai_meta?.revision ?? -1,
+        reason: draft.ai_meta?.draft?.reason || draft.ai_meta?.reason,
+        confidence: draft.ai_meta?.confidence,
+      });
+      if (!replyRef.current.trim()) setReply(draft.content || '');
+    } catch { /* 草稿读取失败不打扰客服 */ }
+  }, []);
+  useEffect(() => {
+    const conversationId = selected?.id;
+    if (!conversationId) return;
+    void loadAiDraft(conversationId);
+    const timer = window.setInterval(() => void loadAiDraft(conversationId), 8000);
+    return () => window.clearInterval(timer);
+  }, [selected?.id, loadAiDraft]);
+  const discardAiDraft = async () => {
+    if (!aiDraft || !selected || draftBusy) return;
+    setDraftBusy(true);
+    try {
+      const result = await adminApiService.rejectCsDraft(aiDraft.id, {
+        expected_revision: selected.ai_revision ?? aiDraft.revision,
+        reason: 'manual_discard',
+      });
+      if (result.conversation) {
+        setSelected((current) => (current?.id === result.conversation.id ? { ...current, ...result.conversation, reply_diagnosis: result.conversation.reply_diagnosis ?? null } : current));
+        setRows((current) => sortConversationsByRecent(current.map((item) => item.id === result.conversation.id ? { ...item, ...result.conversation, reply_diagnosis: result.conversation.reply_diagnosis ?? null } : item)));
+      }
+      setAiDraft(null);
+      setReply('');
+      showToast('已丢弃 AI 草稿', 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '丢弃草稿失败', 'error');
+    } finally {
+      setDraftBusy(false);
+    }
+  };
+  const retryAi = async () => {
+    if (!selected || retryingAi) return;
+    setRetryingAi(true);
+    try {
+      const updated = await adminApiService.retryCsAi(selected.id, selected.ai_revision ?? 0);
+      setSelected((current) => (current?.id === updated.id ? { ...current, ...updated, reply_diagnosis: updated.reply_diagnosis ?? null } : current));
+      setRows((current) => sortConversationsByRecent(current.map((item) => item.id === updated.id ? { ...item, ...updated, reply_diagnosis: updated.reply_diagnosis ?? null } : item)));
+      setAiDraft(null);
+      setReply('');
+      showToast('已重新生成，请稍候', 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '重新生成失败', 'error');
+    } finally {
+      setRetryingAi(false);
     }
   };
   const sendQuickReply = async (quickReplyId: string) => {
@@ -1071,7 +1158,6 @@ const CustomerServicePage: React.FC = () => {
                         </div>
                       </div>
                     </Button>
-                    {item.reply_diagnosis && <div className="shrink-0"><ReplyDiagnosisBadge diagnosis={item.reply_diagnosis} /></div>}
                   </div>
                 ))
               ) : (
@@ -1100,7 +1186,6 @@ const CustomerServicePage: React.FC = () => {
                       <span className="truncate">{selected.user.billing.has_entitlement ? selected.user.billing.entitlements.map((item) => item.name).join(' · ') : '暂无有效权益'}</span>
                     </div>
                   </div>
-                  {selected.reply_diagnosis && <div className="shrink-0"><ReplyDiagnosisBadge diagnosis={selected.reply_diagnosis} /></div>}
                   <Tooltip content={selected.user.profile.remarks ? `用户备注：${selected.user.profile.remarks}` : '添加用户备注'}>
                     <Button isIconOnly size="sm" variant="light" aria-label="用户备注" color={selected.user.profile.remarks ? 'primary' : 'default'} onPress={openRemark}><StickyNote className="h-4 w-4" /></Button>
                   </Tooltip>
@@ -1138,6 +1223,24 @@ const CustomerServicePage: React.FC = () => {
                 <div className="min-h-0 flex-1 overflow-hidden">
                   <ChatMessageList messages={messages.filter((message) => message.content_type !== 'ai_draft')} conversationKey={selected.id} selfRole="admin" loading={messageLoading} emptyText="暂无消息" scope="admin" userLastReadMessageId={selected.user_last_read_message_id} recallWindowMinutes={canRecall ? recallWindowMinutes : undefined} onRecall={canRecall ? setRecallTarget : undefined} onInspectKnowledge={canManageAi ? inspectKnowledge : undefined} />
                 </div>
+                <ReplyDiagnosisBanner
+                  diagnosis={selected.reply_diagnosis}
+                  conversationId={selected.id}
+                  onRetry={canManageConversation ? (() => void retryAi()) : undefined}
+                  retrying={retryingAi}
+                />
+                {aiDraft && (
+                  <div className="mb-2 flex flex-wrap items-center gap-2 rounded-medium border border-secondary-200 bg-secondary-50 px-3 py-2 text-xs">
+                    <Bot className="h-4 w-4 shrink-0 text-secondary" />
+                    <span className="font-medium text-default-700">AI 拟定草稿，请确认后发送</span>
+                    {typeof aiDraft.confidence === 'number' && <span className="text-default-500">置信度 {(aiDraft.confidence * 100).toFixed(0)}%</span>}
+                    {aiDraft.reason && <span className="min-w-0 truncate text-default-500">{csReasonText(aiDraft.reason)}</span>}
+                    <div className="ml-auto flex shrink-0 items-center gap-1">
+                      {canManageConversation && <Button size="sm" variant="flat" startContent={<RotateCcw className="h-3.5 w-3.5" />} isDisabled={retryingAi} onPress={() => void retryAi()}>重新生成</Button>}
+                      {canManageConversation && <Button size="sm" variant="light" color="danger" startContent={<X className="h-3.5 w-3.5" />} isDisabled={draftBusy} onPress={() => void discardAiDraft()}>丢弃</Button>}
+                    </div>
+                  </div>
+                )}
                 {composerAttachmentConfig ? (
                   <ChatComposer
                     key={selected.id}
