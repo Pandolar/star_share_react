@@ -339,7 +339,7 @@ const CustomerServicePage: React.FC = () => {
         setSelected((current) => {
           if (!current) return null;
           const refreshed = nextRows.find((item) => item.id === current.id);
-          return refreshed ? { ...current, ...refreshed } : current;
+          return refreshed ? { ...current, ...refreshed, reply_diagnosis: refreshed.reply_diagnosis ?? null } : current;
         });
       } catch (error) {
         if (requestId === listRequestId.current && !silent) {
@@ -438,7 +438,7 @@ const CustomerServicePage: React.FC = () => {
       }
       if (requestId !== refreshRequestId.current || activeConversationId.current !== conversationId) return;
       const readConversation = { ...result.conversation, admin_unread: remainingUnread, unread: remainingUnread } as AdminCsConversation;
-      setSelected((current) => (current?.id === conversationId ? { ...current, ...readConversation } : current));
+      setSelected((current) => (current?.id === conversationId ? { ...current, ...readConversation, reply_diagnosis: readConversation.reply_diagnosis ?? null } : current));
       setRows((current) => sortConversationsByRecent(current.map((item) => (
         item.id === conversationId ? { ...item, ...readConversation } : item
       ))));
