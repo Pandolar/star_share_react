@@ -483,6 +483,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   <div className="flex items-start gap-2"><WalletCards className="mt-0.5 h-4 w-4 text-success" /><div><p className="text-sm font-medium">返现余额抵扣</p><p className="text-xs text-default-500">可用余额 ¥{cashbackCredit.available_amount}，开启后自动最大抵扣{Number(cashbackCredit.min_payable_amount || 0) > 0 ? `，保留现金 ¥${Number(cashbackCredit.min_payable_amount).toFixed(2)}` : ''}</p></div></div>
                   <Switch aria-label="使用返现余额抵扣" isSelected={cashbackSelected} onValueChange={handleCashbackSwitch} isDisabled={actionsDisabled || invoiceSelected} />
                 </div>
+                {invoiceSelected && (
+                  <p className="text-xs text-warning">已选择开票，返现抵扣与开票不可同时使用；取消开票后即可启用返现抵扣。</p>
+                )}
                 <p className="text-xs text-danger">成功购买后，返现余额抵扣部分不支持退回。</p>
               </CardBody>
             </Card>
