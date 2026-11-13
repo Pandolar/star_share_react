@@ -478,7 +478,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
           {features.cashback_credit && cashbackCredit?.enabled && Number(cashbackCredit.available_amount || 0) > 0 && paymentStatus === 'pending' && !qrCodeExpired && (
             <Card shadow="none" className="border border-success-200 bg-success-50/40">
-              <CardBody className="gap-3 p-4">
+              <CardBody className="gap-2 p-3 sm:gap-3 sm:p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-start gap-2"><WalletCards className="mt-0.5 h-4 w-4 text-success" /><div><p className="text-sm font-medium">返现余额抵扣</p><p className="text-xs text-default-500">可用余额 ¥{cashbackCredit.available_amount}，开启后自动最大抵扣{Number(cashbackCredit.min_payable_amount || 0) > 0 ? `，保留现金 ¥${Number(cashbackCredit.min_payable_amount).toFixed(2)}` : ''}</p></div></div>
                   <Switch aria-label="使用返现余额抵扣" isSelected={cashbackSelected} onValueChange={handleCashbackSwitch} isDisabled={actionsDisabled || invoiceSelected} />
@@ -602,6 +602,18 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           )}
         </ModalBody>
         <ModalFooter>
+          {activeOrder && paymentStatus === 'pending' && !qrCodeExpired && (
+            <div className="mb-2 flex w-full items-center justify-between rounded-medium bg-default-50 px-3 py-2 text-sm sm:hidden">
+              <span className="min-w-0 truncate text-default-600">
+                {cashbackSelected
+                  ? `返现抵扣 -¥${Number(ordinaryOrder?.cashback_credit_amount || 0).toFixed(2)}`
+                  : Number(cashbackCredit?.available_amount || 0) > 0
+                    ? `可用返现 ¥${Number(cashbackCredit?.available_amount || 0).toFixed(2)}${invoiceSelected ? '（开票时不可用）' : ''}`
+                    : '应付金额'}
+              </span>
+              <span className="ml-3 shrink-0 font-semibold text-primary">应付 ¥{activeOrder.payable_amount || '-'}</span>
+            </div>
+          )}
           {paymentStatus === 'pending' && !qrCodeExpired && (
             <div className="flex w-full flex-wrap items-center justify-between gap-2">
               <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">

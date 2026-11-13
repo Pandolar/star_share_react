@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Skeleton } from '@heroui/react';
-import { Headphones } from 'lucide-react';
+import { Copy, Headphones } from 'lucide-react';
 import { customerServiceApi } from '../../../services/userApi';
 import { useCustomerService } from '../../../contexts/CustomerServiceContext';
 import ChatComposer from '../../../components/chat/ChatComposer';
@@ -193,12 +193,12 @@ export default function CustomerServiceTab(): React.ReactElement {
         if (selected) await loadMessages(selected.id, { silent: true }).catch(() => {});
         return;
       }
-      // 手机端直接跳转支付页；桌面端展示二维码弹窗。
-      if (isMobileDevice && payment.payment_url) {
-        window.location.href = payment.payment_url;
-        return;
-      }
+      // 手机端先展示支付信息弹窗，再自动跳转；跳转失败时仍可在弹窗里手动打开。
       setCardPayment(payment);
+      if (isMobileDevice && payment.payment_url) {
+        toast.success('正在打开支付页面…');
+        window.setTimeout(() => { window.location.href = payment.payment_url as string; }, 200);
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '创建支付失败');
     } finally {
@@ -260,6 +260,7 @@ export default function CustomerServiceTab(): React.ReactElement {
             <p className="text-sm text-default-500">
               请使用{paymentMethodLabel(cardPayment?.pay_type || 'alipay')}支付 ¥{cardPayment?.payable_amount || '--'}
             </p>
+            {isMobileDevice && <p className="text-center text-xs text-default-400">若支付页面无法打开，请复制链接到手机浏览器继续支付。</p>}
             {cardPayment && (
               <img
                 src={generateQRCodeDataUrl(cardPayment.qr_code || cardPayment.payment_url || '')}
@@ -269,11 +270,16 @@ export default function CustomerServiceTab(): React.ReactElement {
             )}
             <p className="text-xs text-default-400">支付完成后卡片会自动更新为已支付</p>
           </ModalBody>
-          <ModalFooter>
+          <ModalFooter className="flex-wrap gap-2">
             {cardPayment?.payment_url && (
-              <Button variant="flat" color="primary" onPress={() => window.open(cardPayment.payment_url || '', '_blank')}>
-                打开支付页面
-              </Button>
+              <>
+                <Button variant="flat" color="primary" onPress={() => window.open(cardPayment.payment_url || '', '_blank')}>
+                  打开支付页面
+                </Button>
+                <Button variant="flat" startContent={<Copy size={14} />} onPress={() => {
+                  void navigator.clipboard.writeText(cardPayment.payment_url || '').then(() => toast.success('支付链接已复制')).catch(() => toast.error('复制失败，请长按链接手动复制'));
+                }}>复制链接</Button>
+              </>
             )}
             <Button variant="light" onPress={() => setCardPayment(null)}>关闭</Button>
           </ModalFooter>

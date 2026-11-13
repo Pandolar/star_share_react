@@ -437,11 +437,28 @@ const UserCenter: React.FC = () => {
           isIconOnly
           variant="light"
           className="bg-white shadow-md"
+          aria-label="打开用户中心菜单"
           onClick={() => setMobileMenuOpen(true)}
         >
           <Menu size={20} />
         </Button>
       </div>
+
+      {/* 移动端明显的客服入口：在非客服页时固定在右上角 */}
+      {activeTab !== 'support' && features.customer_service && (
+        <div className="lg:hidden fixed right-4 top-4 z-30">
+          <Button
+            size="sm"
+            color="primary"
+            className="rounded-full shadow-md"
+            startContent={<Headphones size={16} />}
+            endContent={supportUnreadCount > 0 ? <span className="min-w-5 rounded-full bg-danger px-1.5 py-0.5 text-center text-[10px] font-semibold text-white">{Math.min(supportUnreadCount, 99)}</span> : undefined}
+            onPress={() => switchTab('support')}
+          >
+            在线客服
+          </Button>
+        </div>
+      )}
 
       {/* 移动端顶部标签栏（便于发现可切换） */}
       <div className="lg:hidden sticky top-0 z-20 bg-default-50/95 backdrop-blur supports-[backdrop-filter]:bg-default-50/80">
@@ -456,7 +473,7 @@ const UserCenter: React.FC = () => {
         </div>
       </div>
 
-      <div className="container max-w-[2700px] mx-auto px-4 lg:px-6 py-6">
+      <div className="container max-w-[2700px] mx-auto px-3 py-4 pb-24 sm:px-4 sm:py-6 lg:px-6 lg:pb-6">
         {emailUnbound && (
           <Card className="mb-4 border border-danger/30 bg-danger/5">
             <CardBody className="p-4">
@@ -548,7 +565,7 @@ const UserCenter: React.FC = () => {
                 animate={{ x: 0 }}
                 exit={{ x: -300 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                className="fixed left-0 top-0 bottom-0 w-80 bg-white z-50 lg:hidden shadow-xl"
+                className="fixed left-0 top-0 bottom-0 w-[min(20rem,86vw)] bg-white z-50 lg:hidden shadow-xl"
               >
                 {/* 移动端头部 */}
                 <div className="h-16 flex items-center justify-between px-4 border-b border-default-200 bg-blue-600">
@@ -618,7 +635,7 @@ const UserCenter: React.FC = () => {
             className="flex-1 min-w-0"
           >
             <Card className="min-h-[calc(min(100vh,1600px)-12rem)]">
-              <CardBody className="p-6">
+              <CardBody className="p-3 sm:p-6">
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.div
                     key={activeTab}
