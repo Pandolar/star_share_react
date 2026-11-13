@@ -16,7 +16,6 @@ import {
   Menu,
   X,
   LogOut,
-  Home,
   AlertCircle,
   Building2,
   Sparkles,
@@ -444,23 +443,21 @@ const UserCenter: React.FC = () => {
         </Button>
       </div>
 
-      {/* 移动端明显的客服入口：在非客服页时固定在右上角 */}
-      {activeTab !== 'support' && features.customer_service && (
-        <div className="lg:hidden fixed right-4 top-4 z-30">
-          <Button
-            size="sm"
-            color="primary"
-            className="rounded-full shadow-md"
-            startContent={<Headphones size={16} />}
-            endContent={supportUnreadCount > 0 ? <span className="min-w-5 rounded-full bg-danger px-1.5 py-0.5 text-center text-[10px] font-semibold text-white">{Math.min(supportUnreadCount, 99)}</span> : undefined}
-            onPress={() => switchTab('support')}
-          >
-            在线客服
-          </Button>
-        </div>
-      )}
+      {/* 移动端明显的回到聊天页面入口 */}
+      <div className="lg:hidden fixed right-4 top-4 z-30">
+        <Button
+          size="sm"
+          color="primary"
+          className="rounded-full shadow-md"
+          startContent={<MessageCircle size={16} />}
+          onPress={() => navigate('/jumpns')}
+        >
+          回到聊天页面
+        </Button>
+      </div>
 
       {/* 移动端顶部标签栏（便于发现可切换） */}
+
       <div className="lg:hidden sticky top-0 z-20 bg-default-50/95 backdrop-blur supports-[backdrop-filter]:bg-default-50/80">
         <div className="px-4 pt-16 pb-3 border-b border-default-200">
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
@@ -514,17 +511,15 @@ const UserCenter: React.FC = () => {
                 {/* 分隔线 */}
                 <div className="my-6 border-t border-default-200"></div>
 
-                {/* 返回首页 */}
+                {/* 回到聊天页面 */}
                 <motion.button
                   onClick={() => navigate('/jumpns')}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all duration-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                  className="w-full flex items-center gap-3 rounded-lg bg-blue-600 px-4 py-3 text-left text-white shadow-sm transition-all duration-200 hover:bg-blue-700"
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.98 }}
                 >
-                  <span className="flex-shrink-0">
-                    <Home size={20} />
-                  </span>
-                  <span className="flex-1 font-medium">返回首页</span>
+                  <span className="flex-shrink-0"><MessageCircle size={20} /></span>
+                  <span className="flex-1 font-medium">回到聊天页面</span>
                 </motion.button>
 
                 {/* 退出登录按钮 */}
@@ -587,20 +582,18 @@ const UserCenter: React.FC = () => {
                   {/* 分隔线 */}
                   {/* <div className="my-6 border-t border-default-200"></div> */}
 
-                  {/* 返回首页 */}
+                  {/* 回到聊天页面 */}
                   <motion.button
                     onClick={() => {
                       navigate('/jumpns');
                       setMobileMenuOpen(false);
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all duration-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                    className="w-full flex items-center gap-3 rounded-lg bg-blue-600 px-4 py-3 text-left text-white shadow-sm transition-all duration-200 hover:bg-blue-700"
                     whileHover={{ x: 4 }}
                     whileTap={{ scale: 0.98 }}
                   >
-                    <span className="flex-shrink-0">
-                      <Home size={20} />
-                    </span>
-                    <span className="flex-1 font-medium">返回首页</span>
+                    <span className="flex-shrink-0"><MessageCircle size={20} /></span>
+                    <span className="flex-1 font-medium">回到聊天页面</span>
                   </motion.button>
 
                   {/* 退出登录按钮 */}

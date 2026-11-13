@@ -202,7 +202,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         if (response.code === 20000 && response.data?.paid) {
           setPaymentStatus('success');
           cleanup();
-          setTimeout(() => window.location.reload(), 2000);
         } else if (response.code === 20000 && response.data?.orders?.length && response.data.orders.every((order) => order.status === 'failed')) {
           setQrCodeExpired(true);
           cleanup();
@@ -595,7 +594,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 )}
                 {paymentStatus === 'pending' && qrCodeExpired && <div className="space-y-4"><AlertCircle className="mx-auto h-12 w-12 text-danger" /><p className="font-medium text-danger">本次结账已过期，请重新下单</p><Button color="primary" onPress={handleExpiredClose}>重新下单</Button></div>}
                 {paymentStatus === 'checking' && <div className="space-y-4"><Spinner size="lg" color="primary" /><p>正在确认支付结果...</p></div>}
-                {paymentStatus === 'success' && <div className="space-y-6"><CheckCircle className="mx-auto h-20 w-20 text-success" /><div><h3 className="mb-2 text-2xl font-bold text-success">支付成功！</h3><p className="text-default-500">页面即将刷新，请稍等...</p></div></div>}
+                {paymentStatus === 'success' && <div className="space-y-6"><CheckCircle className="mx-auto h-20 w-20 text-success" /><div><h3 className="mb-2 text-2xl font-bold text-success">支付成功！</h3><p className="text-default-500">套餐已更新，可以回到聊天页面继续使用。</p></div><div className="flex flex-wrap justify-center gap-2"><Button color="primary" onPress={() => { closeModal(); navigate('/jumpns'); }}>回到聊天页面</Button><Button variant="light" onPress={closeModal}>留在此页</Button></div></div>}
                 {paymentStatus === 'failed' && <div className="space-y-4"><AlertCircle className="mx-auto h-12 w-12 text-danger" /><p>支付异常，请联系客服处理</p></div>}
               </div>
             </div>

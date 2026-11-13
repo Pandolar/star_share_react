@@ -1,11 +1,11 @@
 {
   "files": {
-    "main.css": "/starstatic/css/main.e6fcbd07.css",
-    "main.js": "/starstatic/js/main.fc2e90e4.js",
+    "main.css": "/starstatic/css/main.6d2bd934.css",
+    "main.js": "/starstatic/js/main.de452737.js",
     "starstatic/js/7767.2ed7ad84.chunk.js": "/starstatic/js/7767.2ed7ad84.chunk.js",
     "starstatic/js/1.7807640a.chunk.js": "/starstatic/js/1.7807640a.chunk.js",
     "starstatic/js/4396.0d2a50d1.chunk.js": "/starstatic/js/4396.0d2a50d1.chunk.js",
-    "starstatic/js/325.44e09386.chunk.js": "/starstatic/js/325.44e09386.chunk.js",
+    "starstatic/js/325.aca82495.chunk.js": "/starstatic/js/325.aca82495.chunk.js",
     "starstatic/js/3690.83186835.chunk.js": "/starstatic/js/3690.83186835.chunk.js",
     "starstatic/js/8729.f4f0c693.chunk.js": "/starstatic/js/8729.f4f0c693.chunk.js",
     "starstatic/js/2002.71523335.chunk.js": "/starstatic/js/2002.71523335.chunk.js",
@@ -64,9 +64,9 @@
     "starstatic/js/8288.2d68b5f1.chunk.js": "/starstatic/js/8288.2d68b5f1.chunk.js",
     "starstatic/js/9981.f94ac0ef.chunk.js": "/starstatic/js/9981.f94ac0ef.chunk.js",
     "starstatic/js/8569.fbfd2386.chunk.js": "/starstatic/js/8569.fbfd2386.chunk.js",
-    "starstatic/js/5867.eaccabe2.chunk.js": "/starstatic/js/5867.eaccabe2.chunk.js",
+    "starstatic/js/4066.ca2201c0.chunk.js": "/starstatic/js/4066.ca2201c0.chunk.js",
     "starstatic/js/7396.68cce264.chunk.js": "/starstatic/js/7396.68cce264.chunk.js",
-    "starstatic/js/125.0c95112e.chunk.js": "/starstatic/js/125.0c95112e.chunk.js",
+    "starstatic/js/125.7ae68d32.chunk.js": "/starstatic/js/125.7ae68d32.chunk.js",
     "starstatic/js/7058.bfc8b828.js": "/starstatic/js/7058.bfc8b828.js",
     "starstatic/js/9133.327087e6.chunk.js": "/starstatic/js/9133.327087e6.chunk.js",
     "starstatic/js/3723.29f740f1.chunk.js": "/starstatic/js/3723.29f740f1.chunk.js",
@@ -94,7 +94,7 @@
   "entrypoints": [
     "starstatic/js/heroui.a4f41065.js",
     "starstatic/js/7058.bfc8b828.js",
-    "starstatic/css/main.e6fcbd07.css",
-    "starstatic/js/main.fc2e90e4.js"
+    "starstatic/css/main.6d2bd934.css",
+    "starstatic/js/main.de452737.js"
   ]
 }

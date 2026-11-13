@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Card, CardBody, Chip, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Progress, Spinner, Switch, Tooltip } from '@heroui/react';
 import { motion } from 'framer-motion';
-import { CheckCircle2, Clock3, ExternalLink, QrCode, ReceiptText, RefreshCw, TriangleAlert, UserRoundCog } from 'lucide-react';
+import { CheckCircle2, Clock3, ExternalLink, MessageCircle, QrCode, ReceiptText, RefreshCw, TriangleAlert, UserRoundCog } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { orderUserApi, teamUserApi, type InvoiceEligibility, type TeamCheckout, type PaymentMethod } from '../../../../services/userApi';
 import { PaymentMethodSelector, paymentMethodLabel } from '../../../../components/PaymentMethodSelector';
@@ -270,6 +270,7 @@ export const TeamPaymentModal: React.FC<TeamPaymentModalProps> = ({
                 <h3 className="text-2xl font-bold text-success">支付成功</h3>
                 <p className="mt-2 text-sm text-default-500">团队订阅状态已更新</p>
               </div>
+              <Button color="primary" startContent={<MessageCircle size={16} />} onPress={() => { onClose(); navigate('/jumpns'); }}>回到聊天页面</Button>
             </motion.div>
           ) : paymentState === 'expired' ? (
             <div className="flex min-h-[280px] flex-col items-center justify-center gap-4 text-center">
