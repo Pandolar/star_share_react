@@ -987,6 +987,7 @@ export interface AdminCsConversation extends ChatConversation {
     user: AdminCsUserSummary;
     waiting_seconds: number | null;
     assigned_admin: string | null;
+    source_domain?: string | null;
     taken_over: boolean;
     internal_remark: string;
     is_pinned: boolean;

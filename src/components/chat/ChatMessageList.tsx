@@ -35,6 +35,32 @@ const relativeTime = (value: string): string => {
   return `${Math.floor(seconds / 86400)} 天前`;
 };
 
+const URL_PATTERN = /(https?:\/\/[^\s<>"']+)/g;
+const URL_TRAILING = /[.,;:!?，。；：！？、)）\]】]+$/;
+
+/** Render plain text with http(s) links that open in a new tab. */
+const renderTextWithLinks = (text: string, keyPrefix: string): React.ReactNode[] => {
+  const parts = text.split(URL_PATTERN);
+  return parts.map((part, index) => {
+    if (!/^https?:\/\//.test(part)) return part;
+    const trailing = part.match(URL_TRAILING)?.[0] || '';
+    const href = trailing ? part.slice(0, -trailing.length) : part;
+    return (
+      <React.Fragment key={`${keyPrefix}-${index}`}>
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="break-all font-medium underline underline-offset-2 hover:opacity-80"
+        >
+          {href}
+        </a>
+        {trailing}
+      </React.Fragment>
+    );
+  });
+};
+
 const senderName = (message: ChatMessage): string => {
   if (message.role === 'admin') return 'Nice';
   return message.sender_name || '用户';
@@ -177,7 +203,7 @@ export default function ChatMessageList({
           if (message.role === 'system')
             return (
               <p key={message.id} className="py-1 text-center text-xs text-default-400">
-                {message.content}
+                {renderTextWithLinks(message.content || '', `s${message.id}`)}
               </p>
             );
           const mine = message.role === selfRole;
@@ -205,7 +231,7 @@ export default function ChatMessageList({
                       <p className="whitespace-pre-wrap break-words text-xs italic opacity-70">{recallNotices.get(message.id) ?? CHAT_RECALL_NOTICE}</p>
                     ) : (
                       <>
-                        {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
+                        {message.content && <p className="whitespace-pre-wrap break-words">{renderTextWithLinks(message.content, `m${message.id}`)}</p>}
                         {message.attachments?.map((attachment, attachmentIndex) => (
                           <div key={attachment.id}>
                             {attachment.kind === 'image' && <p className="mb-1 text-xs opacity-70">图片{attachmentIndex + 1}</p>}

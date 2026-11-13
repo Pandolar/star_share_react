@@ -144,7 +144,10 @@ const CustomerServiceContextPanel: React.FC<CustomerServiceContextPanelProps> = 
     if (guideSending) return;
     setGuideSending(true);
     try {
-      const link = `${window.location.origin}/user-center?tab=profile&openEdit=billing_profile`;
+      const rawHost = (conversation as { source_domain?: string | null }).source_domain || '';
+      const host = rawHost.replace(/^https?:\/\//i, '').split('/')[0];
+      const origin = host ? `https://${host}` : window.location.origin;
+      const link = `${origin}/user-center?tab=profile&openEdit=billing_profile`;
       await adminApiService.sendCsMessage({
         conversation_id: conversation.id,
         content: `您好，开具发票需要您先填写开票信息（发票抬头和税号）。\n请点击链接直接填写：${link}\n也可以在「个人主页 → 账号管理 → 开票主体」里填写。填好后回复我，我马上为您补开发票。`,

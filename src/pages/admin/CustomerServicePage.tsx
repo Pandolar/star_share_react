@@ -47,7 +47,6 @@ import CustomerServiceContextPanel, { PaymentCardPrefill } from './CustomerServi
 
 import { paymentMethodLabel } from '../../components/PaymentMethodSelector';
 import { CsAiManagementPanel } from './CsAiManagementPanel';
-import { CsConversationTools } from './CsAiPanel';
 
 type ActiveAiDraft = { id: number; content: string; revision: number; reason?: string; confidence?: number };
 
@@ -1326,16 +1325,6 @@ const CustomerServicePage: React.FC = () => {
                     </DropdownMenu>
                   </Dropdown>
                 </div>
-                <CsConversationTools
-                  conversation={selected}
-                  canManage={canManageConversation}
-                  canSend={canSend}
-                  onInspectKnowledge={canManageAi ? inspectKnowledge : undefined}
-                  onConversation={(updated) => {
-                    setSelected(updated);
-                    setRows((current) => sortConversationsByRecent(current.map((item) => item.id === updated.id ? updated : item)));
-                  }}
-                />
                 {messages
                   .flatMap((message) => message.attachments)
                   .slice(-1)
