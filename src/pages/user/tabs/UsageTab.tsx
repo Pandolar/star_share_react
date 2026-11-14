@@ -6,6 +6,7 @@ import { LimitUsageData, LimitUsageItem, resetQuotaApi } from '../../../services
 import { useLimitUsage } from '../../../hooks/useLimitUsage';
 import { ResetQuotaModal } from '../../../components/ResetQuotaModal';
 import { useWhiteLabel } from '../../../contexts/WhiteLabelContext';
+import ExpiredPackageNotice from '../../../components/user/ExpiredPackageNotice';
 
 // 将剩余秒数格式化为「x时x分x秒」的简洁形式
 const formatRemaining = (seconds: number): string => {
@@ -209,6 +210,7 @@ export const UsageSection: React.FC<UsageSectionProps> = (props) => {
 
   return (
     <div className="space-y-4">
+      <ExpiredPackageNotice expired={data?.expired_package} />
       {/* 区块标题 */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">

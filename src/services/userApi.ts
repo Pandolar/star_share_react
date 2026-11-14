@@ -1009,6 +1009,7 @@ export interface LimitUsageItem {
 export interface LimitUsageData {
     package_level: string;
     limits: LimitUsageItem[];
+    expired_package?: { name: string; level?: string; expires_at: string; expired_days?: number } | null;
     usage_note?: string;
 }
 

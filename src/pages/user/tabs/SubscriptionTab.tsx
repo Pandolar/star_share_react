@@ -15,6 +15,8 @@ import remarkGfm from 'remark-gfm';
 import { PaymentModal } from './subscription/PaymentModal';
 import { CdkRedeemModal } from './subscription/CdkRedeemModal';
 import { useUserAgreementRequirement } from '../../../components/UserAgreementConsent';
+import ExpiredPackageNotice from '../../../components/user/ExpiredPackageNotice';
+import { useLimitUsage } from '../../../hooks/useLimitUsage';
 import { useNavigate } from 'react-router-dom';
 import {
   PackageInfo,
@@ -59,6 +61,7 @@ export const SubscriptionTab: React.FC = () => {
   const firstPaymentMethod = paymentMethods[0];
   const { isRequired: isAgreementRequired } = useUserAgreementRequirement();
   const navigate = useNavigate();
+  const { data: limitUsage } = useLimitUsage();
 
   const [cdkCode, setCdkCode] = useState('');
 
@@ -560,6 +563,8 @@ export const SubscriptionTab: React.FC = () => {
           backdrop-filter: blur(4px);
         }
       `}</style>
+
+      <ExpiredPackageNotice expired={limitUsage?.expired_package} />
 
       {/* 页面标题 + 操作入口 */}
       <div className="flex items-center justify-between mb-8 gap-4 flex-wrap">
