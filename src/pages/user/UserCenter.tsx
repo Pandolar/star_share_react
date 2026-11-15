@@ -519,7 +519,7 @@ const UserCenter: React.FC = () => {
                   whileTap={{ scale: 0.98 }}
                 >
                   <span className="flex-shrink-0"><MessageCircle size={20} /></span>
-                  <span className="flex-1 font-medium">回到聊天页面</span>
+                  <span className="flex-1 font-medium">回到聊天</span>
                 </motion.button>
 
                 {/* 退出登录按钮 */}

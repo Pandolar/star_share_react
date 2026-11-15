@@ -27,6 +27,7 @@ interface OrderInfo {
   is_cdk: boolean;
   invoice_requested: boolean;
   invoice_status?: 'not_requested' | 'awaiting_payment' | 'pending_issue' | 'processing' | 'issued' | 'cancelled' | 'payment_exception' | null;
+  invoice_delivery_workdays?: number | null;
   payable_amount?: number | null;
   paid_amount?: number | null;
 }
@@ -421,7 +422,16 @@ const invoiceStatusChip = (order: OrderInfo) => {
                                 </div>
                               )}
                             </div>
-                            {!order.is_cdk && <div className="flex flex-wrap items-center gap-2">{invoiceStatusChip(order)}</div>}
+                            {!order.is_cdk && (
+                              <div className="space-y-1.5">
+                                <div className="flex flex-wrap items-center gap-2">{invoiceStatusChip(order)}</div>
+                                {(order.invoice_status === 'pending_issue' || order.invoice_status === 'processing') && (
+                                  <p className="text-xs text-default-500">
+                                    预计 {order.invoice_delivery_workdays || 7} 个工作日内开出，并发送到开票邮箱，请注意查收。
+                                  </p>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </CardBody>

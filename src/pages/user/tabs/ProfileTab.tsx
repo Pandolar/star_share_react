@@ -33,7 +33,7 @@ const maskTaxNumber = (tax?: string) => {
 
 // 账号管理列表行：名称 + 当前状态摘要 + 箭头；点击行为由各行按内容密度决定。
 const ManageRow: React.FC<{ icon: React.ReactNode; label: string; status?: React.ReactNode; open?: boolean; danger?: boolean; onPress: () => void }> = ({ icon, label, status, open, danger, onPress }) => (
-  <button type="button" onClick={onPress} className="flex w-full items-center gap-2 px-3 py-2.5 text-left">
+  <button type="button" onClick={onPress} className="flex w-full items-center gap-2 px-3 py-3 text-left transition-colors hover:bg-default-50">
     <span className={danger ? 'text-danger' : 'text-default-500'}>{icon}</span>
     <span className={`shrink-0 text-sm font-medium ${danger ? 'text-danger-700' : 'text-default-800'}`}>{label}</span>
     <span className="ml-auto min-w-0 truncate text-right text-xs text-default-400">{status}</span>
@@ -319,17 +319,20 @@ export const ProfileTab: React.FC = () => {
               </div>
 
               {/* 账号管理：安全 / 财务资料 / 注销 折叠收纳，默认收起；灰底与白卡分区 */}
-              <div className="mt-4 rounded-xl bg-default-50 p-3">
+              <div className="mt-5 rounded-xl border border-primary/15 bg-primary/5 p-3 shadow-sm sm:p-4">
                 <button
                   type="button"
-                  className="flex w-full items-center gap-2 py-1 text-left"
+                  className="flex w-full items-center gap-3 rounded-lg py-1 text-left transition-colors hover:bg-primary/5"
                   aria-expanded={accountManageOpen}
                   onClick={() => setAccountManageOpen((value) => !value)}
                 >
-                  <Settings2 size={16} className="text-default-500" />
-                  <span className="text-sm font-medium text-default-800">账号管理</span>
-                  <span className="text-xs text-default-400">安全、财务资料与注销</span>
-                  <ChevronDown size={14} className={`ml-auto text-default-400 transition-transform ${accountManageOpen ? '' : '-rotate-90'}`} />
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Settings2 size={18} /></span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-base font-semibold text-default-900">账号管理</span>
+                    <span className="mt-0.5 block text-xs text-default-500">安全设置、收款方式、开票主体与账号注销</span>
+                  </span>
+                  <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">{accountManageOpen ? '收起' : '展开'}</span>
+                  <ChevronDown size={16} className={`shrink-0 text-primary transition-transform ${accountManageOpen ? '' : '-rotate-90'}`} />
                 </button>
                 {accountManageOpen && (() => {
                   const payment = userInfo.preferences?.payment_info;
