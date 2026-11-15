@@ -495,6 +495,13 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
             </div>}
             {showBillingTab && activeTab === 'billing_profile' && <div>
               <div className="space-y-4 mt-4">
+                <Alert
+                  color="danger"
+                  variant="solid"
+                  title="开票只能在购买时勾选，无法后补！无法后开！"
+                  description="如需开票，请务必在购买套餐时勾选「是否开票」并确认开票资料。购买完成后再填写开票信息也无法补开发票。"
+                  classNames={{ title: 'font-bold text-base', description: 'text-sm font-medium' }}
+                />
                 {userInfo?.preferences?.billing_profile ? (
                   <Alert
                     color="warning"

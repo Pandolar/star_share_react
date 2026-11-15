@@ -375,6 +375,7 @@ export const ProfileTab: React.FC = () => {
                         />
                         {manageRow === 'billing' && (
                           <div className="mx-3 mb-2 rounded-lg bg-default-50 p-3 text-xs text-default-600">
+                            <p className="mb-1 font-semibold text-danger">开票只能在购买时勾选，无法后补、无法后开；如需开票请在购买时勾选。</p>
                             {billing?.title ? (
                               <p>抬头：{billing.title}；税号：{maskTaxNumber(billing.tax_number)}。历史订单保留提交时的资料，修改只影响之后的新订单。</p>
                             ) : (
