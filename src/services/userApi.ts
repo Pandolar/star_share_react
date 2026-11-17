@@ -109,6 +109,11 @@ async function createUserRequest<T = unknown>(
 
         // 检查业务错误码
         if (data.code !== undefined && data.code !== 20000) {
+            // 微信账号未绑定真实邮箱：由全局闸门接管，阻止当前调用继续。
+            if (Number(data.code) === 20022) {
+                window.dispatchEvent(new CustomEvent('wechatEmailBindRequired', { detail: data }));
+                throw new Error(data.msg || '请先绑定安全邮箱');
+            }
             // 仅当为 20009（登录过期）时触发全局登录失效
             if (Number(data.code) === 20009) {
                 const event = new CustomEvent('authFailure', {
@@ -206,6 +211,7 @@ export const userInfoApi = {
         inviter_user: string;
         created_at: string;
         wechat_openid?: string;
+        email_bind_required?: boolean;
     }>> => {
         return createUserRequest(getUserApiUrl('/u/get_user_info'), {
             method: 'GET',
@@ -220,6 +226,35 @@ export const userInfoApi = {
                 email,
                 type_: 'register'
             }),
+        });
+    },
+
+    // 微信强制绑定邮箱：发送验证码
+    sendWechatBindEmailCode: async (email: string): Promise<ApiResponse<any>> => {
+        return createUserRequest(getUserApiUrl('/u/wechat_bind_email/send_code'), {
+            method: 'POST',
+            body: JSON.stringify({ email }),
+        });
+    },
+
+    // 微信强制绑定邮箱：验证码校验 + 接管预检
+    precheckWechatBindEmail: async (email: string, email_code: string): Promise<ApiResponse<any>> => {
+        return createUserRequest(getUserApiUrl('/u/wechat_bind_email/precheck'), {
+            method: 'POST',
+            body: JSON.stringify({ email, email_code }),
+        });
+    },
+
+    // 微信强制绑定邮箱：绑定或接管
+    bindWechatEmail: async (params: {
+        ticket: string;
+        password: string;
+        confirm_takeover: boolean;
+        confirm_email?: string;
+    }): Promise<ApiResponse<any>> => {
+        return createUserRequest(getUserApiUrl('/u/wechat_bind_email/bind'), {
+            method: 'POST',
+            body: JSON.stringify(params),
         });
     },
 

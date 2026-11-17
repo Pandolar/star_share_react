@@ -7,6 +7,7 @@ import { WhiteLabelProvider, useWhiteLabel } from './contexts/WhiteLabelContext'
 import { CustomerServiceProvider } from './contexts/CustomerServiceContext';
 import { AdminAuthProvider, useAdminAuth } from './contexts/AdminAuthContext';
 import AdminPermissionRoute from './components/admin/AdminPermissionRoute';
+import { WechatEmailBindGate } from './components/auth/WechatEmailBindGate';
 import type { SiteFeatureName } from './services/userApi';
 
 const HomePage = lazyWithRetry(() => import('./pages/HomePage'), 'HomePage');
@@ -106,6 +107,7 @@ const App: React.FC = () => {
             <ErrorBoundary autoReload={true} reloadDelay={1500}>
               <Suspense fallback={<RouteLoadingFallback />}>
                 <CustomerServiceProvider>
+                  <WechatEmailBindGate />
                   <Routes>
                     {/* 主页路由 */}
                     <Route
