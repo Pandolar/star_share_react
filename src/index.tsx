@@ -1,4 +1,3 @@
-import './utils/assetBase';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { HeroUIProvider, ToastProvider } from '@heroui/react';

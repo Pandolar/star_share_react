@@ -4,6 +4,42 @@
  */
 
 const path = require('path');
+const fs = require('fs');
+
+// CRACO 在 react-scripts 加载 .env* 之前解析本文件，因此这里显式读取
+// .env.production。环境变量优先级更高，便于临时覆盖。
+function readDotenv(file) {
+  try {
+    const values = {};
+    for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+      const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+      if (!match) continue;
+      let value = match[2];
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+      values[match[1]] = value;
+    }
+    return values;
+  } catch {
+    return {};
+  }
+}
+
+// 生产构建的静态资源域名。来自 .env.production 或同名环境变量。
+// 留空则保持同源 /starstatic/。只接受裸 origin，路径由 webpack 拼成
+// `${ASSET_CDN_URL}/starstatic/...`。
+const fileEnv = readDotenv(path.join(__dirname, '.env.production'));
+const assetCdn = (process.env.ASSET_CDN_URL || fileEnv.ASSET_CDN_URL || '')
+  .trim()
+  .replace(/\/+$/, '');
+if (assetCdn && !/^https?:\/\/[^/]+$/.test(assetCdn)) {
+  throw new Error('ASSET_CDN_URL 必须是 http(s)://host[:port] 的裸 origin');
+}
+const assetPublicPath = assetCdn ? `${assetCdn}/` : '';
 
 module.exports = {
   webpack: {
@@ -30,7 +66,10 @@ module.exports = {
           ? 'starstatic/js/[id].[contenthash:8].chunk.js'
           : 'starstatic/js/[name].chunk.js',
         // Asset modules (images, fonts, etc.)
-        assetModuleFilename: 'starstatic/media/[name].[hash:8][ext]'
+        assetModuleFilename: 'starstatic/media/[name].[hash:8][ext]',
+        // 生产构建把入口、异步 chunk 和资源模块的 URL 指到 CDN；
+        // %PUBLIC_URL% 仍由 CRA 保持为本站根，sw.js/offline.html 继续同源。
+        publicPath: isProd && assetPublicPath ? assetPublicPath : config.output.publicPath,
       };
 
       // Update MiniCssExtractPlugin output paths
@@ -41,6 +80,17 @@ module.exports = {
       if (miniCssExtractPlugin && miniCssExtractPlugin.options) {
         miniCssExtractPlugin.options.filename = 'starstatic/css/[name].[contenthash:8].css';
         miniCssExtractPlugin.options.chunkFilename = 'starstatic/css/[name].[contenthash:8].chunk.css';
+      }
+
+      if (isProd && assetPublicPath) {
+        // CRA 在构造插件时显式传了 paths.publicUrlOrPath，必须同步覆盖，
+        // 否则 asset-manifest.json 会继续写成本站相对路径。
+        const manifestPlugin = config.plugins.find(
+          (p) => p && p.constructor && p.constructor.name === 'WebpackManifestPlugin'
+        );
+        if (manifestPlugin && manifestPlugin.options) {
+          manifestPlugin.options.publicPath = assetPublicPath;
+        }
       }
 
       if (isProd) {

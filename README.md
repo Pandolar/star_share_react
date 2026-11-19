@@ -395,18 +395,20 @@ const App: React.FC = () => {
    pm2 serve build 3000 --spa
    ```
 
-### 静态资源 CDN（可选）
+### 静态资源 CDN（构建时指定）
 
-后台「基础设置 → 静态资源CDN域名」只填写裸 origin（如 `https://static.example.com`，不要带路径）。需先升级后端（提供 `STATIC_CDN_URL` 和 `/u/asset_config`），保存后重新执行 `deploy-star-share.sh`，发布脚本会：
+静态资源域名固定在 `.env.production`：
 
-- 优先读取 `ASSET_CDN_URL` 环境变量；未设置时请求 `ASSET_CONFIG_URL`（默认 `http://127.0.0.1:18188/u/asset_config`）取后台配置，`ASSET_CONFIG_URL=off` 可跳过；
-- 在 release 副本（不修改仓库内已提交的 `build/`）中把 `index.html` 的 `/starstatic/` 入口改为 `${CDN}/starstatic/`，并注入 `window.__ASSET_BASE__`；
-- 同步改写 `asset-manifest.json`，发布目录按 `commit + CDN 域名摘要` 命名，切换域名不会覆盖旧版本；
-- 运行时 `src/utils/assetBase.ts` 把 webpack public path 指向 CDN，初始 JS/CSS、异步 chunk、chunk CSS、导入的图片和字体全部直连 CDN。
+```bash
+ASSET_CDN_URL=https://starstaticfiles02.niceaigc.com
+```
 
-CDN 只需回源 `/starstatic/*`（源站为发布目录的 `current`）。缺失路径必须返回 404，不能回落 `index.html`，否则会再次出现 `ChunkLoadError: Unexpected token '<'`。`index.html`、`sw.js`、`offline.html`、`/u/*`、`/star/*`、`favicon.ico`、`/img/` 和 `manifest.json` 仍走本站：Service Worker 必须同源注册，接口必须同源以便携带 Cookie 和按 Host 识别站点。
+`pnpm build` 时 `craco.config.js` 会把它写入 webpack `output.publicPath` 和 `asset-manifest.json`。构建产物中的初始 JS/CSS、异步 chunk、chunk CSS、JS 导入的图片和字体都会是 `${ASSET_CDN_URL}/starstatic/...`；留空则保持同源 `/starstatic/`。
 
-上线后删除源站/网关对 `/starstatic/*` 的 301 规则；旧规则可保留到旧 `index.html` 的 CDN 缓存过期。切换域名后旧发布目录仍保留 `ASSET_RETENTION_DAYS` 天，回滚只需把 `current` 指回旧目录，或在后台清空域名后重新发布。
+- 切换 CDN：修改 `.env.production`，重新 `pnpm build`，提交 `build/`，再执行 `deploy-star-share.sh`。发布脚本只做校验和原子切换，不读取后台配置，也不在发布时改写入口。
+- `%PUBLIC_URL%`、`sw.js`、`offline.html`、`favicon.ico`、`/img/` 和 `manifest.json` 仍走本站：Service Worker 必须同源注册，接口必须同源以便携带 Cookie 和按 Host 识别站点。
+- CDN 只需回源 `/starstatic/*`（源站为发布目录的 `current`）。缺失路径必须返回 404，不能回落 `index.html`，否则会再次出现 `ChunkLoadError: Unexpected token '<'`。
+- 上线后删除源站/网关对 `/starstatic/*` 的 301 规则；旧规则可保留到旧 `index.html` 的 CDN 缓存过期。
 
 ### Docker 部署
 

@@ -29,10 +29,6 @@ KEEP_RELEASES=${KEEP_RELEASES:-10}
 ASSET_RETENTION_DAYS=${ASSET_RETENTION_DAYS:-30}
 HEALTHCHECK_URL=${HEALTHCHECK_URL:-http://127.0.0.1:29724/}
 DEPLOY_PULL=${DEPLOY_PULL:-1}
-# 静态资源域名优先取环境变量；未设置时从后台 STATIC_CDN_URL 读取。
-ASSET_CDN_URL=${ASSET_CDN_URL:-}
-ASSET_CONFIG_URL=${ASSET_CONFIG_URL:-http://127.0.0.1:18188/u/asset_config}
-ASSET_BASE=
 LOCK_DIR=$RELEASE_ROOT/.deploy.lock
 TEMP_RELEASE=
 KEEP_FILE=
@@ -89,7 +85,7 @@ esac
 for command_name in git python3 cp cmp find grep ln mv rm sort; do
     command -v "$command_name" >/dev/null 2>&1 || fail "缺少必要命令：$command_name"
 done
-if [ "$HEALTHCHECK_URL" != off ] || [ "$ASSET_CONFIG_URL" != off ]; then
+if [ "$HEALTHCHECK_URL" != off ]; then
     command -v curl >/dev/null 2>&1 || fail '缺少必要命令：curl'
 fi
 
@@ -121,78 +117,28 @@ elif [ "$DEPLOY_PULL" != 0 ]; then
 fi
 
 [ -z "$(git status --porcelain)" ] || fail '代码更新过程中工作区发生变化，已停止发布'
-
-if [ -z "$ASSET_CDN_URL" ] && [ "$ASSET_CONFIG_URL" != off ]; then
-    ASSET_CDN_URL=$(curl --fail --silent --show-error --max-time 5 "$ASSET_CONFIG_URL" 2>/dev/null | python3 -c '
-import json, sys
-try:
-    payload = json.load(sys.stdin)
-except Exception:
-    raise SystemExit(0)
-data = payload.get("data") if isinstance(payload, dict) else None
-print(data.get("static_cdn_url") or "" if isinstance(data, dict) else "")
-' 2>/dev/null || true)
-    if [ -n "$ASSET_CDN_URL" ]; then
-        log "已从后台读取静态资源域名：$ASSET_CDN_URL"
-    else
-        log "后台未配置静态资源域名，静态资源继续使用本站域名"
-    fi
-fi
-
-ASSET_BASE=$(python3 - "$ASSET_CDN_URL" <<'PY'
-import sys
-from urllib.parse import urlsplit
-
-raw = (sys.argv[1] if len(sys.argv) > 1 else '').strip()
-if not raw:
-    print('')
-    raise SystemExit(0)
-if len(raw) > 255:
-    raise SystemExit('静态资源域名过长')
-parsed = urlsplit(raw)
-if parsed.scheme not in ('http', 'https') or not parsed.netloc or parsed.hostname is None:
-    raise SystemExit('静态资源域名必须是 http:// 或 https:// 开头的域名')
-if parsed.username or parsed.password or parsed.path not in ('', '/') or parsed.query or parsed.fragment:
-    raise SystemExit('静态资源域名只能填写协议和域名，不能包含路径、参数或锚点')
-try:
-    port = parsed.port
-except ValueError:
-    raise SystemExit('静态资源域名端口不正确')
-host = parsed.hostname.strip().lower().rstrip('.')
-if not host or any(char.isspace() for char in host):
-    raise SystemExit('静态资源域名格式不正确')
-netloc = f'[{host}]' if ':' in host else host
-if port is not None:
-    netloc = f'{netloc}:{port}'
-print(f'{parsed.scheme}://{netloc}')
-PY
-) || fail "静态资源域名无效：$ASSET_CDN_URL"
-if [ -n "$ASSET_BASE" ]; then
-    log "静态资源将直连：$ASSET_BASE/starstatic/"
-fi
-
 [ -f build/index.html ] || fail '缺少 build/index.html'
 [ -f build/asset-manifest.json ] || fail '缺少 build/asset-manifest.json'
 [ -d build/starstatic ] || fail '缺少 build/starstatic 目录'
 
 log '正在校验构建清单、入口引用和异步分块'
-python3 - "$REPO_DIR/build" "$ASSET_BASE" <<'PY'
+python3 - "$REPO_DIR/build" <<'PY'
 import json
 import re
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit
 
 build = Path(sys.argv[1]).resolve()
-asset_base = (sys.argv[2] if len(sys.argv) > 2 else '').rstrip('/')
 manifest = json.loads((build / 'asset-manifest.json').read_text(encoding='utf-8'))
 missing = []
 
 def local_path(value):
     if not isinstance(value, str) or not value:
         return None
-    if asset_base and value.startswith(asset_base + '/'):
-        value = value[len(asset_base):]
-    if not value.startswith('/'):
+    if value.startswith(('http://', 'https://')):
+        value = urlsplit(value).path
+    elif not value.startswith('/'):
         return None
     return value.split('?', 1)[0]
 
@@ -243,11 +189,7 @@ PY
 
 commit=$(git rev-parse HEAD)
 short_commit=$(git rev-parse --short=12 HEAD)
-asset_tag=
-if [ -n "$ASSET_BASE" ]; then
-    asset_tag=$(python3 -c 'import hashlib,sys; print("-" + hashlib.sha256(sys.argv[1].encode()).hexdigest()[:8])' "$ASSET_BASE")
-fi
-release_dir=$RELEASE_ROOT/release-$short_commit$asset_tag
+release_dir=$RELEASE_ROOT/release-$short_commit
 shared_assets=$RELEASE_ROOT/shared-starstatic
 mkdir -p "$shared_assets"
 
@@ -276,69 +218,16 @@ for path in source.rglob('*'):
     os.replace(temporary, destination)
 PY
 
-TEMP_RELEASE=$RELEASE_ROOT/.release-$short_commit$asset_tag.tmp-$$
-rm -rf -- "$TEMP_RELEASE"
-mkdir "$TEMP_RELEASE"
-cp -a build/. "$TEMP_RELEASE/"
-
-if [ -n "$ASSET_BASE" ]; then
-    log '正在把静态入口和资源清单指向 CDN'
-    python3 - "$TEMP_RELEASE" "$ASSET_BASE" <<'PY'
-import json
-import re
-import sys
-from pathlib import Path
-
-root = Path(sys.argv[1])
-asset_base = sys.argv[2].rstrip('/')
-index_path = root / 'index.html'
-html = index_path.read_text(encoding='utf-8')
-tag = '<script>window.__ASSET_BASE__=' + json.dumps(asset_base + '/') + '</script>'
-if tag not in html:
-    html, replacements = re.subn(
-        r'(<head(?:\s[^>]*)?>)',
-        lambda match: match.group(1) + tag,
-        html,
-        count=1,
-    )
-    if replacements != 1:
-        raise SystemExit('入口缺少 head 标签，无法注入静态资源域名')
-html = (
-    html.replace('="/starstatic/', f'="{asset_base}/starstatic/')
-    .replace("='/starstatic/", f"='{asset_base}/starstatic/")
-)
-remaining = re.findall(r'(?:src|href)="(/starstatic/[^"]+)"', html)
-if remaining:
-    raise SystemExit('静态入口仍指向本站：' + ', '.join(remaining))
-index_path.write_text(html, encoding='utf-8')
-
-manifest_path = root / 'asset-manifest.json'
-manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
-
-def rewrite(value):
-    if isinstance(value, str):
-        return asset_base + value if value.startswith('/starstatic/') else value
-    if isinstance(value, list):
-        return [rewrite(item) for item in value]
-    if isinstance(value, dict):
-        return {key: rewrite(item) for key, item in value.items()}
-    return value
-
-manifest_path.write_text(
-    json.dumps(rewrite(manifest), ensure_ascii=False, separators=(',', ':')) + '\n',
-    encoding='utf-8',
-)
-PY
-fi
-
 if [ -d "$release_dir" ]; then
-    cmp "$TEMP_RELEASE/index.html" "$release_dir/index.html" >/dev/null 2>&1 || fail "现有发布目录 $release_dir 与当前提交不一致"
-    cmp "$TEMP_RELEASE/asset-manifest.json" "$release_dir/asset-manifest.json" >/dev/null 2>&1 || fail "现有发布目录 $release_dir 的清单与当前提交不一致"
+    cmp build/index.html "$release_dir/index.html" >/dev/null 2>&1 || fail "现有发布目录 $release_dir 与当前提交不一致"
+    cmp build/asset-manifest.json "$release_dir/asset-manifest.json" >/dev/null 2>&1 || fail "现有发布目录 $release_dir 的清单与当前提交不一致"
     [ -L "$release_dir/starstatic" ] || fail "现有发布目录 $release_dir 的 starstatic 链接无效"
-    rm -rf -- "$TEMP_RELEASE"
-    TEMP_RELEASE=
     log "版本 $short_commit 已准备完成"
 else
+    TEMP_RELEASE=$RELEASE_ROOT/.release-$short_commit.tmp-$$
+    rm -rf -- "$TEMP_RELEASE"
+    mkdir "$TEMP_RELEASE"
+    cp -a build/. "$TEMP_RELEASE/"
     rm -rf -- "$TEMP_RELEASE/starstatic"
     ln -s "$shared_assets" "$TEMP_RELEASE/starstatic"
     printf '%s\n' "$commit" > "$TEMP_RELEASE/REVISION"
