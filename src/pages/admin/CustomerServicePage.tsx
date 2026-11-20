@@ -1134,7 +1134,7 @@ const CustomerServicePage: React.FC = () => {
           )}
         </div>
       </header>
-      {aiManagementOpen && canManageAi && <div className="min-h-0 flex-1 overflow-y-auto border-b border-divider bg-content1 p-3"><CsAiManagementPanel selectedConversationIds={Array.from(batchSelection)} knowledgeMessageId={knowledgeMessageId} onOpenConversation={(id) => { void adminApiService.getCsConversation(id).then((conversation) => { setAiManagementOpen(false); void openConversation(conversation); }).catch((error) => showToast(error instanceof Error ? error.message : '无法打开来源会话', 'error')); }} onClose={() => setAiManagementOpen(false)} /></div>}
+      {aiManagementOpen && canManageAi && <div className="min-h-0 flex-1 overflow-y-auto border-b border-divider bg-content1 p-3"><CsAiManagementPanel selectedConversationIds={Array.from(batchSelection)} selectedProductId={productId === 'all' ? undefined : Number(productId)} knowledgeMessageId={knowledgeMessageId} onOpenConversation={(id) => { void adminApiService.getCsConversation(id).then((conversation) => { setAiManagementOpen(false); void openConversation(conversation); }).catch((error) => showToast(error instanceof Error ? error.message : '无法打开来源会话', 'error')); }} onClose={() => setAiManagementOpen(false)} /></div>}
       <div className={`${aiManagementOpen ? 'hidden' : 'grid'} min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden p-3 lg:grid-cols-[340px_minmax(0,1fr)] lg:p-4 xl:grid-cols-[340px_minmax(0,1fr)_320px]`}>
         <Card className={`${mobileChat ? 'hidden lg:block' : 'block'} min-h-0 overflow-hidden`}>
           <CardBody className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-3">

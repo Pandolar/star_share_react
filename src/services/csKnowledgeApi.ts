@@ -30,7 +30,7 @@ export interface KnowledgeClusterDetail extends KnowledgeCluster {
 }
 export interface KnowledgeMetrics { pending:number; conflict:number; needs_answer:number; published:number; blocked:number; variants_absorbed:number; auto_7d:number; total:number }
 export interface KnowledgeBackfillReport {
-  dry_run:boolean; scanned:number; pending_before:number; clusters:number; merged_clusters:number;
+  product_id:number | null; dry_run:boolean; scanned:number; pending_before:number; clusters:number; merged_clusters:number;
   merged:number; conflicts:number; archived:number; blocked:number; pending_after:number;
   examples:Array<{ target_id:number; target_question:string; absorbed:Array<{ id:number; question:string; similarity:number }> }>;
   token:string;
@@ -52,12 +52,12 @@ class CsKnowledgeApi {
     return unwrap((await this.client.post<Response<{ action:string; queued:boolean; job_id?:string; total?:number; results?:KnowledgeBatchResult[]; succeeded:number; failed:number }>>('/star/cs_kb_batch',data)).data);
   }
   async batchJob(id:string) { return unwrap((await this.client.get<Response<{ id:string; action:string; status:string; succeeded:number; failed:number; errors:Array<{ id:number; error:string }>; total:number }>>(`/star/cs_kb_batch_job/${id}`)).data); }
-  async backfill(data:{ dry_run:boolean; token?:string; archive_miss?:boolean; block_rejected?:boolean }) { return unwrap((await this.client.post<Response<KnowledgeBackfillReport>>('/star/cs_kb_backfill',data)).data); }
+  async backfill(data:{ dry_run:boolean; product_id:number; token?:string; archive_miss?:boolean; block_rejected?:boolean }) { return unwrap((await this.client.post<Response<KnowledgeBackfillReport>>('/star/cs_kb_backfill',data)).data); }
   async blocklist(params:Record<string,unknown>={}) { return unwrap((await this.client.get<Response<KnowledgeCluster[]>>('/star/cs_kb_blocklist',{params})).data); }
   async block(id:number, reason?:string) { return unwrap((await this.client.post<Response<KnowledgeCluster>>('/star/cs_kb_blocklist',{ id, reason })).data); }
   async unblock(id:number) { return unwrap((await this.client.delete<Response<KnowledgeCluster>>('/star/cs_kb_blocklist',{ data:{ id } })).data); }
   async messageSources(id:number) { return unwrap((await this.client.get<Response<KnowledgeSources>>(`/star/cs_kb_sources/${id}`)).data); }
-  async add(data:{question:string;answer:string}) { return unwrap((await this.client.post<Response<KnowledgeCluster>>('/star/cs_kb_candidates',data)).data); }
+  async add(data:{question:string;answer:string;product_id:number}) { return unwrap((await this.client.post<Response<KnowledgeCluster>>('/star/cs_kb_candidates',data)).data); }
   async mine(data:Record<string,unknown>={}) { return unwrap((await this.client.post<Response<unknown>>('/star/cs_kb_mine',data)).data); }
 }
 const csKnowledgeApi = new CsKnowledgeApi();

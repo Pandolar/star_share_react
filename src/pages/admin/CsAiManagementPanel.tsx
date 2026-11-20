@@ -78,8 +78,8 @@ const KeywordInput: React.FC<{ label: string; value: string[]; onChange: (next: 
   return <div className="space-y-1"><Input label={label} value={text} onValueChange={handle} isDisabled={isDisabled} />{description && <p className="text-xs text-default-500">{description}</p>}</div>;
 };
 
-type Props = { selectedConversationIds: number[]; onClose?: () => void; knowledgeMessageId?: number | null; onOpenConversation?: (id: number) => void };
-export const CsAiManagementPanel: React.FC<Props> = ({ selectedConversationIds, onClose, knowledgeMessageId, onOpenConversation }) => {
+type Props = { selectedConversationIds: number[]; selectedProductId?: number; onClose?: () => void; knowledgeMessageId?: number | null; onOpenConversation?: (id: number) => void };
+export const CsAiManagementPanel: React.FC<Props> = ({ selectedConversationIds, selectedProductId, onClose, knowledgeMessageId, onOpenConversation }) => {
   const { can } = useAdminAuth();
   const [settings, setSettings] = useState<Data>({});
   const [ai, setAi] = useState<Data>({});
@@ -182,7 +182,7 @@ export const CsAiManagementPanel: React.FC<Props> = ({ selectedConversationIds, 
         <details><summary className="text-sm">分组与分类路由</summary><div className="space-y-2 mt-2">{groups.map((group, index) => <div key={text(group.id)} className="grid grid-cols-3 gap-2"><Input label="分组ID" value={text(group.id)} isReadOnly /><Input label="名称" value={text(group.name)} onValueChange={(value) => setGroups(groups.map((g, i) => i === index ? { ...g, name: value } : g))} /><KeywordInput label="匹配分类ID" value={strings(group.category_ids)} onChange={(next) => setGroups(groups.map((g, i) => i === index ? { ...g, category_ids: next } : g))} /></div>)}<Button size="sm" onPress={() => setGroups([...groups, { id: `group_${Date.now()}`, name: '新分组', category_ids: [], enabled: true }])}>添加分组</Button></div></details>
         <div className="flex gap-2"><Button color="primary" isDisabled={busy || !can('customer_service.ai.manage')} onPress={() => void run(async () => { const value = await adminApiService.updateCsAiConfig({ revision: settings.revision, ai, learning, sla, groups }); setSettings(value); setAi(object(value.ai)); setLearning(object(value.learning)); setSla(object(value.sla)); }, '策略已保存')}>保存策略</Button><Button color="danger" variant="flat" isDisabled={busy || !can('customer_service.ai.manage')} onPress={() => void run(async () => { await adminApiService.stopCsAi(); await loadSettings(); })}>立即停止全部 AI</Button></div>
       </div>}</Tab>
-      <Tab key="knowledge" title="知识管理"><CsKnowledgeWorkspace selectedConversationIds={selectedConversationIds} initialMessageId={knowledgeMessageId} onOpenConversation={onOpenConversation} /></Tab>
+      <Tab key="knowledge" title="知识管理"><CsKnowledgeWorkspace selectedConversationIds={selectedConversationIds} selectedProductId={selectedProductId} initialMessageId={knowledgeMessageId} onOpenConversation={onOpenConversation} /></Tab>
       <Tab key="command" title="命令中心"><CsCommandPanel selectedConversationIds={selectedConversationIds} /></Tab>
       <Tab key="connections" title="模型连接" isDisabled={!can('customer_service.ai.manage')}><CsAiConnectionsPanel /></Tab>
       <Tab key="audit" title="统计质检"><div className="space-y-4 mt-3">

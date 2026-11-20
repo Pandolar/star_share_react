@@ -5,7 +5,7 @@ import csProductApi from '../../services/csProductApi';
 import adminApi from '../../services/adminApi';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
-type Props = { selectedConversationIds: number[]; initialMessageId?: number | null; onOpenConversation?: (id: number) => void };
+type Props = { selectedConversationIds: number[]; selectedProductId?: number; initialMessageId?: number | null; onOpenConversation?: (id: number) => void };
 type Sources = { message_id: number; conversation_id: number; answer: string; citations: Array<{ document_id?: string; document_name?: string; content?: string }>; candidate_ids: number[] };
 type Job = { id: string; action: string; status: string; succeeded: number; failed: number; errors: Array<{ id: number; error: string }>; total: number };
 
@@ -21,11 +21,11 @@ const statuses: Record<string, string> = { pending: '待审核', needs_answer: '
 const sources: Record<string, string> = { manual: '人工录入', history: '历史学习', miss: '未命中转人工', draft_edited: '人工修订', incident: '问题复盘' };
 const date = (value?: string) => value ? new Date(value).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false }) : '—';
 
-export const CsKnowledgeWorkspace: React.FC<Props> = ({ selectedConversationIds, initialMessageId, onOpenConversation }) => {
+export const CsKnowledgeWorkspace: React.FC<Props> = ({ selectedConversationIds, selectedProductId, initialMessageId, onOpenConversation }) => {
   const { can } = useAdminAuth();
   const canManage = can('customer_service.knowledge.manage');
   const [tab, setTab] = useState<KnowledgeTab>('pending');
-  const [productId, setProductId] = useState(0);
+  const [productId, setProductId] = useState(selectedProductId ?? 0);
   const [products, setProducts] = useState<Array<{ id: number; name: string }>>([]);
   const [copyOpen, setCopyOpen] = useState(false);
   const [copyTarget, setCopyTarget] = useState<number | null>(null);
@@ -60,30 +60,44 @@ export const CsKnowledgeWorkspace: React.FC<Props> = ({ selectedConversationIds,
   const [messageSources, setMessageSources] = useState<Sources | null>(null);
   const [mining, setMining] = useState<Record<string, unknown>>({});
   const detailVersion = useRef(0);
+  const listVersion = useRef(0);
+  const metricsVersion = useRef(0);
 
-  const filters = (): Omit<KnowledgeFilters, 'tab'> => ({ source: source === 'all' ? undefined : source, min_frequency: minFrequency || undefined, query: query || undefined, product_id: productId });
+  const filters = useCallback((): Omit<KnowledgeFilters, 'tab'> => ({ source: source === 'all' ? undefined : source, min_frequency: minFrequency || undefined, query: query || undefined, product_id: productId }), [source, minFrequency, query, productId]);
 
   const load = useCallback(async () => {
+    const version = ++listVersion.current;
     setLoading(true); setError('');
     try {
-      const result = await csKnowledgeApi.clusters({ tab, ...filters(), product_id: productId, current_page: page, page_size: size, sort: 'frequency' });
+      const result = await csKnowledgeApi.clusters({ tab, ...filters(), current_page: page, page_size: size, sort: 'frequency' });
+      if (version !== listVersion.current) return;
       setRows(result.data); setTotal(result.total || 0);
       setSelected((current) => Object.fromEntries(Object.entries(current).filter(([id]) => result.data.some((row) => row.id === Number(id)))));
-    } catch (caught) { setError(caught instanceof Error ? caught.message : '知识加载失败'); }
-    finally { setLoading(false); }
-  }, [tab, source, minFrequency, query, page, size, productId]);
+    } catch (caught) { if (version === listVersion.current) setError(caught instanceof Error ? caught.message : '知识加载失败'); }
+    finally { if (version === listVersion.current) setLoading(false); }
+  }, [tab, filters, page, size]);
 
   const loadMetrics = useCallback(async () => {
-    try { setMetrics((await csKnowledgeApi.metrics({ product_id: productId })).data); } catch { /* 指标失败不阻塞列表 */ }
-  }, []);
+    const version = ++metricsVersion.current;
+    try {
+      const result = await csKnowledgeApi.metrics({ product_id: productId });
+      if (version === metricsVersion.current) setMetrics(result.data);
+    } catch { /* 指标失败不阻塞列表 */ }
+  }, [productId]);
 
   useEffect(() => {
     void csProductApi.list().then((result) => setProducts(result.data.map((item) => ({ id: item.id, name: item.name })))).catch(() => undefined);
   }, []);
+  useEffect(() => {
+    if (selectedProductId !== undefined) {
+      listVersion.current += 1; metricsVersion.current += 1; detailVersion.current += 1;
+      setProductId(selectedProductId);
+    }
+  }, [selectedProductId]);
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { void loadMetrics(); }, [loadMetrics, productId]);
-  useEffect(() => { setSelected({}); setPage(1); }, [tab, source, minFrequency, query, productId]);
+  useEffect(() => { setSelected({}); setPage(1); setDetail(null); setBackfill(null); setBackfillOpen(false); }, [tab, source, minFrequency, query, productId]);
 
   useEffect(() => {
     if (!initialMessageId) return;
@@ -163,13 +177,13 @@ export const CsKnowledgeWorkspace: React.FC<Props> = ({ selectedConversationIds,
   });
 
   const previewBackfill = () => run(async () => {
-    const result = await csKnowledgeApi.backfill({ dry_run: true });
+    const result = await csKnowledgeApi.backfill({ dry_run: true, product_id: productId });
     setBackfill(result.data); setBackfillOpen(true);
   });
 
   const applyBackfill = () => run(async () => {
     if (!backfill) return;
-    const result = await csKnowledgeApi.backfill({ dry_run: false, token: backfill.token });
+    const result = await csKnowledgeApi.backfill({ dry_run: false, token: backfill.token, product_id: productId });
     setBackfill(result.data);
     setNotice(`收敛完成：合并 ${result.data.merged} 条、归档 ${result.data.archived} 条，待审 ${result.data.pending_after} 条。`);
     await load(); await loadMetrics();
@@ -192,7 +206,7 @@ export const CsKnowledgeWorkspace: React.FC<Props> = ({ selectedConversationIds,
       <div className="flex flex-wrap gap-2">
         <Button size="sm" isDisabled={!canManage || busy} onPress={() => { setDraft({ question: '', answer: '' }); setEditor(true); }}>新增知识</Button>
         <Button size="sm" variant="flat" isDisabled={!canManage || busy} onPress={() => void previewBackfill()}>清理重复待审</Button>
-        <Button size="sm" variant="light" isDisabled={busy} onPress={() => void run(async () => { await csKnowledgeApi.mine({ conversation_ids: selectedConversationIds.length ? selectedConversationIds : undefined, limit: 100 }); setMining(await adminApi.getCsMineProgress()); setNotice('已提交学习任务，只生成待审核候选。'); })}>{selectedConversationIds.length ? '学习已选已结束会话' : '学习历史会话'}</Button>
+        <Button size="sm" variant="light" isDisabled={busy} onPress={() => void run(async () => { await csKnowledgeApi.mine({ conversation_ids: selectedConversationIds.length ? selectedConversationIds : undefined, product_id: productId, limit: 100 }); setMining(await adminApi.getCsMineProgress()); setNotice('已提交当前产品的学习任务，只生成待审核候选。'); })}>{selectedConversationIds.length ? '学习已选已结束会话' : '学习当前产品历史会话'}</Button>
         <Button size="sm" variant="light" onPress={() => void load()}>刷新</Button>
       </div>
     </div>
@@ -216,7 +230,7 @@ export const CsKnowledgeWorkspace: React.FC<Props> = ({ selectedConversationIds,
     </div>
 
     <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-      <Select label="产品" selectedKeys={[String(productId)]} onSelectionChange={(keys) => setProductId(Number(Array.from(keys)[0] || 0))}>{products.map((product) => <SelectItem key={String(product.id)}>{product.name}</SelectItem>)}</Select>
+      <Select label="产品" selectedKeys={[String(productId)]} onSelectionChange={(keys) => { listVersion.current += 1; metricsVersion.current += 1; detailVersion.current += 1; setProductId(Number(Array.from(keys)[0] || 0)); }}>{products.map((product) => <SelectItem key={String(product.id)}>{product.name}</SelectItem>)}</Select>
       <Select label="来源" selectedKeys={[source]} onSelectionChange={(keys) => setSource(String(Array.from(keys)[0] || 'all'))}>{[{ id: 'all', name: '全部来源' }, ...Object.entries(sources).map(([id, name]) => ({ id, name }))].map((item) => <SelectItem key={item.id}>{item.name}</SelectItem>)}</Select>
       <Input label="最少出现次数" type="number" min="1" value={minFrequency} onValueChange={setMinFrequency} />
       <Select label="每页条数" selectedKeys={[String(size)]} onSelectionChange={(keys) => setSize(Number(Array.from(keys)[0] || 20))}>{[10, 20, 50, 100].map((value) => <SelectItem key={String(value)}>{value} 条</SelectItem>)}</Select>
@@ -319,7 +333,7 @@ export const CsKnowledgeWorkspace: React.FC<Props> = ({ selectedConversationIds,
         </ModalFooter></ModalContent></Modal>
 
     <Modal isOpen={backfillOpen} onClose={() => !busy && setBackfillOpen(false)} size="3xl" scrollBehavior="inside">
-      <ModalContent><ModalHeader>历史知识收敛预览</ModalHeader>
+      <ModalContent><ModalHeader>历史知识收敛预览 · {products.find((product) => product.id === productId)?.name || '默认产品'}</ModalHeader>
         <ModalBody className="gap-3">{backfill && <>
           <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
             <span>扫描：{backfill.scanned} 条</span><span>待审：{backfill.pending_before} → {backfill.pending_after}</span><span>簇：{backfill.clusters}</span>
@@ -336,7 +350,7 @@ export const CsKnowledgeWorkspace: React.FC<Props> = ({ selectedConversationIds,
         <ModalFooter><Button isDisabled={busy} onPress={() => setEditor(false)}>取消</Button>
           <Button color="primary" isLoading={busy} isDisabled={!canManage || busy || !draft.question.trim() || !draft.answer.trim()} onPress={() => void run(async () => {
             if (detail) await csKnowledgeApi.act({ id: detail.id, revision: detail.revision, action: 'edit', ...draft });
-            else await csKnowledgeApi.add(draft);
+            else await csKnowledgeApi.add({ ...draft, product_id: productId });
             setEditor(false); setNotice('内容已保存，需核对审核后才供 AI 使用。');
             await load(); if (detail) await refreshDetail(detail.id);
           })}>保存内容</Button></ModalFooter></ModalContent></Modal>
